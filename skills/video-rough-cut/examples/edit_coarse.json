@@ -1,0 +1,38 @@
+{
+ "source": "work/source.mp4",
+ "title": "Monday Morning Meeting Podcast No.14 2026 (HS Top 200 schoolboy rugby)",
+ "source_duration_s": 3978.5,
+ "strategy": "66-min single-shot talking-head podcast. The first ~27 min is slow preamble (intro boilerplate, platform/subscription plugs, a long self-justifying manifesto, trip logistics, a crossover-fixture wish-list) that the host himself thrice calls 'way too long' -> keep only a few high-value nuggets. The real value (27-66 min) is team-by-team / player-by-player rugby analysis from his Christchurch trip -> keep as large blocks, drop only clear tangents (height aside, 'waiting for games' filler, a coast-as-a-kid life lesson) and let internal >0.6s pauses be auto-trimmed. Chronological order preserved (monologue back-references). Target ~half length.",
+ "keep": [
+  {"in": 6.5,  "out": 18.0,  "reason": "Cold open: host + show intro (Herschel, HS Top 200, Monday Morning Meeting podcast). Trims the 6.7s dead lead-in; drops the platform-listing plugs that follow."},
+  {"in": 362.5, "out": 388,   "reason": "Core framing kept in one clean bite: the rankings are his blunt, honest opinion put out to be challenged. Drops ~3 min of repetitive 'why I do this' around it."},
+  {"in": 1010.5, "out": 1054, "reason": "Best rationale nugget: ~99% of players want to be seen/filmed, so he runs a Top 200 to widen their exposure. Drops the surrounding 8 min self-defense manifesto."},
+  {"in": 1200, "out": 1205.5, "reason": "Pivot out of the bloated preamble into content: 'getting on to some of these games - Christchurch was a massive trip.'"},
+  {"in": 1311.5, "out": 1338.5, "reason": "Trip takeaway: South Island schoolboy rugby surprised him by playing closer to Super 8 style than Auckland/Wellington. Drops the long 'I wish they had crossover fixtures' wish-list."},
+  {"in": 1547.6, "out": 1566.0, "reason": "Seeing the teams live changed his perspective; they play like Super 8 teams."},
+  {"in": 1607.7, "out": 1657.5, "reason": "Style analysis: top teams transition defense-to-attack in unison, which is why they win by big margins."},
+  {"in": 1737.0, "out": 1796.4, "reason": "His recurring thesis: too many boys lack the 'green light' to play on instinct; creativity gets coached out, and that should change."},
+  {"in": 1808, "out": 2993,  "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."},
+  {"in": 3050, "out": 3265.5, "reason": "Game reviews (50:50-54:25): Wellington College's 62-19 blowout and why he still ranks them ~13th; Whanganui/Francis Douglas; Hamilton Boys edging a New Plymouth side that should have won. Drops the preceding 6'5'' height aside."},
+  {"in": 3356, "out": 3673.0, "reason": "More reviews (55:56-61:12): Rotorua Boys grinding out a wet defensive win; the top-of-table St Kentigern's vs Auckland Grammar (39-12) with Auckland Grammar dominant - Niko Stanley (#1 in country) and a deep supporting cast. Drops the 'I used to coast as a kid' tangent before it."},
+  {"in": 3805.0, "out": 3909,  "reason": "Analytical close: St Paul's is no longer just a 'rugby league school' - they produce genuinely good rugby players (a dual-sport school). Drops the 'waiting for games to be sent' filler and the 'I don't think' stammer before it."},
+  {"in": 3964, "out": 3977,  "reason": "Tight sign-off: 'that's enough for now... High School Top 200, love you all.'"}
+ ],
+ "drop": [
+  {"in": 0.0,    "out": 6.5,    "reason": "Dead cold-open / silent lead-in before he starts talking."},
+  {"in": 18.0,   "out": 362.5,  "reason": "Platform & subscription plugs + 'I'm the only one doing this full time' self-promo + Christchurch-trip thanks and 20-years-ago reminiscing + the opening of the 'why I do this' mission monologue. Pure preamble."},
+  {"in": 388.0,  "out": 1010.5, "reason": "Bulk of the mission manifesto: boys-are-appreciated repetition, how scouts/recruiters use the rankings as a 'landing point' (said many times), and social-media advice to players ('clean up your socials'). One nugget is kept at 6:02; the rest is repetitive."},
+  {"in": 1054.0, "out": 1200.0, "reason": "Self-defense block: 'if you challenge me, be informed', money-loss/average-car aside, 'kids say prove-you-wrong' - which he himself ends with 'that ran way too long'."},
+  {"in": 1205.5, "out": 1311.5, "reason": "Trip logistics and school fanboying (went to see the grounds, in awe of St Bede's) - low information."},
+  {"in": 1338.5, "out": 1547.6, "reason": "Long crossover-fixture wish-list tangent: 'I wish South Island and Auckland/North Island schools played/travelled to each other more', repeated many ways."},
+  {"in": 1566.0, "out": 1607.7, "reason": "Connective repetition about seeing teams in person / pacing being different - already covered by the kept lines around it."},
+  {"in": 1657.5, "out": 1737.0, "reason": "Wind-up repetition of the 'creativity gets coached out' thesis before the tighter statement kept at 28:57."},
+  {"in": 1796.4, "out": 1808.0, "reason": "Throwaway connective ('I guess I wonder, rugby's different down there but it's all the same')."},
+  {"in": 2993.0, "out": 3050.0, "reason": "6'5'' height aside (he judges players' heights off his own) + 'shoot, so much to cover' filler."},
+  {"in": 3265.5, "out": 3356.0, "reason": "'I used to coast as a kid when I thought we'd won' personal life-lesson tangent off the New Plymouth game."},
+  {"in": 3673.0, "out": 3805.0, "reason": "'Waiting for games to be sent to me' filler (Rongotai, Campbell, Rosmini/Mahurangi) + a stuttered 'I don't think, I don't think...' run."},
+  {"in": 3909.0, "out": 3964.0, "reason": "Southern Cross point that just repeats the St Paul's dual-sport-school argument, plus another 'we've gone way over time'."},
+  {"in": 3977.0, "out": 3978.5, "reason": "Trailing silence after sign-off."}
+ ],
+ "drop_note": "Coarse (structural) drop spans only. Within each KEEP block, internal pauses > 1.5 s were also trimmed as dead air (see build_edit.py); those micro-drops total ~9 min and are not enumerated individually."
+}
