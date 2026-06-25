@@ -38,6 +38,31 @@ The traps that cost real time on the first run. Read before starting.
   of twitchy segments. Raise SPLIT_GAP (build_edit.py 4th arg) to ~1.5s for far fewer,
   smoother cuts. Tune to the speaker's pacing.
 
+## Auto-speed (varispeed)
+- **Self-check joins must use the POST-speed duration.** A join in the output lands at
+  the cumulative sum of `out_dur` = `(out-in)/speed`, NOT `(out-in)`. `selfcheck_frames.py`
+  already reads `out_dur`; if you compute join times anywhere else, use it too or every
+  frame-check validates the wrong frame and silently "passes".
+- **`atempo`, never `asetrate`, for audio.** `atempo` changes tempo and preserves pitch;
+  `asetrate` (or naive resampling) chipmunks/deepens the voice. `atempo` only accepts
+  0.5–2.0 per instance — `cut_render.py` chains it for factors outside that, but the
+  default 0.9–1.5 clamp stays well inside one instance.
+- **Normalize per input before concat.** Different `speed` values give different frame
+  cadence; without per-input `fps`/`settb`/`aresample`+`asetpts` the concat filter can
+  glitch or drift A/V at joins. `cut_render.py` does this only on the varispeed path and
+  keeps the original graph untouched when every speed is 1.0 (no regression).
+- **Don't over-flatten.** Normalizing every segment exactly to target kills natural
+  rhythm and makes joins audibly "pumpy". The deadband (leave in-band pace alone) + the
+  0.9–1.5 clamp + the short-segment floor exist for this — widen the deadband or lower
+  max_speed before reaching for a bigger correction.
+- **WPM is wrong for CJK.** Chinese/Japanese/Korean have no word spaces; Whisper emits
+  per-char tokens, so words/min is meaningless. `assign_speed.py` auto-detects CJK
+  (transcript `language` + char scan) and switches to chars/min with a CJK target band.
+- **Verify sync on a multi-segment clip, not a single one.** Small per-segment duration
+  quantization can accumulate across many concat inputs. The A/V-duration check on the
+  full cut is the real test — confirmed within ~1ms across varied-speed segments, but
+  re-confirm if you change the filter graph.
+
 ## Self-check interpretation
 - **Single static talking-head ⇒ jump cuts are expected.** The frame self-check hunts
   black / frozen / torn frames at joins, NOT head-position jumps. A visible head-jump

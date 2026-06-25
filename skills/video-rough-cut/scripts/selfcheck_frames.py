@@ -1,12 +1,21 @@
 """Self-check frames AT THE JOINS of the rendered cut (where the only glitch can occur).
 
-Join points in the OUTPUT timeline = cumulative sum of kept-segment durations.
+Join points in the OUTPUT timeline = cumulative sum of each segment's OUTPUT
+duration. With per-segment speed (assign_speed.py) the output duration is
+`out_dur` = (out-in)/speed, NOT (out-in) -- so we must use the post-speed length
+or every frame-check would land on the wrong frame.
 For each join we grab the frames straddling it (-0.1s, +0.0s, +0.1s) into one strip,
 and also run blackdetect on the whole output.
 
 Usage: python selfcheck_frames.py <edit_final.json> <first_cut.mp4> <out_dir>
 """
 import sys, json, os, subprocess
+
+def seg_out_dur(k):
+    """OUTPUT (post-speed) duration of a kept segment."""
+    if "out_dur" in k:
+        return float(k["out_dur"])
+    return (float(k["out"]) - float(k["in"])) / float(k.get("speed", 1.0))
 
 def main():
     edit_p, mp4, out_dir = sys.argv[1], sys.argv[2], sys.argv[3]
@@ -15,11 +24,11 @@ def main():
         edit = json.load(f)
     keep = edit["keep"]
 
-    # cumulative join times in output
+    # cumulative join times in the OUTPUT timeline (post-speed durations)
     joins = []
     t = 0.0
     for k in keep[:-1]:
-        t += float(k["out"]) - float(k["in"])
+        t += seg_out_dur(k)
         joins.append(round(t, 3))
     print(f"[selfcheck] {len(joins)} joins in output")
 
