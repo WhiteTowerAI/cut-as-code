@@ -12,17 +12,15 @@
 </p>
 
 
-**Core Idea**: *Open-Recut turns video editing into coding problem inside an agent workspace.* 
+Open-Recut aims to make video editing as simple as possible. Timeline editors like Premiere Pro and CapCut are powerful, but they can be complex and time-consuming to use. **Open-Recut takes a different approach: it leverages the coding ability of AI models so that editing tasks can be handled by agents, much like software development.** Instead of clicking through complex timelines, humans can let agents inspect or search media files, write edit plans, generate action code, run renders, and refine cuts iteratively.
 
-Agents read or search media files, write edit plans, generate action code, run renders, and revise cuts just like they revise code. 
+## Why Open-Recut?
 
-Humans no longer need to click through timeline editors. With Open-Recut, agents can do the editing work directly.
+- **Make timeline editing agent-friendly.** Agents can trim, split, reorder, crop, caption, add transitions, and export videos through code instead of manual timeline clicks.
 
-## Why Open-Recut
+- **Let agents understand raw media.** Open-Recut gives agents tools to transcribe videos, detect scenes, find key moments, and remove bad takes before editing begins.
 
-- Make timeline editing agent-friendly: trim, split, reorder, crop, caption, transition, and export edits from code.
-- Let agents understand raw media: transcribe videos, detect scenes, find key moments, and remove bad takes.
-- Bring polished motion into the workflow: use Remotion, HyperFrames, and code renderers for AE-style animations and overlays.
+- **Bring polished motion into the workflow.** With Remotion, HyperFrames, and code-based renderers, agents can create AE-style animations, overlays, and motion graphics as part of the same editing pipeline.
 
 
 ## See it in action
