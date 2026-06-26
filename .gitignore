@@ -1,1 +1,11 @@
+TEST/
+TEST_THIRD_PARTY/
+REFERENCES/
+DEV/
 
+.agents/
+.claude/
+
+# Python
+__pycache__/
+*.pyc

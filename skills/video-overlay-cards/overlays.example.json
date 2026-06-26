@@ -1,0 +1,38 @@
+{
+  "video": { "w": 1280, "h": 720, "fps": 30, "duration_s": 600.0 },
+  "fade_s": 0.3,
+  "elements": [
+    {
+      "id": "intro", "type": "intro", "t_in": 0.6, "t_out": 6.4,
+      "kicker": "THE SHOW · EPISODE 14",
+      "title": "THE SHOW",
+      "sub": "with Your Host  —  one-line tagline",
+      "reason": "Title card over the cold open; bottom-anchored so the host's face stays visible."
+    },
+    {
+      "id": "ch1", "type": "chapter", "t_in": 78.5, "t_out": 84.0,
+      "kicker": "PART 1",
+      "title": "THE FIRST TOPIC",
+      "reason": "Topic switch out of the intro into the first section."
+    },
+    {
+      "id": "lt_alice", "type": "lowerthird", "t_in": 120.0, "t_out": 127.0,
+      "line1": "Alice Example",
+      "line2": "Founder, Acme — one-line detail",
+      "reason": "First on-screen mention of Alice; grounded in the transcript."
+    },
+    {
+      "id": "ch2", "type": "chapter", "t_in": 300.0, "t_out": 305.5,
+      "kicker": "PART 2",
+      "title": "THE SECOND TOPIC",
+      "reason": "Second section begins."
+    },
+    {
+      "id": "outro", "type": "outro", "t_in": 591.0, "t_out": 599.5,
+      "title": "THE SHOW",
+      "sub": "Thanks for watching",
+      "small": "New episodes weekly",
+      "reason": "Sign-off card over the closing line."
+    }
+  ]
+}

@@ -1,0 +1,196 @@
+---
+name: video-rough-cut
+description: >
+  End-to-end turn an unedited long-form talking-head / vlog / podcast video into a
+  compact "first cut" (rough cut). Use when asked to edit/剪辑 a raw YouTube (or
+  local) video into a tighter version: download, word-level transcribe, diagnose
+  bad-edit spots (slow intro, fillers, dead air, tangents, rambling), decide cuts
+  in a JSON edit plan (each kept/dropped span with in/out + a one-line reason),
+  render with ffmpeg, then self-check the result (re-transcribe + frame/black/
+  silence checks). Triggers: "剪成第一版", "rough cut", "first cut", "压缩时长",
+  "把这条原片剪短", "cut down this video".
+---
+
+# Video Rough Cut
+
+Turn one unedited long video into a compact, watchable **first cut** — decisive,
+content-aware, and self-verified. Human (you, the model) makes the *editorial*
+decision of WHAT to keep; the bundled scripts do the mechanical precision (boundary
+alignment, dead-air reclaim, memory-safe render, self-check).
+
+## When to use
+- A raw/unedited video (YouTube URL or local file) needs to become a tighter cut.
+- The ask is "halve it", "cut the boring parts", "make a first/rough cut".
+- NOT for: word-by-word filler micro-surgery, multi-cam B-roll assembly, color/audio
+  polish — those are a later P1/P2 polish pass. This skill is P0: validate the
+  diagnosis + produce a solid rough cut.
+
+## Dependencies
+Activate any environment that has these (do NOT assume a specific conda env name):
+- `yt-dlp` (download), `ffmpeg`/`ffprobe` (cut/render/probe) on PATH
+- Python with `faster-whisper` (CPU works: `device=cpu, compute_type=int8`)
+Check first: `yt-dlp --version`, `ffmpeg -version`, `python -c "import faster_whisper"`.
+
+## Working layout
+Keep all intermediates under `work/`, deliver to project root:
+```
+work/source.mp4            # downloaded original
+work/audio16k.wav          # 16k mono audio for whisper
+work/transcript.json/.srt  # word-level timestamps
+work/analysis.json         # diagnosis (silences/fillers/runs)
+work/edit_coarse.json      # *** YOUR editorial decision (hand-written) ***
+work/edit_final.json       # expanded tight render segments (generated; carries per-segment speed)
+work/selfcheck/            # cut re-transcript + join frames
+first_cut.mp4              # THE DELIVERABLE
+first_cut_report.md        # edit + self-check report
+```
+
+## The pipeline (6 steps)
+
+### 1. Download
+Highest accessible quality + audio. The default player client often fails
+(not-available / DRM / sign-in). The reliable fallback is the **android** client:
+```
+yt-dlp --extractor-args "youtube:player_client=android" \
+       -o work/source.mp4 "<URL>"
+```
+If only a muxed 360p (format 18) is reachable without login, accept it and document
+the constraint — HD DASH is frequently DRM/login-gated. Then extract audio:
+```
+ffmpeg -y -i work/source.mp4 -ac 1 -ar 16000 work/audio16k.wav
+```
+
+### 2. Transcribe (word-level)
+```
+python scripts/transcribe.py work/audio16k.wav work/transcript [base.en]
+```
+Produces `work/transcript.json` (segments + per-word start/end) and `.srt`.
+faster-whisper, CPU/int8, VAD on, `word_timestamps=True`.
+**Note:** Whisper strips most vocalized "um/uh" — they are NOT transcript-measurable,
+so filler detection must combine the lexical word-search below with silence-gap
+analysis, not rely on the transcript text alone.
+
+### 3. Diagnose ("see" + "read")
+```
+python scripts/analyze.py work/transcript.json work/analysis.json
+```
+Surfaces: leading/trailing dead air, inter-word silences ≥0.8s (with the word they
+follow), filler counts, wpm, speaking_ratio, near-duplicate repetitions, monologue
+runs >40s (ramble candidates).
+
+To **see** the picture, sample a frame every ~2s into a contact sheet and read it
+yourself; confirm scene structure / hunt black or junk frames:
+```
+ffmpeg -y -i work/source.mp4 -vf "fps=1/2,scale=240:-1,tile=10x10" -frames:v 1 work/contact.png
+ffmpeg -i work/source.mp4 -vf "blackdetect=d=0.1:pic_th=0.98" -an -f null -
+```
+For a single static talking-head shot there are no scene cuts — expect this, and
+note that the later jump-cuts are normal, not glitches.
+
+### 4. Decide the cut — write `edit_coarse.json` BY HAND
+This is the editorial core. Read the transcript + analysis, then write a coarse plan
+of **keep-blocks and drop-spans that tile the entire timeline with no gaps/overlaps**,
+each with `in`, `out`, and a one-line `reason`. Compress slow preamble to a few
+high-value nuggets; keep substance as large blocks; drop clear tangents/rambles.
+Preserve chronological order unless reordering clearly helps (monologues back-reference).
+Aim to roughly halve runtime.
+- Format spec + a real worked example: `reference/edit_coarse.schema.md`.
+- Align every block boundary to a **sentence/clause end** — never start/stop
+  mid-sentence or on a stammer. Use:
+  ```
+  python scripts/inspect_bounds.py work/edit_coarse.json work/transcript.json
+  ```
+  It prints the words straddling each in/out so you can nudge them onto clean edges.
+
+### 5. Expand → auto-speed → render
+Turn coarse blocks into tight, dead-air-free render segments, normalize the speaking
+pace, then render:
+```
+python scripts/build_edit.py   work/edit_coarse.json work/transcript.json work/edit_final.json 1.5
+python scripts/assign_speed.py work/edit_final.json   work/transcript.json   # adds per-segment speed
+python scripts/cut_render.py    work/edit_final.json   work/source.mp4 first_cut.mp4
+```
+- `build_edit.py` splits each block at internal pauses > SPLIT_GAP (4th arg, e.g. 1.5s)
+  and trims every boundary INTO the silence (LEAD 0.10s / TRAIL 0.30s) so no word is
+  clipped and dead air is reclaimed. Lower SPLIT_GAP = tighter but choppier; for a
+  slow, deliberate speaker prefer ~1.5, not 0.6 (avoids twitchy micro-cuts).
+- `assign_speed.py` (auto varispeed) — for each kept segment it measures the speaking
+  pace and writes a `speed` factor + the resulting `out_dur` back into `edit_final.json`.
+  **Slow stretches get sped up, fast stretches slowed down**, toward a comfortable target
+  band; pace already in-band is left at 1.0. It changes pace only — never which content
+  is kept. Read the printed table and tune before rendering:
+  - Metric: words/min (English) — auto-switches to **chars/min for CJK** (zh/ja/ko).
+  - Defaults are **first-run starting points, not validated constants**: target 165 WPM,
+    deadband 145–185 (no change inside it), speed clamped to **0.9–1.5** (keeps voices
+    natural — `atempo` changes tempo, NOT pitch). Short segments (<3.5s / <6 words) are
+    too noisy to measure and inherit the global factor. Note the WPM is measured on the
+    *dead-air-reclaimed* segment, so it reads higher than gross WPM (it's closer to
+    articulation rate) — **the printed-table review is load-bearing**: eyeball it and
+    tune `target`/`deadband` to the speaker before rendering, don't trust the defaults blind.
+  - Knobs (k=v): `mode=segment|global|off` (default `segment`; `global`=one factor for
+    the whole video, `off`=disable), `target=`, `deadband=lo,hi`, `min_speed=`/`max_speed=`,
+    `min_seg=`/`min_words=`, `lang=auto|en|cjk`. To skip the feature entirely, just don't
+    run this step — `cut_render.py` treats a missing `speed` as 1.0.
+- `cut_render.py` uses **N separate seeked inputs + concat filter, single re-encode**.
+  This is mandatory: trimming N times off ONE decoded input makes ffmpeg buffer the
+  whole decoded stream (tens of GB for a long video). See `reference/pitfalls.md`.
+  When segments carry a `speed`, it re-times each input (`setpts` video / `atempo` audio)
+  and normalizes fps/timebase/sample-rate per input before concat so A/V stays locked;
+  with no speed it falls back to the exact original graph.
+- **Pairs-with caveat (`video-edit-compare`):** that sibling visualizes keep/drop on the
+  ORIGINAL timeline (it reads `source.mp4` + the keep spans, not `first_cut.mp4`), so it
+  still works — it just ignores `speed` and shows kept content at original pace. Its right
+  panel will NOT reflect the varispeed; it answers "what content was kept", not "at what
+  pace it plays". That's expected, not a desync.
+
+### 6. Self-check — do not declare done until this passes
+```
+# re-transcribe the finished cut
+ffmpeg -y -i first_cut.mp4 -ac 1 -ar 16000 work/selfcheck/cut_audio16k.wav
+python scripts/transcribe.py work/selfcheck/cut_audio16k.wav work/selfcheck/cut_transcript
+# content + filler + boundary check
+python scripts/verify_cut.py work/edit_final.json work/transcript.json work/selfcheck/cut_transcript.json
+# frame / black / join check (join times use post-speed out_dur, so they stay accurate)
+python scripts/selfcheck_frames.py work/edit_final.json first_cut.mp4 work/selfcheck
+# A/V sync + no residual dead air
+ffprobe -v error -select_streams v:0 -show_entries stream=duration -of csv=p=0 first_cut.mp4
+ffprobe -v error -select_streams a:0 -show_entries stream=duration -of csv=p=0 first_cut.mp4
+ffmpeg -i first_cut.mp4 -af silencedetect=noise=-32dB:d=1.5 -f null -
+```
+**Pass thresholds:**
+| Check | Pass condition |
+|---|---|
+| Black frames | none |
+| Join frames | clean — only natural head-jumps, no black/frozen/torn |
+| A/V sync | video vs audio duration within ~1 frame (≈30ms); total ≈ `final_duration_s_after_speed` when varispeed is on |
+| Dead air ≥1.5s | 0 (speaking_ratio should rise markedly) |
+| Dropped/dup segment | none — all key content present (difflib ~0.90 is OK; lower
+  ratio is usually 2nd-pass transcription noise on mumbled speech, not loss — verify
+  by keyword presence before blaming the cut) |
+| Cut-off half-sentences | none — boundaries land in silence / on sentence ends |
+
+**Honest filler caveat:** paragraph-level cutting will NOT achieve "almost no fillers".
+Per-minute density can even *rise* because the retained substance is conversational.
+Report this honestly; word-level filler excision belongs to P1/P2 (and would make a
+single-shot talking head visibly choppy).
+
+### Finally
+Write `first_cut_report.md`: source summary, what was cut & why, the self-check table,
+and any honest caveats (quality ceiling from 360p source, filler density, etc.).
+If varispeed was applied, disclose it: **how many segments were re-timed and the speed
+range** (from `assign_speed.py`'s table / `speed_params`), so the reader knows the cut is
+not 1:1 real-time. Note too that `verify_cut.py`'s filler-per-minute figure reads slightly
+higher after speed-up (same words, shorter minutes) — a reporting artifact, not added fillers.
+
+## Key principles (the hard-won ones)
+- **You decide content; scripts decide frames.** Hand-write `edit_coarse.json`;
+  let `build_edit.py` do precision and `assign_speed.py` do pace.
+- **Speed touches pace, never content.** Auto-varispeed only re-times kept segments
+  (slow→faster, fast→slower) toward a comfortable band; clamp 0.9–1.5 and `atempo`
+  keep the voice natural (no pitch shift). Review the table; `mode=off` or skip the
+  step to disable.
+- **Never clip a word.** Boundaries always fall inside silence.
+- **Memory-safe render only** (N seeked inputs + concat). Never multi-trim one input.
+- **Be decisive.** Make reasonable calls and proceed; don't over-ask.
+- **Self-check is non-negotiable.** Re-transcribe + frame-check before claiming done.
+- See `reference/pitfalls.md` for the full list of traps and fixes.
