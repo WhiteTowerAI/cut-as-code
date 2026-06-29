@@ -17,6 +17,7 @@ Usage:
 import sys, json
 
 ENDERS = (".", "?", "!", "…", "。", "！", "？")
+MIN_CUE_DUR = 0.6   # cues shorter than this (or 1 token) are merged into a neighbor
 
 def _cjk(ch):
     return ("一" <= ch <= "鿿" or "぀" <= ch <= "ヿ"
@@ -91,6 +92,28 @@ def build(words, max_chars, max_lines, max_dur, gap):
         if nxt and (nxt["start"] - w["end"] >= gap):
             flush(); cur = []
     flush()
+
+    # merge orphan cues (1 token or < MIN_CUE_DUR) into a neighbor so a stray
+    # "So" (0.44s) doesn't flash on its own. Prefer the previous cue; a leading
+    # orphan folds into the next.
+    def is_orphan(c):
+        return len(c["words"]) <= 1 or (c["end"] - c["start"]) < MIN_CUE_DUR
+    merged = []
+    for c in cues:
+        if merged and is_orphan(c):
+            p = merged[-1]
+            p["words"] = p["words"] + c["words"]
+            p["end"] = c["end"]
+            p["text"] = text_of(p["words"])
+        else:
+            merged.append(c)
+    if len(merged) >= 2 and is_orphan(merged[0]):
+        nxt = merged[1]
+        nxt["words"] = merged[0]["words"] + nxt["words"]
+        nxt["start"] = merged[0]["start"]
+        nxt["text"] = text_of(nxt["words"])
+        merged = merged[1:]
+    cues = merged
 
     for idx, c in enumerate(cues, 1):
         c["index"] = idx

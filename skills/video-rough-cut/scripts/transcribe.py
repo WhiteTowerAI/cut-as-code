@@ -1,7 +1,12 @@
 """Transcribe audio with word-level timestamps using faster-whisper (CPU/int8 + VAD).
 
-Usage: python transcribe.py <audio_or_video_path> <out_prefix> [model]
+Usage: python transcribe.py <audio_or_video_path> <out_prefix> [model] [--lang CODE]
 Outputs: <out_prefix>.json  (segments + words)  and  <out_prefix>.srt
+
+  model    Whisper model (default base.en). For any non-English language pass a
+           MULTILINGUAL model — the .en models are English-only (e.g. `medium`).
+  --lang   ISO language code passed to the model (default en). Use with a
+           multilingual model, e.g.:  transcribe.py a.wav out medium --lang zh
 """
 import sys, json, datetime
 
@@ -13,19 +18,32 @@ def fmt_ts(t):
     s, ms = divmod(rem, 1000)
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
+def parse_args(argv):
+    """positional: audio, out_prefix, [model];  option: --lang CODE (default en)."""
+    lang = "en"
+    pos = []
+    i = 0
+    while i < len(argv):
+        if argv[i] == "--lang":
+            lang = argv[i + 1]; i += 2
+        else:
+            pos.append(argv[i]); i += 1
+    audio = pos[0]
+    out_prefix = pos[1]
+    model_name = pos[2] if len(pos) > 2 else "base.en"
+    return audio, out_prefix, model_name, lang
+
 def main():
-    audio = sys.argv[1]
-    out_prefix = sys.argv[2]
-    model_name = sys.argv[3] if len(sys.argv) > 3 else "base.en"
+    audio, out_prefix, model_name, lang = parse_args(sys.argv[1:])
 
     from faster_whisper import WhisperModel
-    print(f"[transcribe] loading model={model_name} (cpu/int8)", flush=True)
+    print(f"[transcribe] loading model={model_name} lang={lang} (cpu/int8)", flush=True)
     model = WhisperModel(model_name, device="cpu", compute_type="int8")
 
     print(f"[transcribe] transcribing {audio} ...", flush=True)
     segments, info = model.transcribe(
         audio,
-        language="en",
+        language=lang,
         word_timestamps=True,
         vad_filter=True,
         vad_parameters=dict(min_silence_duration_ms=500),

@@ -63,8 +63,9 @@ editorial copy, not raw transcript fragments.
     `public/`; an arbitrary path won't load. `npm install`, then render.
 - Python with **faster-whisper** for the transcript (CPU/int8 works). The
   `video-rough-cut` skill's `transcribe.py` produces the exact `work/transcript.json`
-  format this skill consumes (segments → words with start/end). It is English-only
-  (`base.en`, `language="en"`) — for other languages, change the model/lang there first.
+  format this skill consumes (segments → words with start/end). Default model is
+  English-only (`base.en`); for other languages pass a multilingual model + `--lang`
+  (e.g. `transcribe.py audio.wav out medium --lang zh`).
 - ffmpeg for **scene detection** (optional; on a single-shot talking-head it often finds 0
   cuts, so section cards then come from transcript pauses — that's fine).
 - On Windows/PowerShell the bash `grep`/`sed` one-liner in step 2 won't run — capture
@@ -83,7 +84,8 @@ src/index.ts            # entry: registerRoot(RemotionRoot)
 src/anim.tsx            # design system: timing + palette + Scrim + height-relative scale
 src/components/*.tsx    # Intro, SectionCard(chapter), LowerThird, StatCallout, Keypoint, ListReveal, Outro
 src/FinalEdit.tsx       # the cue sheet, transparent overlay, slow OffthreadVideo fallback
-src/Root.tsx            # composition @ SOURCE size / 24fps (NOT 4K)
+src/source-meta.json    # {width,height,durationInSeconds} from scripts/probe.py
+src/Root.tsx            # composition @ SOURCE size / 24fps (NOT 4K), sized from source-meta.json
 out/graphics-overlay.mov # transparent ProRes overlay
 out/final.mp4           # THE DELIVERABLE
 ```
@@ -98,6 +100,10 @@ Overlays are timed off the transcript, so get per-word timestamps first:
 ffmpeg -y -i work/source.mp4 -ac 1 -ar 16000 work/audio16k.wav
 python ../video-rough-cut/scripts/transcribe.py work/audio16k.wav work/transcript
 ```
+**Already ran `video-rough-cut` on this clip?** Its self-check wrote
+`work/selfcheck/cut_transcript.json` — a word-level transcript of the exact cut you're
+dressing. Reuse it as `work/transcript.json` and skip this step (saves a ~15–20 min CPU
+transcription).
 
 ### 2. (Optional) Detect scene cuts
 For section cards, list where the picture changes:
@@ -140,10 +146,16 @@ from `anim.tsx`). You rarely redraw them; the real work is the **copy**:
 Register any new component in `FinalEdit`'s `COMPONENTS` map; pass `durFrames` so cards fade.
 
 ### 6. Render transparent overlay at SOURCE size + self-review
-Set `Root.tsx`'s `width/height` to the **source's own pixels** and `durationInFrames` to
-the cut's full length (`ffprobe`) — do NOT render a 640-px clip at 4K (it only blurs the
-picture and adds letterbox bars). Cards are vector text, so they stay sharp; pass
-`--scale 2` for a bigger file instead of inflating the composition.
+Size the composition to the source first — do NOT render a 640-px clip at 4K (it only
+blurs the picture and adds letterbox bars):
+```
+python scripts/probe.py work/source.mp4 src/source-meta.json
+```
+`Root.tsx` imports `src/source-meta.json` and sets `width`/`height`/`durationInFrames`
+from it (`durationInFrames = ceil(durationInSeconds × 24)`) — no more hand-edited
+`SRC_W`/`SRC_H`/`DURATION_S` placeholders to forget. No `source-meta.json`? Hand-write it
+with the real `{width, height, durationInSeconds}`. Cards are vector text, so they stay
+sharp; pass `--scale 2` for a bigger file instead of inflating the composition.
 
 Default for any clip longer than ~1-2 minutes: render `FinalEditOverlay` as transparent
 ProRes, then use one ffmpeg overlay pass to composite onto the source while copying audio.
@@ -155,7 +167,10 @@ npx remotion render src/index.ts FinalEditOverlay out/graphics-overlay.mov --cod
 ffmpeg -y -i work/source.mp4 -i out/graphics-overlay.mov -filter_complex "[0:v][1:v]overlay=shortest=1:format=auto[v]" -map "[v]" -map 0:a? -c:v libx264 -crf 18 -preset veryfast -c:a copy -movflags +faststart out/final.mp4
 ```
 Use the `FinalEdit` still for self-review because it shows the graphics on the real frame;
-it only decodes selected frames. For long renders, keep the render under a foreground/
+it only decodes selected frames. The transparent ProRes 4444 `out/graphics-overlay.mov` is
+a **large, deletable intermediate** (a full alpha frame every frame); keep `out/final.mp4`
+and delete the `.mov` after compositing (a sparse graphics overlay is far smaller than a
+captions one, but it still adds up). For long renders, keep the render under a foreground/
 monitoring process that emits progress. Detached fire-and-forget background jobs can be
 killed when the controlling session goes idle.
 
@@ -163,6 +178,23 @@ Simple, slow one-pass fallback for very short clips:
 ```
 npx remotion render src/index.ts FinalEdit out/final.mp4
 ```
+
+## Combining overlays + captions (with video-to-captions)
+These cards and the `video-to-captions` captions are both **bottom-anchored**, so layering
+them as-is makes them overlap. To ship one video with BOTH:
+1. **Keep captions at the bottom** (unchanged in the captions skill).
+2. **Re-anchor these cards to the TOP** so they clear the captions: in each card component
+   switch `justifyContent:"flex-end"` → `"flex-start"`, and make `Scrim` a **top** scrim.
+   `examples/anim.tsx`'s `Scrim` sets `top:${100-heightPct}%` with a top→bottom gradient; a
+   top variant sets `top:0` and reverses the gradient (`rgba(12,20,28,maxOpacity)` →
+   `rgba(12,20,28,0)`).
+3. **Render BOTH transparent overlays, then composite serially in one ffmpeg pass** (captions
+   first, cards on top), copying audio:
+   ```
+   ffmpeg -y -i work/source.mp4 -i out/caption-overlay.mov -i out/graphics-overlay.mov \
+     -filter_complex "[0:v][1:v]overlay[a];[a][2:v]overlay[v]" \
+     -map "[v]" -map 0:a? -c:a copy -c:v libx264 -crf 18 -preset veryfast out/final.mp4
+   ```
 
 ## Self-check
 Grab a still mid-window for each kept cue and confirm all four — this is the loop that

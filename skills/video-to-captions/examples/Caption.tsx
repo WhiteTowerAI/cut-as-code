@@ -10,8 +10,15 @@ export type Cue = { index: number; start: number; end: number; text: string; lin
 
 export const Caption: React.FC<{ captions: Cue[]; karaoke?: boolean }> = ({ captions, karaoke = true }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, height } = useVideoConfig();
   const t = frame / fps;
+
+  // Size everything off frame HEIGHT so captions read at any resolution
+  // (was hard-coded 66px / paddingBottom 200 — only valid on a 2160px-tall 4K
+  // frame; on a 298px source that overflowed off-screen).
+  const fontSize = Math.round(height * 0.105);     // ~31px @298, ~227px @2160
+  const paddingBottom = Math.round(height * 0.07); // ~21px @298
+  const shadow = Math.round(height * 0.03);
 
   const cue = captions.find((c) => t >= c.start && t < c.end);
   if (!cue) return null;
@@ -21,14 +28,14 @@ export const Caption: React.FC<{ captions: Cue[]; karaoke?: boolean }> = ({ capt
     { easing: EASE_OUT, extrapolateLeft: "clamp", extrapolateRight: "clamp" });
 
   return (
-    <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: "center", paddingBottom: 200 }}>
+    <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: "center", paddingBottom }}>
       <div style={{
         opacity: pop,
         transform: `translateY(${interpolate(pop, [0, 1], [22, 0])}px)`,
-        maxWidth: "80%", textAlign: "center",
+        maxWidth: "92%", textAlign: "center",
         fontFamily: "Inter, system-ui, sans-serif", fontWeight: 800,
-        fontSize: 66, lineHeight: 1.2, letterSpacing: -0.5, color: CREAM,
-        textShadow: "0 2px 14px rgba(0,0,0,.6), 0 0 2px rgba(0,0,0,.5)",
+        fontSize, lineHeight: 1.2, letterSpacing: -0.5, color: CREAM,
+        textShadow: `0 ${shadow}px ${shadow * 2}px rgba(0,0,0,.6), 0 0 2px rgba(0,0,0,.5)`,
       }}>
         {cue.words.map((w, i) => {
           const active = karaoke && t >= w.start && t < w.end;

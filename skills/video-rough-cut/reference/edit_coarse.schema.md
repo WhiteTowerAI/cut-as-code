@@ -31,6 +31,14 @@ judgment. Everything downstream is mechanical. Get this right.
    it is the audit trail for the edit and forces you to justify each call.
 3. **Boundaries land on sentence/clause ends.** Verify with `inspect_bounds.py` and
    nudge any boundary that starts/stops mid-sentence or on a stammer onto a clean edge.
+   `inspect_bounds.py` also prints `⚠ dangling exit` when a block ends on a hanging
+   conjunction/preposition/article ("...I liked. Because") or splits a capitalized
+   proper-noun bigram ("...too Southern" / dropped "Cross") — fix those.
+
+   **How a word is kept (load-bearing):** `build_edit.py` keeps a word when the word's
+   **center** `(start+end)/2` falls inside `[in,out]` — it does NOT clip at the raw
+   timestamp. So a word is fully in or fully out, and nudging an `out` by ±0.2s flips one
+   whole word across the boundary cleanly. Reason about boundary nudges in those terms.
 4. **Chronological order** unless reordering clearly helps (monologues back-reference,
    so reorder cautiously).
 5. Internal dead air inside a keep block is NOT your job here — `build_edit.py`

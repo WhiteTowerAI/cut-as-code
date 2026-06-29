@@ -84,8 +84,12 @@ def short_label_after(full, end):
     return m.group(1).strip() if m else ""
 
 def is_interesting_number(num_txt):
+    # Time/age units (year|month|week|day|hour|minute|second) are deliberately NOT
+    # here: "17 years" (an age) and "15 minutes" (a game clock) carry a unit but are
+    # exactly the noise the bare-int guard below rejects. Dropping them routes small
+    # time/age numbers through the <100 guard; a large one (>=100) still passes there.
     if re.search(r"[%$]|percent|x|times|fps|frame|billion|million|thousand|"
-                 r"dollar|hour|minute|second|day|week|month|year|user|customer|people",
+                 r"dollar|user|customer|people",
                  num_txt, re.I):
         return True
     # bare integers: only flag genuinely large ones. Two-digit numbers in speech
@@ -135,12 +139,16 @@ def main():
                      "quote": m.group(0).strip()})
 
     # stat callouts
+    seen_values = set()        # de-dup repeated brand/jersey numbers ("HS Top 200" x3)
     for m in STAT_RE.finditer(full):
         txt = m.group(0).strip()
         if not re.match(r"\$?\d", txt) or not is_interesting_number(txt):
             continue
-        at = round(time_at_char(words, spans, m.start()), 2)
         value = re.match(r"\$?[\d,.]+", txt).group(0)
+        if value in seen_values:   # same number recurs -> a repeated token, not N stats
+            continue
+        seen_values.add(value)
+        at = round(time_at_char(words, spans, m.start()), 2)
         unit = txt[len(value):].strip()            # unit already inside the match
         label = unit or short_label_after(full, m.end())
         opps.append({"type": "stat", "at": at, "dur": 4.0,
@@ -189,8 +197,11 @@ def main():
     for c, title in sec:
         if c - last_t < 8.0 or (title and title == last_title):  # sparse + de-dup
             continue
+        # The "title" is a raw transcript fragment ("made him sort of like a"), never
+        # usable as-is. Don't present it as a title: leave props.title empty, flag it,
+        # and keep the raw fragment only as `quote` so the agent writes the real label.
         opps.append({"type": "section", "at": c, "dur": 3.0,
-                     "props": {"title": " ".join(title.split()[:6])},
+                     "props": {"title": ""}, "title_is_raw": True,
                      "quote": title[:80]})
         last_t, last_title = c, title
 
