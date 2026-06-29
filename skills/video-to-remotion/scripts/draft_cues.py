@@ -35,9 +35,7 @@ def to_props(o, counts):
         return {"line1": line1, "line2": ""}          # write line2 from the transcript
     if t == "section":
         counts["section"] = counts.get("section", 0) + 1
-        # title from analyze_content is a raw transcript fragment (title_is_raw) — leave
-        # it blank so the agent writes an editorial label; the boundary is still marked.
-        title = "" if o.get("title_is_raw") else (p.get("title") or "")
+        title = p.get("title") or o.get("quote", "")
         return {"kicker": f"PART {counts['section']}", "title": " ".join(title.split()[:6])}
     if t == "stat":
         return {"value": p.get("value", ""), "label": p.get("label", "")}
