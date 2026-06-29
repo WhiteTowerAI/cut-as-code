@@ -6,6 +6,8 @@ DEV/
 .agents/
 .claude/
 
+skills/skill-improvements-2026-06-26.md
+
 # Python
 __pycache__/
 *.pyc
