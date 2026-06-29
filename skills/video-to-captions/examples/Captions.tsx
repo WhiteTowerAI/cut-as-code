@@ -5,9 +5,9 @@
 // render), and <Caption> draws over it. `npx remotion render` outputs the final
 // captioned MP4 directly — no separate ffmpeg compositing pass needed.
 //
-// (Alternative, lossless path: drop the <OffthreadVideo>, render on transparent
-//  with --codec=prores --pixel-format=yuva444p10le, then ffmpeg-overlay onto the
-//  source with `-c:a copy`. See SKILL.md step 5.)
+// (Alternative, lossless path: render CaptionsOverlay with ProRes 4444,
+//  yuva444p10le, and --image-format=png, then ffmpeg-overlay onto the source with
+//  `-c:a copy`. See SKILL.md step 5.)
 import * as React from "react";
 import { AbsoluteFill, OffthreadVideo, staticFile } from "remotion";
 import captions from "./captions.json";

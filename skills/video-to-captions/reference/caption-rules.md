@@ -42,7 +42,8 @@ read, or to hand to any player / another tool.
 1. **OffthreadVideo background (default).** `Captions.tsx` plays `source.mp4` under
    the captions; `remotion render` outputs the final captioned MP4 with original
    audio. Simplest — one command.
-2. **Transparent + ffmpeg (lossless).** Render captions on transparent
-   (`--codec=prores --pixel-format=yuva444p10le`), then overlay onto the untouched
-   source with `-c:a copy`. Keeps the source bytes/audio pristine; better when the
-   footage is already final and you don't want Remotion to re-encode it.
+2. **Transparent + ffmpeg (lossless).** Render the `CaptionsOverlay` composition on
+   transparent (`--codec=prores --prores-profile=4444 --pixel-format=yuva444p10le
+   --image-format=png`), then overlay onto the untouched source with `-c:a copy`.
+   Keeps the source bytes/audio pristine; better when the footage is already final
+   and you don't want Remotion to re-encode it.

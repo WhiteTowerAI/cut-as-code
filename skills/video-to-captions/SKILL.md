@@ -58,6 +58,7 @@ out/captions.srt        # portable SubRip (bonus / sanity read)
 src/anim.tsx            # palette + caption timing knobs
 src/Caption.tsx         # draws the active cue (+ karaoke highlight)
 src/Captions.tsx        # composition: OffthreadVideo(source) + Caption
+src/CaptionsOverlay.tsx # composition: transparent Caption-only overlay
 src/Root.tsx            # registers it, matched to the source via calculateMetadata
 out/captioned.mp4       # THE DELIVERABLE
 ```
@@ -93,8 +94,9 @@ raise `paddingBottom` for vertical video).
 ### 4. Put captions INTO the video
 `examples/Captions.tsx` plays `source.mp4` via `<OffthreadVideo>` as the background and
 layers `<Caption>` on top — so the render *is* the captioned video, with the original
-audio carried through. `Root.tsx` matches the composition length + dimensions to the
-source via `calculateMetadata`/`getVideoMetadata`.
+audio carried through. `examples/CaptionsOverlay.tsx` renders the same captions on a
+transparent background for the lossless overlay path. `Root.tsx` matches both composition
+lengths + dimensions to the source via `calculateMetadata`/`getVideoMetadata`.
 
 ### 5. Render (or composite losslessly) + self-review
 Default — one pass outputs the final MP4:
@@ -102,10 +104,11 @@ Default — one pass outputs the final MP4:
 npx remotion still   Captions work/stills/t12.png --frame=290   # check a cue + karaoke
 npx remotion render  Captions out/captioned.mp4
 ```
-Lossless alternative — keep the source bytes/audio untouched: render on transparent and
-ffmpeg-overlay (drop `<OffthreadVideo>` from `Captions.tsx` first):
+Lossless alternative — keep the source bytes/audio untouched: render the transparent
+caption-only composition and ffmpeg-overlay it:
 ```
-npx remotion render Captions out/overlay.mov --codec=prores --pixel-format=yuva444p10le
+npx remotion render src/index.ts CaptionsOverlay out/overlay.mov \
+  --codec=prores --prores-profile=4444 --pixel-format=yuva444p10le --image-format=png
 ffmpeg -i public/source.mp4 -i out/overlay.mov \
   -filter_complex "[0][1]overlay" -c:a copy out/captioned.mp4
 ```
