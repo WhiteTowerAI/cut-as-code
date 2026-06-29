@@ -66,6 +66,9 @@ python scripts/transcribe.py work/audio16k.wav work/transcript [base.en]
 ```
 Produces `work/transcript.json` (segments + per-word start/end) and `.srt`.
 faster-whisper, CPU/int8, VAD on, `word_timestamps=True`.
+**Non-English:** pass a multilingual model + `--lang`, e.g.
+`python scripts/transcribe.py work/audio16k.wav work/transcript medium --lang zh`
+(the `.en` models are English-only). Verify the language on a short sample first.
 **Note:** Whisper strips most vocalized "um/uh" — they are NOT transcript-measurable,
 so filler detection must combine the lexical word-search below with silence-gap
 analysis, not rely on the transcript text alone.
@@ -127,6 +130,13 @@ python scripts/cut_render.py    work/edit_final.json   work/source.mp4 first_cut
     *dead-air-reclaimed* segment, so it reads higher than gross WPM (it's closer to
     articulation rate) — **the printed-table review is load-bearing**: eyeball it and
     tune `target`/`deadband` to the speaker before rendering, don't trust the defaults blind.
+  - **Single-shot talking-heads / podcasts: prefer `min_speed=1.0` (speed-up-only).**
+    After dead-air reclaim a deliberate speaker's articulation rate reads high, so the
+    default `min_speed=0.9` *slows* many natural-fast segments to 0.90 — draggy, and the
+    varying speeds make joins "pumpy" (one run: 47/89 segments re-timed, cut got *longer*).
+    `min_speed=1.0` only tightens genuinely slow stretches and leaves fast delivery at 1.0
+    (same run: 25/89 re-timed, slightly shorter, no slowing). Consider it the default for
+    this footage class.
   - Knobs (k=v): `mode=segment|global|off` (default `segment`; `global`=one factor for
     the whole video, `off`=disable), `target=`, `deadband=lo,hi`, `min_speed=`/`max_speed=`,
     `min_seg=`/`min_words=`, `lang=auto|en|cjk`. To skip the feature entirely, just don't

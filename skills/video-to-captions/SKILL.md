@@ -38,17 +38,17 @@ highlighting the current word. Re-chunk or restyle by editing text + re-renderin
   (→ `video-to-remotion`); design-frame interludes (→ `design-frames-to-motion`).
 
 ## Dependencies
-- **Node + Remotion** project (`npx create-video@latest`), `@remotion/media-utils`
-  (for `getVideoMetadata`), ffmpeg.
+- **Node + Remotion** project (`npx create-video@latest`), ffmpeg + ffprobe
+  (ffprobe drives `scripts/probe.py`, which sizes the render — see step 4).
 - Python with **faster-whisper** for the transcript (CPU/int8 works). Reuses the
   `video-rough-cut` skill's `transcribe.py` and its exact `work/transcript.json`
   format (segments → words with start/end).
 - **Languages.** The chunker handles both space-delimited (English) and CJK
-  (Chinese/Japanese/Korean wrap by character, break on `。！？`). BUT the bundled
-  `transcribe.py` is hardcoded English (`base.en`, `language="en"`) — for any other
-  language you must transcribe with a multilingual Whisper model and set the language
-  (e.g. `medium`, `language="zh"`). This skill consumes only the resulting transcript.
-  For CJK, use a smaller `--max-chars` (≈12–16) since each char is one display unit.
+  (Chinese/Japanese/Korean wrap by character, break on `。！？`). The bundled
+  `transcribe.py` defaults to English (`base.en`); for any other language pass a
+  multilingual model + `--lang` (e.g. `transcribe.py audio.wav out medium --lang zh`).
+  This skill consumes only the resulting transcript. For CJK, use a smaller
+  `--max-chars` (≈12–16) since each char is one display unit.
 
 ## Working layout
 ```
@@ -60,7 +60,8 @@ src/anim.tsx            # palette + caption timing knobs
 src/Caption.tsx         # draws the active cue (+ karaoke highlight)
 src/CaptionsOverlay.tsx # default composition: transparent Caption-only overlay
 src/Captions.tsx        # simple, slow fallback: OffthreadVideo(source) + Caption
-src/Root.tsx            # registers both, matched to the source via calculateMetadata
+src/source-meta.json    # {width,height,durationInSeconds} from scripts/probe.py
+src/Root.tsx            # registers both, sized from src/source-meta.json
 out/caption-overlay.mov # transparent ProRes overlay
 out/captioned.mp4       # THE DELIVERABLE
 ```
@@ -73,9 +74,13 @@ Worked versions of the `src/` files are in `examples/`.
 ffmpeg -y -i public/source.mp4 -ac 1 -ar 16000 work/audio16k.wav
 python ../video-rough-cut/scripts/transcribe.py work/audio16k.wav work/transcript
 ```
-**Non-English:** the bundled `transcribe.py` is English-only — transcribe with a
-multilingual model + language instead (e.g. `WhisperModel("medium")`,
-`language="zh"`), or run your own Whisper. This skill only needs `transcript.json`.
+**Already ran `video-rough-cut` on this clip?** Its self-check wrote
+`work/selfcheck/cut_transcript.json` — a word-level transcript of the exact cut you're
+captioning. Reuse it as `work/transcript.json` and skip this step (saves a ~15–20 min
+CPU transcription).
+**Non-English:** pass a multilingual model + `--lang` to `transcribe.py` (e.g.
+`python ../video-rough-cut/scripts/transcribe.py work/audio16k.wav work/transcript medium --lang zh`),
+or run your own Whisper. This skill only needs `transcript.json`.
 
 ### 2. Build caption cues
 ```
@@ -86,6 +91,19 @@ Groups words into readable cues — broken on sentence punctuation, a line budge
 timings for karaoke. Writes `src/captions.json` (drives the render) and `out/captions.srt`
 (portable). See `reference/caption-rules.md` for the rules, schema and tunables. Skim the
 `.srt` to confirm the chunking reads well before rendering.
+
+**Correct recurring proper-noun / domain-term ASR errors before rendering.** "Faithful to
+the transcript" must not burn real ASR *errors* into every cue — e.g. a host's name heard
+as "social front" (actually "Herschel Fruean"), or "first XV" heard as "first 13 / first
+15". These don't match the audio; they're mistakes. This is a **cheap, targeted
+find-replace on a handful of systematic strings** in `src/captions.json` — NOT an
+editorial rewrite of every line. For each fix, edit **both**:
+- the cue's `text` and `lines[]` (these drive the `.srt`), and
+- the cue's **`words[]` entries** — `Caption.tsx` renders the karaoke from `words[]`, so
+  fixing only `text` does NOT change the burned-in display.
+Scope each replacement so it can't over-fire (e.g. "first 13/15" → "first XV" but **leave**
+genuine "first 15 **minutes**"). Then continue to render. This is distinct from editorially
+rewriting cues.
 
 ### 3. Style the caption component
 `examples/Caption.tsx` spans the whole video and draws whichever cue is active for the
@@ -98,8 +116,15 @@ raise `paddingBottom` for vertical video).
 default for any clip longer than ~1-2 minutes because Remotion only renders the caption
 layer; it does not seek/decode the H.264 source on every frame. `examples/Captions.tsx`
 is the simple, slow fallback that plays `source.mp4` via `<OffthreadVideo>` and burns the
-captions in during one render. `Root.tsx` matches both composition lengths + dimensions
-to the source via `calculateMetadata`/`getVideoMetadata`.
+captions in during one render. Size both compositions to the source first:
+```
+python scripts/probe.py public/source.mp4 src/source-meta.json
+```
+`Root.tsx` imports `src/source-meta.json` and sets `width`/`height`/`durationInFrames`
+from it (`durationInFrames = ceil(durationInSeconds × 24)`). This replaces the old
+runtime `getVideoMetadata`/`calculateMetadata`, which failed on some server-side render
+paths and silently fell back to a 4K render. No `source-meta.json`? Hand-write it with
+the real `{width, height, durationInSeconds}`.
 
 ### 5. Render the overlay, ffmpeg-composite it, then self-review
 Render cost starts with `frames = duration_s x fps`. The full-frame fallback decodes the
@@ -112,6 +137,10 @@ ffmpeg -y -i public/source.mp4 -i out/caption-overlay.mov -filter_complex "[0:v]
 ```
 Use the `Captions` still for self-review because it shows captions on the real frame; it
 only decodes selected frames.
+The transparent ProRes 4444 `out/caption-overlay.mov` is a **large, deletable intermediate**
+(it stores a full alpha frame every frame — multiple GB even at low resolution). The final
+`out/captioned.mp4` is the deliverable; delete the `.mov` after compositing (or use a lighter
+alpha codec like `qtrle` / VP9-webm-alpha if you want to keep it).
 For long renders, keep the render under a foreground/monitoring process that emits
 progress. Detached fire-and-forget background jobs can be killed when the controlling
 session goes idle.
@@ -121,6 +150,23 @@ Simple, slow one-pass fallback for very short clips:
 npx remotion still src/index.ts Captions work/stills/t12.png --frame=290
 npx remotion render src/index.ts Captions out/captioned.mp4
 ```
+
+## Combining captions + overlays (with video-to-remotion)
+Captions (this skill) and the `video-to-remotion` cards are both **bottom-anchored**, so
+layering them as-is makes them overlap. To ship one video with BOTH:
+1. **Keep captions at the bottom** (unchanged — `Caption.tsx` is `justifyContent:"flex-end"`).
+2. **Re-anchor the remotion cards to the TOP** so they clear the captions: in each card
+   component switch `justifyContent:"flex-end"` → `"flex-start"`, and make the `Scrim` a
+   **top** scrim. `video-to-remotion/examples/anim.tsx`'s `Scrim` sets `top:${100-heightPct}%`
+   with a top→bottom gradient; a top variant sets `top:0` and reverses the gradient
+   (`rgba(12,20,28,maxOpacity)` → `rgba(12,20,28,0)`).
+3. **Render BOTH transparent overlays, then composite serially in one ffmpeg pass** (captions
+   first, cards on top), copying audio:
+   ```
+   ffmpeg -y -i first_cut.mp4 -i out/caption-overlay.mov -i out/graphics-overlay.mov \
+     -filter_complex "[0:v][1:v]overlay[a];[a][2:v]overlay[v]" \
+     -map "[v]" -map 0:a? -c:a copy -c:v libx264 -crf 18 -preset veryfast out/final.mp4
+   ```
 
 ## Self-check
 - Read `out/captions.srt`: cues are readable length, break on sense, and match the audio.

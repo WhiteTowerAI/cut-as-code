@@ -74,6 +74,13 @@ Requirements: `ffmpeg`/`ffprobe` on PATH, Python with `numpy` + `Pillow`.
    representative frame (`work/assess/frame.png`), and suggests base tweaks. **Retune
    `looks.json` `base`** accordingly (e.g. warm cast → add a little blue; log → put the
    log→709 conversion in `base`).
+   - **The rep frame is picked by median luma, not by faces.** On a single-shot talking-head
+     that usually lands on a good face frame, but on B-roll-heavy / multi-shot footage it can
+     pick a faceless frame — and then `face_skin_check.png` is useless (skin is the quality
+     bar). Force a known face moment with `--frame-time SECONDS`.
+   - The WB/exposure stats come from **one ~10s `signalstats` window at 10% of duration**
+     — fine for constant light; for footage whose light changes, move/lengthen it with
+     `--win-start SECONDS` / `--win-dur SECONDS`.
 
 2. **Render the looks for choosing.**
    ```
@@ -102,8 +109,26 @@ Requirements: `ffmpeg`/`ffprobe` on PATH, Python with `numpy` + `Pillow`.
    ```
    `apply_grade.py` verifies duration/audio are kept, prints the WB shift (U/V toward 128),
    and drops a spot frame to eyeball.
+   - **The apply re-encodes the video once (lossy); audio is `-c:a copy`.** Quality/time are
+     set by `--crf` (default 18) and `--preset` (default `slow`). `slow` is fine for small/
+     short clips, but on 1080p/4K hour-long footage it's a large, silent time cost — drop to
+     `--preset medium` for delivery (or `veryfast` for a quick preview), `slow` only for final.
+   - **Match the delivered video to the delivered LUT:** the chain (`--name`) and the baked
+     33³ `.cube` (`--lut`) can differ by up to ~5/255 on steep curves (`bake_lut.py` reports
+     this `max|d|`). Invisible for most work, but if you're *shipping the `.cube`* and want the
+     rendered video to match it exactly, apply with **`--lut out/CHOSEN.cube`**, not `--name`.
 
 ## Design notes / gotchas
+- **Grade the CLEAN cut, then composite overlays on top of the graded footage.** If you must
+  grade a video that already has burned-in captions/cards, do NOT trust `assess.py`: its WB/
+  exposure stats and frame pick are skewed by the graphics (dark top/bottom scrims drag Y down,
+  bright caption text / teal accents skew U/V, and the frame pick can land on a caption-heavy
+  frame) — you'd be correcting the overlays, not the footage. Reuse a `base` tuned on the clean
+  footage, and expect the grade to tint the overlays, so use only a subtle/corrective look
+  (`clean_neutral`); `teal_orange`/`vintage_faded` will visibly recolor the text/accents.
+- **One look/LUT covers all related clips.** Once you've picked a look, reuse the same
+  `looks.json` / `.cube` across every related clip (e.g. clean cut + the overlaid version) —
+  do NOT re-run the two-phase pick per clip.
 - **Correct, then style.** The base is the generalization of the deck's S-Log3→Rec.709 step.
   For normal footage the base is WB+exposure+contrast; for log footage put the conversion there.
 - **Skin first.** `teal_orange`/`cool_desat` are the usual skin offenders on darker subjects —
@@ -114,6 +139,12 @@ Requirements: `ffmpeg`/`ffprobe` on PATH, Python with `numpy` + `Pillow`.
   `metadata=print:file=`). The scripts run ffmpeg with `cwd` = the file's folder and reference
   it by **basename**. Keep this pattern for any new path-taking filter.
 - **Outputs land in the `--out` dirs you pass** (durable), not a system temp dir.
+- **The face/skin strip uses a fixed centered upper-middle crop, not face detection.** If the
+  subject isn't roughly centered, pass `--face-crop W:H:X:Y` to `render_looks.py` or the skin
+  strip will show the wrong region.
+- **`apply_grade.py`'s verify spot frame is at 20% of duration** — a *different* frame than the
+  one the looks were chosen on. If that 20% point is faceless, eyeball skin on another frame
+  instead (or pass `--frame-time` to `assess.py` so the chosen frame is a known face moment).
 - **The LUT bake is exact**, because every filter here is a per-pixel point op: `bake_lut.py`
   pushes a 33³ identity grid through the real chain and self-checks against it
   (`mean|d|` should be well under 1/255; a few-level `max|d|` is just interpolation).
