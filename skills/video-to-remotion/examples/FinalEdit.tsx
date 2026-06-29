@@ -1,10 +1,12 @@
-// FinalEdit.tsx — the cue sheet, timed by the transcript, composited over the
-// source. The video is the background (<OffthreadVideo>), so ONE `remotion
-// render` outputs the finished MP4 with the original audio.
+// FinalEdit.tsx - cue sheet timed by the transcript.
+//
+// Default render path: FinalEditOverlay renders only transparent graphics, then
+// ffmpeg overlays it onto the source while copying audio. FinalEdit keeps the
+// simple, slow one-pass fallback with <OffthreadVideo> as the background.
 //
 // staticFile() needs the file in public/  →  copy work/source.mp4 to
-// public/source.mp4 (an arbitrary path won't load). Composition dims match the
-// source (Root.tsx), so the video fills the frame with no upscale / no bars.
+// public/source.mp4 for the one-pass fallback. Composition dims match the source
+// (Root.tsx), so the video fills the frame with no upscale / no bars.
 //
 // CUES is seeded by draft_cues.py, then PRUNED and — crucially — REWRITTEN by
 // hand: line1/line2/kicker/title are editorial copy you WRITE from the
@@ -36,14 +38,10 @@ const CUES = [
   { id: "outro-1",   component: "Outro",       at: 1861.0, dur: 8.0, props: { title: "HS TOP 200", sub: "Thanks for watching", small: "Monday Morning Meeting Podcast" } },
 ] as const;
 
-export const FinalEdit: React.FC = () => {
+const OverlayCues: React.FC = () => {
   const { fps } = useVideoConfig();
   return (
-    <AbsoluteFill style={{ backgroundColor: "black" }}>
-      <OffthreadVideo
-        src={staticFile("source.mp4")}
-        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-      />
+    <>
       {CUES.map((cue) => {
         const C = COMPONENTS[cue.component];
         const durFrames = Math.round(cue.dur * fps);
@@ -53,6 +51,22 @@ export const FinalEdit: React.FC = () => {
           </Sequence>
         );
       })}
-    </AbsoluteFill>
+    </>
   );
 };
+
+export const FinalEditOverlay: React.FC = () => (
+  <AbsoluteFill>
+    <OverlayCues />
+  </AbsoluteFill>
+);
+
+export const FinalEdit: React.FC = () => (
+  <AbsoluteFill style={{ backgroundColor: "black" }}>
+    <OffthreadVideo
+      src={staticFile("source.mp4")}
+      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+    />
+    <OverlayCues />
+  </AbsoluteFill>
+);

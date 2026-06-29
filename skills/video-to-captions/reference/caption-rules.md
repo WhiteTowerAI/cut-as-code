@@ -39,11 +39,12 @@ read, or to hand to any player / another tool.
 - One look in `anim.tsx` (palette + pop timing) so every cue matches.
 
 ## Getting the graphics INTO the video (two paths)
-1. **OffthreadVideo background (default).** `Captions.tsx` plays `source.mp4` under
-   the captions; `remotion render` outputs the final captioned MP4 with original
-   audio. Simplest — one command.
-2. **Transparent + ffmpeg (lossless).** Render the `CaptionsOverlay` composition on
-   transparent (`--codec=prores --prores-profile=4444 --pixel-format=yuva444p10le
-   --image-format=png`), then overlay onto the untouched source with `-c:a copy`.
-   Keeps the source bytes/audio pristine; better when the footage is already final
-   and you don't want Remotion to re-encode it.
+1. **Transparent overlay + ffmpeg (default for clips > ~1-2 min).** Render the
+   `CaptionsOverlay` composition on transparent (`--codec=prores
+   --prores-profile=4444 --pixel-format=yuva444p10le --image-format=png`), then
+   overlay it onto the source with ffmpeg and `-c:a copy`. Remotion only renders
+   the caption layer instead of seeking/decoding the source on every frame; ffmpeg
+   copies the original audio while compositing the final picture.
+2. **OffthreadVideo background (simple, slow fallback).** `Captions.tsx` plays
+   `source.mp4` under the captions; `remotion render` outputs the final captioned
+   MP4 directly. Use this for very short clips or quick experiments.

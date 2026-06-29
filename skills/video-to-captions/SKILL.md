@@ -3,11 +3,12 @@ name: video-to-captions
 description: >
   Auto-caption a video as Remotion (React): transcribe it word-by-word, group the
   words into readable caption cues (broken on punctuation, line budget, duration and
-  speech gaps), and render styled subtitles burned onto the footage — with optional
-  per-word karaoke highlight. The source video is fed into the composition via
-  <OffthreadVideo>, so a single `remotion render` outputs the final captioned MP4 with
-  the original audio (a lossless transparent + ffmpeg path is also provided). Also
-  emits a standard .srt. Use when asked to "add captions/subtitles to this video",
+  speech gaps), and render styled subtitles with optional per-word karaoke highlight.
+  Render a transparent caption overlay by default, then
+  composite that overlay onto the source with ffmpeg (`-c:a copy`) so Remotion does not
+  decode the source on every frame. A simple full-frame <OffthreadVideo> render path is
+  also provided for short clips. Also emits a standard .srt. Use when asked to
+  "add captions/subtitles to this video",
   "auto-caption / burn in subtitles", "karaoke / word-by-word captions", 给视频自动加
   字幕, 烧录字幕, 逐词高亮字幕. Same content-driven, transcript-timed, code-is-the-edit
   approach as video-to-remotion — but this one covers EVERY line, where
@@ -18,10 +19,10 @@ description: >
 # Video → Auto Captions (Remotion)
 
 Turn a video's speech into **styled, burned-in subtitles** — every line covered,
-timed to the word, optionally karaoke-highlighted — and render the captioned film in
-one pass. Same philosophy as `video-to-remotion` (transcript → cue sheet → Remotion →
-render, all text), but where that skill adds *selective* graphics, this one provides
-*full* caption coverage.
+timed to the word, optionally karaoke-highlighted — by rendering a transparent caption
+overlay and compositing it onto the source with ffmpeg. Same philosophy as
+`video-to-remotion` (transcript → cue sheet → Remotion → render, all text), but where
+that skill adds *selective* graphics, this one provides *full* caption coverage.
 
 ## The one idea
 **Captions are data, not a timeline.** The transcript becomes `captions.json` (cues
@@ -57,9 +58,10 @@ src/captions.json       # *** caption cues w/ per-word timings ***  (build_capti
 out/captions.srt        # portable SubRip (bonus / sanity read)
 src/anim.tsx            # palette + caption timing knobs
 src/Caption.tsx         # draws the active cue (+ karaoke highlight)
-src/Captions.tsx        # composition: OffthreadVideo(source) + Caption
-src/CaptionsOverlay.tsx # composition: transparent Caption-only overlay
-src/Root.tsx            # registers it, matched to the source via calculateMetadata
+src/CaptionsOverlay.tsx # default composition: transparent Caption-only overlay
+src/Captions.tsx        # simple, slow fallback: OffthreadVideo(source) + Caption
+src/Root.tsx            # registers both, matched to the source via calculateMetadata
+out/caption-overlay.mov # transparent ProRes overlay
 out/captioned.mp4       # THE DELIVERABLE
 ```
 Worked versions of the `src/` files are in `examples/`.
@@ -91,26 +93,33 @@ current frame; with `karaoke` on, the spoken word is highlighted (`CLAY`) and up
 words are dimmed. Tune position/size/look there and in `anim.tsx` (bottom-center default;
 raise `paddingBottom` for vertical video).
 
-### 4. Put captions INTO the video
-`examples/Captions.tsx` plays `source.mp4` via `<OffthreadVideo>` as the background and
-layers `<Caption>` on top — so the render *is* the captioned video, with the original
-audio carried through. `examples/CaptionsOverlay.tsx` renders the same captions on a
-transparent background for the lossless overlay path. `Root.tsx` matches both composition
-lengths + dimensions to the source via `calculateMetadata`/`getVideoMetadata`.
+### 4. Put captions into a transparent overlay
+`examples/CaptionsOverlay.tsx` draws `<Caption>` on a transparent background. This is the
+default for any clip longer than ~1-2 minutes because Remotion only renders the caption
+layer; it does not seek/decode the H.264 source on every frame. `examples/Captions.tsx`
+is the simple, slow fallback that plays `source.mp4` via `<OffthreadVideo>` and burns the
+captions in during one render. `Root.tsx` matches both composition lengths + dimensions
+to the source via `calculateMetadata`/`getVideoMetadata`.
 
-### 5. Render (or composite losslessly) + self-review
-Default — one pass outputs the final MP4:
+### 5. Render the overlay, ffmpeg-composite it, then self-review
+Render cost starts with `frames = duration_s x fps`. The full-frame fallback decodes the
+source for every frame; the transparent overlay path avoids that and then uses one ffmpeg
+pass to combine the overlay with the source while copying audio.
 ```
-npx remotion still   Captions work/stills/t12.png --frame=290   # check a cue + karaoke
-npx remotion render  Captions out/captioned.mp4
+npx remotion still src/index.ts Captions work/stills/t12.png --frame=290
+npx remotion render src/index.ts CaptionsOverlay out/caption-overlay.mov --codec=prores --prores-profile=4444 --pixel-format=yuva444p10le --image-format=png
+ffmpeg -y -i public/source.mp4 -i out/caption-overlay.mov -filter_complex "[0:v][1:v]overlay=shortest=1:format=auto[v]" -map "[v]" -map 0:a? -c:v libx264 -crf 18 -preset veryfast -c:a copy -movflags +faststart out/captioned.mp4
 ```
-Lossless alternative — keep the source bytes/audio untouched: render the transparent
-caption-only composition and ffmpeg-overlay it:
+Use the `Captions` still for self-review because it shows captions on the real frame; it
+only decodes selected frames.
+For long renders, keep the render under a foreground/monitoring process that emits
+progress. Detached fire-and-forget background jobs can be killed when the controlling
+session goes idle.
+
+Simple, slow one-pass fallback for very short clips:
 ```
-npx remotion render src/index.ts CaptionsOverlay out/overlay.mov \
-  --codec=prores --prores-profile=4444 --pixel-format=yuva444p10le --image-format=png
-ffmpeg -i public/source.mp4 -i out/overlay.mov \
-  -filter_complex "[0][1]overlay" -c:a copy out/captioned.mp4
+npx remotion still src/index.ts Captions work/stills/t12.png --frame=290
+npx remotion render src/index.ts Captions out/captioned.mp4
 ```
 
 ## Self-check

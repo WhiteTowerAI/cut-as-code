@@ -1,13 +1,13 @@
-// Captions.tsx — the deliverable composition: source video + burned-in captions.
+// Captions.tsx - simple, slow fallback: source video + burned-in captions.
 //
-// This is where the graphics actually go INTO the video: <OffthreadVideo> plays
-// the source as the background layer (it carries the original audio through the
-// render), and <Caption> draws over it. `npx remotion render` outputs the final
-// captioned MP4 directly — no separate ffmpeg compositing pass needed.
+// <OffthreadVideo> plays the source as the background layer and <Caption> draws
+// over it, so `npx remotion render` outputs the final captioned MP4 directly.
+// That is convenient for short clips, but slow for long videos because every
+// frame seeks/decodes the source.
 //
-// (Alternative, lossless path: render CaptionsOverlay with ProRes 4444,
-//  yuva444p10le, and --image-format=png, then ffmpeg-overlay onto the source with
-//  `-c:a copy`. See SKILL.md step 5.)
+// Default path: render CaptionsOverlay with ProRes 4444, yuva444p10le, and
+// --image-format=png, then ffmpeg-overlay onto the source with `-c:a copy`.
+// See SKILL.md step 5.
 import * as React from "react";
 import { AbsoluteFill, OffthreadVideo, staticFile } from "remotion";
 import captions from "./captions.json";

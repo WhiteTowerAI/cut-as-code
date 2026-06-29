@@ -1,4 +1,4 @@
-// Root.tsx — register the captioned composition at 4K / 24fps.
+// Root.tsx - register source-matched caption compositions at 24fps.
 //
 // Match the render length AND dimensions to the SOURCE video so captions cover the
 // whole clip and the frame matches the footage.

@@ -8,8 +8,9 @@ description: >
   one parametric Remotion component per graphic — all on ONE design language (each rides a
   bottom scrim/card, bottom-anchored so it never covers the face, sized to the canvas) with
   *editorial copy* written from the content (ASR-garbled names corrected), and a cue sheet that
-  fires each overlay on the spoken word. Render headless at the source's own size (not 4K) with
-  the agent screenshotting its own stills to self-review. Use when asked to "auto-generate
+  fires each overlay on the spoken word. Render a transparent overlay at the source's own size
+  (not 4K), ffmpeg-composite it onto the source while copying audio, and screenshot stills to
+  self-review. Use when asked to "auto-generate
   Remotion components from this video", "watch the video and add the graphics it needs",
   "turn this talking-head into a motion-graphics cut", 根据视频内容自动生成 remotion 组件,
   自动给视频加字幕条/数据callout/章节卡. This is the content-driven sibling of
@@ -57,8 +58,9 @@ editorial copy, not raw transcript fragments.
   - `package.json` with `remotion` + `@remotion/cli` (pin one 4.x, e.g. `4.0.230`) and
     **`react`/`react-dom` pinned to `18.3.1`** (don't let npm pull React 19 against an older
     Remotion), `tsconfig.json`, and `src/index.ts` → `registerRoot(RemotionRoot)`.
-  - `public/source.mp4` — `OffthreadVideo` loads via `staticFile("source.mp4")`, which only
-    resolves inside `public/`; an arbitrary path won't load. `npm install`, then render.
+  - `public/source.mp4` — needed for `FinalEdit` still checks and the slow fallback because
+    `OffthreadVideo` loads via `staticFile("source.mp4")`, which only resolves inside
+    `public/`; an arbitrary path won't load. `npm install`, then render.
 - Python with **faster-whisper** for the transcript (CPU/int8 works). The
   `video-rough-cut` skill's `transcribe.py` produces the exact `work/transcript.json`
   format this skill consumes (segments → words with start/end). It is English-only
@@ -76,12 +78,13 @@ work/scenes.txt         # optional: one scene-cut timestamp per line (ffmpeg)
 work/content.json       # *** detected graphic opportunities ***  (analyze_content.py)
 work/cues.json          # draft cue sheet                         (draft_cues.py)
 package.json            # Remotion project (pin React 18) — see Dependencies
-public/source.mp4       # the video, for staticFile() in FinalEdit (copy of work/source.mp4)
+public/source.mp4       # only needed for the slow OffthreadVideo fallback
 src/index.ts            # entry: registerRoot(RemotionRoot)
 src/anim.tsx            # design system: timing + palette + Scrim + height-relative scale
 src/components/*.tsx    # Intro, SectionCard(chapter), LowerThird, StatCallout, Keypoint, ListReveal, Outro
-src/FinalEdit.tsx       # the cue sheet (pruned + rewritten), OffthreadVideo background
+src/FinalEdit.tsx       # the cue sheet, transparent overlay, slow OffthreadVideo fallback
 src/Root.tsx            # composition @ SOURCE size / 24fps (NOT 4K)
+out/graphics-overlay.mov # transparent ProRes overlay
 out/final.mp4           # THE DELIVERABLE
 ```
 Worked versions of every `src/` file are in `examples/` (you still scaffold `package.json`,
@@ -136,20 +139,30 @@ from `anim.tsx`). You rarely redraw them; the real work is the **copy**:
 - Place **Intro** over the cold open and **Outro** over the sign-off (fixed, not detected).
 Register any new component in `FinalEdit`'s `COMPONENTS` map; pass `durFrames` so cards fade.
 
-### 6. Render at SOURCE size + self-review
-`FinalEdit` already composites the overlays onto the footage via `<OffthreadVideo
-src={staticFile("source.mp4")}>`, so one render outputs the finished MP4 *with audio*. Set
-`Root.tsx`'s `width/height` to the **source's own pixels** and `durationInFrames` to the cut's
-full length (`ffprobe`) — do NOT render a 640-px clip at 4K (it only blurs the picture and
-adds letterbox bars). Cards are vector text, so they stay sharp; pass `--scale 2` for a bigger
-file instead of inflating the composition. Pass the entry (`src/index.ts`) to the CLI:
+### 6. Render transparent overlay at SOURCE size + self-review
+Set `Root.tsx`'s `width/height` to the **source's own pixels** and `durationInFrames` to
+the cut's full length (`ffprobe`) — do NOT render a 640-px clip at 4K (it only blurs the
+picture and adds letterbox bars). Cards are vector text, so they stay sharp; pass
+`--scale 2` for a bigger file instead of inflating the composition.
+
+Default for any clip longer than ~1-2 minutes: render `FinalEditOverlay` as transparent
+ProRes, then use one ffmpeg overlay pass to composite onto the source while copying audio.
+Render cost starts with `frames = duration_s x fps`; the slow fallback pays that cost plus
+an `OffthreadVideo` seek/decode on every frame.
 ```
-npx remotion still   src/index.ts FinalEdit work/stills/f295.png --frame=295   # self-review a beat
-npx remotion render  src/index.ts FinalEdit out/final.mp4
+npx remotion still src/index.ts FinalEdit work/stills/f295.png --frame=295
+npx remotion render src/index.ts FinalEditOverlay out/graphics-overlay.mov --codec=prores --prores-profile=4444 --pixel-format=yuva444p10le --image-format=png
+ffmpeg -y -i work/source.mp4 -i out/graphics-overlay.mov -filter_complex "[0:v][1:v]overlay=shortest=1:format=auto[v]" -map "[v]" -map 0:a? -c:v libx264 -crf 18 -preset veryfast -c:a copy -movflags +faststart out/final.mp4
 ```
-Screenshot stills first — render cost is dominated by **frame count** (each frame = a browser
-render + an `OffthreadVideo` seek), so a 30-min cut is hours regardless of resolution; catch a
-mistimed overlay or wrong prop on a still before burning the full pass.
+Use the `FinalEdit` still for self-review because it shows the graphics on the real frame;
+it only decodes selected frames. For long renders, keep the render under a foreground/
+monitoring process that emits progress. Detached fire-and-forget background jobs can be
+killed when the controlling session goes idle.
+
+Simple, slow one-pass fallback for very short clips:
+```
+npx remotion render src/index.ts FinalEdit out/final.mp4
+```
 
 ## Self-check
 Grab a still mid-window for each kept cue and confirm all four — this is the loop that
