@@ -4,7 +4,7 @@
 // describes what's actually said next.
 import * as React from "react";
 import { AbsoluteFill, useCurrentFrame, interpolate } from "remotion";
-import { TIMING, EASE_OUT, ACCENT, WHITE, useUnit, useFade, Scrim } from "../anim";
+import { TIMING, EASE_OUT, ACCENT, WHITE, useUnit, useFade, Scrim, anchorJustify, anchorPad } from "../anim";
 
 export const SectionCard: React.FC<{ kicker?: string; title: string; durFrames?: number }> = ({
   kicker, title, durFrames,
@@ -14,9 +14,9 @@ export const SectionCard: React.FC<{ kicker?: string; title: string; durFrames?:
   const f = useCurrentFrame();
   const p = interpolate(f, [0, TIMING.overlayIn], [0, 1], { easing: EASE_OUT, extrapolateRight: "clamp" });
   return (
-    <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: "flex-start" }}>
+    <AbsoluteFill style={{ justifyContent: anchorJustify(), alignItems: "flex-start" }}>
       <Scrim heightPct={46} maxOpacity={0.9} />
-      <div style={{ opacity: o, padding: `0 0 ${u * 9}px ${u * 6}px` }}>
+      <div style={{ opacity: o, padding: anchorPad(u * 9, u * 6) }}>
         {kicker ? (
           <div style={{ color: ACCENT, fontSize: u * 2.6, fontWeight: 700,
                         letterSpacing: u * 0.4, marginBottom: u * 1.2 }}>{kicker}</div>

@@ -2,7 +2,7 @@
 // Props: { title, sub?, small? }. Grounded in the actual sign-off.
 import * as React from "react";
 import { AbsoluteFill } from "remotion";
-import { ACCENT, WHITE, MUTED, useUnit, useFade, Scrim } from "../anim";
+import { ACCENT, WHITE, MUTED, useUnit, useFade, Scrim, anchorJustify, anchorPad } from "../anim";
 
 export const Outro: React.FC<{ title: string; sub?: string; small?: string; durFrames?: number }> = ({
   title, sub, small, durFrames,
@@ -10,9 +10,9 @@ export const Outro: React.FC<{ title: string; sub?: string; small?: string; durF
   const u = useUnit();
   const o = useFade(durFrames);
   return (
-    <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: "flex-start" }}>
+    <AbsoluteFill style={{ justifyContent: anchorJustify(), alignItems: "flex-start" }}>
       <Scrim heightPct={50} maxOpacity={0.92} />
-      <div style={{ opacity: o, display: "flex", gap: u * 2.4, padding: `0 0 ${u * 9}px ${u * 6}px` }}>
+      <div style={{ opacity: o, display: "flex", gap: u * 2.4, padding: anchorPad(u * 9, u * 6) }}>
         <div style={{ width: u * 0.8, background: ACCENT, borderRadius: u * 0.4 }} />
         <div>
           <div style={{ color: WHITE, fontSize: u * 8.5, fontWeight: 800, letterSpacing: -1, lineHeight: 1 }}>

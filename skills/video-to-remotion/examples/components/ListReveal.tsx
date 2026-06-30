@@ -3,7 +3,7 @@
 // The analyzer detects the count; the agent WRITES the items from the transcript.
 import * as React from "react";
 import { AbsoluteFill, useCurrentFrame, interpolate } from "remotion";
-import { TIMING, EASE_OUT, ACCENT, WHITE, useUnit, useFade, Scrim } from "../anim";
+import { TIMING, EASE_OUT, ACCENT, WHITE, useUnit, useFade, Scrim, anchorJustify, anchorPad } from "../anim";
 
 export const ListReveal: React.FC<{ title?: string; items: string[]; durFrames?: number }> = ({
   title, items, durFrames,
@@ -12,9 +12,9 @@ export const ListReveal: React.FC<{ title?: string; items: string[]; durFrames?:
   const o = useFade(durFrames);
   const frame = useCurrentFrame();
   return (
-    <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: "flex-start" }}>
+    <AbsoluteFill style={{ justifyContent: anchorJustify(), alignItems: "flex-start" }}>
       <Scrim heightPct={62} maxOpacity={0.9} />
-      <div style={{ opacity: o, padding: `0 0 ${u * 8}px ${u * 6}px`,
+      <div style={{ opacity: o, padding: anchorPad(u * 8, u * 6),
                     display: "flex", flexDirection: "column", gap: u * 1.6 }}>
         {title ? (
           <div style={{ color: ACCENT, fontSize: u * 3, fontWeight: 700,

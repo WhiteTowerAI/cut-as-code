@@ -4,7 +4,7 @@
 // bottom-left, teal edge — readable over any footage, never covers the face.
 import * as React from "react";
 import { AbsoluteFill, useCurrentFrame, interpolate } from "remotion";
-import { TIMING, EASE_OUT, ACCENT, WHITE, MUTED, CARD, useUnit, useFade } from "../anim";
+import { TIMING, EASE_OUT, ACCENT, WHITE, MUTED, CARD, useUnit, useFade, anchorJustify, anchorPad } from "../anim";
 
 export const LowerThird: React.FC<{ line1: string; line2?: string; durFrames?: number }> = ({
   line1, line2, durFrames,
@@ -15,8 +15,8 @@ export const LowerThird: React.FC<{ line1: string; line2?: string; durFrames?: n
   const slide = interpolate(f, [0, TIMING.overlayIn], [u * 1.8, 0],
     { easing: EASE_OUT, extrapolateRight: "clamp" });
   return (
-    <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: "flex-start",
-                           padding: `0 0 ${u * 8}px ${u * 5}px` }}>
+    <AbsoluteFill style={{ justifyContent: anchorJustify(), alignItems: "flex-start",
+                           padding: anchorPad(u * 8, u * 5) }}>
       <div style={{
         opacity: o, transform: `translateX(${slide}px)`,
         background: CARD, borderRadius: u * 1.2, borderLeft: `${u * 0.8}px solid ${ACCENT}`,
