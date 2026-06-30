@@ -3,7 +3,7 @@
 // short and rewritten — a tight paraphrase reads better than a raw clause.
 import * as React from "react";
 import { AbsoluteFill, useCurrentFrame, interpolate } from "remotion";
-import { TIMING, EASE_OUT, ACCENT, WHITE, CARD, useUnit, useFade } from "../anim";
+import { TIMING, EASE_OUT, ACCENT, WHITE, CARD, useUnit, useFade, anchorJustify, anchorPad } from "../anim";
 
 export const KeypointCallout: React.FC<{ text: string; durFrames?: number }> = ({ text, durFrames }) => {
   const u = useUnit();
@@ -12,8 +12,8 @@ export const KeypointCallout: React.FC<{ text: string; durFrames?: number }> = (
   const rise = interpolate(f, [0, TIMING.reveal], [u * 1.4, 0],
     { easing: EASE_OUT, extrapolateRight: "clamp" });
   return (
-    <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: "flex-start",
-                           padding: `0 ${u * 8}px ${u * 8}px ${u * 5}px` }}>
+    <AbsoluteFill style={{ justifyContent: anchorJustify(), alignItems: "flex-start",
+                           padding: anchorPad(u * 8, u * 5, u * 8) }}>
       <div style={{
         opacity: o, transform: `translateY(${rise}px)`, maxWidth: "72%",
         background: CARD, borderLeft: `${u * 0.8}px solid ${ACCENT}`, borderRadius: u * 1.2,

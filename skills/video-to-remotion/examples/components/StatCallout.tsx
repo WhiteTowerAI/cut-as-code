@@ -5,7 +5,7 @@
 // first; use this when the number itself is the point.
 import * as React from "react";
 import { AbsoluteFill, useCurrentFrame, interpolate } from "remotion";
-import { TIMING, EASE_OUT, ACCENT, WHITE, CARD, useUnit, useFade } from "../anim";
+import { TIMING, EASE_OUT, ACCENT, WHITE, CARD, useUnit, useFade, anchorJustify, anchorPad } from "../anim";
 
 export const StatCallout: React.FC<{ value: string; label?: string; durFrames?: number }> = ({
   value, label, durFrames,
@@ -19,8 +19,8 @@ export const StatCallout: React.FC<{ value: string; label?: string; durFrames?: 
   const suffix = (value.match(/\D*$/) ?? [""])[0];
   const display = isNaN(num) ? value : prefix + Math.round(num * p).toLocaleString() + suffix;
   return (
-    <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: "flex-end",
-                           padding: `0 ${u * 5}px ${u * 8}px 0` }}>
+    <AbsoluteFill style={{ justifyContent: anchorJustify(), alignItems: "flex-end",
+                           padding: anchorPad(u * 8, 0, u * 5) }}>
       <div style={{
         opacity: o, display: "flex", alignItems: "baseline", gap: u * 1.6,
         background: CARD, borderRadius: u * 1.2, borderBottom: `${u * 0.6}px solid ${ACCENT}`,

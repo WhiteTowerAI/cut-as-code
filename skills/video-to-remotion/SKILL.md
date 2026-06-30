@@ -36,9 +36,11 @@ edit stays text — a cue sheet you can read, diff, and re-render.
 
 **One design language.** The overlays sit on REAL footage, not light designer frames, so
 every card obeys three rules (in `anim.tsx` + the components): it rides on its OWN
-background (a bottom **scrim** or a **dark card**) so it's legible on any picture; it is
-**bottom-anchored** so it never covers the speaker's face; and its sizes are a **% of canvas
-height** so it reads at any resolution. One teal accent, 0.3 s fades. Four card jobs —
+background (a **scrim** or a **dark card**) so it's legible on any picture; it is
+**edge-anchored** so it never covers the speaker's face — the `ANCHOR` knob in `anim.tsx`
+sets which edge, defaulting to **bottom** (the lower-third safe zone), flip to **top** to
+clear bottom captions; and its sizes are a **% of canvas height** so it reads at any
+resolution. One teal accent, 0.3 s fades. Four card jobs —
 **intro / chapter / lower-third / outro** (+ optional stat / keypoint / list) — written in
 editorial copy, not raw transcript fragments.
 
@@ -183,11 +185,10 @@ npx remotion render src/index.ts FinalEdit out/final.mp4
 These cards and the `video-to-captions` captions are both **bottom-anchored**, so layering
 them as-is makes them overlap. To ship one video with BOTH:
 1. **Keep captions at the bottom** (unchanged in the captions skill).
-2. **Re-anchor these cards to the TOP** so they clear the captions: in each card component
-   switch `justifyContent:"flex-end"` → `"flex-start"`, and make `Scrim` a **top** scrim.
-   `examples/anim.tsx`'s `Scrim` sets `top:${100-heightPct}%` with a top→bottom gradient; a
-   top variant sets `top:0` and reverses the gradient (`rgba(12,20,28,maxOpacity)` →
-   `rgba(12,20,28,0)`).
+2. **Re-anchor these cards to the TOP** so they clear the captions: set `ANCHOR = "top"` in
+   `examples/anim.tsx`. That one knob flips every component's `justifyContent` + edge padding
+   and the `Scrim` (top band, reversed gradient) together — no per-component edits. Default is
+   `"bottom"` (the lower-third safe zone); only flip when you're layering over bottom captions.
 3. **Render BOTH transparent overlays, then composite serially in one ffmpeg pass** (captions
    first, cards on top), copying audio:
    ```
@@ -201,8 +202,8 @@ Grab a still mid-window for each kept cue and confirm all four — this is the l
 catches the real defects:
 - **Legible:** the card rides on its scrim/card and reads against THIS frame (not dark text
   on dark footage).
-- **Face clear:** the card is bottom-anchored and doesn't cover the speaker's face, or run
-  off-frame.
+- **Face clear:** the card is anchored to its edge (bottom by default; top if `ANCHOR="top"`)
+  and doesn't cover the speaker's face or run off-frame.
 - **On the word:** the overlay lands on its phrase — re-check at each cue's `at`.
 - **Content true:** the copy matches what's said there; names/numbers are correct (cross-check
   by grepping the transcript at that time).

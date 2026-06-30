@@ -3,7 +3,7 @@
 // name, real host name (correct ASR mis-hearings; verify a headline name).
 import * as React from "react";
 import { AbsoluteFill, useCurrentFrame, interpolate } from "remotion";
-import { TIMING, EASE_OUT, ACCENT, WHITE, MUTED, useUnit, useFade, Scrim } from "../anim";
+import { TIMING, EASE_OUT, ACCENT, WHITE, MUTED, useUnit, useFade, Scrim, anchorJustify, anchorPad } from "../anim";
 
 export const Intro: React.FC<{ kicker?: string; title: string; sub?: string; durFrames?: number }> = ({
   kicker, title, sub, durFrames,
@@ -14,10 +14,10 @@ export const Intro: React.FC<{ kicker?: string; title: string; sub?: string; dur
   const slide = interpolate(f, [0, TIMING.overlayIn], [u * 1.6, 0],
     { easing: EASE_OUT, extrapolateRight: "clamp" });
   return (
-    <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: "flex-start" }}>
+    <AbsoluteFill style={{ justifyContent: anchorJustify(), alignItems: "flex-start" }}>
       <Scrim heightPct={50} maxOpacity={0.92} />
       <div style={{ opacity: o, transform: `translateY(${slide}px)`, display: "flex",
-                    gap: u * 2.4, padding: `0 0 ${u * 9}px ${u * 6}px` }}>
+                    gap: u * 2.4, padding: anchorPad(u * 9, u * 6) }}>
         <div style={{ width: u * 0.8, background: ACCENT, borderRadius: u * 0.4 }} />
         <div>
           {kicker ? (
