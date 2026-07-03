@@ -15,12 +15,23 @@ export type CardStyle = {
   shadow: string;
 };
 
+// scrimPlate:card=null 的主题(如 editorial)给"小组件"(名条/数字/金句)文字底下
+// 垫的一层局部半透暗板。全宽组件(片头/章节/列表/片尾)用整条 Scrim,不需要它。
+// 为什么需要:实测无卡+全宽 scrim 在高光画面上小组件文字对比度仅 ~1.2-2:1(看不清),
+// 违反"任意画面可读"铁律;局部暗板贴着文字,实测 5.7:1 过 WCAG。<Surface> 在
+// T.card===null 且 scrimPlate 有值时渲染它——只有用 <Surface> 的 3 个小组件会命中。
+export type ScrimPlate = {
+  bg: string;        // 半透暗色(如 rgba(11,13,16,0.62))
+  radiusU: number;   // 圆角(u)
+};
+
 export type Theme = {
   name: ThemeName;
   font: string;
   weight: { heavy: number; med: number; light: number };
   color: { text: string; textMuted: string; accent: string; scrimBase: string };
   card: CardStyle | null;
+  scrimPlate?: ScrimPlate;   // 仅 card=null 主题用;有卡的主题(teal)留空。
   rule: "bar" | "hairline";
   kicker: { case: "upper" | "none"; spacingEm: number };
   motion: "fade" | "stagger";
@@ -36,6 +47,8 @@ const editorial: Theme = {
   weight: { heavy: 800, med: 600, light: 500 },
   color: { text: "#F4F1EA", textMuted: "#C7C2B6", accent: "#E0B252", scrimBase: "#0B0D10" },
   card: null,
+  // 无实心卡,但小组件文字底下垫一层局部暗板保证任意画面可读(实测 5.7:1)。
+  scrimPlate: { bg: "rgba(11,13,16,0.62)", radiusU: 0.8 },
   rule: "hairline",
   kicker: { case: "upper", spacingEm: 0.28 },
   motion: "stagger",
@@ -44,7 +57,11 @@ const editorial: Theme = {
 // teal 复刻今天的常量,确保零回归(数值取自现 anim.tsx 与各组件)。
 const teal: Theme = {
   name: "teal",
-  font: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
+  // font 必须是 "serif":旧组件从不设 fontFamily,浏览器默认用衬线体渲染文字,
+  // 所以"今天的 teal 外观"实际是衬线体(Windows 上 = Times New Roman)。迁移后
+  // 组件显式设 fontFamily: T.font,唯有 "serif" 能逐帧复刻旧样子(已验证 0 像素差)。
+  // 不要改成 sans-serif/system-ui——那会让 teal 文字变无衬线,破坏零回归铁律。
+  font: "serif",
   weight: { heavy: 800, med: 600, light: 500 },
   color: { text: "#F5F8F9", textMuted: "#B7C6CE", accent: "#26CAA8", scrimBase: "#0C141C" },
   card: {
