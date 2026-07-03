@@ -1,26 +1,36 @@
-// KeypointCallout.tsx — pins a punchy line / question, as a bottom-left quote
-// card (NOT dark text floating over the footage). Props: { text }. Keep it
-// short and rewritten — a tight paraphrase reads better than a raw clause.
+// KeypointCallout.tsx — 金句/问题卡。props 不变:text。
+// teal=实心卡+左accent+上浮;editorial=无卡骑 scrim + title 擦入。
 import * as React from "react";
 import { AbsoluteFill, useCurrentFrame, interpolate } from "remotion";
-import { TIMING, EASE_OUT, ACCENT, WHITE, CARD, useUnit, useFade, anchorJustify, anchorPad } from "../anim";
+import {
+  T, Surface, Scrim, useUnit, useFade, useEntrance, TIMING, EASE_OUT,
+  anchorJustify, anchorPad,
+} from "../anim";
 
 export const KeypointCallout: React.FC<{ text: string; durFrames?: number }> = ({ text, durFrames }) => {
   const u = useUnit();
   const o = useFade(durFrames);
   const f = useCurrentFrame();
+  const stagger = T.motion === "stagger";
   const rise = interpolate(f, [0, TIMING.reveal], [u * 1.4, 0],
     { easing: EASE_OUT, extrapolateRight: "clamp" });
+  const e = useEntrance("title");
+
+  const cardStyle: React.CSSProperties = stagger
+    ? { opacity: o, maxWidth: "72%" }
+    : { opacity: o, transform: `translateY(${rise}px)`, maxWidth: "72%" };
+  const textStyle: React.CSSProperties = {
+    color: T.color.text, fontFamily: T.font, fontSize: u * 5, fontWeight: T.weight.med, lineHeight: 1.18,
+    ...(stagger ? { opacity: e.opacity, clipPath: e.clipPath } : null),
+  };
+
   return (
     <AbsoluteFill style={{ justifyContent: anchorJustify(), alignItems: "flex-start",
                            padding: anchorPad(u * 8, u * 5, u * 8) }}>
-      <div style={{
-        opacity: o, transform: `translateY(${rise}px)`, maxWidth: "72%",
-        background: CARD, borderLeft: `${u * 0.8}px solid ${ACCENT}`, borderRadius: u * 1.2,
-        padding: `${u * 2.4}px ${u * 3}px`, boxShadow: "0 6px 24px rgba(0,0,0,0.4)",
-      }}>
-        <div style={{ color: WHITE, fontSize: u * 5, fontWeight: 600, lineHeight: 1.18 }}>{text}</div>
-      </div>
+      {!T.card ? <Scrim heightPct={45} maxOpacity={0.9} /> : null}
+      <Surface side="left" style={{ ...cardStyle, padding: `${u * 2.4}px ${u * 3}px` }}>
+        <div style={textStyle}>{text}</div>
+      </Surface>
     </AbsoluteFill>
   );
 };
