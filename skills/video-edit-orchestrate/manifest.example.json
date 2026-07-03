@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "source": {
+    "path": "first_cut.mp4",
+    "w": 640, "h": 298, "fps": 24.0, "dur_s": 1831.3,
+    "hash": "sha256:3b1f...source"
+  },
+  "transcript": {
+    "path": "work/selfcheck/cut_transcript.json",
+    "hash": "sha256:9c2a...transcript"
+  },
+  "stages": {
+    "captions": {
+      "skill": "video-to-captions",
+      "enabled": true,
+      "workdir": "work/captions",
+      "inputs": {
+        "work/selfcheck/cut_transcript.json": "sha256:9c2a...transcript",
+        "first_cut.mp4": "sha256:3b1f...source"
+      },
+      "params": { "max_chars": 14, "karaoke": true },
+      "params_hash": "sha256:1884b8661ac247537a1f763aeb41e464e78edcad45374442f5f15b3d7a765c8c",
+      "decision": { "chunking": "approved", "name_fixes": { "social front": "Herschel Fruean" } },
+      "outputs": { "work/captions/out/caption-overlay.mov": "sha256:c0de...cap" },
+      "status": "done"
+    },
+    "remotion": {
+      "skill": "video-to-remotion",
+      "enabled": true,
+      "workdir": "work/remotion",
+      "inputs": {
+        "work/selfcheck/cut_transcript.json": "sha256:9c2a...transcript",
+        "first_cut.mp4": "sha256:3b1f...source"
+      },
+      "params": { "anchor": "top" },
+      "params_hash": "sha256:6488446f1833b452c9c700e69fb8e9c5805f4b91de95bf84322c3b0e8f1394e0",
+      "decision": { "kept_cues": ["intro", "lower-third@142", "stat@410", "outro"] },
+      "outputs": { "work/remotion/out/graphics-overlay.mov": "sha256:f00d...gfx" },
+      "status": "done"
+    },
+    "grade": {
+      "skill": "video-color-grade",
+      "enabled": true,
+      "workdir": "work/grade",
+      "inputs": { "first_cut.mp4": "sha256:3b1f...source" },
+      "params": { "crf": 18, "preset": "medium" },
+      "params_hash": "sha256:ab265cb8654e50e3643d7cdbe7d2b7322a84a54d7dc0a64d9ec051e13488b55a",
+      "decision": { "look": "clean_neutral" },
+      "outputs": {
+        "work/grade/out/graded.mp4": "sha256:beef...graded",
+        "work/grade/out/clean_neutral.cube": "sha256:1ce0...lut"
+      },
+      "status": "done"
+    }
+  },
+  "final": {
+    "composite_order": ["graded", "captions", "cards"],
+    "outputs": { "final.mp4": "sha256:fina...final" },
+    "status": "done"
+  }
+}
