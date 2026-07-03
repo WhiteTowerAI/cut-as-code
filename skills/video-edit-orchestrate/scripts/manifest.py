@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """video-edit-orchestrate manifest tool. Stdlib only. See SKILL.md."""
-import sys, json, hashlib, argparse, subprocess, os, tempfile
+import sys, json, hashlib, argparse, subprocess, os, tempfile, copy
 
 SKILL_OF = {
     "captions": "video-to-captions",
@@ -93,6 +93,31 @@ def load_manifest(path: str) -> dict:
     with open(path, encoding="utf-8") as f:
         return json.load(f)
 
+def fold_stage(manifest: dict, stage: str, stagefile: dict, hasher=None) -> dict:
+    if hasher is None:
+        hasher = hash_file
+    if stage not in manifest["stages"]:
+        raise KeyError(f"stage '{stage}' not in manifest (have {list(manifest['stages'])})")
+    m = copy.deepcopy(manifest)
+    st = m["stages"][stage]
+    st["params"] = stagefile.get("params", st.get("params", {}))
+    st["params_hash"] = params_hash(st["params"])
+    st["decision"] = stagefile.get("decision", st.get("decision", {}))
+    st["status"] = stagefile.get("status", "done")
+    st["inputs"] = {p: hasher(p) for p in stagefile.get("input_paths", [])}
+    st["outputs"] = {p: hasher(p) for p in stagefile.get("output_paths", [])}
+    return m
+
+def cmd_fold(args) -> int:
+    manifest = load_manifest(args.manifest)
+    with open(getattr(args, "from"), encoding="utf-8") as f:
+        stagefile = json.load(f)
+    manifest = fold_stage(manifest, args.stage, stagefile)
+    save_manifest(manifest, args.manifest)
+    print(f"[fold] {args.stage} <- {getattr(args, 'from')}: "
+          f"status={manifest['stages'][args.stage]['status']}")
+    return 0
+
 def cmd_init(args) -> int:
     enabled = [s.strip() for s in args.enable.split(",") if s.strip()]
     bad = [s for s in enabled if s not in SKILL_OF]
@@ -140,6 +165,30 @@ def selftest() -> int:
     m3 = build_manifest(src, ["remotion", "grade"])    # remotion without captions
     assert m3["stages"]["remotion"]["params"]["anchor"] == "bottom"
 
+    # --- Task 3: fold_stage merges ONE stage, leaves siblings untouched ---
+    fake = {"first_cut.mp4": "sha256:aaa", "cut.json": "sha256:bbb",
+            "cap.mov": "sha256:ccc"}
+    m4 = build_manifest(src, ["captions", "remotion", "grade"])
+    sf = {"params": {"max_chars": 12, "karaoke": False},
+          "decision": {"chunking": "approved"},
+          "input_paths": ["cut.json", "first_cut.mp4"],
+          "output_paths": ["cap.mov"], "status": "done"}
+    m5 = fold_stage(m4, "captions", sf, hasher=lambda p: fake[p])
+    c = m5["stages"]["captions"]
+    assert c["status"] == "done"
+    assert c["inputs"] == {"cut.json": "sha256:bbb", "first_cut.mp4": "sha256:aaa"}
+    assert c["outputs"] == {"cap.mov": "sha256:ccc"}
+    assert c["decision"] == {"chunking": "approved"}
+    assert c["params_hash"] == params_hash({"max_chars": 12, "karaoke": False})
+    # siblings untouched, and the input manifest was not mutated
+    assert m5["stages"]["remotion"]["status"] == "pending"
+    assert m4["stages"]["captions"]["status"] == "pending"
+    try:
+        fold_stage(m4, "nosuch", sf)
+        assert False, "expected KeyError"
+    except KeyError:
+        pass
+
     print("OK")
     return 0
 
@@ -151,11 +200,17 @@ def main() -> int:
     pi.add_argument("source")
     pi.add_argument("--enable", required=True)
     pi.add_argument("--out", default="manifest.json")
+    pf = sub.add_parser("fold")
+    pf.add_argument("--manifest", default="manifest.json")
+    pf.add_argument("--stage", required=True)
+    pf.add_argument("--from", dest="from", required=True)
     args = p.parse_args()
     if args.cmd == "selftest":
         return selftest()
     if args.cmd == "init":
         return cmd_init(args)
+    if args.cmd == "fold":
+        return cmd_fold(args)
     return 1
 
 if __name__ == "__main__":
