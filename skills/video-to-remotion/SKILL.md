@@ -44,6 +44,34 @@ resolution. One teal accent, 0.3 s fades. Four card jobs —
 **intro / chapter / lower-third / outro** (+ optional stat / keypoint / list) — written in
 editorial copy, not raw transcript fragments.
 
+### Theme system (change the look = change THEME, not the components)
+
+The whole look is driven by one switch in `src/themes.ts`, orthogonal to `ANCHOR`
+(top/bottom) in `anim.tsx`:
+
+```ts
+export const THEME = "editorial";   // "editorial" (documentary look) | "teal" (the old teal look)
+```
+
+- **`editorial`** (default): Archivo font, warm-white text, gold accent, hairline rules,
+  choreographed stagger entrance. Polish comes from type/tracking/thin rules — no film grain.
+- **`teal`**: the original teal dark-card look, frame-for-frame unchanged (zero regression).
+
+Three layers: `themes.ts` (theme data) → `anim.tsx` (building blocks `<Surface>/<Rule>/<Kicker>`
++ entrance hooks, all read the active theme `T`) → `components/*` (layout + anchoring only).
+The cue-sheet fields don't change.
+
+**To add a new style:**
+1. Add an entry to `THEMES` in `themes.ts`, filling the `Theme` fields (font, colors, `card`
+   vs scrim, `rule` bar/hairline, `kicker` case/spacing/weight, `motion` entrance family).
+2. If it uses a new font: add one more `loadFont()` at the top of `themes.ts`.
+3. Point `THEME` at the new name and render-check.
+4. Only if it needs a **genuinely new structure** (frosted glass, full-frame wipe, …): add a
+   field to `Theme` + one branch in the matching block (`<Surface>`/`<Rule>`) or `useEntrance`
+   — add it once, reuse it after.
+
+A common re-color / re-font theme is **step 1 only**.
+
 ## When to use
 - A finished/near-finished video needs **on-screen graphics derived from its content**:
   who's talking, the numbers they cite, the questions they pose, the lists they walk
@@ -60,6 +88,9 @@ editorial copy, not raw transcript fragments.
   - `package.json` with `remotion` + `@remotion/cli` (pin one 4.x, e.g. `4.0.230`) and
     **`react`/`react-dom` pinned to `18.3.1`** (don't let npm pull React 19 against an older
     Remotion), `tsconfig.json`, and `src/index.ts` → `registerRoot(RemotionRoot)`.
+  - **`@remotion/google-fonts`** (same 4.x version as `remotion`) — the `editorial` theme
+    loads `Archivo` via a top-level `loadFont()` in `themes.ts`. The `teal` theme uses a
+    system font and doesn't need it.
   - `public/source.mp4` — needed for `FinalEdit` still checks and the slow fallback because
     `OffthreadVideo` loads via `staticFile("source.mp4")`, which only resolves inside
     `public/`; an arbitrary path won't load. `npm install`, then render.
@@ -215,3 +246,9 @@ Plus:
   height so they read.
 - One rhythm + one look: every component reads timing/palette from `anim.tsx`.
 - The whole edit is text — re-readable, diffable, re-renderable.
+- **Theme consistent:** with `THEME` chosen, the font really is that theme's font (editorial =
+  Archivo, not the system default — confirm on a still, since a failed font load falls back
+  silently). Switching to `teal` should return frame-for-frame to the old teal look.
+- **Theme × anchor orthogonal:** grab a still for editorial/teal under each of
+  `ANCHOR="bottom"/"top"`; all four combinations satisfy the three rules (legible / face clear /
+  resolution-independent).
