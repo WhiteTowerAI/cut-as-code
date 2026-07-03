@@ -284,6 +284,36 @@ def selftest() -> int:
     assert "remotion" not in md          # disabled stage not shown
     assert "ffmpeg" in md                # join command block present
 
+    # --- Task 8: end-to-end lifecycle on real temp files ---
+    with tempfile.TemporaryDirectory() as d:
+        cut = os.path.join(d, "first_cut.mp4")
+        tr = os.path.join(d, "cut_transcript.json")
+        cap = os.path.join(d, "caption-overlay.mov")
+        for p, b in [(cut, b"CUT"), (tr, b"TRANS"), (cap, b"CAPMOV")]:
+            open(p, "wb").write(b)
+        srcx = {"path": cut, "w": 640, "h": 298, "fps": 24.0,
+                "dur_s": 10.0, "hash": hash_file(cut)}
+        man = build_manifest(srcx, ["captions", "remotion", "grade"])
+        # fold captions with real files -> hashes come from disk
+        man = fold_stage(man, "captions", {
+            "params": {"max_chars": 14, "karaoke": True},
+            "decision": {"chunking": "approved"},
+            "input_paths": [tr, cut], "output_paths": [cap], "status": "done"})
+        assert stage_dirty(man["stages"]["captions"]) == []      # clean right after fold
+        # mutate an input file -> captions goes dirty, siblings still pending-clean
+        open(tr, "wb").write(b"TRANS-EDITED")
+        reasons = stage_dirty(man["stages"]["captions"])
+        assert reasons == [f"changed:{tr}"], reasons
+        assert stage_dirty(man["stages"]["grade"]) == []         # grade untouched
+        # params drift -> dirty
+        man["stages"]["captions"]["params"] = {"max_chars": 20, "karaoke": True}
+        assert "params" in stage_dirty(man["stages"]["captions"])
+        # manifest round-trips through disk and renders
+        mp = os.path.join(d, "manifest.json")
+        save_manifest(man, mp)
+        assert load_manifest(mp)["stages"]["captions"]["decision"]["chunking"] == "approved"
+        assert "video-to-captions" in render_edit_md(load_manifest(mp))
+
     print("OK")
     return 0
 
