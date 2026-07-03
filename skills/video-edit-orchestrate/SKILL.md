@@ -127,8 +127,9 @@ python skills/video-edit-orchestrate/scripts/manifest.py init first_cut.mp4 \
   --enable captions,remotion,grade --out manifest.json
 ```
 
-Record the transcript path into the manifest's `transcript` block (hand-edit, or a later
-`fold`). **ANCHOR auto-settles:** when both `captions` and `remotion` are enabled, `init`
+Record the transcript path into the manifest's `transcript` block by hand-editing it —
+`fold` writes only per-stage blocks, never the top-level `transcript`. **ANCHOR
+auto-settles:** when both `captions` and `remotion` are enabled, `init`
 sets `remotion.params.anchor = "top"` so the cards clear the bottom captions — this is not
 a human gate, do not ask.
 
