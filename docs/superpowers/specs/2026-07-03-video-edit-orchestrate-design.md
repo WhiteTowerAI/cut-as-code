@@ -22,14 +22,21 @@ Nothing coordinates them, and two facts about that manual flow are wasteful:
 
 **Goals (priority order):**
 
-1. **Parallelize where it actually pays — the propose wave.** The three post-cut stages'
-   propose phases are LLM/network-bound (read the transcript, write card copy, fix ASR-mangled
-   names, vision-judge the looks sheet), **not** CPU-bound — so running them as concurrent
-   subagents is contention-free and collapses ~20–35 min of serial agent work to the longest
-   single branch. The CPU-bound renders are the opposite case (§8): one Remotion render already
-   saturates every core, so the two overlay renders **serialize by default** — grade's cheap
-   ffmpeg pass overlaps them, but two headless-Chromium renders do not fly on one box. Net:
-   a real parallel saving in the propose wave + one grade overlap; **not** a render-wave speedup.
+1. **Parallelize where it actually pays — the propose wave.** Each post-cut stage's propose
+   phase is a short local script (`build_captions.py`, `analyze_content.py`+`draft_cues.py`,
+   `assess.py`+`render_looks.py`) followed by the **dominant** cost: the LLM/network-bound
+   agent judgment on its output (read the transcript, write card copy, fix ASR-mangled names,
+   vision-judge the looks sheet). The judgment segment is genuinely contention-free across
+   branches; the script segments carry **light, bounded local CPU** — notably `render_looks.py`
+   compositing 5–6 looks on **one** representative frame (seconds-to-a-minute of single-frame
+   ffmpeg/numpy, *not* the 40k-frame full renders of §8). So concurrent propose subagents may
+   contend briefly on cores during those script segments, but that overlap is negligible beside
+   the LLM segments they parallelize — collapsing ~20–35 min of serial agent work toward the
+   longest single branch. Worth parallelizing; just not "zero contention." The CPU-bound
+   **renders** are the opposite case (§8): one Remotion render already saturates every core, so
+   the two overlay renders **serialize by default** — grade's cheap ffmpeg pass overlaps them,
+   but two headless-Chromium renders do not fly on one box. Net: a real parallel saving in the
+   propose wave + one grade overlap; **not** a render-wave speedup.
 2. **Independent per-branch gates, with the false cross-cuts removed** (§4). A co-equal
    payoff, not a side effect: ANCHOR collision and grade subtlety are auto-settled from the
    enabled-set (no human call), leaving three genuinely independent decisions; each branch
