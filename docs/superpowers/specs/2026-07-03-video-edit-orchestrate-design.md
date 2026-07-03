@@ -22,12 +22,24 @@ Nothing coordinates them, and two facts about that manual flow are wasteful:
 
 **Goals (priority order):**
 
-1. **Parallelize the independent stages** behind one agent-driven orchestrator, with a
-   single batched human-decision point instead of three scattered ones.
-2. **Introduce the edit manifest** — one `manifest.json` that is simultaneously the
+1. **Parallelize where it actually pays — the propose wave.** The three post-cut stages'
+   propose phases are LLM/network-bound (read the transcript, write card copy, fix ASR-mangled
+   names, vision-judge the looks sheet), **not** CPU-bound — so running them as concurrent
+   subagents is contention-free and collapses ~20–35 min of serial agent work to the longest
+   single branch. The CPU-bound renders are the opposite case (§8): one Remotion render already
+   saturates every core, so the two overlay renders **serialize by default** — grade's cheap
+   ffmpeg pass overlaps them, but two headless-Chromium renders do not fly on one box. Net:
+   a real parallel saving in the propose wave + one grade overlap; **not** a render-wave speedup.
+2. **Independent per-branch gates, with the false cross-cuts removed** (§4). A co-equal
+   payoff, not a side effect: ANCHOR collision and grade subtlety are auto-settled from the
+   enabled-set (no human call), leaving three genuinely independent decisions; each branch
+   advances on its own gate and a rejected proposal re-runs only that branch. Opportunistic
+   coalescing recovers the "decide several in one sitting / step away" ergonomic without
+   holding a fast branch hostage to the slowest proposer.
+3. **Introduce the edit manifest** — one `manifest.json` that is simultaneously the
    provenance document, the re-render recipe, and the dependency graph the orchestrator
    walks. This is the "documentation for future reference / further editing" the repo lacks.
-3. **Do not modify the four skills.** The orchestrator calls their existing scripts in
+4. **Do not modify the four skills.** The orchestrator calls their existing scripts in
    their existing documented order; their SKILL.md files stay the source of truth.
 
 **Non-goals:** no make-style auto-rebuild engine (staleness is *reported*, the agent
@@ -86,7 +98,7 @@ Six units. Only one is meaningfully new code.
 
 | Unit | What it is / does | Depends on |
 |---|---|---|
-| **`video-edit-orchestrate/SKILL.md`** | The playbook. Holds, per stage, the propose-phase and render-phase command lists (copied from each skill's documented steps), the fan-out procedure, the batch-gate procedure, and the join. Agent-driven. | the 4 skills, `manifest.py` |
+| **`video-edit-orchestrate/SKILL.md`** | The playbook. Holds, per stage, the propose-phase and render-phase command lists (copied from each skill's documented steps), the fan-out procedure, the per-branch gate + bounded re-propose loop, ANCHOR auto-settle rule, and the join. Agent-driven. | the 4 skills, `manifest.py` |
 | **`scripts/manifest.py`** | The only real new code (small). Three verbs: `init` (probe source → seed manifest), `fold` (merge a branch's `stage.json` into `manifest.json`), `status` (hash current files vs recorded inputs → print staleness). Plus `render` → `EDIT.md`. | ffprobe |
 | **`manifest.json`** | Source of truth: the edit doc + the DAG + the re-render recipe. **Orchestrator is its only writer.** | — |
 | **`EDIT.md`** | Human-readable view generated from the manifest (`manifest.py render`). Never hand-edited. | manifest.json |
@@ -97,7 +109,7 @@ The orchestrator sequences and merges; it never reimplements a skill. That is wh
 this an "orchestrator skill" and not the make-style job-runner that was considered and
 rejected.
 
-## 4. Control flow — two waves around one gate
+## 4. Control flow — per-branch pipelines, one serial root, one serial join
 
 Each of the four skills already splits into a **propose** phase and a **render** phase with
 the human gate sitting exactly on the seam — this is not invented, it is how the skills are
@@ -106,64 +118,96 @@ written:
 | Skill | propose phase (ends at the gate) | the gate (human) | render phase |
 |---|---|---|---|
 | color-grade | `assess.py` → `render_looks.py` → contact sheet | "present + STOP", pick a look # | `bake_lut.py` → `apply_grade.py --name CHOSEN` |
-| remotion | `analyze_content.py` → `draft_cues.py` | prune cues, write copy, set ANCHOR | render overlay |
+| remotion | `analyze_content.py` → `draft_cues.py` | prune cues, write copy | render overlay |
 | captions | `build_captions.py` → read `.srt` | approve chunking, fix ASR names | render overlay |
 | (rough-cut) | `transcribe.py`→`analyze.py`→`inspect_bounds.py` | hand-write `edit_coarse.json` | `build_edit`→`assign_speed`→`cut_render` |
 
-Flow:
+Each post-cut stage is an **independent pipeline** — propose → its own gate → render —
+fanned out after the serial root and rejoined at the serial composite. A branch advances the
+moment *its* gate clears; it never waits on a sibling.
 
 ```
-STAGE 0  rough-cut   [serial root; its own gate: hand-write edit_coarse.json]
+STAGE 0  rough-cut   [serial root; own gate: hand-write edit_coarse.json]
          → first_cut.mp4, transcript.json, cut_transcript.json  (folded into manifest)
                     │
-   ┌────────────────┼────────────────┐   WAVE 1 — propose (parallel subagents, one per branch)
-   ▼                ▼                ▼
- captions        remotion          grade
- build_captions  analyze+draft     assess+render_looks
- → .srt          → cues draft      → looks_compare.png
-   └── each writes work/<branch>/stage.json (proposal + artifacts), EXITS ──┘
-                    │
-              ╔═════▼═════╗  BATCH GATE — orchestrator reads all 3 stage.json, presents ONE table:
-              ║  human    ║   • captions: chunking OK? name fixes?
-              ║  decides  ║   • remotion: which cues, copy, ANCHOR = top|bottom?
-              ║  once     ║   • grade: pick look #
-              ╚═════╤═════╝   • cross-cut: captions+cards both bottom-anchored → collide;
-                    │            if shipping both, set cards ANCHOR="top". Keep grade look
-                    │            subtle (overlays sit on top of it).
-              records decisions → manifest.json (orchestrator is sole writer)
-   ┌────────────────┼────────────────┐   WAVE 2 — render (parallel subagents, concurrency-capped §8)
-   ▼                ▼                ▼
- caption-        graphics-        graded.mp4
- overlay.mov     overlay.mov      (apply_grade)
-   └────────────────┼────────────────┘
+   ┌────────────────┼─────────────────┐   fan out — one independent pipeline per enabled stage
+   ▼                ▼                 ▼
+ captions         remotion           grade
+ propose:         propose:           propose:
+  build_captions   analyze+draft      assess+render_looks
+  → .srt           → cues draft       → looks_compare.png
+   │ GATE:          │ GATE:            │ GATE:
+   │ chunking ok?   │ pruning ok?      │ pick look #
+   │ name fixes     │ copy ok?         │ (auto-hint: keep
+   │                │                  │  subtle — overlays
+   │ [reject →      │ [reject →        │  land on top)
+   │  re-propose]   │  re-propose]     │ [reject → re-propose]
+   ▼                ▼                 ▼
+ render:          render:            render:
+  caption-         graphics-          apply_grade
+  overlay.mov      overlay.mov        → graded.mp4
+   └────────────────┼─────────────────┘
                     ▼
-              JOIN [serial] — two single-overlay ffmpeg passes (§6) → final.mp4 → self-check
+              JOIN [serial; waits for every enabled branch]
+              two single-overlay ffmpeg passes (§6) → final.mp4 → self-check
 ```
 
-Stage 0 is serial because everything downstream needs the cut and the transcript. It is
-also **skippable**: if the operator already has `first_cut.mp4` + a transcript, the manifest
-is pointed at them and Wave 1 starts immediately.
+Each stage is **stateless end to end**: the propose-subagent runs its scripts, writes
+`work/<branch>/stage.json`, and **exits**; the orchestrator surfaces that branch's gate,
+records the answer into the manifest, then spawns a **fresh** render-subagent that reads the
+manifest and renders. No subagent ever stays alive holding an open question — the handoff is
+always a file. (This is why per-branch is *no harder to build* than batch: both hand off
+through files, neither needs a long-lived blocked agent. An earlier draft claimed per-branch
+required that live-blocked agent — it does not.)
 
-**Every stage is opt-in.** The manifest lists only enabled stages; the orchestrator fans
-out whatever is present. captions + grade with no cards is a valid two-branch run.
+**ANCHOR is auto-settled, never asked.** Captions are inherently bottom (the reading
+safe-zone); cards must clear them. So *whenever both captions and remotion are enabled*, the
+orchestrator sets `remotion.params.anchor = "top"` at manifest-init — the skills' own
+"combining" sections mandate exactly this rule. It is not a line item on any gate. (The value
+lives in the manifest, so an operator can still override it there; they are simply not asked.)
+With cards disabled, ANCHOR stays at its `bottom` default — no collision to settle.
 
-### Why batch (the settled decision)
+**Grade's "keep it subtle" is an auto-injected hint, not a cross-stage decision.** Whether
+overlays will sit on top is known from the *enabled-set* at init, not from the caption/card
+*proposal content* — so when any overlay stage is enabled, the orchestrator surfaces that
+advisory at grade's own gate. The human still picks the look; they need not see the other
+branches' proposals to pick well.
 
-Raw scheduling favors per-branch gates slightly (`max_i(propose_i+render_i)` ≤
-`max_i propose + max_i render`). Batch was chosen anyway for two reasons that outweigh a
-wash on wall-clock:
+**A rejected proposal re-runs only that branch's propose phase** — a bounded loop (default 3
+rounds, then the orchestrator asks how to proceed). Siblings are unaffected: an approved grade
+can be rendering while remotion re-proposes. This is the redo path the two-wave model had no
+slot for; per-branch treats it as the normal case.
 
-1. **The human is a serial, often-AFK resource.** Batching = one decision sitting, step
-   away between waves; per-branch = three unpredictable interrupts, and a branch blocks if
-   you are away when its gate arrives.
-2. **The decisions interact.** captions and cards collide (both bottom-anchored); grade must
-   stay subtle *because* overlays land on top. Deciding these blind, per-branch, invites
-   rework (e.g. re-render cards after seeing the grade). One table decides them coherently.
+**Opportunistic coalescing (ergonomics, not a third model).** If more than one branch's gate
+is ready when the operator engages, the orchestrator presents them together — recovering
+batch's "decide several in one sitting / step away" feel *without* holding a fast branch's
+gate hostage to the slowest proposer. It is strictly "show all currently-ready gates," never
+"wait until all are ready."
 
-Batch is also the **simpler, more robust build**: propose-subagents and render-subagents are
-stateless and short-lived, handing off through files. Per-branch would need a subagent to
-stay alive and blocked mid-skill holding a round-trip question — exactly the long-lived job
-the improvement report notes gets reaped when a session idles.
+**Every stage is opt-in.** The manifest lists only enabled stages; the orchestrator fans out
+whatever is present. captions + grade with no cards is a valid two-branch run.
+
+Stage 0 is the serial root (everything downstream needs the cut + transcript) and is
+**skippable**: point the manifest at an existing `first_cut.mp4` + transcript and the fan-out
+starts immediately. The JOIN is the serial reduce — it waits for every enabled branch's render.
+
+### Why per-branch (the settled decision)
+
+Batch (propose-wave → one gate → render-wave) was designed first; two findings flipped it:
+
+1. **The decisions do not actually interact.** Both apparent cross-cuts dissolve: ANCHOR is
+   auto-settled from the enabled-set, and grade's "subtle" is an auto-injected hint from the
+   enabled-set — neither needs one branch's *proposal content* to answer another's gate. What
+   remains are three genuinely independent judgment calls (chunking / pruning+copy / look).
+2. **Rejection is first-class.** Remotion's propose does the skill's core creative work (prune
+   ~20 opportunities to ~6, write editorial copy); "redo this branch" is a normal outcome, not
+   an exception. Per-branch loops that one branch while siblings proceed; batch would either
+   stall approved branches waiting on the re-proposal or silently degrade into per-branch timing.
+
+Per-branch is also **not harder to build** (equal statelessness, above) and **not slower** —
+the render cap (§8) serializes the heavy renders either way, and per-branch lets a fast branch
+(grade) finish while a slow one (remotion copy) is still proposing. Batch's only real edge —
+"one sitting, walk away" — is recovered by opportunistic coalescing.
 
 ## 5. The manifest (the interface everything talks through)
 
@@ -218,6 +262,11 @@ stage), the re-render recipe (inputs + params reproduce any stage), and the DAG 
 orchestrator walks. `EDIT.md` is its human projection — a table of source → each stage's
 decisions/params/outputs + the composite command — regenerated, never hand-edited.
 
+`status` (§9) hashes each stage's `inputs` **and** its `params` block, so a params-only edit
+(e.g. caption chunking) is caught without any file changing. `decision` is provenance, not a
+staleness input — it records *what the human chose*, and re-running a stage on a new decision
+is an explicit agent action, not something `status` needs to detect.
+
 ## 6. The join — two single-overlay passes, not one 3-way chain
 
 The final composite layers `graded.mp4` (base) + `caption-overlay.mov` + `graphics-overlay.mov`.
@@ -236,8 +285,9 @@ ffmpeg -y -i work/_capped.mp4 -i work/remotion/graphics-overlay.mov \
   -map "[v]" -map 0:a? -c:v libx264 -crf 18 -preset veryfast -c:a copy -movflags +faststart out/final.mp4
 ```
 
-Captions stay bottom-anchored; cards are re-anchored to top (the gate decision) so the two
-layers do not overlap. If only one overlay stage is enabled, the join is a single pass.
+Captions stay bottom-anchored; cards are auto-re-anchored to top (§4, set at manifest-init
+whenever both overlay stages are enabled) so the two layers do not overlap. If only one
+overlay stage is enabled, the join is a single pass and ANCHOR stays at its `bottom` default.
 
 ## 7. Isolation — subdirs, not worktrees
 
@@ -248,15 +298,31 @@ safe parallel fan-out. Grade is pure Python + ffmpeg and needs no project scaffo
 worktrees would add a per-branch `npm install` and disk cost for no isolation benefit over
 subdirs here. `// ponytail: subdir isolation; worktrees buy nothing extra for this`
 
-## 8. Compute cap — the honest ceiling
+## 8. Compute cap — why the renders serialize (cap=1 is technical, not timid)
 
-Two headless-Chromium Remotion overlay renders at ~40k frames are heavy; the improvement
-report records such renders being reaped. So "parallel renders" is partly aspirational on one
-machine. Default policy: **grade's single cheap ffmpeg pass runs alongside the renders freely,
-but the two Remotion overlay renders serialize against each other** unless a
-`--max-render-concurrency` knob is raised. Renders run under a foreground/monitoring process
-that emits progress (never detached fire-and-forget, which gets reaped when the session idles).
-`// ponytail: cap=1 heavy render by default; expose the knob, don't pretend 2 fit`
+**A single Remotion render already saturates the machine.** Its `--concurrency` default fans
+frame rendering across N headless-Chrome workers = all cores. So a second simultaneous render
+finds **no idle capacity**: it time-slices the same cores across 2× the work (a wash in
+core-seconds at best) while **doubling peak RAM** — two Chrome worker pools + two ProRes-4444
+alpha streams (a full alpha frame every frame, multiple GB each). That memory blow-up is a real
+OOM failure mode, so two-in-parallel is typically *worse* than sequential, not faster. Default
+policy: **grade's single cheap ffmpeg pass overlaps the renders freely, but the two Remotion
+overlay renders serialize** unless `--max-render-concurrency` is raised (meaningful only on
+multiple machines, or a render deliberately run at low `--concurrency` with core headroom).
+
+**Two distinct kill modes — don't conflate them.** The improvement report shows both:
+(a) **session-idle reaping** of *detached* background renders — a process-supervision problem,
+fixed by keeping every render in a **monitored foreground job** that emits progress; orthogonal
+to concurrency. (b) **resource exhaustion** — the one that two-in-parallel worsens. cap=1 targets
+(b); the foreground-job rule targets (a).
+
+**The lever that does exist on one box** is not "run both at once" but: tune a single render's
+`--concurrency`, and use the VP8-alpha webm overlay path (§below) to cut the RAM/disk that
+kills renders. Asymmetric weight is worth noting but not promising — the captions overlay is
+*dense* (full-frame alpha every frame), the graphics overlay is *sparse* (mostly empty alpha,
+lighter); the sparse one might fit under the dense one's headroom, but that needs measuring
+before the cap is raised.
+`// ponytail: one render already = all cores; cap=1 avoids an OOM, not a speedup`
 
 **Disk fallback:** the transparent overlays are large deletable intermediates (a full alpha
 frame every frame — multiple GB). Delete each `.mov` after the join. Under disk pressure,
@@ -268,18 +334,29 @@ render overlays as VP8-alpha webm instead of ProRes 4444 (~100× smaller, same q
 - **A failed branch is isolated.** It writes `status:"failed"` + the error into its
   `stage.json`; the orchestrator folds that in but does not overwrite siblings' good outputs.
   Re-running that one branch reuses its recorded inputs.
-- **Staleness is reported, not auto-rebuilt.** `manifest.py status` hashes current files
-  against recorded `inputs` and prints what is dirty: change `edit_coarse.json` → transcript
-  changes → captions + remotion + grade all stale; change only caption chunking → captions
-  only. The **agent** decides what to re-run from that report. Recording hashes is what makes
-  the manifest useful for iterative re-editing; the decision engine stays the agent.
-  `// ponytail: report staleness; agent rebuilds — not a make graph`
+- **Direct-input staleness only — reported, not auto-rebuilt.** `manifest.py status` marks a
+  stage dirty when any of *its own recorded direct inputs* changed: an input **file** whose
+  hash differs, or a changed `params` value (params are hashed alongside the input files — a
+  cheap per-stage check, not a graph walk). Examples that hold under this rule: regenerate the
+  cut → `first_cut.mp4` / `cut_transcript.json` hashes change → captions, remotion, grade all
+  flag dirty **because those files are their recorded direct inputs**; change only caption
+  chunking (a `param`) → captions dirty, others clean. The **agent** decides what to re-run
+  from that report.
+- **Deliberate limit (no transitive walk).** `status` does **not** trace an edit back through a
+  stage's *internals*. Rough-cut is the serial root, not a manifest stage (its outputs live in
+  top-level `source`/`transcript`, §5), so editing its internal `edit_coarse.json` is invisible
+  to `status` until you re-run rough-cut — at which point the changed `first_cut.mp4` /
+  `cut_transcript.json` hashes make the downstream stages flag dirty through the normal
+  direct-input check above. Modelling rough-cut as a stage and propagating dirtiness upstream→
+  downstream would be a true dependency graph — i.e. the make-style engine this design lists as
+  a non-goal (§1). We stay one level shy of it on purpose.
+  `// ponytail: direct-input + params dirty check; re-run rough-cut yourself, no make graph`
 
 ## 10. Files created
 
 | File | Change |
 |---|---|
-| `skills/video-edit-orchestrate/SKILL.md` | **New.** Playbook: dependency graph, per-stage propose/render command lists, fan-out procedure, batch-gate procedure, two-pass join, self-check, opt-in/skip rules, compute cap. |
+| `skills/video-edit-orchestrate/SKILL.md` | **New.** Playbook: dependency graph, per-stage propose/render command lists, fan-out procedure, per-branch gate + bounded re-propose loop, ANCHOR auto-settle rule, two-pass join, self-check, opt-in/skip rules, compute cap. |
 | `skills/video-edit-orchestrate/scripts/manifest.py` | **New.** `init` / `fold` / `status` / `render` (→ `EDIT.md`). Small; ffprobe for source probe, hashlib for staleness. |
 | `skills/video-edit-orchestrate/manifest.example.json` | **New.** A worked manifest (like the repo's `looks.example.json` / `overlays.example.json`). |
 | the 4 existing skills | **Unchanged.** |
@@ -293,9 +370,11 @@ runnable check on the only non-trivial new logic:
   fixture; `fold` a fake `stage.json`; assert the stage lands with its hashes; mutate a file
   and assert `status` flags exactly the dependent stages dirty. This is the money path (hashing
   + dependency propagation), so it gets the one test. `// ponytail: one self-check on the DAG logic`
-- **Dry-run orchestration:** on a short clip, confirm Wave 1 produces three `stage.json`, the
-  gate table lists all three decisions, Wave 2 produces the three artifacts in isolated dirs,
-  and the two-pass join yields `final.mp4` at source geometry.
+- **Dry-run orchestration:** on a short clip, confirm the fan-out produces one `stage.json`
+  per enabled branch, each branch's gate surfaces its own decision, ANCHOR auto-sets to `top`
+  when both overlay stages are on, a rejected proposal re-runs only that branch (bounded loop),
+  the render artifacts land in isolated dirs, and the two-pass join yields `final.mp4` at
+  source geometry.
 - **Join correctness:** a still mid-video shows **both** captions (bottom) and a card (top) —
   the check that catches the silent-overlay-drop regression.
 - **Provenance round-trip:** `manifest.py render` yields an `EDIT.md` whose commands + decisions
@@ -304,12 +383,17 @@ runnable check on the only non-trivial new logic:
 ## 12. Risks
 
 - **Low:** the manifest schema and `init/fold/status` are straightforward JSON + hashing.
-- **Medium:** real parallel speedup is capped by render contention (§8) — the win is as much
-  "one coherent decision point + full provenance" as raw wall-clock. Stated honestly so the
-  skill does not over-promise "3× faster".
-- **Medium:** the batch gate's cross-cutting advice (anchor collision, subtle grade) must be
-  spelled out in SKILL.md or an operator picks a heavy look and re-renders cards. Mitigated by
-  making it an explicit line item on the gate table.
+- **Medium:** the parallel win is real but *located* — the LLM-bound propose wave (§1,
+  contention-free) plus one grade overlap — **not** the CPU-bound render wave, which serializes
+  by default (§8). The skill must sell "faster decisions + full provenance + a propose-wave
+  saving," never a render-wave "3× faster" it can't deliver on one machine.
+- **Low–medium:** the former cross-cutting decisions are now auto-settled (ANCHOR from the
+  enabled-set; grade "subtle" as an auto-injected hint), so the operator can't forget them —
+  but the auto-settle rules must be correct and documented in SKILL.md. The residual risk is a
+  wrong *auto* rule (e.g. ANCHOR not flipping), caught by the join self-check (a still showing
+  captions bottom + card top).
+- **Low:** per-branch adds a bounded re-propose loop; if a proposal is rejected >3 rounds the
+  orchestrator must stop and ask rather than loop forever (explicit cap in SKILL.md).
 
 ## 13. Open confirmation points
 
