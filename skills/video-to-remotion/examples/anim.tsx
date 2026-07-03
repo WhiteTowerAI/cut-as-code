@@ -13,6 +13,7 @@ import * as React from "react";
 import {
   AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig,
 } from "remotion";
+import { T } from "./themes";
 
 // --- timing (frames @ 24fps) — tweak the feel in one place -----------------
 export const TIMING = {
@@ -25,13 +26,13 @@ export const TIMING = {
 
 export const EASE_OUT = Easing.bezier(0.16, 1, 0.3, 1);
 
-// --- palette: one teal accent on dark cards; white / muted text ------------
-// (aligned to the video-overlay-cards look: INK card + WHITE text + teal bar)
-export const INK    = "#0C141C";   // dark card / scrim base
-export const ACCENT = "#26CAA8";   // teal accent
-export const WHITE  = "#F5F8F9";
-export const MUTED  = "#B7C6CE";
-export const CARD   = "rgba(12,20,28,0.82)";   // semi-opaque card fill
+// --- palette: 由当前主题 T 提供(themes.ts)。保留旧常量名,组件无需改 import。
+export const INK    = T.color.scrimBase;   // 深色卡/scrim 底
+export const ACCENT = T.color.accent;      // 强调色
+export const WHITE  = T.color.text;         // 主文字
+export const MUTED  = T.color.textMuted;    // 次文字
+// CARD: teal 为半透卡填色;editorial(card=null)退化为透明——迁移后组件不再用它。
+export const CARD   = T.card ? T.card.bg : "transparent";
 
 // --- resolution-independent sizing -----------------------------------------
 // u(6) === 6% of canvas height. Author every size in these fractions so the
@@ -75,22 +76,32 @@ export const useFade = (durFrames?: number): number => {
   return Math.min(fin, fout);
 };
 
+// #RRGGBB + alpha(0..1) → rgba(),供渐变用(scrimBase 是 hex)。
+const hexA = (hex: string, a: number): string => {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${a})`;
+};
+
 // A soft scrim (transparent -> INK) on the anchored edge so text stays legible
 // on busy footage. Used by full-width cards (chapter / intro / outro / list).
 // Follows ANCHOR: a bottom band by default, a top band (reversed gradient) when
 // flipped — INK is always densest at the anchored edge, fading toward center.
 export const Scrim: React.FC<{ heightPct?: number; maxOpacity?: number }> = ({
   heightPct = 45, maxOpacity = 0.88,
-}) => (
-  <AbsoluteFill style={
+}) => {
+  const base = T.color.scrimBase;
+  const grad = (op: number) =>
     ANCHOR === "top"
-      ? {
-          top: 0, bottom: "auto", height: `${heightPct}%`,
-          background: `linear-gradient(to top, rgba(12,20,28,0), rgba(12,20,28,${maxOpacity}))`,
-        }
-      : {
-          top: `${100 - heightPct}%`,
-          background: `linear-gradient(to bottom, rgba(12,20,28,0), rgba(12,20,28,${maxOpacity}))`,
-        }
-  } />
-);
+      ? `linear-gradient(to top, ${hexA(base, 0)}, ${hexA(base, op)})`
+      : `linear-gradient(to bottom, ${hexA(base, 0)}, ${hexA(base, op)})`;
+  return (
+    <AbsoluteFill style={
+      ANCHOR === "top"
+        ? { top: 0, bottom: "auto", height: `${heightPct}%`, background: grad(maxOpacity) }
+        : { top: `${100 - heightPct}%`, background: grad(maxOpacity) }
+    } />
+  );
+};
