@@ -105,3 +105,70 @@ export const Scrim: React.FC<{ heightPct?: number; maxOpacity?: number }> = ({
     } />
   );
 };
+
+// --- 第 2 层积木:组件只用这些拼装,样式值全来自 T ------------------------
+
+// Surface: 文字底板。实心卡(teal)或透明(editorial,靠 Scrim 保证可读)。
+// 只管主题化的卡片外观(底色/圆角/投影/强调边)+ card=null 的透明退化。
+// padding 与其它布局由调用方经 `style` 传入(那是第 3 层组件的职责),这样每个
+// 组件都能保留自己今天的精确 padding/边宽,teal 零回归。side/widthU 可覆盖,
+// 因为各卡片的强调边位置与粗细本就不同(LowerThird 0.8u左、Stat 0.6u下)。
+export const Surface: React.FC<{
+  side?: "left" | "bottom"; widthU?: number;
+  style?: React.CSSProperties; children: React.ReactNode;
+}> = ({ side, widthU, style, children }) => {
+  const u = useUnit();
+  const c = T.card;
+  if (!c) return <div style={style}>{children}</div>;   // editorial:透明,靠 Scrim
+  const s = side ?? c.borderSide;
+  const w = u * (widthU ?? c.borderWidthU);
+  const border =
+    s === "left"
+      ? { borderLeft: `${w}px solid ${c.borderColor}` }
+      : { borderBottom: `${w}px solid ${c.borderColor}` };
+  return (
+    <div style={{
+      background: c.bg, borderRadius: u * c.radiusU, boxShadow: c.shadow,
+      ...border, ...style,
+    }}>{children}</div>
+  );
+};
+
+// Rule: 分隔/强调线。bar=粗竖条(teal 的左边条);hairline=细线+accent 小段(editorial)。
+// progress(0..1):stagger 入场时由 useDraw 传入,做 0→满宽的描线;fade 主题默认 1。
+export const Rule: React.FC<{ widthU?: number; progress?: number }> = ({
+  widthU = 36, progress = 1,
+}) => {
+  const u = useUnit();
+  if (T.rule === "bar") {
+    // teal:细高的一段(SectionCard 用作 title 下的强调条)。
+    return <div style={{ height: u * 0.6, width: u * widthU * progress,
+      background: T.color.accent, borderRadius: u * 0.3 }} />;
+  }
+  // editorial hairline:整条细线(淡文字色) + 左端一小段 accent。淡色由 T 派生,
+  // 不写死(hexA 在本文件 Task 3 已定义)。
+  const seg = u * 6; // accent 段长(u=6)
+  const full = u * widthU * progress;
+  return (
+    <div style={{ position: "relative", height: u * 0.35, width: full,
+      background: hexA(T.color.text, 0.32) }}>
+      <div style={{ position: "absolute", left: 0, top: 0, height: "100%",
+        width: Math.min(seg, full), background: T.color.accent }} />
+    </div>
+  );
+};
+
+// Kicker: 小标题(EPISODE 14 / PART 1 …)。大小写与字距来自 T.kicker。
+export const Kicker: React.FC<{ children: React.ReactNode; style?: React.CSSProperties }> = ({
+  children, style,
+}) => {
+  const u = useUnit();
+  return (
+    <div style={{
+      color: T.color.accent, fontFamily: T.font, fontSize: u * 2.6, fontWeight: T.weight.med,
+      letterSpacing: T.kicker.case === "upper" ? `${T.kicker.spacingEm}em` : u * 0.2,
+      textTransform: T.kicker.case === "upper" ? "uppercase" : "none",
+      ...style,
+    }}>{children}</div>
+  );
+};
