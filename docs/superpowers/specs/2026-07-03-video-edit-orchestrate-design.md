@@ -107,7 +107,7 @@ Six units. Only one is meaningfully new code.
 |---|---|---|
 | **`video-edit-orchestrate/SKILL.md`** | The playbook. Holds, per stage, the propose-phase and render-phase command lists (copied from each skill's documented steps), the fan-out procedure, the per-branch gate + bounded re-propose loop, ANCHOR auto-settle rule, and the join. Agent-driven. | the 4 skills, `manifest.py` |
 | **`scripts/manifest.py`** | The only real new code (small). Three verbs: `init` (probe source → seed manifest), `fold` (merge a branch's `stage.json` into `manifest.json`), `status` (hash current files vs recorded inputs → print staleness). Plus `render` → `EDIT.md`. | ffprobe |
-| **`manifest.json`** | Source of truth: the edit doc + the DAG + the re-render recipe. **Orchestrator is its only writer.** | — |
+| **`manifest.json`** | Source of truth: the edit doc + the DAG + the re-render recipe. **Orchestrator is its only writer, and serializes those writes** (§3.1). | — |
 | **`EDIT.md`** | Human-readable view generated from the manifest (`manifest.py render`). Never hand-edited. | manifest.json |
 | **per-branch `work/<branch>/stage.json`** | A branch subagent's private output slot: its proposal, params, artifact paths+hashes, status. Avoids concurrent writes to the manifest. | — |
 | **the 4 existing skills** | **Unchanged.** Their scripts are invoked; their SKILL.md stays authoritative for *how* each script works. | — |
@@ -115,6 +115,23 @@ Six units. Only one is meaningfully new code.
 The orchestrator sequences and merges; it never reimplements a skill. That is what keeps
 this an "orchestrator skill" and not the make-style job-runner that was considered and
 rejected.
+
+### 3.1 Serialized manifest writes (no lock needed)
+
+"Orchestrator is the only writer" is necessary but **not sufficient** — a single writer can
+still corrupt the file via a read-modify-write race on itself: with per-branch fan-out (§4),
+branches finish at different times, so the orchestrator folds several `stage.json` into the
+manifest at different moments (plus writes `decision` at each gate and `anchor` at init). If it
+folded two of these concurrently, each would read the pre-fold manifest, and the second write
+would clobber the first stage's fold.
+
+**Rule (design-level, must be honored by the implementation):** the orchestrator **serializes
+all manifest writes** — every mutation is one atomic *read → merge exactly one stage → write
+back*, and these run one at a time even when the branches themselves run in parallel. Branches
+fan out and do their heavy work concurrently; only the millisecond-scale `fold`/`decision`
+write is queued. This gives correctness **without a file lock** (fits the thin-sequencer
+model): the queue *is* the mutual exclusion. `manifest.py fold` therefore takes exactly one
+stage per call and never batch-merges. `// ponytail: serial folds = free mutual exclusion; no lockfile`
 
 ## 4. Control flow — per-branch pipelines, one serial root, one serial join
 
