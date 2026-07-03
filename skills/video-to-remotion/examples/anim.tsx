@@ -43,10 +43,12 @@ export const useUnit = () => useVideoConfig().height / 100;
 // Set "top" to clear bottom captions when compositing captions + cards on one
 // video (video-to-captions). Every component reads it via the two helpers below
 // (justify + padding) and Scrim flips with it, so this single line moves them all.
-// To flip, change only the VALUE. Keep the `"bottom" | "top"` union annotation —
-// without it TS infers the literal "bottom" and every `=== "top"` branch below
-// becomes a TS2367 "no overlap" error, breaking the top path.
-export const ANCHOR: "bottom" | "top" = "bottom";
+// To flip, change only the VALUE ("bottom" -> "top"). The `as "bottom" | "top"`
+// widening is load-bearing: a plain annotated `const ANCHOR: ... = "bottom"` gets
+// narrowed by TS to the literal "bottom" at the comparison sites below, so every
+// `=== "top"` branch trips a TS2367 "no overlap" error, breaking the top path.
+// The `as` keeps the const's static type wide so both branches stay reachable.
+export const ANCHOR = "bottom" as "bottom" | "top";
 
 // justifyContent for a card's AbsoluteFill so it sits on the anchored edge.
 export const anchorJustify = (): "flex-start" | "flex-end" =>
