@@ -172,3 +172,40 @@ export const Kicker: React.FC<{ children: React.ReactNode; style?: React.CSSProp
     }}>{children}</div>
   );
 };
+
+// --- 第 2 层:stagger 入场编排(editorial)。fade 主题的组件不调用这些。------
+// 统一用 EASE_OUT,不 bounce(纪录片规矩)。所有位移用 useUnit 派生,分辨率无关。
+
+// 0→1 绘出进度,delay 帧后开始,历时 TIMING.overlayIn。
+export const useDraw = (delay = 0): number => {
+  const f = useCurrentFrame();
+  return interpolate(f, [delay, delay + TIMING.overlayIn], [0, 1],
+    { easing: EASE_OUT, extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+};
+
+// 左→右擦入:inset(0 <right>% 0 0),right 从 100→0。
+export const useClipReveal = (delay = 0): string => {
+  const f = useCurrentFrame();
+  const p = interpolate(f, [delay, delay + TIMING.reveal], [100, 0],
+    { easing: EASE_OUT, extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  return `inset(0 ${p}% 0 0)`;
+};
+
+export type EntranceRole = "kicker" | "title" | "rule" | "sub";
+
+// stagger 家族:每个角色错开 TIMING.stagger 帧登场。返回该帧的样式片段。
+// title 用 clipPath 擦入,其余用 淡入+上浮。clip 在顶层无条件计算(满足 hook 规则)。
+export const useEntrance = (role: EntranceRole): {
+  opacity: number; transform: string; clipPath?: string;
+} => {
+  const f = useCurrentFrame();
+  const u = useUnit();
+  const order: Record<EntranceRole, number> = { kicker: 0, title: 1, rule: 2, sub: 3 };
+  const delay = order[role] * TIMING.stagger;
+  const clip = useClipReveal(delay);            // 无条件调用,满足 hook 规则
+  const p = interpolate(f, [delay, delay + TIMING.reveal], [0, 1],
+    { easing: EASE_OUT, extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  if (role === "title") return { opacity: p, transform: "none", clipPath: clip };
+  const rise = interpolate(p, [0, 1], [u * 1.2, 0]);
+  return { opacity: p, transform: `translateY(${rise}px)` };
+};
