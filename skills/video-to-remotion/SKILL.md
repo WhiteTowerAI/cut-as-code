@@ -40,7 +40,8 @@ background (a **scrim** or a **dark card**) so it's legible on any picture; it i
 **edge-anchored** so it never covers the speaker's face — the `ANCHOR` knob in `anim.tsx`
 sets which edge, defaulting to **bottom** (the lower-third safe zone), flip to **top** to
 clear bottom captions; and its sizes are a **% of canvas height** so it reads at any
-resolution. One teal accent, 0.3 s fades. Four card jobs —
+resolution. One accent color, 0.3 s fades (both set by the active theme — see Theme system
+below). Four card jobs —
 **intro / chapter / lower-third / outro** (+ optional stat / keypoint / list) — written in
 editorial copy, not raw transcript fragments.
 
@@ -64,6 +65,12 @@ The cue-sheet fields don't change.
 **To add a new style:**
 1. Add an entry to `THEMES` in `themes.ts`, filling the `Theme` fields (font, colors, `card`
    vs scrim, `rule` bar/hairline, `kicker` case/spacing/weight, `motion` entrance family).
+   **If you set `card: null`** (text rides a scrim, not a solid card) you MUST also set
+   `scrimPlate` — the small cards (lower-third / stat / keypoint) don't span the frame, so
+   without a local plate their text drops to ~1.2–2:1 contrast on bright footage and fails
+   rule #1. `scrimPlate` is typed optional only because a `card` theme doesn't need it; a
+   `card: null` theme without it will type-check but ship illegible small cards. (`editorial`
+   is the worked example.)
 2. If it uses a new font: add one more `loadFont()` at the top of `themes.ts`.
 3. Point `THEME` at the new name and render-check.
 4. Only if it needs a **genuinely new structure** (frosted glass, full-frame wipe, …): add a
@@ -88,9 +95,9 @@ A common re-color / re-font theme is **step 1 only**.
   - `package.json` with `remotion` + `@remotion/cli` (pin one 4.x, e.g. `4.0.230`) and
     **`react`/`react-dom` pinned to `18.3.1`** (don't let npm pull React 19 against an older
     Remotion), `tsconfig.json`, and `src/index.ts` → `registerRoot(RemotionRoot)`.
-  - **`@remotion/google-fonts`** (same 4.x version as `remotion`) — the `editorial` theme
-    loads `Archivo` via a top-level `loadFont()` in `themes.ts`. The `teal` theme uses a
-    system font and doesn't need it.
+  - **`@remotion/google-fonts`** (same 4.x version as `remotion`) — `themes.ts` calls
+    `loadFont()` for `Archivo` at the top level, so the package must be installed for either
+    theme to build. Only the `editorial` theme uses the glyphs; `teal` uses a system font.
   - `public/source.mp4` — needed for `FinalEdit` still checks and the slow fallback because
     `OffthreadVideo` loads via `staticFile("source.mp4")`, which only resolves inside
     `public/`; an arbitrary path won't load. `npm install`, then render.
@@ -166,7 +173,7 @@ word (grep `work/transcript.json` for the phrase, read its start time). No timel
 ### 5. Write the copy + fill the components
 The components already exist in `examples/components/` (`Intro`, `SectionCard` = chapter,
 `LowerThird`, `StatCallout`, `KeypointCallout`, `ListReveal`, `Outro`) — all on the one
-design language (scrim/card, bottom-anchored, height-relative, teal accent, reading timing
+design language (scrim/card, bottom-anchored, height-relative, theme accent, reading timing
 from `anim.tsx`). You rarely redraw them; the real work is the **copy**:
 - **Write, don't paste.** A lower-third is `line1` (the entity) + `line2` (a one-line
   *editorial gloss* you write — "a 62–19 blowout", "#1 in the country"), not a raw clause.

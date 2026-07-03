@@ -30,7 +30,8 @@ export const TIMING = {
 
 export const EASE_OUT = Easing.bezier(0.16, 1, 0.3, 1);
 
-// --- palette: 由当前主题 T 提供(themes.ts)。保留旧常量名,组件无需改 import。
+// --- palette: 由当前主题 T 提供(themes.ts)。这些旧常量名现已无组件引用(迁移后
+// 都改读 T);保留为向后兼容的导出,方便外部样板/旧代码沿用,删之亦无妨。
 export const INK    = T.color.scrimBase;   // 深色卡/scrim 底
 export const ACCENT = T.color.accent;      // 强调色
 export const WHITE  = T.color.text;         // 主文字
@@ -80,12 +81,16 @@ export const useFade = (durFrames?: number): number => {
   return Math.min(fin, fout);
 };
 
-// #RRGGBB + alpha(0..1) → rgba(),供渐变用(scrimBase 是 hex)。
+// color + alpha(0..1) → a color usable in gradients. Handles #RGB / #RRGGBB (the
+// form both shipped themes use); any already-alpha or functional color (rgba()/rgb()/
+// named) is passed through with its alpha assumed handled by the caller's maxOpacity.
 const hexA = (hex: string, a: number): string => {
   const h = hex.replace("#", "");
-  const r = parseInt(h.slice(0, 2), 16);
-  const g = parseInt(h.slice(2, 4), 16);
-  const b = parseInt(h.slice(4, 6), 16);
+  if (h.length !== 3 && h.length !== 6) return hex;   // not a plain hex → don't mangle
+  const dup = h.length === 3;
+  const r = parseInt(dup ? h[0] + h[0] : h.slice(0, 2), 16);
+  const g = parseInt(dup ? h[1] + h[1] : h.slice(2, 4), 16);
+  const b = parseInt(dup ? h[2] + h[2] : h.slice(4, 6), 16);
   return `rgba(${r},${g},${b},${a})`;
 };
 

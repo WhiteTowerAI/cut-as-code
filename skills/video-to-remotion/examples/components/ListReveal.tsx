@@ -1,5 +1,6 @@
 // ListReveal.tsx — 枚举列表。props 不变:title + items[]。scrim 类。
-// 逐条错峰入场(两主题都保留);颜色/字体来自 T,title 用 <Kicker>。
+// 逐条错峰入场(两主题都保留);颜色/字体来自 T。title 不走 <Kicker>(它是混合大小写
+// 且更大,u*3),内联一个 div 但仍读 T.color.accent/T.font/T.kicker.weight。
 import * as React from "react";
 import { AbsoluteFill, useCurrentFrame, interpolate } from "remotion";
 import {
