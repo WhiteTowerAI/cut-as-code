@@ -108,6 +108,29 @@ def fold_stage(manifest: dict, stage: str, stagefile: dict, hasher=None) -> dict
     st["outputs"] = {p: hasher(p) for p in stagefile.get("output_paths", [])}
     return m
 
+def stage_dirty(stage: dict, hasher=None, exists=None) -> list:
+    if hasher is None:
+        hasher = hash_file
+    if exists is None:
+        exists = os.path.exists
+    reasons = []
+    for path, recorded in stage.get("inputs", {}).items():
+        if not exists(path):
+            reasons.append(f"missing:{path}")
+        elif hasher(path) != recorded:
+            reasons.append(f"changed:{path}")
+    if params_hash(stage.get("params", {})) != stage.get("params_hash", params_hash(stage.get("params", {}))):
+        reasons.append("params")
+    return reasons
+
+def cmd_status(args) -> int:
+    m = load_manifest(args.manifest)
+    for name, st in m["stages"].items():
+        reasons = stage_dirty(st)
+        tag = "clean" if not reasons else "DIRTY: " + ", ".join(reasons)
+        print(f"  {name:10s} [{st['status']}] {tag}")
+    return 0
+
 def cmd_fold(args) -> int:
     manifest = load_manifest(args.manifest)
     with open(getattr(args, "from"), encoding="utf-8") as f:
@@ -189,6 +212,20 @@ def selftest() -> int:
     except KeyError:
         pass
 
+    # --- Task 4: stage_dirty (pure, direct-input + params only) ---
+    stg = {"inputs": {"a.mp4": "sha256:aaa", "b.json": "sha256:bbb"},
+           "params": {"crf": 18}, "params_hash": params_hash({"crf": 18})}
+    live = {"a.mp4": "sha256:aaa", "b.json": "sha256:bbb"}
+    assert stage_dirty(stg, hasher=lambda p: live[p], exists=lambda p: True) == []
+    changed = dict(live); changed["b.json"] = "sha256:ZZZ"
+    assert stage_dirty(stg, hasher=lambda p: changed[p], exists=lambda p: True) == ["changed:b.json"]
+    assert stage_dirty(stg, hasher=lambda p: live[p],
+                       exists=lambda p: p != "a.mp4") == ["missing:a.mp4"]
+    stg2 = dict(stg, params={"crf": 20})   # params drifted from stored hash
+    assert stage_dirty(stg2, hasher=lambda p: live[p], exists=lambda p: True) == ["params"]
+    # pending stage, nothing recorded yet -> clean
+    assert stage_dirty({"inputs": {}, "params": {}, "params_hash": params_hash({})}) == []
+
     print("OK")
     return 0
 
@@ -204,6 +241,8 @@ def main() -> int:
     pf.add_argument("--manifest", default="manifest.json")
     pf.add_argument("--stage", required=True)
     pf.add_argument("--from", dest="from", required=True)
+    ps = sub.add_parser("status")
+    ps.add_argument("--manifest", default="manifest.json")
     args = p.parse_args()
     if args.cmd == "selftest":
         return selftest()
@@ -211,6 +250,8 @@ def main() -> int:
         return cmd_init(args)
     if args.cmd == "fold":
         return cmd_fold(args)
+    if args.cmd == "status":
+        return cmd_status(args)
     return 1
 
 if __name__ == "__main__":
