@@ -14,6 +14,10 @@ import {
   AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig,
 } from "remotion";
 import { T } from "./themes";
+// Re-export T so the 7 components import it from here (the anim facade) alongside
+// the building blocks/hooks, per the theme-system design — they never reach into
+// themes.ts directly. (anim also uses T internally for the palette/Scrim/blocks.)
+export { T };
 
 // --- timing (frames @ 24fps) — tweak the feel in one place -----------------
 export const TIMING = {
@@ -119,7 +123,15 @@ export const Surface: React.FC<{
 }> = ({ side, widthU, style, children }) => {
   const u = useUnit();
   const c = T.card;
-  if (!c) return <div style={style}>{children}</div>;   // editorial:透明,靠 Scrim
+  if (!c) {
+    // card=null(如 editorial):无实心卡。若主题配了 scrimPlate,给文字垫一层局部
+    // 半透暗板(保证小组件在高光画面上也可读,实测 5.7:1);否则纯透明靠整条 Scrim。
+    // 只有用 <Surface> 的 3 个小组件会走到这里;全宽组件直接用 <Scrim>,不受影响。
+    const plate = T.scrimPlate
+      ? { background: T.scrimPlate.bg, borderRadius: u * T.scrimPlate.radiusU }
+      : null;
+    return <div style={{ ...plate, ...style }}>{children}</div>;
+  }
   const s = side ?? c.borderSide;
   const w = u * (widthU ?? c.borderWidthU);
   const border =
