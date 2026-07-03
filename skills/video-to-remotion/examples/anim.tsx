@@ -177,8 +177,8 @@ export const Kicker: React.FC<{ children: React.ReactNode; style?: React.CSSProp
   const u = useUnit();
   return (
     <div style={{
-      color: T.color.accent, fontFamily: T.font, fontSize: u * 2.6, fontWeight: T.weight.med,
-      letterSpacing: T.kicker.case === "upper" ? `${T.kicker.spacingEm}em` : u * 0.2,
+      color: T.color.accent, fontFamily: T.font, fontSize: u * 2.6, fontWeight: T.kicker.weight,
+      letterSpacing: `${T.kicker.spacingEm}em`,
       textTransform: T.kicker.case === "upper" ? "uppercase" : "none",
       ...style,
     }}>{children}</div>

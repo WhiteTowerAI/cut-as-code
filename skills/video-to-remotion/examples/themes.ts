@@ -33,7 +33,7 @@ export type Theme = {
   card: CardStyle | null;
   scrimPlate?: ScrimPlate;   // 仅 card=null 主题用;有卡的主题(teal)留空。
   rule: "bar" | "hairline";
-  kicker: { case: "upper" | "none"; spacingEm: number };
+  kicker: { case: "upper" | "none"; spacingEm: number; weight: number };
   motion: "fade" | "stagger";
 };
 
@@ -50,7 +50,7 @@ const editorial: Theme = {
   // 无实心卡,但小组件文字底下垫一层局部暗板保证任意画面可读(实测 5.7:1)。
   scrimPlate: { bg: "rgba(11,13,16,0.62)", radiusU: 0.8 },
   rule: "hairline",
-  kicker: { case: "upper", spacingEm: 0.28 },
+  kicker: { case: "upper", spacingEm: 0.28, weight: 600 },
   motion: "stagger",
 };
 
@@ -73,7 +73,7 @@ const teal: Theme = {
     shadow: "0 6px 24px rgba(0,0,0,0.4)",
   },
   rule: "bar",
-  kicker: { case: "upper", spacingEm: 0.04 },
+  kicker: { case: "upper", spacingEm: 0.1538, weight: 700 },   // = 旧 letterSpacing u*0.4 / fontSize u*2.6
   motion: "fade",
 };
 
