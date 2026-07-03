@@ -313,6 +313,15 @@ Captions stay bottom-anchored; cards are auto-re-anchored to top (§4, set at ma
 whenever both overlay stages are enabled) so the two layers do not overlap. If only one
 overlay stage is enabled, the join is a single pass and ANCHOR stays at its `bottom` default.
 
+**OPEN (resolve at implementation):** two ffmpeg passes = the video is H.264-encoded **twice**
+(three generations counting the grade), unlike the single-encode rule elsewhere in the repo.
+Before building, check the `video-to-captions` skill's "combining captions + overlays" example
+— it uses a **single ffmpeg with two chained overlay nodes** (`[0][1]overlay[a];[a][2]overlay[v]`),
+one encode. If that reliably avoids the silent-drop bug ([[remotion-overlay-two-pass]]), prefer
+it (no-drop **and** single-encode). Fallbacks if it doesn't: (1) keep two passes, document the
+extra generation, or (2) stage the intermediate losslessly. Decide then; do not silently ship
+two lossy generations.
+
 ## 7. Isolation — subdirs, not worktrees
 
 captions and remotion are **both full Remotion projects** — each scaffolds `package.json`,
