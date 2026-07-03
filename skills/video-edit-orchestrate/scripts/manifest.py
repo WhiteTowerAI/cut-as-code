@@ -131,6 +131,51 @@ def cmd_status(args) -> int:
         print(f"  {name:10s} [{st['status']}] {tag}")
     return 0
 
+def render_edit_md(manifest: dict) -> str:
+    s = manifest["source"]
+    lines = [
+        f"# EDIT — {s['path']}",
+        "",
+        f"- Source: `{s['path']}`  ({s['w']}×{s['h']}, {s['fps']} fps, {s['dur_s']}s)",
+        f"- Source hash: `{s['hash']}`",
+        "",
+        "> Generated from `manifest.json` by `manifest.py render`. Do not hand-edit.",
+        "",
+        "## Stages",
+        "",
+        "| stage | skill | status | decision | outputs |",
+        "|---|---|---|---|---|",
+    ]
+    for name, st in manifest["stages"].items():
+        dec = json.dumps(st.get("decision", {}), ensure_ascii=False) if st.get("decision") else "—"
+        outs = ", ".join(f"`{p}`" for p in st.get("outputs", {})) or "—"
+        lines.append(f"| {name} | {st['skill']} | {st['status']} | {dec} | {outs} |")
+    fin = manifest.get("final", {})
+    order = " + ".join(fin.get("composite_order", []))
+    final_outs = ", ".join(f"`{p}`" for p in fin.get("outputs", {})) or "—"
+    lines += [
+        "",
+        "## Join (final composite)",
+        "",
+        f"- Composite order: {order or '—'}",
+        f"- Output: {final_outs}  (status: {fin.get('status', '—')})",
+        "",
+        "```",
+        "# see SKILL.md §join for the exact ffmpeg command(s);",
+        "# captions bottom, cards top, audio -c:a copy",
+        "ffmpeg -y -i graded.mp4 -i caption-overlay.mov ... -c:a copy final.mp4",
+        "```",
+        "",
+    ]
+    return "\n".join(lines)
+
+def cmd_render(args) -> int:
+    md = render_edit_md(load_manifest(args.manifest))
+    with open(args.out, "w", encoding="utf-8") as f:
+        f.write(md)
+    print(f"[render] {args.manifest} -> {args.out} ({len(md)} bytes)")
+    return 0
+
 def cmd_fold(args) -> int:
     manifest = load_manifest(args.manifest)
     with open(getattr(args, "from"), encoding="utf-8") as f:
@@ -226,6 +271,19 @@ def selftest() -> int:
     # pending stage, nothing recorded yet -> clean
     assert stage_dirty({"inputs": {}, "params": {}, "params_hash": params_hash({})}) == []
 
+    # --- Task 5: render_edit_md (pure) ---
+    m6 = build_manifest(src, ["captions", "grade"])
+    m6["stages"]["grade"]["decision"] = {"look": "clean_neutral"}
+    m6["stages"]["grade"]["outputs"] = {"out/graded.mp4": "sha256:g"}
+    md = render_edit_md(m6)
+    assert md.startswith("# EDIT — ")
+    assert "first_cut.mp4" in md
+    assert "video-color-grade" in md and "clean_neutral" in md
+    assert "out/graded.mp4" in md
+    assert "| captions |" in md and "| grade |" in md
+    assert "remotion" not in md          # disabled stage not shown
+    assert "ffmpeg" in md                # join command block present
+
     print("OK")
     return 0
 
@@ -243,6 +301,9 @@ def main() -> int:
     pf.add_argument("--from", dest="from", required=True)
     ps = sub.add_parser("status")
     ps.add_argument("--manifest", default="manifest.json")
+    pr = sub.add_parser("render")
+    pr.add_argument("--manifest", default="manifest.json")
+    pr.add_argument("--out", default="EDIT.md")
     args = p.parse_args()
     if args.cmd == "selftest":
         return selftest()
@@ -252,6 +313,8 @@ def main() -> int:
         return cmd_fold(args)
     if args.cmd == "status":
         return cmd_status(args)
+    if args.cmd == "render":
+        return cmd_render(args)
     return 1
 
 if __name__ == "__main__":
