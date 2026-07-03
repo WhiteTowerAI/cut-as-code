@@ -1371,7 +1371,7 @@ Expected: 命中仅在 `examples/themes.ts`（teal 主题定义）；`anim.tsx`/
 ```bash
 cd work/theme-harness
 set_theme(){ node -e "let f='src/themes.ts',s=require('fs').readFileSync(f,'utf8');require('fs').writeFileSync(f,s.replace(/const THEME: ThemeName = \"[a-z]+\"/,'const THEME: ThemeName = \"'+process.argv[1]+'\"'))" "$1"; }
-set_anchor(){ node -e "let f='src/anim.tsx',s=require('fs').readFileSync(f,'utf8');require('fs').writeFileSync(f,s.replace(/const ANCHOR: \"bottom\" \| \"top\" = \"[a-z]+\"/,'const ANCHOR: \"bottom\" | \"top\" = \"'+process.argv[1]+'\"'))" "$1"; }
+set_anchor(){ node -e "let f='src/anim.tsx',s=require('fs').readFileSync(f,'utf8');require('fs').writeFileSync(f,s.replace(/const ANCHOR = \"[a-z]+\" as \"bottom\" \| \"top\"/,'const ANCHOR = \"'+process.argv[1]+'\" as \"bottom\" | \"top\"'))" "$1"; }
 for th in editorial teal; do for an in bottom top; do
   set_theme $th; set_anchor $an
   npx remotion still src/index.ts DemoAll out/combo-$th-$an.png --frame=252
