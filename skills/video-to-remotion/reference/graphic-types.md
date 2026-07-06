@@ -30,7 +30,7 @@ accent + Newsreader automatically.
 | `CommandChips` | `{ items[{cmd,desc}], kicker? }`                                           | mono cmd chip (system-mono fallback) + serif desc |
 | `PromptCard`   | `{ segments[{t,hl?}], kicker? }`                                           | quoted prompt; `hl:true` segments render coral |
 | `ReframeCard`  | `{ instead, avoid?, kicker? }`                                            | "INSTEAD SAY" + coral line; the themed `KeypointCallout` (reuses `keypoint`) |
-| `Outro`        | `{ title, sub?, small?, mark? }`                                          | re-skin: full-bleed cream, centered spark `mark` (default `✳`) + wordmark |
+| `Outro`        | `{ title, sub?, small? }`                                                 | re-skin: full-bleed cream, centered CSS coral diamond + wordmark |
 
 `TitleBumper` and the `almanac` `Outro` are full-bleed (opaque cream, footage gone) — a
 momentary cutaway, anchor-agnostic. The rest ride a solid cream card and honor `ANCHOR`.

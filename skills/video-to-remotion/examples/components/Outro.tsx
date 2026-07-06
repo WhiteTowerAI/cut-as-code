@@ -1,17 +1,18 @@
-// Outro.tsx — 片尾卡。props:title + sub + small(+ almanac 的 mark spark glyph)。
-// teal:纯淡入(原样,左竖 accent 条);editorial:title 擦入 → sub/small 依次登场。
-// almanac(fullBleed):整屏奶油底,居中 spark 字符 + wordmark 锁版(spark + 标题的收尾锁版)。
+// Outro.tsx — 片尾卡。props:title + sub + small。teal:纯淡入(原样,左竖 accent 条);
+// editorial:title 擦入 → sub/small 依次登场。
+// almanac(fullBleed):整屏奶油底,居中一个 CSS 画的珊瑚菱形(旋转方块)+ wordmark 竖向锁版。
+// 用画的几何形而非字符,既通用无品牌联想,又跨环境逐像素一致(不依赖系统字体回退)。
 import * as React from "react";
 import { AbsoluteFill } from "remotion";
 import { T, Backdrop, useUnit, useFade, useEntrance, anchorJustify, anchorPad } from "../anim";
 
 export const Outro: React.FC<{
-  title: string; sub?: string; small?: string; mark?: string; durFrames?: number;
-}> = ({ title, sub, small, mark = "✳", durFrames }) => {
+  title: string; sub?: string; small?: string; durFrames?: number;
+}> = ({ title, sub, small, durFrames }) => {
   const u = useUnit();
   const o = useFade(durFrames);
   const stagger = T.motion === "stagger";
-  const eKicker = useEntrance("kicker");   // fullBleed 分支给 spark 用;其余主题算而不用
+  const eKicker = useEntrance("kicker");   // fullBleed 分支给菱形用;其余主题算而不用
   const eTitle = useEntrance("title");
   const eSub = useEntrance("sub");
 
@@ -29,18 +30,19 @@ export const Outro: React.FC<{
     ...(stagger ? { opacity: eSub.opacity, transform: eSub.transform } : null),
   };
 
-  // almanac:整屏奶油,居中 spark 字符 + wordmark 竖向锁版。spark 走 kicker 拍先登场,
-  // title 擦入,sub/small 收尾。mark 是作者传入的普通字符(默认 ✳),非任何品牌 logo 重绘。
+  // almanac:整屏奶油,居中珊瑚菱形 + wordmark 竖向锁版。菱形走 kicker 拍先登场(淡入+上浮),
+  // title 擦入,sub/small 收尾。菱形 = 一个旋转 45° 的实心方块,纯几何、无品牌联想。
   if (T.fullBleed) {
-    const sparkStyle: React.CSSProperties = {
-      color: T.color.accent, fontFamily: T.font, fontSize: u * 9, lineHeight: 1, marginBottom: u * 2,
-      ...(stagger ? { opacity: eKicker.opacity, transform: eKicker.transform } : null),
-    };
+    const d = u * 2.6;   // 菱形对角前的方块边长
     return (
       <AbsoluteFill style={{ justifyContent: "center", alignItems: "center" }}>
         <Backdrop heightPct={50} maxOpacity={0.92} />
         <div style={{ opacity: o, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
-          {mark ? <div style={sparkStyle}>{mark}</div> : null}
+          <div style={{ marginBottom: u * 3, height: d * 1.42, display: "flex", alignItems: "center",
+                        ...(stagger ? { opacity: eKicker.opacity, transform: eKicker.transform } : null) }}>
+            <div style={{ width: d, height: d, background: T.color.accent,
+                          borderRadius: u * 0.3, transform: "rotate(45deg)" }} />
+          </div>
           <div style={{ ...titleStyle, letterSpacing: -1 }}>{title}</div>
           {sub ? <div style={{ ...subStyle, marginTop: u * 1.4 }}>{sub}</div> : null}
           {small ? <div style={smallStyle}>{small}</div> : null}
