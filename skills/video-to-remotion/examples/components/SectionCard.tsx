@@ -3,7 +3,7 @@
 import * as React from "react";
 import { AbsoluteFill, useCurrentFrame, interpolate } from "remotion";
 import {
-  T, Scrim, Kicker, Rule, useUnit, useFade, useEntrance, useDraw, TIMING, EASE_OUT,
+  T, Backdrop, Kicker, Rule, useUnit, useFade, useEntrance, useDraw, TIMING, EASE_OUT,
   anchorJustify, anchorPad,
 } from "../anim";
 
@@ -29,7 +29,7 @@ export const SectionCard: React.FC<{ kicker?: string; title: string; durFrames?:
 
   return (
     <AbsoluteFill style={{ justifyContent: anchorJustify(), alignItems: "flex-start" }}>
-      <Scrim heightPct={46} maxOpacity={0.9} />
+      <Backdrop heightPct={46} maxOpacity={0.9} />
       <div style={{ opacity: o, padding: anchorPad(u * 9, u * 6) }}>
         {kicker ? <Kicker style={{ marginBottom: u * 1.2, ...kickerExtra }}>{kicker}</Kicker> : null}
         <div style={titleStyle}>{title}</div>

@@ -23,9 +23,18 @@ import { StatCallout } from "./components/StatCallout";
 import { KeypointCallout } from "./components/KeypointCallout";
 import { ListReveal } from "./components/ListReveal";
 import { Outro } from "./components/Outro";
+// almanac 主题的卡(THEME="almanac" 时手工放进 CUES;深色主题不用它们)。TitleBumper/Outro
+// 是 fullBleed 整屏接管;Checklist≈ListReveal、ReframeCard≈KeypointCallout 的 almanac 味渲染器。
+import { TitleBumper } from "./components/TitleBumper";
+import { BeforeAfter } from "./components/BeforeAfter";
+import { Checklist } from "./components/Checklist";
+import { CommandChips } from "./components/CommandChips";
+import { PromptCard } from "./components/PromptCard";
+import { ReframeCard } from "./components/ReframeCard";
 
 const COMPONENTS: Record<string, React.FC<any>> = {
   Intro, SectionCard, LowerThird, StatCallout, KeypointCallout, ListReveal, Outro,
+  TitleBumper, BeforeAfter, Checklist, CommandChips, PromptCard, ReframeCard,
 };
 
 // One design language, four card jobs (intro / chapter / lower-third / outro),

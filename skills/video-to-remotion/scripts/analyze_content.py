@@ -5,7 +5,7 @@ video-rough-cut skill's transcribe.py) and, optionally, a list of scene-cut
 timestamps, then emits work/content.json: places where an auto-generated
 Remotion overlay would earn its keep —
 
-  lower-third  speaker self-introduction        ("it's Thariq from ... team")
+  lower-third  speaker self-introduction        ("it's Jordan from ... team")
   stat         a number/%/$/multiplier worth flagging
   list         an enumeration ("three ways", "first ... second ...")
   keypoint     a question or punchy line worth pinning on screen

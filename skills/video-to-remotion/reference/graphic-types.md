@@ -12,6 +12,29 @@ the decision table the analyzer encodes and the agent prunes.
 | `keypoint`    | a question or punchy line worth pinning                            | `KeypointCallout`| `{ text }`                     | 6.0s        |
 | `section`     | a topic boundary — a long pause (≥1.8s) and/or a scene cut          | `SectionCard`    | `{ title, index? }`            | 3.0s        |
 
+## `almanac` theme cards (hand-placed; no detector)
+
+The `almanac` theme (see `SKILL.md` → Themes) adds a cream/serif card language derived from
+launch-video design research (`docs/design-research/`). These are **hand-placed** in
+`FinalEdit`'s `CUES` like `Intro`/`Outro` — the analyzer emits no opportunity for them. Two
+exceptions reuse existing detector output: point a `list` cue at `Checklist` and a `keypoint`
+cue at `ReframeCard` when running `THEME="almanac"` (same content, themed renderer — an author
+choice, not an automatic swap). All read `T`, so they inherit the cream card + coral
+accent + Newsreader automatically.
+
+| component      | props                                                                      | notes |
+|----------------|----------------------------------------------------------------------------|-------|
+| `TitleBumper`  | `{ title, kicker? }`                                                       | full-bleed cream takeover (footage hidden); the signature moment |
+| `BeforeAfter`  | `{ before, after, beforeLabel?, afterLabel?, beforeSub?, afterSub? }`      | 2-col cream card; left strikethrough + "BEFORE", right ink + "AFTER" (labels overridable) |
+| `Checklist`    | `{ items[], kicker? }`                                                     | coral `01/02/03` numerals; the themed `ListReveal` (reuses `list`) |
+| `CommandChips` | `{ items[{cmd,desc}], kicker? }`                                           | mono cmd chip (system-mono fallback) + serif desc |
+| `PromptCard`   | `{ segments[{t,hl?}], kicker? }`                                           | quoted prompt; `hl:true` segments render coral |
+| `ReframeCard`  | `{ instead, avoid?, kicker? }`                                            | "INSTEAD SAY" + coral line; the themed `KeypointCallout` (reuses `keypoint`) |
+| `Outro`        | `{ title, sub?, small?, mark? }`                                          | re-skin: full-bleed cream, centered spark `mark` (default `✳`) + wordmark |
+
+`TitleBumper` and the `almanac` `Outro` are full-bleed (opaque cream, footage gone) — a
+momentary cutaway, anchor-agnostic. The rest ride a solid cream card and honor `ANCHOR`.
+
 ## content.json schema
 ```jsonc
 {
@@ -24,8 +47,8 @@ the decision table the analyzer encodes and the agent prunes.
       "type": "lower-third",        // one of the types above
       "at": 1.2,                    // seconds; word-accurate from the transcript
       "dur": 4.5,                   // suggested on-screen duration (seconds)
-      "props": { "name": "Thariq", "org": "Claude Code" },
-      "quote": "it's Thariq from the Claude Code team"  // the line it came from
+      "props": { "name": "Jordan Reyes", "org": "Field Research" },
+      "quote": "it's Jordan from the Field Research team"  // the line it came from
     }
   ]
 }

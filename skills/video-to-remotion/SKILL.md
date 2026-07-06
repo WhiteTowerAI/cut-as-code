@@ -51,11 +51,21 @@ The whole look is driven by one switch in `src/themes.ts`, orthogonal to `ANCHOR
 (top/bottom) in `anim.tsx`:
 
 ```ts
-export const THEME = "editorial";   // "editorial" (documentary look) | "teal" (the old teal look)
+export const THEME = "almanac";   // "almanac" (cream/serif) | "editorial" (documentary) | "teal" (old teal)
 ```
 
-- **`editorial`** (default): Archivo font, warm-white text, gold accent, hairline rules,
-  choreographed stagger entrance. Polish comes from type/tracking/thin rules — no film grain.
+- **`almanac`** (default): cream cards, near-black **serif** ink (Newsreader), terracotta-coral accent,
+  tracked-caps kickers — a warm editorial/publishing look derived from launch-video design research
+  (`docs/design-research/`). **Inverts the polarity**
+  of the other two (dark card/light text → cream card/dark text). Adds the optional `fullBleed`
+  field: full-width cards (`Intro`/`SectionCard`/`ListReveal`/`Outro`/`TitleBumper`) paint an
+  opaque cream frame — footage gone — instead of a scrim gradient (a cream gradient over bright
+  footage is invisible). Ships 6 extra cards (`TitleBumper`, `BeforeAfter`, `Checklist`,
+  `CommandChips`, `PromptCard`, `ReframeCard`); see `reference/graphic-types.md`. Newsreader is
+  a free, open-licensed serif — if you swap in a proprietary display face, confirm its license
+  first (one-line change in `themes.ts`).
+- **`editorial`**: Archivo font, warm-white text, gold accent, hairline rules, choreographed
+  stagger entrance. Polish comes from type/tracking/thin rules — no film grain.
 - **`teal`**: the original teal dark-card look, frame-for-frame unchanged (zero regression).
 
 Three layers: `themes.ts` (theme data) → `anim.tsx` (building blocks `<Surface>/<Rule>/<Kicker>`
@@ -75,7 +85,12 @@ The cue-sheet fields don't change.
 3. Point `THEME` at the new name and render-check.
 4. Only if it needs a **genuinely new structure** (frosted glass, full-frame wipe, …): add a
    field to `Theme` + one branch in the matching block (`<Surface>`/`<Rule>`) or `useEntrance`
-   — add it once, reuse it after.
+   — add it once, reuse it after. The `almanac` theme is the worked example: its `fullBleed`
+   field drives one new primitive `<Backdrop>` (in `anim.tsx`) that wraps the untouched
+   `<Scrim>` — `fullBleed` themes paint an opaque `color.scrimBase` fill, others forward to
+   `<Scrim>` byte-for-byte. Every full-width card calls `<Backdrop>` instead of `<Scrim>`
+   directly, so a cream theme can't ship an invisible gradient. Small cards are unaffected
+   (they already gate the scrim behind `!T.card`, and a solid-card theme skips it).
 
 A common re-color / re-font theme is **step 1 only**.
 
@@ -96,8 +111,10 @@ A common re-color / re-font theme is **step 1 only**.
     **`react`/`react-dom` pinned to `18.3.1`** (don't let npm pull React 19 against an older
     Remotion), `tsconfig.json`, and `src/index.ts` → `registerRoot(RemotionRoot)`.
   - **`@remotion/google-fonts`** (same 4.x version as `remotion`) — `themes.ts` calls
-    `loadFont()` for `Archivo` at the top level, so the package must be installed for either
-    theme to build. Only the `editorial` theme uses the glyphs; `teal` uses a system font.
+    `loadFont()` for `Archivo` and `Newsreader` at the top level, so the package must be
+    installed for any theme to build. Only the selected theme uses its glyphs: `editorial` =
+    Archivo, `almanac` = Newsreader; `teal` uses a system serif. A failed font load falls back
+    silently to Georgia/system — confirm the real face on a still (self-check below).
   - `public/source.mp4` — needed for `FinalEdit` still checks and the slow fallback because
     `OffthreadVideo` loads via `staticFile("source.mp4")`, which only resolves inside
     `public/`; an arbitrary path won't load. `npm install`, then render.
@@ -254,8 +271,13 @@ Plus:
 - One rhythm + one look: every component reads timing/palette from `anim.tsx`.
 - The whole edit is text — re-readable, diffable, re-renderable.
 - **Theme consistent:** with `THEME` chosen, the font really is that theme's font (editorial =
-  Archivo, not the system default — confirm on a still, since a failed font load falls back
-  silently). Switching to `teal` should return frame-for-frame to the old teal look.
-- **Theme × anchor orthogonal:** grab a still for editorial/teal under each of
-  `ANCHOR="bottom"/"top"`; all four combinations satisfy the three rules (legible / face clear /
-  resolution-independent).
+  Archivo, almanac = Newsreader serif — not Georgia/system default; confirm on a still, since a
+  failed font load falls back silently). Switching to `teal` should return frame-for-frame to
+  the old teal look, and editorial should be unchanged — adding `almanac` must not regress either.
+- **`almanac` full-bleed:** on `TitleBumper` and the `almanac` `Outro`, the cream fills the whole
+  frame — no footage bleeds through (that's the opaque `<Backdrop>`, not a faint scrim). The
+  cream cards (`BeforeAfter`/`Checklist`/`CommandChips`/`PromptCard`/`ReframeCard`) sit legibly
+  on their solid card with dark serif ink and the coral accent edge.
+- **Theme × anchor orthogonal:** grab a still for editorial/teal/almanac under each of
+  `ANCHOR="bottom"/"top"`; all combinations satisfy the three rules (legible / face clear /
+  resolution-independent). Full-bleed `almanac` cards are anchor-agnostic (they cover the frame).

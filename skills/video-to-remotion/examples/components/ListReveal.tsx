@@ -4,7 +4,7 @@
 import * as React from "react";
 import { AbsoluteFill, useCurrentFrame, interpolate } from "remotion";
 import {
-  T, Scrim, useUnit, useFade, TIMING, EASE_OUT, anchorJustify, anchorPad,
+  T, Backdrop, useUnit, useFade, TIMING, EASE_OUT, anchorJustify, anchorPad,
 } from "../anim";
 
 export const ListReveal: React.FC<{ title?: string; items: string[]; durFrames?: number }> = ({
@@ -15,7 +15,7 @@ export const ListReveal: React.FC<{ title?: string; items: string[]; durFrames?:
   const frame = useCurrentFrame();
   return (
     <AbsoluteFill style={{ justifyContent: anchorJustify(), alignItems: "flex-start" }}>
-      <Scrim heightPct={62} maxOpacity={0.9} />
+      <Backdrop heightPct={62} maxOpacity={0.9} />
       <div style={{ opacity: o, padding: anchorPad(u * 8, u * 6),
                     display: "flex", flexDirection: "column", gap: u * 1.6 }}>
         {title ? (

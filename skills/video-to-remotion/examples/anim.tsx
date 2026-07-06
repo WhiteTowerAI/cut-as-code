@@ -84,7 +84,7 @@ export const useFade = (durFrames?: number): number => {
 // color + alpha(0..1) → a color usable in gradients. Handles #RGB / #RRGGBB (the
 // form both shipped themes use); any already-alpha or functional color (rgba()/rgb()/
 // named) is passed through with its alpha assumed handled by the caller's maxOpacity.
-const hexA = (hex: string, a: number): string => {
+export const hexA = (hex: string, a: number): string => {
   const h = hex.replace("#", "");
   if (h.length !== 3 && h.length !== 6) return hex;   // not a plain hex → don't mangle
   const dup = h.length === 3;
@@ -113,6 +113,16 @@ export const Scrim: React.FC<{ heightPct?: number; maxOpacity?: number }> = ({
         : { top: `${100 - heightPct}%`, background: grad(maxOpacity) }
     } />
   );
+};
+
+// Backdrop: 全宽组件(片头/章节/列表/片尾)的底板选择器。fullBleed 主题(almanac)铺一层
+// 不透明底色(color.scrimBase = 奶油),画面被完全盖住——视频的"整屏标题接管";其余主题
+// (editorial/teal,fullBleed 未设→假)原样转发给 <Scrim>,逐帧零回归。<Scrim> 本身不动。
+// 为什么必须让所有全宽组件走这里:奶油 Scrim 渐变在亮画面上≈透明(看不清),违反"任意画面
+// 可读"铁律;不透明底板才能兜住。凡今天无条件渲染 <Scrim> 的组件都应改用 <Backdrop>。
+export const Backdrop: React.FC<{ heightPct?: number; maxOpacity?: number }> = (props) => {
+  if (T.fullBleed) return <AbsoluteFill style={{ background: T.color.scrimBase }} />;
+  return <Scrim {...props} />;
 };
 
 // --- 第 2 层积木:组件只用这些拼装,样式值全来自 T ------------------------

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { AbsoluteFill, useCurrentFrame, interpolate } from "remotion";
 import {
-  T, Scrim, Kicker, useUnit, useFade, useEntrance, TIMING, EASE_OUT,
+  T, Backdrop, Kicker, useUnit, useFade, useEntrance, TIMING, EASE_OUT,
   anchorJustify, anchorPad,
 } from "../anim";
 
@@ -35,7 +35,7 @@ export const Intro: React.FC<{ kicker?: string; title: string; sub?: string; dur
 
   return (
     <AbsoluteFill style={{ justifyContent: anchorJustify(), alignItems: "flex-start" }}>
-      <Scrim heightPct={50} maxOpacity={0.92} />
+      <Backdrop heightPct={50} maxOpacity={0.92} />
       <div style={outer}>
         <div style={{ width: u * 0.8, background: T.color.accent, borderRadius: u * 0.4 }} />
         <div>
