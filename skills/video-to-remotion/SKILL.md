@@ -51,7 +51,7 @@ The whole look is driven by one switch in `src/themes.ts`, orthogonal to `ANCHOR
 (top/bottom) in `anim.tsx`:
 
 ```ts
-export const THEME = "almanac";   // "almanac" (cream/serif) | "editorial" (documentary) | "teal" (old teal)
+export const THEME = "almanac";   // "almanac" cream/serif | "editorial" documentary | "teal" old teal | "dotgrid" pixel-mono | "apex" motorsport-italic
 ```
 
 - **`almanac`** (default): cream cards, near-black **serif** ink (Newsreader), terracotta-coral accent,
@@ -67,6 +67,16 @@ export const THEME = "almanac";   // "almanac" (cream/serif) | "editorial" (docu
 - **`editorial`**: Archivo font, warm-white text, gold accent, hairline rules, choreographed
   stagger entrance. Polish comes from type/tracking/thin rules — no film grain.
 - **`teal`**: the original teal dark-card look, frame-for-frame unchanged (zero regression).
+- **`dotgrid`**: retro-digital / LED look — pixel display font (Silkscreen) + mono body
+  (Space Mono), monochrome black takeover (`fullBleed`), one rationed **yellow** (#FFE600) on
+  the dot rule / stat / list numbers only. Uses two new optional fields: `fontBody` (a second
+  font family for body/label roles) and `card.borderAll` (a neutral full box-border so the
+  accent stays off the card edge). Silkscreen ships only 400/700.
+- **`apex`**: motorsport-telemetry look — heavy **italic** display (Titillium Web, a free
+  stand-in; real F1 face is proprietary and its guidelines forbid third-party association use),
+  carbon base, rationed **red** (#E10600), and **functional sector-color** list numbers
+  (purple/green/yellow). Uses new optional fields: `displayItalic`, `listNumColors` (per-index
+  list-number colors), `ruleSkewDeg` (skews the accent bar / outro mark).
 
 Three layers: `themes.ts` (theme data) → `anim.tsx` (building blocks `<Surface>/<Rule>/<Kicker>`
 + entrance hooks, all read the active theme `T`) → `components/*` (layout + anchoring only).

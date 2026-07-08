@@ -4,7 +4,7 @@
 // 用画的几何形而非字符,既通用无品牌联想,又跨环境逐像素一致(不依赖系统字体回退)。
 import * as React from "react";
 import { AbsoluteFill } from "remotion";
-import { T, Backdrop, useUnit, useFade, useEntrance, anchorJustify, anchorPad } from "../anim";
+import { T, Backdrop, useUnit, useFade, useEntrance, bodyFont, dispItalic, anchorJustify, anchorPad } from "../anim";
 
 export const Outro: React.FC<{
   title: string; sub?: string; small?: string; durFrames?: number;
@@ -17,16 +17,16 @@ export const Outro: React.FC<{
   const eSub = useEntrance("sub");
 
   const titleStyle: React.CSSProperties = {
-    color: T.color.text, fontFamily: T.font, fontSize: u * 8.5, fontWeight: T.weight.heavy,
+    color: T.color.text, fontFamily: T.font, fontStyle: dispItalic(), fontSize: u * 8.5, fontWeight: T.weight.heavy,
     letterSpacing: -1, lineHeight: 1,
     ...(stagger ? { opacity: eTitle.opacity, clipPath: eTitle.clipPath } : null),
   };
   const subStyle: React.CSSProperties = {
-    color: T.color.text, fontFamily: T.font, fontSize: u * 3.6, fontWeight: T.weight.med, marginTop: u * 1.4,
+    color: T.color.text, fontFamily: bodyFont(), fontSize: u * 3.6, fontWeight: T.weight.med, marginTop: u * 1.4,
     ...(stagger ? { opacity: eSub.opacity, transform: eSub.transform, filter: eSub.filter } : null),
   };
   const smallStyle: React.CSSProperties = {
-    color: T.color.textMuted, fontFamily: T.font, fontSize: u * 2.8, fontWeight: T.weight.light, marginTop: u * 0.8,
+    color: T.color.textMuted, fontFamily: bodyFont(), fontSize: u * 2.8, fontWeight: T.weight.light, marginTop: u * 0.8,
     ...(stagger ? { opacity: eSub.opacity, transform: eSub.transform, filter: eSub.filter } : null),
   };
 
@@ -55,7 +55,8 @@ export const Outro: React.FC<{
     <AbsoluteFill style={{ justifyContent: anchorJustify(), alignItems: "flex-start" }}>
       <Backdrop heightPct={50} maxOpacity={0.92} />
       <div style={{ opacity: o, display: "flex", gap: u * 2.4, padding: anchorPad(u * 9, u * 6) }}>
-        <div style={{ width: u * 0.8, background: T.color.accent, borderRadius: u * 0.4 }} />
+        <div style={{ width: u * 0.8, background: T.color.accent, borderRadius: u * 0.4,
+                      ...(T.ruleSkewDeg ? { transform: `skewX(${T.ruleSkewDeg}deg)` } : null) }} />
         <div>
           <div style={titleStyle}>{title}</div>
           {sub ? <div style={subStyle}>{sub}</div> : null}

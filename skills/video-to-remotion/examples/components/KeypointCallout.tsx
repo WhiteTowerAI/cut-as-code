@@ -3,7 +3,7 @@
 import * as React from "react";
 import { AbsoluteFill, useCurrentFrame, interpolate } from "remotion";
 import {
-  T, Surface, Scrim, useUnit, useFade, useEntrance, TIMING, EASE_OUT,
+  T, Surface, Scrim, useUnit, useFade, useEntrance, dispItalic, TIMING, EASE_OUT,
   anchorJustify, anchorPad,
 } from "../anim";
 
@@ -20,7 +20,7 @@ export const KeypointCallout: React.FC<{ text: string; durFrames?: number }> = (
     ? { opacity: o, maxWidth: "72%" }
     : { opacity: o, transform: `translateY(${rise}px)`, maxWidth: "72%" };
   const textStyle: React.CSSProperties = {
-    color: T.color.text, fontFamily: T.font, fontSize: u * 5, fontWeight: T.weight.med, lineHeight: 1.18,
+    color: T.color.text, fontFamily: T.font, fontStyle: dispItalic(), fontSize: u * 5, fontWeight: T.weight.med, lineHeight: 1.18,
     ...(stagger ? { opacity: e.opacity, clipPath: e.clipPath } : null),
   };
 

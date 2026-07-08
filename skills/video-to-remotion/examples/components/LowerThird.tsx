@@ -3,7 +3,7 @@
 import * as React from "react";
 import { AbsoluteFill, useCurrentFrame, interpolate } from "remotion";
 import {
-  T, Surface, Scrim, useUnit, useFade, useEntrance, usePop, TIMING, EASE_OUT,
+  T, Surface, Scrim, useUnit, useFade, useEntrance, usePop, bodyFont, dispItalic, TIMING, EASE_OUT,
   anchorJustify, anchorPad,
 } from "../anim";
 
@@ -26,12 +26,12 @@ export const LowerThird: React.FC<{ line1: string; line2?: string; durFrames?: n
     : { opacity: o, transform: `translateX(${slide}px) scale(${pop})`, transformOrigin: "left center" };
 
   const line1Style: React.CSSProperties = {
-    color: T.color.text, fontFamily: T.font, fontSize: u * 6, fontWeight: T.weight.heavy,
+    color: T.color.text, fontFamily: T.font, fontStyle: dispItalic(), fontSize: u * 6, fontWeight: T.weight.heavy,
     letterSpacing: -0.5, lineHeight: 1.05,
     ...(stagger ? { opacity: e1.opacity, clipPath: e1.clipPath } : null),
   };
   const line2Style: React.CSSProperties = {
-    color: T.color.textMuted, fontFamily: T.font, fontSize: u * 3.6, fontWeight: T.weight.light,
+    color: T.color.textMuted, fontFamily: bodyFont(), fontSize: u * 3.6, fontWeight: T.weight.light,
     marginTop: u * 0.8,
     ...(stagger ? { opacity: e2.opacity, transform: e2.transform } : null),
   };

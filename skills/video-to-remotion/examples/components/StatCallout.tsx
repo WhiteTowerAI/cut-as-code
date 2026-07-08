@@ -3,7 +3,7 @@
 import * as React from "react";
 import { AbsoluteFill, useCurrentFrame, interpolate } from "remotion";
 import {
-  T, Surface, Scrim, useUnit, useFade, useEntrance, usePop, TIMING, EASE_OUT,
+  T, Surface, Scrim, useUnit, useFade, useEntrance, usePop, bodyFont, dispItalic, TIMING, EASE_OUT,
   anchorJustify, anchorPad,
 } from "../anim";
 
@@ -23,11 +23,11 @@ export const StatCallout: React.FC<{ value: string; label?: string; durFrames?: 
   const eLabel = useEntrance("sub");
 
   const valueStyle: React.CSSProperties = {
-    color: T.color.accent, fontFamily: T.font, fontSize: u * 9, fontWeight: T.weight.heavy,
+    color: T.color.accent, fontFamily: T.font, fontStyle: dispItalic(), fontSize: u * 9, fontWeight: T.weight.heavy,
     letterSpacing: -1, lineHeight: 1,
   };
   const labelStyle: React.CSSProperties = {
-    color: T.color.text, fontFamily: T.font, fontSize: u * 3.4, fontWeight: T.weight.med,
+    color: T.color.text, fontFamily: bodyFont(), fontSize: u * 3.4, fontWeight: T.weight.med,
     ...(stagger ? { opacity: eLabel.opacity, transform: eLabel.transform } : null),
   };
 

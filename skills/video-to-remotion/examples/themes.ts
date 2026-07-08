@@ -2,8 +2,11 @@
 // 组件与 anim 积木只读当前主题 T,不写死样式值。与 anim.tsx 的 ANCHOR 正交。
 import { loadFont as loadArchivo } from "@remotion/google-fonts/Archivo";
 import { loadFont as loadNewsreader } from "@remotion/google-fonts/Newsreader";
+import { loadFont as loadSilkscreen } from "@remotion/google-fonts/Silkscreen";
+import { loadFont as loadSpaceMono } from "@remotion/google-fonts/SpaceMono";
+import { loadFont as loadTitillium } from "@remotion/google-fonts/TitilliumWeb";
 
-export type ThemeName = "editorial" | "teal" | "almanac";
+export type ThemeName = "editorial" | "teal" | "almanac" | "dotgrid" | "apex";
 
 // 小卡片(LowerThird/Stat/Keypoint)的实心底板;editorial 为 null(无卡片)。
 // 尺寸用 u 单位(画布高度%),由 <Surface> 乘以 useUnit() 落地为像素——不写死 px。
@@ -14,6 +17,10 @@ export type CardStyle = {
   borderSide: "left" | "bottom";    // 强调边在左(LowerThird/Keypoint)或下(Stat)
   radiusU: number;                  // 圆角(u)
   shadow: string;
+  // borderAll:整框细边(dotgrid 的发丝盒边),而非单侧强调边。设了此值时 <Surface> 用
+  // borderColor/borderWidthU 画四边、并忽略组件传入的 side——这样 dotgrid 把黄色只留给那颗点,
+  // 卡边是中性灰。不设(teal/almanac)→ 照旧走单侧强调边,逐帧零回归。
+  borderAll?: boolean;
 };
 
 // scrimPlate:card=null 的主题(如 editorial)给"小组件"(名条/数字/金句)文字底下
@@ -29,6 +36,9 @@ export type ScrimPlate = {
 export type Theme = {
   name: ThemeName;
   font: string;
+  // fontBody:正文/次要文字用的第二字族(dotgrid = Space Mono,与像素显示字 Silkscreen 分工)。
+  // 不设→undefined→组件的 bodyFont() 回退到 T.font→单字族主题逐帧零回归。见 anim bodyFont。
+  fontBody?: string;
   weight: { heavy: number; med: number; light: number };
   color: { text: string; textMuted: string; accent: string; scrimBase: string };
   card: CardStyle | null;
@@ -37,7 +47,15 @@ export type Theme = {
   // 画面被完全盖住——almanac 的"整屏标题接管"。深色主题不设此字段→undefined→假→照旧走
   // <Scrim> 渐变路径,逐帧零回归。见 anim.tsx 的 <Backdrop>。
   fullBleed?: boolean;
-  rule: "bar" | "hairline";
+  rule: "bar" | "hairline" | "dot";
+  // displayItalic:标题/数字/金句等"显示"角色用斜体(apex 的赛事重斜体);kicker/正文保持直立。
+  // 不设→undefined→React 省略 fontStyle→非斜体主题零回归。见 anim dispItalic。
+  displayItalic?: boolean;
+  // listNumColors:ListReveal 列表序号按位置取色(apex 的功能性扇区色 紫/绿/黄)。越界或不设→
+  // 回退到 T.color.accent(现状)。仅 ListReveal 读它。
+  listNumColors?: string[];
+  // ruleSkewDeg:强调条/片尾标记的 skewX 角度(apex = -18)。不设→不倾斜→零回归。见 anim Rule / Outro。
+  ruleSkewDeg?: number;
   kicker: { case: "upper" | "none"; spacingEm: number; weight: number };
   motion: "fade" | "stagger";
   // 非标题元素(kicker/sub/小卡标签)入场的失焦半径(px):从 blurIn→0 聚焦,叠在淡入+上浮上做
@@ -59,6 +77,16 @@ const ARCHIVO = `${archivo.fontFamily}, system-ui, sans-serif`;
 // 与 anim.tsx 里 teal 的 "serif" 不同,这里显式加载真实字族,避免落到系统 Georgia。
 const newsreader = loadNewsreader();
 const NEWSREADER = `${newsreader.fontFamily}, Georgia, "Times New Roman", serif`;
+
+// dotgrid 用两款:Silkscreen(点阵像素体,免费,≈ Nothing 私有 NDot 的替身)做显示字;
+// Space Mono(等宽,≈ NType 82 Mono 的替身)做正文。apex 用 Titillium Web(免费替身——
+// 真实赛事字体私有且其品牌指南禁止第三方关联使用;loadFont() 不带参数会加载全部字重与斜体)。
+const silkscreen = loadSilkscreen();
+const SILKSCREEN = `${silkscreen.fontFamily}, "Courier New", monospace`;
+const spacemono = loadSpaceMono();
+const SPACEMONO = `${spacemono.fontFamily}, ui-monospace, monospace`;
+const titillium = loadTitillium();
+const TITILLIUM = `${titillium.fontFamily}, system-ui, sans-serif`;
 
 const editorial: Theme = {
   name: "editorial",
@@ -130,7 +158,56 @@ const almanac: Theme = {
   fullBleed: true,         // 全幅组件铺不透明奶油底板(整屏接管)——见 anim.tsx <Backdrop>
 };
 
-export const THEMES: Record<ThemeName, Theme> = { editorial, teal, almanac };
+// dotgrid — "点阵实用主义"卡片语言:像素显示字(Silkscreen)+ 等宽正文(Space Mono)+
+// 纯黑白 + 严格克制的一点黄(#FFE600,只给片头/章节标题下那颗方点与列表序号)。整屏黑接管
+// (fullBleed),小卡是近黑透明底 + 中性发丝盒边(borderAll,黄色不上边框,只留给那颗点)。
+// 灵感与色值来自 refs2/nothing 的真实产品卡研究;Silkscreen 只有 400/700 两档字重。
+const dotgrid: Theme = {
+  name: "dotgrid",
+  font: SILKSCREEN,
+  fontBody: SPACEMONO,
+  weight: { heavy: 700, med: 400, light: 400 },   // Silkscreen 仅 400/700;med/light 都落 400
+  color: { text: "#F4F4F2", textMuted: "#8C8C90", accent: "#FFE600", scrimBase: "#0A0A0B" },
+  card: {
+    bg: "rgba(10,10,11,0.92)",
+    borderColor: "#2A2A2E",      // 中性灰盒边(不是黄!黄只留给那颗点)
+    borderWidthU: 0.2,
+    borderSide: "left",          // borderAll 生效时此值被忽略,仅为满足类型
+    borderAll: true,
+    radiusU: 0,                  // 0 圆角(像素直角)
+    shadow: "none",
+  },
+  fullBleed: true,               // 全幅组件铺不透明黑底(整屏接管)——见 anim <Backdrop>
+  rule: "dot",                   // 那颗克制的黄方点
+  kicker: { case: "upper", spacingEm: 0.16, weight: 400 },
+  motion: "fade",
+};
+
+// apex — "赛事遥测"卡片语言:重斜体显示字(Titillium Web)+ 碳黑底 + 严格克制的红(#E10600)+
+// 功能性扇区色列表序号(紫/绿/黄,呼应赛车三段计时)+ 斜切强调条。碳卡半透 + 红色左强调边。
+// 非 fullBleed:走 Scrim 渐变,画面透气。灵感与色值来自 refs2/f1 的真实转播帧研究。
+const apex: Theme = {
+  name: "apex",
+  font: TITILLIUM,
+  displayItalic: true,           // 标题/数字/金句斜体;kicker/正文直立
+  weight: { heavy: 900, med: 600, light: 600 },
+  color: { text: "#FFFFFF", textMuted: "#B0B0B8", accent: "#E10600", scrimBase: "#15151E" },
+  card: {
+    bg: "#1F1F2A",
+    borderColor: "#E10600",
+    borderWidthU: 1.2,
+    borderSide: "left",
+    radiusU: 0.6,
+    shadow: "0 6px 24px rgba(0,0,0,0.5)",
+  },
+  rule: "bar",
+  ruleSkewDeg: -18,              // 斜切强调条/片尾标记
+  listNumColors: ["#B300B3", "#00D06E", "#FFD500"],   // 功能性扇区色:紫/绿/黄
+  kicker: { case: "upper", spacingEm: 0.22, weight: 700 },
+  motion: "fade",
+};
+
+export const THEMES: Record<ThemeName, Theme> = { editorial, teal, almanac, dotgrid, apex };
 
 // —— 唯一的风格开关。改这一行切换整套外观。——
 export const THEME: ThemeName = "almanac";

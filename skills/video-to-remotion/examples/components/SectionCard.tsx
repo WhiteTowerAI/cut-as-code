@@ -3,7 +3,7 @@
 import * as React from "react";
 import { AbsoluteFill, useCurrentFrame, interpolate } from "remotion";
 import {
-  T, Backdrop, Kicker, Rule, useUnit, useFade, useEntrance, useDraw, TIMING, EASE_OUT,
+  T, Backdrop, Kicker, Rule, useUnit, useFade, useEntrance, useDraw, dispItalic, TIMING, EASE_OUT,
   anchorJustify, anchorPad,
 } from "../anim";
 
@@ -21,7 +21,7 @@ export const SectionCard: React.FC<{ kicker?: string; title: string; durFrames?:
 
   const kickerExtra = stagger ? { opacity: eKicker.opacity, transform: eKicker.transform } : null;
   const titleStyle: React.CSSProperties = {
-    color: T.color.text, fontFamily: T.font, fontSize: u * 8.5, fontWeight: T.weight.heavy,
+    color: T.color.text, fontFamily: T.font, fontStyle: dispItalic(), fontSize: u * 8.5, fontWeight: T.weight.heavy,
     letterSpacing: -1, lineHeight: 1.0,
     ...(stagger ? { opacity: eTitle.opacity, clipPath: eTitle.clipPath } : null),
   };

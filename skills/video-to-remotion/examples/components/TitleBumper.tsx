@@ -5,7 +5,7 @@
 import * as React from "react";
 import { AbsoluteFill } from "remotion";
 import {
-  T, Backdrop, Kicker, useUnit, useFade, useEntrance, anchorJustify, anchorPad,
+  T, Backdrop, Kicker, useUnit, useFade, useEntrance, dispItalic, anchorJustify, anchorPad,
 } from "../anim";
 
 export const TitleBumper: React.FC<{ title: string; kicker?: string; durFrames?: number }> = ({
@@ -18,7 +18,7 @@ export const TitleBumper: React.FC<{ title: string; kicker?: string; durFrames?:
   const eTitle = useEntrance("title");
 
   const titleStyle: React.CSSProperties = {
-    color: T.color.text, fontFamily: T.font, fontSize: u * 10, fontWeight: T.weight.heavy,
+    color: T.color.text, fontFamily: T.font, fontStyle: dispItalic(), fontSize: u * 10, fontWeight: T.weight.heavy,
     letterSpacing: -1, lineHeight: 1.0, maxWidth: "72%",
     ...(stagger ? { opacity: eTitle.opacity, clipPath: eTitle.clipPath } : null),
   };

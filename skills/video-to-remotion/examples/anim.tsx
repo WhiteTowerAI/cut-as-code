@@ -44,6 +44,13 @@ export const CARD   = T.card ? T.card.bg : "transparent";
 // design reads identically at 640x298 or 1920x896 — never hardcode px.
 export const useUnit = () => useVideoConfig().height / 100;
 
+// --- theme font helpers (guarded; undefined → shipped themes unchanged) -----
+// bodyFont:正文/次要文字的字族。双字族主题(dotgrid)给 fontBody;单字族主题回退到 T.font。
+export const bodyFont = (): string => T.fontBody ?? T.font;
+// dispItalic:显示角色(标题/数字/金句)的 fontStyle。斜体主题(apex)返回 "italic";
+// 其余返回 undefined → React 省略该属性 → 逐帧零回归。
+export const dispItalic = (): "italic" | undefined => (T.displayItalic ? "italic" : undefined);
+
 // --- anchor: which edge the whole piece rides on ---------------------------
 // ONE knob for the entire design. "bottom" = the lower-third safe zone (default).
 // Set "top" to clear bottom captions when compositing captions + cards on one
@@ -149,8 +156,10 @@ export const Surface: React.FC<{
   }
   const s = side ?? c.borderSide;
   const w = u * (widthU ?? c.borderWidthU);
-  const border =
-    s === "left"
+  // borderAll(dotgrid):整框中性发丝边,忽略单侧强调边。其余主题走单侧,零回归。
+  const border = c.borderAll
+    ? { border: `${u * c.borderWidthU}px solid ${c.borderColor}` }
+    : s === "left"
       ? { borderLeft: `${w}px solid ${c.borderColor}` }
       : { borderBottom: `${w}px solid ${c.borderColor}` };
   return (
@@ -167,10 +176,16 @@ export const Rule: React.FC<{ widthU?: number; progress?: number }> = ({
   widthU = 36, progress = 1,
 }) => {
   const u = useUnit();
+  // skew:apex 设了 ruleSkewDeg 时强调条/标记倾斜;不设→undefined→不倾斜,零回归。
+  const skew = T.ruleSkewDeg ? { transform: `skewX(${T.ruleSkewDeg}deg)` } : null;
+  if (T.rule === "dot") {
+    // dotgrid:那颗克制的黄方点(不是线)。progress 只控透明度,避免方块被拉成条。
+    return <div style={{ height: u * 3, width: u * 3, background: T.color.accent, opacity: progress }} />;
+  }
   if (T.rule === "bar") {
-    // teal:细高的一段(SectionCard 用作 title 下的强调条)。
+    // teal:细高的一段(SectionCard 用作 title 下的强调条)。apex:同款但斜切。
     return <div style={{ height: u * 0.6, width: u * widthU * progress,
-      background: T.color.accent, borderRadius: u * 0.3 }} />;
+      background: T.color.accent, borderRadius: u * 0.3, ...skew }} />;
   }
   // editorial hairline:整条细线(淡文字色) + 左端一小段 accent。淡色由 T 派生,
   // 不写死(hexA 在本文件 Task 3 已定义)。

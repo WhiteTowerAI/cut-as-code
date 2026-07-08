@@ -3,7 +3,7 @@
 import * as React from "react";
 import { AbsoluteFill, useCurrentFrame, interpolate } from "remotion";
 import {
-  T, Backdrop, Kicker, useUnit, useFade, useEntrance, TIMING, EASE_OUT,
+  T, Backdrop, Kicker, useUnit, useFade, useEntrance, bodyFont, dispItalic, TIMING, EASE_OUT,
   anchorJustify, anchorPad,
 } from "../anim";
 
@@ -24,12 +24,12 @@ export const Intro: React.FC<{ kicker?: string; title: string; sub?: string; dur
     ? { opacity: o, display: "flex", gap: u * 2.4, padding: anchorPad(u * 9, u * 6) }
     : { opacity: o, transform: `translateY(${slide}px)`, display: "flex", gap: u * 2.4, padding: anchorPad(u * 9, u * 6) };
   const titleStyle: React.CSSProperties = {
-    color: T.color.text, fontFamily: T.font, fontSize: u * 10, fontWeight: T.weight.heavy,
+    color: T.color.text, fontFamily: T.font, fontStyle: dispItalic(), fontSize: u * 10, fontWeight: T.weight.heavy,
     letterSpacing: -1.5, lineHeight: 0.98,
     ...(stagger ? { opacity: eTitle.opacity, clipPath: eTitle.clipPath } : null),
   };
   const subStyle: React.CSSProperties = {
-    color: T.color.textMuted, fontFamily: T.font, fontSize: u * 3.4, fontWeight: T.weight.light, marginTop: u * 1.4,
+    color: T.color.textMuted, fontFamily: bodyFont(), fontSize: u * 3.4, fontWeight: T.weight.light, marginTop: u * 1.4,
     ...(stagger ? { opacity: eSub.opacity, transform: eSub.transform, filter: eSub.filter } : null),
   };
 

@@ -4,7 +4,7 @@
 import * as React from "react";
 import { AbsoluteFill, useCurrentFrame, interpolate } from "remotion";
 import {
-  T, Backdrop, useUnit, useFade, TIMING, EASE_OUT, anchorJustify, anchorPad,
+  T, Backdrop, useUnit, useFade, bodyFont, dispItalic, TIMING, EASE_OUT, anchorJustify, anchorPad,
 } from "../anim";
 
 export const ListReveal: React.FC<{ title?: string; items: string[]; durFrames?: number }> = ({
@@ -19,7 +19,7 @@ export const ListReveal: React.FC<{ title?: string; items: string[]; durFrames?:
       <div style={{ opacity: o, padding: anchorPad(u * 8, u * 6),
                     display: "flex", flexDirection: "column", gap: u * 1.6 }}>
         {title ? (
-          <div style={{ color: T.color.accent, fontFamily: T.font, fontSize: u * 3, fontWeight: T.kicker.weight,
+          <div style={{ color: T.color.accent, fontFamily: T.font, fontStyle: dispItalic(), fontSize: u * 3, fontWeight: T.kicker.weight,
                         letterSpacing: u * 0.3, marginBottom: u * 1 }}>{title}</div>
         ) : null}
         {items.map((it, i) => {
@@ -29,10 +29,10 @@ export const ListReveal: React.FC<{ title?: string; items: string[]; durFrames?:
           return (
             <div key={i} style={{ opacity: p, transform: `translateX(${interpolate(p, [0, 1], [u * 2, 0])}px)`,
                                   display: "flex", alignItems: "baseline", gap: u * 2 }}>
-              <span style={{ color: T.color.accent, fontFamily: T.font, fontSize: u * 4, fontWeight: T.weight.heavy }}>
+              <span style={{ color: T.listNumColors?.[i] ?? T.color.accent, fontFamily: T.font, fontStyle: dispItalic(), fontSize: u * 4, fontWeight: T.weight.heavy }}>
                 {String(i + 1).padStart(2, "0")}
               </span>
-              <span style={{ color: T.color.text, fontFamily: T.font, fontSize: u * 5, fontWeight: T.weight.med }}>{it}</span>
+              <span style={{ color: T.color.text, fontFamily: bodyFont(), fontSize: u * 5, fontWeight: T.weight.med }}>{it}</span>
             </div>
           );
         })}
