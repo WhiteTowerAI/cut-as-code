@@ -3,7 +3,7 @@
 import * as React from "react";
 import { AbsoluteFill, useCurrentFrame, interpolate } from "remotion";
 import {
-  T, Surface, Scrim, useUnit, useFade, useEntrance, TIMING, EASE_OUT,
+  T, Surface, Scrim, useUnit, useFade, useEntrance, usePop, TIMING, EASE_OUT,
   anchorJustify, anchorPad,
 } from "../anim";
 
@@ -14,6 +14,7 @@ export const StatCallout: React.FC<{ value: string; label?: string; durFrames?: 
   const o = useFade(durFrames);
   const f = useCurrentFrame();
   const stagger = T.motion === "stagger";
+  const pop = usePop();   // 主题设了 T.pop 才 ≠1;整卡 spring 缩放弹入(Stat 数字揭晓感)
   const p = interpolate(f, [0, TIMING.reveal], [0, 1], { easing: EASE_OUT, extrapolateRight: "clamp" });
   const num = parseFloat(value.replace(/[^\d.]/g, ""));
   const prefix = (value.match(/^\D*/) ?? [""])[0];
@@ -37,6 +38,7 @@ export const StatCallout: React.FC<{ value: string; label?: string; durFrames?: 
       <Surface side="bottom" widthU={0.6} style={{
         opacity: o, display: "flex", alignItems: "baseline", gap: u * 1.6,
         padding: `${u * 1.8}px ${u * 3}px`,
+        transform: `scale(${pop})`, transformOrigin: "center",   // T.pop 主题:spring 弹入;其余 pop=1 无变化
       }}>
         <div style={valueStyle}>{display}</div>
         {label ? <div style={labelStyle}>{label}</div> : null}

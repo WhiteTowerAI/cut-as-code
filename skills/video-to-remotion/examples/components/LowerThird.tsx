@@ -3,7 +3,7 @@
 import * as React from "react";
 import { AbsoluteFill, useCurrentFrame, interpolate } from "remotion";
 import {
-  T, Surface, Scrim, useUnit, useFade, useEntrance, TIMING, EASE_OUT,
+  T, Surface, Scrim, useUnit, useFade, useEntrance, usePop, TIMING, EASE_OUT,
   anchorJustify, anchorPad,
 } from "../anim";
 
@@ -18,11 +18,12 @@ export const LowerThird: React.FC<{ line1: string; line2?: string; durFrames?: n
     { easing: EASE_OUT, extrapolateRight: "clamp" });
   const e1 = useEntrance("title");   // 无条件调用(hook 规则);仅 stagger 用
   const e2 = useEntrance("sub");
+  const pop = usePop();   // 主题设了 T.pop 才 ≠1;整卡 spring 缩放弹入(名条 pop-in)
 
-  // 卡外层:fade=整卡淡入+左滑;stagger=整卡只淡入(元素各自动画)。
+  // 卡外层:fade=整卡淡入+左滑;stagger=整卡只淡入(元素各自动画)。pop 主题额外叠 spring 缩放。
   const cardStyle: React.CSSProperties = stagger
-    ? { opacity: o }
-    : { opacity: o, transform: `translateX(${slide}px)` };
+    ? { opacity: o, transform: `scale(${pop})`, transformOrigin: "left center" }
+    : { opacity: o, transform: `translateX(${slide}px) scale(${pop})`, transformOrigin: "left center" };
 
   const line1Style: React.CSSProperties = {
     color: T.color.text, fontFamily: T.font, fontSize: u * 6, fontWeight: T.weight.heavy,

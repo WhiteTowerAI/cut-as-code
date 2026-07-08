@@ -30,7 +30,7 @@ export const Intro: React.FC<{ kicker?: string; title: string; sub?: string; dur
   };
   const subStyle: React.CSSProperties = {
     color: T.color.textMuted, fontFamily: T.font, fontSize: u * 3.4, fontWeight: T.weight.light, marginTop: u * 1.4,
-    ...(stagger ? { opacity: eSub.opacity, transform: eSub.transform } : null),
+    ...(stagger ? { opacity: eSub.opacity, transform: eSub.transform, filter: eSub.filter } : null),
   };
 
   return (

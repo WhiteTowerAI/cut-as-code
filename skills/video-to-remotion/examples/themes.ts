@@ -40,6 +40,14 @@ export type Theme = {
   rule: "bar" | "hairline";
   kicker: { case: "upper" | "none"; spacingEm: number; weight: number };
   motion: "fade" | "stagger";
+  // 非标题元素(kicker/sub/小卡标签)入场的失焦半径(px):从 blurIn→0 聚焦,叠在淡入+上浮上做
+  // "镜头对焦"揭示。仅 stagger 主题、且设了此值才生效;标题永不受影响(仍走 clipPath 擦入,不叠)。
+  // 不设→undefined→filter 属性省略→teal/almanac 逐帧零回归。见 anim.tsx useEntrance。
+  blurIn?: number;
+  // pop:信息高光卡(Stat 数字 / LowerThird 名条)的 spring 弹入(带 bounce)。这是全仓唯一带回弹的
+  // 动效,刻意与 stagger 家族的"纪录片不 bounce"分开——只有 opt-in 此字段的主题才弹。不设(teal/almanac)
+  // → usePop 返回 1 → 无缩放 → 逐帧零回归。config 传给 spring();fromScale 是起始缩放(如 0.7→1)。
+  pop?: { config: { damping: number; stiffness?: number; mass?: number; overshootClamping?: boolean }; fromScale: number };
 };
 
 // editorial 用 Archivo(顶层加载;只有被选中的主题真正用到其 family)。
@@ -63,6 +71,11 @@ const editorial: Theme = {
   rule: "hairline",
   kicker: { case: "upper", spacingEm: 0.28, weight: 600 },
   motion: "stagger",
+  // 副标题/kicker/small 失焦→聚焦揭示(纪录片"对焦"感,不带 bounce)。标题仍走 clipPath 擦入,不叠。
+  // 只有叙事书挡(Intro/Outro)的次要文字用它;信息卡(名条/数字/金句/列表)保持即时清晰。见 anim useEntrance。
+  blurIn: 24,
+  // Stat 数字卡 / LowerThird 名条的 spring 弹入(带回弹)。damping:9 → 明显过冲再落定。见 anim usePop。
+  pop: { config: { damping: 9 }, fromScale: 0.7 },
 };
 
 // teal 复刻今天的常量,确保零回归(数值取自现 anim.tsx 与各组件)。

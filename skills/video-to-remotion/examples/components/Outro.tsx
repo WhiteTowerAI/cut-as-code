@@ -23,11 +23,11 @@ export const Outro: React.FC<{
   };
   const subStyle: React.CSSProperties = {
     color: T.color.text, fontFamily: T.font, fontSize: u * 3.6, fontWeight: T.weight.med, marginTop: u * 1.4,
-    ...(stagger ? { opacity: eSub.opacity, transform: eSub.transform } : null),
+    ...(stagger ? { opacity: eSub.opacity, transform: eSub.transform, filter: eSub.filter } : null),
   };
   const smallStyle: React.CSSProperties = {
     color: T.color.textMuted, fontFamily: T.font, fontSize: u * 2.8, fontWeight: T.weight.light, marginTop: u * 0.8,
-    ...(stagger ? { opacity: eSub.opacity, transform: eSub.transform } : null),
+    ...(stagger ? { opacity: eSub.opacity, transform: eSub.transform, filter: eSub.filter } : null),
   };
 
   // almanac:整屏奶油,居中珊瑚菱形 + wordmark 竖向锁版。菱形走 kicker 拍先登场(淡入+上浮),

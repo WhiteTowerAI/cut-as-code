@@ -11,7 +11,7 @@
 // output resolution (render at the source's size, not 4K — see Root.tsx).
 import * as React from "react";
 import {
-  AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig,
+  AbsoluteFill, Easing, interpolate, spring, useCurrentFrame, useVideoConfig,
 } from "remotion";
 import { T } from "./themes";
 // Re-export T so the 7 components import it from here (the anim facade) alongside
@@ -223,7 +223,7 @@ export type EntranceRole = "kicker" | "title" | "rule" | "sub";
 // stagger 家族:每个角色错开 TIMING.stagger 帧登场。返回该帧的样式片段。
 // title 用 clipPath 擦入,其余用 淡入+上浮。clip 在顶层无条件计算(满足 hook 规则)。
 export const useEntrance = (role: EntranceRole): {
-  opacity: number; transform: string; clipPath?: string;
+  opacity: number; transform: string; clipPath?: string; filter?: string;
 } => {
   const f = useCurrentFrame();
   const u = useUnit();
@@ -232,7 +232,28 @@ export const useEntrance = (role: EntranceRole): {
   const clip = useClipReveal(delay);            // 无条件调用,满足 hook 规则
   const p = interpolate(f, [delay, delay + TIMING.reveal], [0, 1],
     { easing: EASE_OUT, extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  if (role === "title") return { opacity: p, transform: "none", clipPath: clip };
+  if (role === "title") return { opacity: p, transform: "none", clipPath: clip };  // 标题只走 clipPath 擦入,不叠 blur
+  // 非标题(kicker/sub):失焦→聚焦。关键——blur 与 opacity 解耦:opacity 在 reveal 窗口内快速淡入
+  // (文字先看清),blur 从 blurIn 起、在一个更长的窗口(reveal*2.2)上单独释放到 0(再对焦)。
+  // 若与 opacity 同窗口,最模糊会撞在最透明(看不见)上,读不出 focus-pull(实测踩过)。
+  // 未设(teal/almanac)→ filter 为 undefined → React 省略该属性 → 逐帧零回归。
+  const filter = T.blurIn
+    ? `blur(${interpolate(f, [delay, delay + TIMING.reveal * 2.2], [T.blurIn, 0],
+        { easing: EASE_OUT, extrapolateLeft: "clamp", extrapolateRight: "clamp" })}px)`
+    : undefined;
   const rise = interpolate(p, [0, 1], [u * 1.2, 0]);
-  return { opacity: p, transform: `translateY(${rise}px)` };
+  return { opacity: p, transform: `translateY(${rise}px)`, filter };
+};
+
+// usePop —— spring 弹入的缩放值(0→1,默认过冲回弹)。给"信息高光"卡(Stat 数字 / LowerThird 名条)
+// 做 pop-in。仅当主题设了 T.pop 才生效:返回一个 scale 值,组件乘进 transform。未设(teal/almanac)
+// → 返回 1 → 无缩放 → 逐帧零回归。注意:这是全仓唯一带 bounce 的动效,刻意与 stagger 家族的
+// "纪录片不 bounce" EASE_OUT 分开——只有明确 opt-in(T.pop)的主题/卡片才弹。config 由主题给,
+// 默认 damping:9(明显回弹);想要干脆无过冲可设 overshootClamping。fromScale 也来自主题(如 0.7)。
+export const usePop = (): number => {
+  const f = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  if (!T.pop) return 1;                                   // 未 opt-in 的主题:恒等,零回归
+  const s = spring({ frame: f, fps, config: T.pop.config });
+  return interpolate(s, [0, 1], [T.pop.fromScale, 1]);    // 例:0.7 → 1,过冲到 ~1.1 再落定
 };
