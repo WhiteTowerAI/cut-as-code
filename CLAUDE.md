@@ -32,7 +32,7 @@ root build, no package manifest, no test suite, and no lint config — the scrip
 ad hoc by an agent following the skill's pipeline. When you change a skill, the SKILL.md
 *is* the spec; keep it and the scripts in sync.
 
-## The seven skills
+## The eight skills
 
 | Skill | Job | Stack |
 |---|---|---|
@@ -42,6 +42,7 @@ ad hoc by an agent following the skill's pipeline. When you change a skill, the 
 | `video-overlay-cards` | Composite intro/chapter/lower-third/outro cards onto a video (no re-cut) | Python · ffmpeg · Pillow |
 | `video-to-captions` | Every-line styled subtitles, optional karaoke | Remotion (React/TS) · ffmpeg · faster-whisper |
 | `video-to-remotion` | Watch content → auto-generate *selective* motion graphics (lower-thirds, stats, chapter cards) | Remotion (React/TS) · ffmpeg · faster-whisper |
+| `video-to-hyperframes` | Same as video-to-remotion, authored as HTML + GSAP instead of React (agents iterate HTML faster; no bundler) | HyperFrames (HTML/GSAP) · ffmpeg · faster-whisper |
 | `design-frames-to-motion` | Rebuild designer PNG frames as parametric Remotion components, transcript-synced | Remotion (React/TS) · ffmpeg |
 
 ## Architecture that spans skills
