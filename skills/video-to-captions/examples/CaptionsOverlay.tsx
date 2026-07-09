@@ -9,6 +9,6 @@ import { Caption, Cue } from "./Caption";
 
 export const CaptionsOverlay: React.FC = () => (
   <AbsoluteFill>
-    <Caption captions={captions as Cue[]} karaoke />
+    <Caption captions={captions as Cue[]} />
   </AbsoluteFill>
 );

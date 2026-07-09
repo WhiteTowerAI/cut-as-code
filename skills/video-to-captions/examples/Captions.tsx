@@ -16,6 +16,6 @@ import { Caption, Cue } from "./Caption";
 export const Captions: React.FC = () => (
   <AbsoluteFill style={{ backgroundColor: "black" }}>
     <OffthreadVideo src={staticFile("source.mp4")} />
-    <Caption captions={captions as Cue[]} karaoke />
+    <Caption captions={captions as Cue[]} />
   </AbsoluteFill>
 );

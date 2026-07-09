@@ -1,0 +1,253 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://open-recut.local/schemas/video-to-shorts/shorts-plan.v1.json",
+  "title": "Open-Recut Shorts Plan",
+  "description": "Human-approved plan for extracting short horizontal source clips.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "video",
+    "transcript",
+    "producer",
+    "target",
+    "shorts"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "shorts-plan.v1"
+    },
+    "video": {
+      "$ref": "#/$defs/video"
+    },
+    "transcript": {
+      "$ref": "#/$defs/transcript_source"
+    },
+    "producer": {
+      "$ref": "#/$defs/producer"
+    },
+    "source_candidates": {
+      "$ref": "#/$defs/source_candidates"
+    },
+    "target": {
+      "$ref": "#/$defs/target"
+    },
+    "shorts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/short"
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "video": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "duration_s"],
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "fps": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "duration_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "kind": {
+          "enum": ["rough_cut", "source"]
+        }
+      }
+    },
+    "transcript_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "timebase"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timebase": {
+          "enum": ["input_video_relative"]
+        },
+        "source": {
+          "enum": ["provided", "rough_cut_selfcheck", "generated_by_whisper"]
+        }
+      }
+    },
+    "producer": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["skill", "created_at"],
+      "properties": {
+        "skill": {
+          "const": "video-to-shorts"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "planner": {
+          "type": "string"
+        }
+      }
+    },
+    "source_candidates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "schema_version"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schema_version": {
+          "const": "shorts-candidates.v1"
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["aspect_ratio"],
+      "properties": {
+        "aspect_ratio": {
+          "const": "9:16"
+        },
+        "downstream_reframe_skill": {
+          "const": "video-vertical-reframe"
+        }
+      }
+    },
+    "short": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "short_id",
+        "order",
+        "title",
+        "start_time",
+        "end_time",
+        "duration",
+        "score",
+        "hook_sentence",
+        "virality_reason",
+        "transcript_excerpt",
+        "source_candidate_index",
+        "outputs",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "short_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_id": {
+          "type": "string"
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "start_time": {
+          "type": "number",
+          "minimum": 0
+        },
+        "end_time": {
+          "type": "number",
+          "minimum": 0
+        },
+        "duration_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "duration": {
+          "type": "number",
+          "minimum": 0
+        },
+        "score": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "hook_sentence": {
+          "type": "string"
+        },
+        "virality_reason": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "transcript_excerpt": {
+          "type": "string"
+        },
+        "source_candidate_index": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "validation": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "outputs": {
+          "$ref": "#/$defs/outputs"
+        },
+        "status": {
+          "enum": ["planned", "extracted", "reframed", "rejected"]
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["directory", "source_video", "transcript"],
+      "properties": {
+        "directory": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_video": {
+          "type": "string",
+          "minLength": 1
+        },
+        "transcript": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vertical_reframe_dir": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

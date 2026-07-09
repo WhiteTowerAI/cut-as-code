@@ -1,176 +1,440 @@
 ---
 name: video-to-captions
 description: >
-  Auto-caption a video as Remotion (React): transcribe it word-by-word, group the
-  words into readable caption cues (broken on punctuation, line budget, duration and
-  speech gaps), and render styled subtitles with optional per-word karaoke highlight.
-  Render a transparent caption overlay by default, then
-  composite that overlay onto the source with ffmpeg (`-c:a copy`) so Remotion does not
-  decode the source on every frame. A simple full-frame <OffthreadVideo> render path is
-  also provided for short clips. Also emits a standard .srt. Use when asked to
-  "add captions/subtitles to this video",
-  "auto-caption / burn in subtitles", "karaoke / word-by-word captions", 给视频自动加
-  字幕, 烧录字幕, 逐词高亮字幕. Same content-driven, transcript-timed, code-is-the-edit
-  approach as video-to-remotion — but this one covers EVERY line, where
-  video-to-remotion adds selective graphics (lower-thirds, stats, section cards).
-  NOT for cutting footage (rough-cut) or selective callouts (video-to-remotion).
+  Add styled, burned-in subtitles to an existing video using Remotion. The skill
+  consumes a source video plus word-timed captions, lets the agent map natural
+  language style requests to caption presets/options, previews the selected style
+  by default, then renders a transparent caption overlay and composites it onto
+  the source with ffmpeg while copying audio. Use for auto-captions, subtitles,
+  karaoke/word-by-word highlight, and short-video subtitle styling. Do not use
+  for rough cutting or selective motion graphics.
 ---
 
-# Video → Auto Captions (Remotion)
+# Video to Captions
 
-Turn a video's speech into **styled, burned-in subtitles** — every line covered,
-timed to the word, optionally karaoke-highlighted — by rendering a transparent caption
-overlay and compositing it onto the source with ffmpeg. Same philosophy as
-`video-to-remotion` (transcript → cue sheet → Remotion → render, all text), but where
-that skill adds *selective* graphics, this one provides *full* caption coverage.
+This skill adds subtitles to a video. It does not cut, trim, diagnose, or
+restructure the footage. If the video was already edited by `video-rough-cut` or
+another workflow, this skill starts from that finished video and its caption data.
 
-## The one idea
-**Captions are data, not a timeline.** The transcript becomes `captions.json` (cues
-with per-word timings); one Remotion component reads it and draws the active cue,
-highlighting the current word. Re-chunk or restyle by editing text + re-rendering.
+The agent-facing rule is simple:
 
-## When to use
-- Any video that needs subtitles / captions burned in (talking-head, podcast, social
-  vertical, explainer).
-- The ask is "add captions", "auto-subtitle this", "karaoke / word-by-word captions",
-  "burn in subtitles with the original audio".
-- NOT for: cutting the footage (rough-cut); *selective* callouts/lower-thirds/stats
-  (→ `video-to-remotion`); design-frame interludes (→ `design-frames-to-motion`).
+**User describes the caption result in natural language. The agent maps that to a
+stable preset/config, previews it by default, then renders only after confirmation.**
 
-## Dependencies
-- **Node + Remotion** project (`npx create-video@latest`), ffmpeg + ffprobe
-  (ffprobe drives `scripts/probe.py`, which sizes the render — see step 4).
-- Python with **faster-whisper** for the transcript (CPU/int8 works). Reuses the
-  `video-rough-cut` skill's `transcribe.py` and its exact `work/transcript.json`
-  format (segments → words with start/end).
-- **Languages.** The chunker handles both space-delimited (English) and CJK
-  (Chinese/Japanese/Korean wrap by character, break on `。！？`). The bundled
-  `transcribe.py` defaults to English (`base.en`); for any other language pass a
-  multilingual model + `--lang` (e.g. `transcribe.py audio.wav out medium --lang zh`).
-  This skill consumes only the resulting transcript. For CJK, use a smaller
-  `--max-chars` (≈12–16) since each char is one display unit.
+## Scope
 
-## Working layout
+Use this skill for:
+
+- Burned-in captions/subtitles on an existing video.
+- Every-line captions generated from a word-level transcript.
+- Optional per-word karaoke highlight.
+- Preset-based visual styles for clean captions, social captions, background bars,
+  outlines, and vertical Shorts/Reels/TikTok-style captions.
+
+Do not use this skill for:
+
+- Rough cutting, removing silence, trimming, or editorial selection.
+- Selective graphics such as lower-thirds, stats cards, chapter cards, or callouts.
+- Asking the final user to manually edit renderer internals.
+
+If rough cutting has already happened, accept the rough-cut output as the input video.
+This skill then needs only:
+
+- `public/source.mp4`
+- `src/captions.json`
+- `src/source-meta.json` or equivalent video metadata
+- `src/caption-style.ts` or equivalent final caption style config
+
+## Safe Edit Points
+
+The agent may safely modify:
+
+- `src/caption-style.ts` or `examples/caption-style.ts`: final confirmed style.
+- `src/preview-config.ts` or `examples/preview-config.ts`: preview candidates.
+- `src/captions.json`: only when fixing caption text/timing data, such as systematic
+  ASR errors. If changing displayed text, keep `text`, `lines[]`, and `words[]`
+  consistent because the renderer displays `words[]`.
+
+The agent should not modify these for ordinary style feedback:
+
+- `Caption.tsx`
+- `Captions.tsx`
+- `CaptionsOverlay.tsx`
+- `Root.tsx`
+- `anim.tsx`
+- `caption-style-resolver.ts`
+- preset/theme files, unless the task is explicitly a style-system change
+
+## Style Selection Workflow
+
+Preview is the recommended default flow, but it is not mandatory.
+
+1. If the user describes a style, map it to a preset/config, render one preview
+   still, show it, and wait for confirmation.
+2. If the user does not describe a style, render multiple candidate previews from
+   the official presets/options, show them, and let the user choose.
+3. If the user explicitly says "skip preview", "do not preview", or "directly
+   generate the full video", use the current `caption-style.ts` and render.
+4. If the user dislikes a preview, adjust config from natural-language feedback,
+   regenerate a preview, and repeat until confirmed.
+5. After confirmation, write the final selection to `caption-style.ts` and render
+   the complete video.
+
+Do not ask the user to edit `Caption.tsx` or `anim.tsx`. The user speaks in natural
+language; the agent edits the config layer.
+
+## Official Presets
+
+Official preset names are exactly:
+
+- `clean`: default clean captions; white/near-white text, no background, light shadow.
+- `minimal`: quieter and more restrained; no background, weak or no shadow.
+- `social-bold`: large high-impact social captions; preserves the existing bold
+  short-video design.
+- `pill`: semi-transparent large rounded/capsule background.
+- `boxed`: semi-transparent small-radius rectangular background bar.
+- `stroked`: no background; white/near-white text with stroke/outline.
+- `shorts`: vertical 9:16 trend/shorts style; Cal_Sans, all caps, black stroke,
+  no background, lower-mid placement, default karaoke on.
+
+Do not create or document these as official presets:
+
+- `karaoke`
+- `pill-yellow`
+- `boxed-green`
+- `stroked-blue`
+- `shorts-yellow`
+- `social-bold-karaoke`
+
+Those are preset plus option/theme combinations, or preview candidate ids.
+
+## Themes and Options
+
+Background themes are:
+
+- `gray`
+- `yellow`
+- `blue`
+- `pink`
+- `green`
+
+Use them as:
+
+```ts
+{
+  preset: "pill",
+  overrides: {
+    background: {
+      enabled: true,
+      shape: "pill",
+      theme: "yellow"
+    }
+  }
+}
 ```
-public/source.mp4       # the video (Remotion staticFile root)
-work/transcript.json    # word-level timestamps  (video-rough-cut/transcribe.py)
-src/captions.json       # *** caption cues w/ per-word timings ***  (build_captions.py)
-out/captions.srt        # portable SubRip (bonus / sanity read)
-src/anim.tsx            # palette + caption timing knobs
-src/Caption.tsx         # draws the active cue (+ karaoke highlight)
-src/CaptionsOverlay.tsx # default composition: transparent Caption-only overlay
-src/Captions.tsx        # simple, slow fallback: OffthreadVideo(source) + Caption
-src/source-meta.json    # {width,height,durationInSeconds} from scripts/probe.py
-src/Root.tsx            # registers both, sized from src/source-meta.json
-out/caption-overlay.mov # transparent ProRes overlay
-out/captioned.mp4       # THE DELIVERABLE
-```
-Worked versions of the `src/` files are in `examples/`.
 
-## The pipeline (5 steps)
+Stroke themes are:
 
-### 1. Transcribe the video (word level)
-```
-ffmpeg -y -i public/source.mp4 -ac 1 -ar 16000 work/audio16k.wav
-python ../video-rough-cut/scripts/transcribe.py work/audio16k.wav work/transcript
-```
-**Already ran `video-rough-cut` on this clip?** Its self-check wrote
-`work/selfcheck/cut_transcript.json` — a word-level transcript of the exact cut you're
-captioning. Reuse it as `work/transcript.json` and skip this step (saves a ~15–20 min
-CPU transcription).
-**Non-English:** pass a multilingual model + `--lang` to `transcribe.py` (e.g.
-`python ../video-rough-cut/scripts/transcribe.py work/audio16k.wav work/transcript medium --lang zh`),
-or run your own Whisper. This skill only needs `transcript.json`.
+- `black`
+- `yellow`
+- `blue`
+- `pink`
+- `green`
 
-### 2. Build caption cues
+Use them as:
+
+```ts
+{
+  preset: "stroked",
+  overrides: {
+    background: { enabled: false },
+    stroke: {
+      enabled: true,
+      theme: "green"
+    }
+  }
+}
 ```
+
+Shorts highlight colors are:
+
+- `green`: `#21D32E`
+- `orange`: `#F8BD6D`
+- `yellow`: `#F8F54F`
+
+Use them by overriding `wordHighlight.activeColor` and `wordHighlight.backgroundColor`.
+The default `shorts` highlight is green.
+
+Karaoke is an option:
+
+- `karaoke: true` enables per-word highlight.
+- `karaoke: false` disables per-word highlight.
+
+It is not an official preset. If an external `karaoke` prop/selection is provided,
+it overrides the preset default. Otherwise the renderer uses
+`wordHighlight.enabled` from the resolved style.
+
+## Natural Language Mapping Examples
+
+"Subtitle clean, no background, just white text and light shadow":
+
+```ts
+{
+  preset: "clean",
+  karaoke: false,
+  overrides: {
+    background: { enabled: false }
+  }
+}
+```
+
+"I want big short-video captions":
+
+```ts
+{
+  preset: "social-bold",
+  karaoke: true
+}
+```
+
+"I want yellow rounded background":
+
+```ts
+{
+  preset: "pill",
+  overrides: {
+    background: {
+      enabled: true,
+      shape: "pill",
+      theme: "yellow"
+    }
+  }
+}
+```
+
+"I want a blue small rounded background bar":
+
+```ts
+{
+  preset: "boxed",
+  overrides: {
+    background: {
+      enabled: true,
+      shape: "rounded",
+      theme: "blue"
+    }
+  }
+}
+```
+
+"No background, add black outline":
+
+```ts
+{
+  preset: "stroked",
+  overrides: {
+    background: { enabled: false },
+    stroke: {
+      enabled: true,
+      theme: "black"
+    }
+  }
+}
+```
+
+"White text with green outline, no background":
+
+```ts
+{
+  preset: "stroked",
+  overrides: {
+    background: { enabled: false },
+    stroke: {
+      enabled: true,
+      theme: "green"
+    }
+  }
+}
+```
+
+"I want vertical shorts style with green highlight":
+
+```ts
+{
+  preset: "shorts",
+  karaoke: true,
+  overrides: {
+    wordHighlight: {
+      activeColor: "#21D32E",
+      backgroundColor: "#21D32E"
+    }
+  }
+}
+```
+
+"Shorts style with orange highlight":
+
+```ts
+{
+  preset: "shorts",
+  karaoke: true,
+  overrides: {
+    wordHighlight: {
+      activeColor: "#F8BD6D",
+      backgroundColor: "#F8BD6D"
+    }
+  }
+}
+```
+
+"Enable word-by-word highlight":
+
+```ts
+{
+  preset: "clean",
+  karaoke: true
+}
+```
+
+"Do not use word-by-word highlight":
+
+```ts
+{
+  preset: "clean",
+  karaoke: false
+}
+```
+
+If the user only says "I do not like it", offer a small set of directions instead
+of asking a broad open question:
+
+- cleaner
+- more eye-catching
+- bigger or smaller text
+- stronger or weaker background
+- change background color
+- switch to outline text
+- switch to shorts style
+- enable or disable karaoke
+- generate another preview set
+
+## Working Layout
+
+In a Remotion scaffold, copy the `examples/` files into `src/` or import them from
+the skill examples:
+
+```text
+public/source.mp4
+src/captions.json
+src/source-meta.json
+src/caption-style.ts
+src/caption-presets.ts
+src/caption-style-resolver.ts
+src/caption-color-themes.ts
+src/Caption.tsx
+src/CaptionsOverlay.tsx
+src/Captions.tsx
+src/CaptionPreview.tsx
+src/preview-config.ts
+src/preview-index.tsx
+src/Root.tsx
+out/caption-overlay.mov
+out/captioned.mp4
+```
+
+The example files live in `examples/`. Helper scripts live in `scripts/`.
+
+## Caption Data
+
+If you need to generate captions from a transcript:
+
+```powershell
 python scripts/build_captions.py work/transcript.json src/captions.json out/captions.srt
 ```
-Groups words into readable cues — broken on sentence punctuation, a line budget
-(`--max-chars`×`--max-lines`), `--max-dur`, and speech `--gap` — keeping per-word
-timings for karaoke. Writes `src/captions.json` (drives the render) and `out/captions.srt`
-(portable). See `reference/caption-rules.md` for the rules, schema and tunables. Skim the
-`.srt` to confirm the chunking reads well before rendering.
 
-**Correct recurring proper-noun / domain-term ASR errors before rendering.** "Faithful to
-the transcript" must not burn real ASR *errors* into every cue — e.g. a host's name heard
-as "social front" (actually "Herschel Fruean"), or "first XV" heard as "first 13 / first
-15". These don't match the audio; they're mistakes. This is a **cheap, targeted
-find-replace on a handful of systematic strings** in `src/captions.json` — NOT an
-editorial rewrite of every line. For each fix, edit **both**:
-- the cue's `text` and `lines[]` (these drive the `.srt`), and
-- the cue's **`words[]` entries** — `Caption.tsx` renders the karaoke from `words[]`, so
-  fixing only `text` does NOT change the burned-in display.
-Scope each replacement so it can't over-fire (e.g. "first 13/15" → "first XV" but **leave**
-genuine "first 15 **minutes**"). Then continue to render. This is distinct from editorially
-rewriting cues.
+The transcript should be word-level JSON compatible with the shared
+`video-rough-cut/scripts/transcribe.py` output. This skill can reuse a transcript
+from a prior rough-cut run, but it does not perform the rough cut itself.
 
-### 3. Style the caption component
-`examples/Caption.tsx` spans the whole video and draws whichever cue is active for the
-current frame; with `karaoke` on, the spoken word is highlighted (`CLAY`) and upcoming
-words are dimmed. Tune position/size/look there and in `anim.tsx` (bottom-center default;
-raise `paddingBottom` for vertical video).
+Before rendering, skim `out/captions.srt` and fix systematic ASR errors in
+`src/captions.json` if necessary. If fixing displayed text, update `text`, `lines[]`,
+and the relevant `words[]` entries together.
 
-### 4. Put captions into a transparent overlay
-`examples/CaptionsOverlay.tsx` draws `<Caption>` on a transparent background. This is the
-default for any clip longer than ~1-2 minutes because Remotion only renders the caption
-layer; it does not seek/decode the H.264 source on every frame. `examples/Captions.tsx`
-is the simple, slow fallback that plays `source.mp4` via `<OffthreadVideo>` and burns the
-captions in during one render. Size both compositions to the source first:
-```
+## Source Metadata
+
+Generate source metadata before Remotion render:
+
+```powershell
 python scripts/probe.py public/source.mp4 src/source-meta.json
 ```
-`Root.tsx` imports `src/source-meta.json` and sets `width`/`height`/`durationInFrames`
-from it (`durationInFrames = ceil(durationInSeconds × 24)`). This replaces the old
-runtime `getVideoMetadata`/`calculateMetadata`, which failed on some server-side render
-paths and silently fell back to a 4K render. No `source-meta.json`? Hand-write it with
-the real `{width, height, durationInSeconds}`.
 
-### 5. Render the overlay, ffmpeg-composite it, then self-review
-Render cost starts with `frames = duration_s x fps`. The full-frame fallback decodes the
-source for every frame; the transparent overlay path avoids that and then uses one ffmpeg
-pass to combine the overlay with the source while copying audio.
+`Root.tsx` expects `{ width, height, durationInSeconds }` so the compositions match
+the source dimensions and duration.
+
+## Preview Commands
+
+Preview requires a Remotion scaffold with the example preview files available.
+Run from the skill/scaffold directory that contains `examples/preview-index.tsx`:
+
+```powershell
+node --experimental-strip-types scripts/render-caption-previews.mjs
 ```
+
+The script:
+
+- reads `examples/preview-config.ts`
+- renders each preview candidate through Remotion
+- writes PNGs to `out/style-previews`
+- uses `Caption.tsx` and the same style resolver as final render
+
+On machines without `npx` on `PATH`, set `REMOTION_BIN`:
+
+```powershell
+$env:REMOTION_BIN="F:\path\to\node_modules\.bin\remotion.cmd"
+node --experimental-strip-types scripts/render-caption-previews.mjs
+```
+
+Use preview output as a decision aid. Do not treat preview candidate ids as official
+preset names.
+
+## Render Commands
+
+For long videos, prefer the transparent overlay path:
+
+```powershell
 npx remotion still src/index.ts Captions work/stills/t12.png --frame=290
 npx remotion render src/index.ts CaptionsOverlay out/caption-overlay.mov --codec=prores --prores-profile=4444 --pixel-format=yuva444p10le --image-format=png
 ffmpeg -y -i public/source.mp4 -i out/caption-overlay.mov -filter_complex "[0:v][1:v]overlay=shortest=1:format=auto[v]" -map "[v]" -map 0:a? -c:v libx264 -crf 18 -preset veryfast -c:a copy -movflags +faststart out/captioned.mp4
 ```
-Use the `Captions` still for self-review because it shows captions on the real frame; it
-only decodes selected frames.
-The transparent ProRes 4444 `out/caption-overlay.mov` is a **large, deletable intermediate**
-(it stores a full alpha frame every frame — multiple GB even at low resolution). The final
-`out/captioned.mp4` is the deliverable; delete the `.mov` after compositing (or use a lighter
-alpha codec like `qtrle` / VP9-webm-alpha if you want to keep it).
-For long renders, keep the render under a foreground/monitoring process that emits
-progress. Detached fire-and-forget background jobs can be killed when the controlling
-session goes idle.
 
-Simple, slow one-pass fallback for very short clips:
-```
+For very short clips, the simple full-frame fallback is available:
+
+```powershell
 npx remotion still src/index.ts Captions work/stills/t12.png --frame=290
 npx remotion render src/index.ts Captions out/captioned.mp4
 ```
 
-## Combining captions + overlays (with video-to-remotion)
-Captions (this skill) and the `video-to-remotion` cards are both **bottom-anchored**, so
-layering them as-is makes them overlap. To ship one video with BOTH:
-1. **Keep captions at the bottom** (unchanged — `Caption.tsx` is `justifyContent:"flex-end"`).
-2. **Re-anchor the remotion cards to the TOP** so they clear the captions: set `ANCHOR = "top"`
-   in `video-to-remotion/examples/anim.tsx`. That single knob flips every card's
-   `justifyContent` + edge padding and the `Scrim` (top band, reversed gradient) together — no
-   per-component edits. Its default is `"bottom"`; only flip it for this combined layout.
-3. **Render BOTH transparent overlays, then composite serially in one ffmpeg pass** (captions
-   first, cards on top), copying audio:
-   ```
-   ffmpeg -y -i first_cut.mp4 -i out/caption-overlay.mov -i out/graphics-overlay.mov \
-     -filter_complex "[0:v][1:v]overlay[a];[a][2:v]overlay[v]" \
-     -map "[v]" -map 0:a? -c:a copy -c:v libx264 -crf 18 -preset veryfast out/final.mp4
-   ```
+The overlay `.mov` can be large. It is an intermediate artifact; the final deliverable
+is `out/captioned.mp4`.
 
-## Self-check
-- Read `out/captions.srt`: cues are readable length, break on sense, and match the audio.
-- Spot-check stills mid-cue: the right line shows, and (karaoke) the highlight is on the
-  word actually being said.
-- No caption overruns its audio or collides with the next (gaps/`--max-dur` respected).
-- Composition length + frame size match the source (no captions past the end, no letterbox).
-- The whole edit is text — re-chunk or restyle and re-render.
+## Testing Guidance
+
+After the real-video tuning work, use this validation order:
+
+1. Short smoke test first: 30-60 seconds, a few representative captions, one or two
+   style previews, one final still, then a short final render.
+2. Long E2E test second: full duration, final style in `caption-style.ts`, overlay
+   render, ffmpeg composite, and spot-check early/middle/late captions.
+3. Watch for visual issues: safe area, long words, multiline cues, bright backgrounds,
+   vertical/horizontal framing, and subtitle density.
+4. Treat visual corrections as Design Tuning. Adjust preset/config values narrowly.
+   Do not change architecture or renderer internals unless a real rendering bug requires it.
+
+## Self Check
+
+- `caption-style.ts` contains the confirmed final preset/options.
+- Preview and final render use the same resolved style path.
+- `captions.json`, `source-meta.json`, and `public/source.mp4` exist.
+- Stills show the right cue at the right frame.
+- Karaoke highlight, if enabled, follows the spoken word.
+- The final video duration, dimensions, audio, and caption placement match expectations.

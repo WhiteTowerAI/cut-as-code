@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://open-recut.local/schemas/video-to-shorts/short-transcript.v1.json",
+  "title": "Open-Recut Short Transcript",
+  "description": "Transcript for one extracted short, with timings relative to the short source video.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "short_id",
+    "source",
+    "timebase",
+    "segments"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "short-transcript.v1"
+    },
+    "short_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "$ref": "#/$defs/source"
+    },
+    "timebase": {
+      "const": "short_relative"
+    },
+    "segments": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/segment"
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_video",
+        "source_transcript",
+        "source_start_time",
+        "source_end_time"
+      ],
+      "properties": {
+        "input_video": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_transcript": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_start_time": {
+          "type": "number",
+          "minimum": 0
+        },
+        "source_end_time": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "segment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end", "text"],
+      "properties": {
+        "start": {
+          "type": "number",
+          "minimum": 0
+        },
+        "end": {
+          "type": "number",
+          "minimum": 0
+        },
+        "text": {
+          "type": "string"
+        },
+        "words": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/word"
+          }
+        }
+      }
+    },
+    "word": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end", "word"],
+      "properties": {
+        "start": {
+          "type": "number",
+          "minimum": 0
+        },
+        "end": {
+          "type": "number",
+          "minimum": 0
+        },
+        "word": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

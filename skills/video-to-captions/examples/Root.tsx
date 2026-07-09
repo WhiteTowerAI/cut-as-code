@@ -13,6 +13,7 @@ import * as React from "react";
 import { Composition } from "remotion";
 import { Captions } from "./Captions";
 import { CaptionsOverlay } from "./CaptionsOverlay";
+import { CaptionPreview } from "./CaptionPreview";
 import meta from "./source-meta.json";
 
 const FPS = 24;
@@ -31,6 +32,14 @@ export const RemotionRoot: React.FC = () => (
     <Composition
       id="CaptionsOverlay"
       component={CaptionsOverlay}
+      fps={FPS}
+      width={meta.width}
+      height={meta.height}
+      durationInFrames={durationInFrames}
+    />
+    <Composition
+      id="CaptionPreview"
+      component={CaptionPreview}
       fps={FPS}
       width={meta.width}
       height={meta.height}
