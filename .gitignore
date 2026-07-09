@@ -7,3 +7,7 @@ __pycache__/
 work/
 
 .claude/worktrees/
+# HyperFrames preview cache + regenerable self-check stills/gallery
+.hyperframes/
+snapshots/
+gallery.html

@@ -12,12 +12,15 @@
 // toggles style.visibility — exactly what the runtime does — instead of
 // force-showing a scene. If the wrong scene paints, the composition is wrong.
 //
-// Usage:  node shoot.mjs [comp-id] [t1,t2,...]
-//   defaults: comp id "v2hf-almanac", the 5 example cue mid-windows.
+// Usage:  node shoot.mjs [file-or-comp-id] [t1,t2,...]
+//   First arg: a .html filename (e.g. index-teal.html) OR a comp-id string.
+//   If it ends in .html, it is used as the source file and the comp-id is
+//   derived as "v2hf-<stem>" (e.g. index-teal.html → v2hf-teal).
+//   Defaults: index.html / comp-id "v2hf-almanac", all 13 cue mid-windows.
 //   Set CHROME env to override the Chrome path.
 import puppeteer from "puppeteer-core";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { dirname, join, basename } from "node:path";
 import { existsSync } from "node:fs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -38,8 +41,17 @@ if (!CHROME) {
   process.exit(1);
 }
 
-const COMP_ID = process.argv[2] || "v2hf-almanac";
-const TIMES = (process.argv[3] || "3,9,15,21,27").split(",").map(Number);
+// Resolve file + comp-id + snapshot prefix from first arg.
+//   index.html          → file index.html,        comp v2hf-almanac, prefix ""
+//   index-teal.html     → file index-teal.html,    comp v2hf-teal,    prefix "teal-"
+//   (bare comp-id)      → file index.html,         comp <that id>,    prefix ""
+const arg1 = process.argv[2] || "index.html";
+const isFile = arg1.endsWith(".html");
+const HTML_FILE = isFile ? arg1 : "index.html";
+const stem = isFile ? basename(arg1, ".html").replace(/^index-?/, "") : "";
+const COMP_ID = isFile ? "v2hf-" + (stem || "almanac") : arg1;
+const PREFIX = stem ? stem + "-" : "";   // keeps 5 themes' 65 shots from colliding
+const TIMES = (process.argv[3] || "3,9,15,21,27,33,39,45,51,57,63,69,75").split(",").map(Number);
 
 const browser = await puppeteer.launch({
   executablePath: CHROME,
@@ -48,7 +60,7 @@ const browser = await puppeteer.launch({
 });
 const page = await browser.newPage();
 // Read the stage size so the shot matches the composition.
-await page.goto("file://" + join(here, "index.html").replace(/\\/g, "/"), {
+await page.goto("file://" + join(here, HTML_FILE).replace(/\\/g, "/"), {
   waitUntil: "networkidle0",
 });
 const { w, h } = await page.evaluate(() => {
@@ -88,7 +100,7 @@ for (const t of TIMES) {
     { id: COMP_ID, time: t },
   );
   await new Promise((r) => setTimeout(r, 120)); // let the paint settle
-  const out = join(here, "snapshots", `t${t}s.png`);
+  const out = join(here, "snapshots", `${PREFIX}t${t}s.png`);
   await page.screenshot({ path: out, omitBackground: false });
   console.log("wrote", out);
 }
