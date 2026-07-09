@@ -60,8 +60,7 @@ export const THEME = "almanac";   // "almanac" cream/serif | "editorial" documen
   of the other two (dark card/light text → cream card/dark text). Adds the optional `fullBleed`
   field: full-width cards (`Intro`/`SectionCard`/`ListReveal`/`Outro`/`TitleBumper`) paint an
   opaque cream frame — footage gone — instead of a scrim gradient (a cream gradient over bright
-  footage is invisible). Ships 6 extra cards (`TitleBumper`, `BeforeAfter`, `Checklist`,
-  `CommandChips`, `PromptCard`, `ReframeCard`); see `reference/graphic-types.md`. Newsreader is
+  footage is invisible). Newsreader is
   a free, open-licensed serif — if you swap in a proprietary display face, confirm its license
   first (one-line change in `themes.ts`).
 - **`editorial`**: Archivo font, warm-white text, gold accent, hairline rules, choreographed
@@ -80,7 +79,9 @@ export const THEME = "almanac";   // "almanac" cream/serif | "editorial" documen
 
 Three layers: `themes.ts` (theme data) → `anim.tsx` (building blocks `<Surface>/<Rule>/<Kicker>`
 + entrance hooks, all read the active theme `T`) → `components/*` (layout + anchoring only).
-The cue-sheet fields don't change.
+The cue-sheet fields don't change. Every component in `components/*` (the full card set — see
+`reference/graphic-types.md`) is theme-agnostic: each renders under any `THEME`, reading its
+font/color/card style from `T`. No card is tied to a particular theme.
 
 **To add a new style:**
 1. Add an entry to `THEMES` in `themes.ts`, filling the `Theme` fields (font, colors, `card`
@@ -284,10 +285,10 @@ Plus:
   Archivo, almanac = Newsreader serif — not Georgia/system default; confirm on a still, since a
   failed font load falls back silently). Switching to `teal` should return frame-for-frame to
   the old teal look, and editorial should be unchanged — adding `almanac` must not regress either.
-- **`almanac` full-bleed:** on `TitleBumper` and the `almanac` `Outro`, the cream fills the whole
-  frame — no footage bleeds through (that's the opaque `<Backdrop>`, not a faint scrim). The
-  cream cards (`BeforeAfter`/`Checklist`/`CommandChips`/`PromptCard`/`ReframeCard`) sit legibly
-  on their solid card with dark serif ink and the coral accent edge.
+- **Full-bleed (fullBleed themes):** on `TitleBumper` and the `Outro`, the base color fills the
+  whole frame — no footage bleeds through (that's the opaque `<Backdrop>`, not a faint scrim).
+  The remaining cards (`BeforeAfter`/`Checklist`/`CommandChips`/`PromptCard`/`ReframeCard`) sit
+  legibly on their card surface, reading text/accent from the active theme `T`.
 - **Theme × anchor orthogonal:** grab a still for editorial/teal/almanac under each of
   `ANCHOR="bottom"/"top"`; all combinations satisfy the three rules (legible / face clear /
-  resolution-independent). Full-bleed `almanac` cards are anchor-agnostic (they cover the frame).
+  resolution-independent). Full-bleed cards (any `fullBleed` theme) are anchor-agnostic (they cover the frame).
