@@ -715,6 +715,37 @@
         // Register the timeline — key MUST equal the stage's data-composition-id.
         window.__timelines = window.__timelines || {};
         window.__timelines["v2hf-teal"] = tl;
+
+        // Gallery loop driver — dormant unless the URL hash asks for it, so
+        // direct-open / shoot.mjs / the HF runtime are unaffected. The animated
+        // gallery embeds this file as a self-playing iframe (a file:// parent
+        // can't script a cross-origin iframe, so each frame drives itself).
+        // Hash #loop=<start>,<dur>: paint only that cue's scene, then loop the
+        // paused timeline within [start, start+dur).
+        (function () {
+          const m = /#loop=([\d.]+),([\d.]+)/.exec(location.hash);
+          if (!m) return;
+          const start = parseFloat(m[1]), dur = parseFloat(m[2]);
+          document.querySelectorAll(".clip").forEach((el) => {
+            const s = parseFloat(el.dataset.start ?? "0") || 0;
+            const d = parseFloat(el.dataset.duration ?? "0") || 0;
+            el.style.visibility = start >= s && start < s + d ? "visible" : "hidden";
+          });
+          tl.pause();
+          if (window.parent === window) {
+            // opened directly: self-drive with GSAP's own ticker (elapsed s).
+            gsap.ticker.add((time) => tl.seek(start + (time % dur), false));
+          } else {
+            // embedded in the animated gallery: Chrome throttles rAF inside a
+            // cross-origin iframe, so our own ticker would stall. The parent
+            // can't script us across origins, but it CAN postMessage a master
+            // clock (its top-level rAF is never throttled) — seek on that.
+            addEventListener("message", (e) => {
+              const t = e.data && e.data.hfClock;
+              if (typeof t === "number") tl.seek(start + (t % dur), false);
+            });
+          }
+        })();
       </script>
     </div>
   </body>

@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8">
+<title>video-to-hyperframes — 5 themes × 13 cards (animated)</title>
+<style>
+  /* --scale is UNITLESS (CSS scale() rejects lengths); cell width derives from it. */
+  :root { --scale: 0.1771; --cw: calc(1920px * var(--scale)); }
+  body { margin: 0; background: #1a1a1e; color: #e8e8ea;
+         font: 14px/1.4 system-ui, sans-serif; }
+  h1 { font-size: 18px; font-weight: 600; padding: 20px 24px 4px; margin: 0; }
+  p.sub { padding: 0 24px 16px; margin: 0; color: #9a9aa2; }
+  table { border-collapse: collapse; }
+  thead th { position: sticky; top: 0; background: #26262c; color: #e8e8ea;
+             font-weight: 600; padding: 10px 8px; text-align: center; z-index: 3;
+             border-bottom: 2px solid #3a3a42; }
+  thead th:first-child { text-align: left; padding-left: 24px; }
+  th.card { text-align: left; padding: 8px 8px 8px 24px; white-space: nowrap;
+            vertical-align: middle; color: #e8e8ea; font-weight: 600;
+            background: #202027; position: sticky; left: 0; z-index: 2; }
+  th.card .t { display: block; color: #7a7a82; font-weight: 400; font-size: 12px; }
+  td { padding: 6px; vertical-align: top; }
+  .missing { display: grid; place-items: center; width: var(--cw); aspect-ratio: 16/9;
+             color: #d06060; font-size: 12px; text-align: center;
+             border: 1px dashed #5a3a3a; border-radius: 4px; }
+  img { display: block; width: var(--cw); height: auto; border-radius: 4px;
+        background: repeating-conic-gradient(#3a3a3e 0 25%, #2a2a2e 0 50%) 0 0/24px 24px; }
+  .frame { position: relative; width: var(--cw); aspect-ratio: 16/9; overflow: hidden;
+           border-radius: 4px;
+           background: repeating-conic-gradient(#3a3a3e 0 25%, #2a2a2e 0 50%) 0 0/24px 24px; }
+  .frame iframe { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px;
+                  transform-origin: top left; transform: scale(var(--scale));
+                  border: 0; }
+</style></head>
+<body>
+  <h1>video-to-hyperframes — 5 themes × 13 cards (animated)</h1>
+  <p class="sub">Each cell is the live composition looping its 6s cue (entrance → hold → exit). 65 iframes driven by a shared master clock. Same content as the static gallery, just moving.</p>
+  <table>
+    <thead><tr>
+      <th>Card ↓ / Theme →</th>
+      <th>almanac</th><th>teal</th><th>editorial</th><th>dotgrid</th><th>apex</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <th class="card">Intro<span class="t">t3s</span></th>
+        <td><div class="frame"><iframe loading="lazy" title="index.html t3s"
+      src="index.html#loop=0,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-teal.html t3s"
+      src="index-teal.html#loop=0,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-editorial.html t3s"
+      src="index-editorial.html#loop=0,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t3s"
+      src="index-dotgrid.html#loop=0,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-apex.html t3s"
+      src="index-apex.html#loop=0,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">SectionCard<span class="t">t9s</span></th>
+        <td><div class="frame"><iframe loading="lazy" title="index.html t9s"
+      src="index.html#loop=6,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-teal.html t9s"
+      src="index-teal.html#loop=6,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-editorial.html t9s"
+      src="index-editorial.html#loop=6,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t9s"
+      src="index-dotgrid.html#loop=6,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-apex.html t9s"
+      src="index-apex.html#loop=6,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">LowerThird<span class="t">t15s</span></th>
+        <td><div class="frame"><iframe loading="lazy" title="index.html t15s"
+      src="index.html#loop=12,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-teal.html t15s"
+      src="index-teal.html#loop=12,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-editorial.html t15s"
+      src="index-editorial.html#loop=12,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t15s"
+      src="index-dotgrid.html#loop=12,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-apex.html t15s"
+      src="index-apex.html#loop=12,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">StatCallout<span class="t">t21s</span></th>
+        <td><div class="frame"><iframe loading="lazy" title="index.html t21s"
+      src="index.html#loop=18,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-teal.html t21s"
+      src="index-teal.html#loop=18,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-editorial.html t21s"
+      src="index-editorial.html#loop=18,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t21s"
+      src="index-dotgrid.html#loop=18,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-apex.html t21s"
+      src="index-apex.html#loop=18,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">Outro<span class="t">t27s</span></th>
+        <td><div class="frame"><iframe loading="lazy" title="index.html t27s"
+      src="index.html#loop=24,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-teal.html t27s"
+      src="index-teal.html#loop=24,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-editorial.html t27s"
+      src="index-editorial.html#loop=24,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t27s"
+      src="index-dotgrid.html#loop=24,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-apex.html t27s"
+      src="index-apex.html#loop=24,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">TitleBumper<span class="t">t33s</span></th>
+        <td><div class="frame"><iframe loading="lazy" title="index.html t33s"
+      src="index.html#loop=30,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-teal.html t33s"
+      src="index-teal.html#loop=30,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-editorial.html t33s"
+      src="index-editorial.html#loop=30,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t33s"
+      src="index-dotgrid.html#loop=30,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-apex.html t33s"
+      src="index-apex.html#loop=30,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">KeypointCallout<span class="t">t39s</span></th>
+        <td><div class="frame"><iframe loading="lazy" title="index.html t39s"
+      src="index.html#loop=36,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-teal.html t39s"
+      src="index-teal.html#loop=36,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-editorial.html t39s"
+      src="index-editorial.html#loop=36,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t39s"
+      src="index-dotgrid.html#loop=36,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-apex.html t39s"
+      src="index-apex.html#loop=36,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">ReframeCard<span class="t">t45s</span></th>
+        <td><div class="frame"><iframe loading="lazy" title="index.html t45s"
+      src="index.html#loop=42,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-teal.html t45s"
+      src="index-teal.html#loop=42,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-editorial.html t45s"
+      src="index-editorial.html#loop=42,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t45s"
+      src="index-dotgrid.html#loop=42,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-apex.html t45s"
+      src="index-apex.html#loop=42,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">PromptCard<span class="t">t51s</span></th>
+        <td><div class="frame"><iframe loading="lazy" title="index.html t51s"
+      src="index.html#loop=48,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-teal.html t51s"
+      src="index-teal.html#loop=48,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-editorial.html t51s"
+      src="index-editorial.html#loop=48,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t51s"
+      src="index-dotgrid.html#loop=48,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-apex.html t51s"
+      src="index-apex.html#loop=48,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">BeforeAfter<span class="t">t57s</span></th>
+        <td><div class="frame"><iframe loading="lazy" title="index.html t57s"
+      src="index.html#loop=54,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-teal.html t57s"
+      src="index-teal.html#loop=54,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-editorial.html t57s"
+      src="index-editorial.html#loop=54,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t57s"
+      src="index-dotgrid.html#loop=54,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-apex.html t57s"
+      src="index-apex.html#loop=54,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">Checklist<span class="t">t63s</span></th>
+        <td><div class="frame"><iframe loading="lazy" title="index.html t63s"
+      src="index.html#loop=60,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-teal.html t63s"
+      src="index-teal.html#loop=60,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-editorial.html t63s"
+      src="index-editorial.html#loop=60,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t63s"
+      src="index-dotgrid.html#loop=60,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-apex.html t63s"
+      src="index-apex.html#loop=60,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">CommandChips<span class="t">t69s</span></th>
+        <td><div class="frame"><iframe loading="lazy" title="index.html t69s"
+      src="index.html#loop=66,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-teal.html t69s"
+      src="index-teal.html#loop=66,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-editorial.html t69s"
+      src="index-editorial.html#loop=66,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t69s"
+      src="index-dotgrid.html#loop=66,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-apex.html t69s"
+      src="index-apex.html#loop=66,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">ListReveal<span class="t">t75s</span></th>
+        <td><div class="frame"><iframe loading="lazy" title="index.html t75s"
+      src="index.html#loop=72,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-teal.html t75s"
+      src="index-teal.html#loop=72,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-editorial.html t75s"
+      src="index-editorial.html#loop=72,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t75s"
+      src="index-dotgrid.html#loop=72,6"></iframe></div></td><td><div class="frame"><iframe loading="lazy" title="index-apex.html t75s"
+      src="index-apex.html#loop=72,6"></iframe></div></td>
+      </tr>
+    </tbody>
+  </table>
+  <script>
+    const frames = () => [...document.querySelectorAll("iframe")];
+    const t0 = performance.now();
+    function beat() {
+      const t = (performance.now() - t0) / 1000;
+      for (const f of frames()) { try { f.contentWindow.postMessage({ hfClock: t }, "*"); } catch (e) {} }
+      requestAnimationFrame(beat);
+    }
+    requestAnimationFrame(beat);
+  </script>
+</body></html>
