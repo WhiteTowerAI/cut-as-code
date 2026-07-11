@@ -6,7 +6,7 @@
 // scrim or a card — and is ANCHORED to one edge, never centered over the face.
 // Default anchor is the BOTTOM (the lower-third safe zone on a talking-head).
 // Flip the whole piece to the TOP by setting ANCHOR below — e.g. to clear
-// bottom captions when combining with video-to-captions (see that recipe in
+// bottom captions when combining with video-add-captions (see that recipe in
 // SKILL.md). Sizes are a % of canvas height, so the look auto-scales to any
 // output resolution (render at the source's size, not 4K — see Root.tsx).
 import * as React from "react";
@@ -54,7 +54,7 @@ export const dispItalic = (): "italic" | undefined => (T.displayItalic ? "italic
 // --- anchor: which edge the whole piece rides on ---------------------------
 // ONE knob for the entire design. "bottom" = the lower-third safe zone (default).
 // Set "top" to clear bottom captions when compositing captions + cards on one
-// video (video-to-captions). Every component reads it via the two helpers below
+// video (video-add-captions). Every component reads it via the two helpers below
 // (justify + padding) and Scrim flips with it, so this single line moves them all.
 // To flip, change only the VALUE ("bottom" -> "top"). The `as "bottom" | "top"`
 // widening is load-bearing: a plain annotated `const ANCHOR: ... = "bottom"` gets

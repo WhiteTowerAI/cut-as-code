@@ -247,8 +247,8 @@ Simple, slow one-pass fallback for very short clips:
 npx remotion render src/index.ts FinalEdit out/final.mp4
 ```
 
-## Combining overlays + captions (with video-to-captions)
-These cards and the `video-to-captions` captions are both **bottom-anchored**, so layering
+## Combining overlays + captions (with video-add-captions)
+These cards and the `video-add-captions` captions are both **bottom-anchored**, so layering
 them as-is makes them overlap. To ship one video with BOTH:
 1. **Keep captions at the bottom** (unchanged in the captions skill).
 2. **Re-anchor these cards to the TOP** so they clear the captions: set `ANCHOR = "top"` in

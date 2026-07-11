@@ -1,5 +1,5 @@
 ---
-name: video-to-captions
+name: video-add-captions
 description: >
   Auto-caption a video as Remotion (React): transcribe it word-by-word, group the
   words into readable caption cues (broken on punctuation, line budget, duration and

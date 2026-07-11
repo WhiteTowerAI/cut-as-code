@@ -40,9 +40,9 @@ ad hoc by an agent following the skill's pipeline. When you change a skill, the 
 | `video-edit-compare` | Split-screen diff (original vs cut on one timeline) to review an edit plan | Python · ffmpeg |
 | `video-color-grade` | Assess footage → corrective base + named looks → human picks → bake `.cube` LUT + apply | Python · ffmpeg · numpy · Pillow |
 | `video-overlay-cards` | Composite intro/chapter/lower-third/outro cards onto a video (no re-cut) | Python · ffmpeg · Pillow |
-| `video-to-captions` | Every-line styled subtitles, optional karaoke | Remotion (React/TS) · ffmpeg · faster-whisper |
+| `video-add-captions` | Every-line styled subtitles, optional karaoke | Remotion (React/TS) · ffmpeg · faster-whisper |
 | `video-to-remotion` | Watch content → auto-generate *selective* motion graphics (lower-thirds, stats, chapter cards) | Remotion (React/TS) · ffmpeg · faster-whisper |
-| `video-to-hyperframes` | Same as video-to-remotion, authored as HTML + GSAP instead of React (agents iterate HTML faster; no bundler) | HyperFrames (HTML/GSAP) · ffmpeg · faster-whisper |
+| `video-add-hyperframes` | Same as video-to-remotion, authored as HTML + GSAP instead of React (agents iterate HTML faster; no bundler) | HyperFrames (HTML/GSAP) · ffmpeg · faster-whisper |
 | `design-frames-to-motion` | Rebuild designer PNG frames as parametric Remotion components, transcript-synced | Remotion (React/TS) · ffmpeg |
 
 ## Architecture that spans skills
@@ -52,7 +52,7 @@ These conventions are shared and load-bearing — match them in any new skill:
 - **The transcript is the shared interchange format.** `skills/video-rough-cut/scripts/transcribe.py`
   is the canonical transcriber (faster-whisper, CPU/int8, VAD, word-level). It emits
   `transcript.json` = `segments[] → words[]` with per-word `start`/`end`. The Remotion
-  skills (`video-to-captions`, `video-to-remotion`) deliberately reuse it via a relative
+  skills (`video-add-captions`, `video-to-remotion`) deliberately reuse it via a relative
   path (`../video-rough-cut/scripts/transcribe.py`) rather than copying. Note it is
   **English-only** (`base.en`, `language="en"`); for other languages the caller swaps the
   model/lang — downstream scripts only consume the resulting JSON.

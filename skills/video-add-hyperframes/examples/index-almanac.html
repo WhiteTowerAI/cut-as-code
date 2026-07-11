@@ -2,36 +2,30 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8">
-    <title>video-to-hyperframes — dotgrid composition</title>
+    <title>video-add-hyperframes — almanac composition</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 
-    <!-- dotgrid fonts: two families. Silkscreen (pixel/dot-matrix display face) for
-         titles/kickers/numbers/stat value/list nums; Space Mono (monospace body)
-         for sub/line2/labels/list items/desc. Google Fonts <link>, weights
-         enumerated (Silkscreen only ships 400/700). Swap the families here + the
-         vars below to re-theme. A proprietary face needs a self-hosted @font-face. -->
+    <!-- almanac font: Newsreader serif. Google Fonts <link>, weights enumerated
+         (only what the CSS uses: 400/500/600). Swap the family + weights to
+         re-theme. A proprietary face needs a self-hosted @font-face instead. -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
-    <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500;600&display=swap" rel="stylesheet">
 
     <style>
-      /* ── dotgrid theme ─────────────────────────────────────────────────────
-         Pixel-utilitarian card language: dot-matrix display type + monospace
-         body, pure black/white, one strictly-rationed yellow (#FFE600, reserved
-         for the section dot + list numbers only). Change these vars + the fonts
-         <link> to re-color/re-font. Sizes are vh so the design reads at any
-         output resolution — never hardcode px for type/spacing.
+      /* ── almanac theme ─────────────────────────────────────────────────────
+         Warm cream/serif publishing look. Change these 5 vars + the fonts <link>
+         to re-color/re-font the whole piece. Sizes are vh so the design reads at
+         any output resolution — never hardcode px for type/spacing.
          Background is transparent: the render is an OVERLAY, composited onto the
-         footage by ffmpeg. fullBleed scenes (.bleed) paint OPAQUE near-black so a
-         dark takeover isn't invisible over bright footage. */
+         footage by ffmpeg. fullBleed scenes (.bleed) paint opaque cream so a
+         cream gradient isn't invisible over bright footage. */
       :root {
-        --ink: #f4f4f2; /* light text (polarity flips vs almanac: dark theme) */
-        --muted: #8c8c90; /* neutral grey, secondary text */
-        --accent: #ffe600; /* rationed yellow — dot + list numbers only */
-        --scrim: #0a0a0b; /* fullBleed + card fill base (near-black) */
-        --border: #2a2a2e; /* neutral grey box border (NOT yellow) */
-        --disp: "Silkscreen", monospace; /* display: titles, kickers, numbers */
-        --body: "Space Mono", monospace; /* body: sub, labels, items, desc */
+        --ink: #14120e; /* near-black serif ink */
+        --muted: #5c574e; /* warm grey, secondary text */
+        --coral: #c15f3c; /* terracotta accent */
+        --cream: #f9f7f3; /* fullBleed + card fill */
+        --serif: "Newsreader", Georgia, "Times New Roman", serif;
       }
       html,
       body {
@@ -41,7 +35,7 @@
         height: 1080px;
         overflow: hidden;
         background: transparent;
-        font-family: var(--body);
+        font-family: var(--serif);
       }
       /* No opacity:0 here — the HF runtime windows each .clip by its
          data-start/data-duration via style.visibility. Pinning opacity:0 would
@@ -51,9 +45,9 @@
         position: absolute;
         inset: 0;
       }
-      /* full-bleed near-black takeover (a fullBleed scene) */
+      /* full-bleed cream takeover (a fullBleed scene) */
       .bleed {
-        background: var(--scrim);
+        background: var(--cream);
       }
       /* Anchor wrappers. flex-direction:column is load-bearing: a plain flex div
          defaults to row and maps justify/align to the wrong axes, landing cards
@@ -80,21 +74,19 @@
       }
       .accent-bar {
         width: 0.8vh;
-        background: var(--accent);
-        border-radius: 0;
+        background: var(--coral);
+        border-radius: 0.4vh;
       }
       .kicker {
-        color: var(--accent);
-        font-family: var(--disp);
+        color: var(--coral);
         font-size: 2.6vh;
-        font-weight: 400;
-        letter-spacing: 0.16em;
+        font-weight: 600;
+        letter-spacing: 0.18em;
         text-transform: uppercase;
       }
       .title {
         color: var(--ink);
-        font-family: var(--disp);
-        font-weight: 700;
+        font-weight: 600;
         line-height: 0.98;
         letter-spacing: -1.5px;
       }
@@ -104,13 +96,12 @@
       }
       .sub {
         color: var(--muted);
-        font-family: var(--body);
         font-size: 3.4vh;
         font-weight: 400;
         margin-top: 1.4vh;
       }
 
-      /* ── SectionCard (fullBleed): kicker + title + yellow square dot ──────── */
+      /* ── SectionCard (fullBleed): kicker + title + coral rule bar ─────────── */
       .section-wrap {
         padding: 0 0 9vh 6vh;
       }
@@ -119,39 +110,34 @@
         letter-spacing: -1px;
         line-height: 1;
       }
-      /* rule = dot: a rationed yellow SQUARE (not a bar). Its entrance animates
-         opacity only, so it never stretches. */
       .rule-bar {
-        height: 3vh;
-        width: 3vh;
-        background: var(--accent);
-        border-radius: 0;
+        height: 0.6vh;
+        width: 36vh;
+        background: var(--coral);
+        border-radius: 0.3vh;
         margin-top: 2vh;
+        transform-origin: left center;
       }
 
-      /* ── LowerThird: dark box-border card, line1 + line2 ─────────────────── */
+      /* ── LowerThird: solid cream card, coral left border, line1 + line2 ───── */
       .lt-wrap {
         padding: 0 0 8vh 5vh;
       }
-      /* Cards = box border (all sides), 0 radius, no shadow. Neutral grey border
-         (yellow is reserved for the dot + list nums). */
       .card {
-        background: rgba(10, 10, 11, 0.92);
-        border: 0.2vh solid var(--border);
-        border-radius: 0;
-        box-shadow: none;
+        background: var(--cream);
+        border-left: 0.9vh solid var(--coral);
+        border-radius: 1vh;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
       }
       .lt .line1 {
         color: var(--ink);
-        font-family: var(--disp);
         font-size: 6vh;
-        font-weight: 700;
+        font-weight: 600;
         letter-spacing: -0.5px;
         line-height: 1.05;
       }
       .lt .line2 {
         color: var(--muted);
-        font-family: var(--body);
         font-size: 3.6vh;
         font-weight: 400;
         margin-top: 0.8vh;
@@ -160,7 +146,7 @@
         padding: 2.2vh 3vh;
       }
 
-      /* ── StatCallout: dark box-border card, count-up + label ─────────────── */
+      /* ── StatCallout: solid cream card, coral bottom border, count-up + label */
       .stat-wrap {
         display: flex;
         flex-direction: column;
@@ -169,27 +155,27 @@
         padding: 0 5vh 8vh 0;
       }
       .stat .card {
+        border-left: none;
+        border-bottom: 0.6vh solid var(--coral);
         display: flex;
         align-items: baseline;
         gap: 1.6vh;
         padding: 1.8vh 3vh;
       }
       .stat .value {
-        color: var(--ink);
-        font-family: var(--disp);
+        color: var(--coral);
         font-size: 9vh;
-        font-weight: 700;
+        font-weight: 600;
         letter-spacing: -1px;
         line-height: 1;
       }
       .stat .label {
-        color: var(--muted);
-        font-family: var(--body);
+        color: var(--ink);
         font-size: 3.4vh;
-        font-weight: 400;
+        font-weight: 500;
       }
 
-      /* ── Outro (fullBleed): centered yellow diamond + wordmark lockup ─────── */
+      /* ── Outro (fullBleed): centered coral diamond + wordmark lockup ──────── */
       .outro-wrap {
         display: flex;
         flex-direction: column;
@@ -199,8 +185,8 @@
       .diamond {
         width: 2.6vh;
         height: 2.6vh;
-        background: var(--accent);
-        border-radius: 0;
+        background: var(--coral);
+        border-radius: 0.3vh;
         transform: rotate(45deg);
         margin-bottom: 3vh;
       }
@@ -214,7 +200,6 @@
       }
       .outro .small {
         color: var(--muted);
-        font-family: var(--body);
         font-size: 2.8vh;
         font-weight: 400;
         margin-top: 0.8vh;
@@ -234,7 +219,7 @@
         max-width: 72%;
       }
 
-      /* ── KeypointCallout: dark box-border card, one big line ─────────────── */
+      /* ── KeypointCallout: solid cream card, coral left, one big line ─────── */
       .key-wrap {
         padding: 0 8vh 8vh 5vh;
       }
@@ -244,13 +229,12 @@
       }
       .key .text {
         color: var(--ink);
-        font-family: var(--body);
         font-size: 5vh;
-        font-weight: 700;
+        font-weight: 500;
         line-height: 1.18;
       }
 
-      /* ── ReframeCard: avoid(strike) → INSTEAD SAY → accent instead ───────── */
+      /* ── ReframeCard: avoid(strike) → INSTEAD SAY → coral instead ────────── */
       .reframe-wrap {
         padding: 0 6vh 8vh 6vh;
       }
@@ -263,7 +247,6 @@
       }
       .reframe .avoid {
         color: var(--muted);
-        font-family: var(--body);
         font-size: 3.4vh;
         font-weight: 400;
         text-decoration: line-through;
@@ -271,22 +254,20 @@
       }
       .reframe .instead-label {
         color: var(--muted);
-        font-family: var(--body);
         font-size: 2.2vh;
-        font-weight: 700;
+        font-weight: 600;
         letter-spacing: 0.18em;
         text-transform: uppercase;
         margin-bottom: 1vh;
       }
       .reframe .instead {
-        color: var(--ink);
-        font-family: var(--disp);
+        color: var(--coral);
         font-size: 5vh;
-        font-weight: 700;
+        font-weight: 600;
         line-height: 1.15;
       }
 
-      /* ── PromptCard: dark box-border card, quote body, highlight words ───── */
+      /* ── PromptCard: cream card, quote body, coral highlight words ───────── */
       .prompt-wrap {
         padding: 0 6vh 8vh 6vh;
       }
@@ -298,16 +279,14 @@
         margin-bottom: 1.6vh;
       }
       .prompt .body {
-        font-family: var(--body);
         font-size: 4.4vh;
-        font-weight: 400;
+        font-weight: 500;
         line-height: 1.32;
         color: var(--ink);
       }
       .prompt .hl {
-        color: var(--ink);
-        font-weight: 700;
-        text-decoration: underline;
+        color: var(--coral);
+        font-weight: 600;
       }
 
       /* ── BeforeAfter: two columns split by a hairline divider ────────────── */
@@ -324,20 +303,18 @@
       }
       .ba .col-label {
         color: var(--muted);
-        font-family: var(--body);
         font-size: 2.2vh;
-        font-weight: 700;
+        font-weight: 600;
         letter-spacing: 0.18em;
         text-transform: uppercase;
         margin-bottom: 1.2vh;
       }
       .ba .col-label.after {
-        color: var(--ink);
+        color: var(--coral);
       }
       .ba .value {
-        font-family: var(--body);
         font-size: 4.6vh;
-        font-weight: 400;
+        font-weight: 500;
         line-height: 1.15;
       }
       .ba .value.before {
@@ -354,7 +331,7 @@
         opacity: 0.35;
       }
 
-      /* ── Checklist: dark card, 01/02/03 numbers, staggered rows ──────────── */
+      /* ── Checklist: cream card, coral 01/02/03 numbers, staggered rows ───── */
       .checklist-wrap {
         padding: 0 0 8vh 6vh;
       }
@@ -373,20 +350,18 @@
         gap: 2vh;
       }
       .checklist .num {
-        color: var(--ink);
-        font-family: var(--disp);
+        color: var(--coral);
         font-size: 3.4vh;
-        font-weight: 700;
+        font-weight: 600;
         font-variant-numeric: tabular-nums;
       }
       .checklist .item {
         color: var(--ink);
-        font-family: var(--body);
         font-size: 4vh;
-        font-weight: 400;
+        font-weight: 500;
       }
 
-      /* ── CommandChips: mono cmd chip + mono desc, staggered rows ─────────── */
+      /* ── CommandChips: monospace cmd chip + serif desc, staggered rows ───── */
       .cmd-wrap {
         padding: 0 0 8vh 6vh;
       }
@@ -405,24 +380,23 @@
         gap: 2vh;
       }
       .cmd .chip {
-        font-family: var(--body);
+        font-family: ui-monospace, monospace;
         font-size: 2.8vh;
-        font-weight: 700;
-        color: var(--ink);
-        background: rgba(244, 244, 242, 0.08);
-        border: 0.12vh solid var(--border);
-        border-radius: 0;
+        font-weight: 500;
+        color: var(--coral);
+        background: rgba(193, 95, 60, 0.1);
+        border: 0.12vh solid rgba(193, 95, 60, 0.5);
+        border-radius: 0.6vh;
         padding: 0.6vh 1.2vh;
         white-space: nowrap;
       }
       .cmd .desc {
-        color: var(--muted);
-        font-family: var(--body);
+        color: var(--ink);
         font-size: 3.4vh;
         font-weight: 400;
       }
 
-      /* ── ListReveal (fullBleed): title + numbered rows (yellow nums) ─────── */
+      /* ── ListReveal (fullBleed): coral title + numbered rows, staggered ──── */
       .list-wrap {
         display: flex;
         flex-direction: column;
@@ -430,10 +404,9 @@
         padding: 0 0 8vh 6vh;
       }
       .list .list-title {
-        color: var(--ink);
-        font-family: var(--disp);
+        color: var(--coral);
         font-size: 3vh;
-        font-weight: 700;
+        font-weight: 600;
         letter-spacing: 0.3vh;
         margin-bottom: 1vh;
       }
@@ -443,28 +416,26 @@
         gap: 2vh;
       }
       .list .num {
-        color: var(--accent);
-        font-family: var(--disp);
+        color: var(--coral);
         font-size: 4vh;
-        font-weight: 700;
+        font-weight: 600;
       }
       .list .item {
         color: var(--ink);
-        font-family: var(--body);
         font-size: 5vh;
-        font-weight: 400;
+        font-weight: 500;
       }
     </style>
   </head>
   <body>
     <!-- Worked example: all 13 cards packed back-to-back at 6s each (78s) so
-         every card is eyeballable in one render — the dotgrid port of
+         every card is eyeballable in one render — the full almanac port of
          video-to-remotion's card catalog. In production, keep each cue's
          transcript-derived at/dur (from work/cues.json) and set the stage
          data-duration to the SOURCE length; scenes fire on the spoken word.
          Set data-width/height/fps to the source (scripts/probe.py of
          video-to-remotion writes source-meta.json you can read). -->
-    <div data-hf-id="hf-r0kp" id="stage" data-composition-id="v2hf-dotgrid" data-start="0" data-duration="78" data-fps="24" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-r0kp" id="stage" data-composition-id="v2hf-almanac" data-start="0" data-duration="78" data-fps="24" data-width="1920" data-height="1080">
       <!-- cue 1: Intro (0–6s) — fullBleed -->
       <div data-hf-id="hf-n4ne" id="intro" class="scene bleed anchor-bl clip" data-start="0" data-duration="6" data-track-index="0">
         <div data-hf-id="hf-hdnq" class="intro">
@@ -545,7 +516,7 @@
         </div>
       </div>
 
-      <!-- cue 8: ReframeCard (42–48s) — avoid → INSTEAD SAY → accent instead -->
+      <!-- cue 8: ReframeCard (42–48s) — avoid → INSTEAD SAY → coral instead -->
       <div data-hf-id="hf-xoxn" id="reframe" class="scene anchor-bl clip" data-start="42" data-duration="6" data-track-index="1" data-hidden="">
         <div data-hf-id="hf-og1i" class="reframe">
           <div data-hf-id="hf-fqhz" class="reframe-wrap">
@@ -559,7 +530,7 @@
         </div>
       </div>
 
-      <!-- cue 9: PromptCard (48–54s) — quote body, highlight words -->
+      <!-- cue 9: PromptCard (48–54s) — quote body, coral highlight words -->
       <div data-hf-id="hf-rbmj" id="prompt" class="scene anchor-bl clip" data-start="48" data-duration="6" data-track-index="1" data-hidden="">
         <div data-hf-id="hf-3k5u" class="prompt">
           <div data-hf-id="hf-f4gb" class="prompt-wrap">
@@ -590,7 +561,7 @@
         </div>
       </div>
 
-      <!-- cue 11: Checklist (60–66s) — 01/02/03 rows on a card -->
+      <!-- cue 11: Checklist (60–66s) — coral 01/02/03 rows on a card -->
       <div data-hf-id="hf-ilkl" id="checklist" class="scene anchor-bl clip" data-start="60" data-duration="6" data-track-index="1" data-hidden="">
         <div data-hf-id="hf-g1yo" class="checklist">
           <div data-hf-id="hf-q8el" class="checklist-wrap">
@@ -604,7 +575,7 @@
         </div>
       </div>
 
-      <!-- cue 12: CommandChips (66–72s) — mono chip + mono desc rows -->
+      <!-- cue 12: CommandChips (66–72s) — mono chip + serif desc rows -->
       <div data-hf-id="hf-mz8b" id="cmd" class="scene anchor-bl clip" data-start="66" data-duration="6" data-track-index="1" data-hidden="">
         <div data-hf-id="hf-03wg" class="cmd">
           <div data-hf-id="hf-wba5" class="cmd-wrap">
@@ -633,48 +604,81 @@
       <script>
         // ────────────────────────────────────────────────────────────────────
         // One paused GSAP timeline, keyed in SECONDS (HF seeks it per frame).
-        // dotgrid motion = "fade": each scene does ONE slide+fade on its inner
-        // wrapper — no per-element stagger (that's the almanac/stagger language).
-        //   fade 0.292s · reveal 0.542s. EASE_OUT bezier(0.16,1,0.3,1)≈power4.out.
+        // Timing mirrors the almanac design language (was anim.tsx @24fps):
+        //   fade 0.292s · reveal 0.542s · stagger beat 0.167s · rule-draw 0.417s
+        // EASE_OUT bezier(0.16,1,0.3,1) ≈ power4.out. stagger entrance = title
+        // clip-wipe + kicker/sub fade-rise; each scene's inner wrapper fades.
         //
         // Two seek-safety rules the HF linter enforces (learned the hard way):
         //   1. Fade an INNER wrapper, never the .clip div — the runtime owns clip
         //      visibility; animating it leaves stale state on non-linear seeks.
         //   2. Animate a transform with fromTo (not to) when CSS sets its initial
-        //      value, so GSAP owns the whole transform. (The dot animates opacity
-        //      only, so it's fine either way.)
+        //      value, so GSAP owns the whole transform (no scaleX/rotate clobber).
         // ────────────────────────────────────────────────────────────────────
         const EO = "power4.out";
         const FADE = 0.292,
-          REVEAL = 0.542;
+          REVEAL = 0.542,
+          STAG = 0.167,
+          IN = 0.417;
 
         const tl = gsap.timeline({ paused: true });
 
-        // motion="fade": slide (y: dy→0) + fade IN over REVEAL at `start`, then a
-        // straight fade OUT over the last FADE seconds, then a hard opacity kill.
-        // Animates a scene's inner wrapper — never the .clip div (seek-safe).
-        function slideFade(sel, start, dur, dy = "1.6vh") {
+        // Fade a scene's inner wrapper in at `start`, out over its last FADE s.
+        function sceneFade(sel, start, dur) {
           const el = document.querySelector(sel);
-          tl.fromTo(el, { opacity: 0, y: dy }, { opacity: 1, y: 0, duration: REVEAL, ease: EO }, start);
+          tl.fromTo(el, { opacity: 0 }, { opacity: 1, duration: FADE, ease: "none" }, start);
           tl.to(el, { opacity: 0, duration: FADE, ease: "none" }, start + dur - FADE);
           tl.set(el, { opacity: 0 }, start + dur); // hard kill (seek-safe)
         }
+        // title entrance: clip-path wipe L→R + fade, over REVEAL after `at`.
+        function titleIn(el, at) {
+          tl.fromTo(
+            el,
+            { opacity: 0, clipPath: "inset(0 100% 0 0)" },
+            { opacity: 1, clipPath: "inset(0 0% 0 0)", duration: REVEAL, ease: EO },
+            at,
+          );
+        }
+        // kicker/sub entrance: fade + translateY(1.2vh→0), over REVEAL after `at`.
+        function riseIn(el, at) {
+          tl.fromTo(el, { opacity: 0, y: "1.2vh" }, { opacity: 1, y: 0, duration: REVEAL, ease: EO }, at);
+        }
+        // list-row entrance: fade + translateX(2vh→0). Rows stagger per index —
+        // the almanac port of Checklist/CommandChips/ListReveal's per-item reveal.
+        function rowIn(el, at) {
+          tl.fromTo(el, { opacity: 0, x: "2vh" }, { opacity: 1, x: 0, duration: REVEAL, ease: EO }, at);
+        }
+        // stagger a list of rows: first at REVEAL after scene start, then +STAG each.
+        function rowsIn(rows, sceneStart) {
+          rows.forEach((el, i) => rowIn(el, sceneStart + REVEAL + i * STAG));
+        }
 
-        // ─── cue 1: Intro ────────────────────────────────────────────────────
-        slideFade("#intro .intro", 0, 6);
+        // ─── cue 1: Intro (kicker@0, title@1, sub@3 beats) ───────────────────
+        sceneFade("#intro .intro", 0, 6);
+        const intro = document.querySelector("#intro");
+        riseIn(intro.querySelector(".kicker"), 0 + 0 * STAG);
+        titleIn(intro.querySelector(".title"), 0 + 1 * STAG);
+        riseIn(intro.querySelector(".sub"), 0 + 3 * STAG);
 
-        // ─── cue 2: SectionCard — dot appears with an opacity fromTo at start ──
-        slideFade("#section .section", 6, 6);
-        tl.fromTo(document.querySelector("#section .rule-bar"), { opacity: 0 }, { opacity: 1, duration: REVEAL, ease: EO }, 6);
+        // ─── cue 2: SectionCard (kicker@0, title@1, rule drawn@2 beats) ──────
+        sceneFade("#section .section", 6, 6);
+        const section = document.querySelector("#section");
+        riseIn(section.querySelector(".kicker"), 6 + 0 * STAG);
+        titleIn(section.querySelector(".title"), 6 + 1 * STAG);
+        tl.fromTo(section.querySelector(".rule-bar"), { scaleX: 0 }, { scaleX: 1, duration: IN, ease: EO }, 6 + 2 * STAG);
 
-        // ─── cue 3: LowerThird ─────────────────────────────────────────────────
-        slideFade("#lt .lt", 12, 6);
+        // ─── cue 3: LowerThird (line1 clip-wipe, line2 rise) ─────────────────
+        sceneFade("#lt .lt", 12, 6);
+        const lt = document.querySelector("#lt");
+        titleIn(lt.querySelector(".line1"), 12);
+        riseIn(lt.querySelector(".line2"), 12 + 3 * STAG);
 
-        // ─── cue 4: StatCallout — count-up survives (0→N over REVEAL) ─────────
+        // ─── cue 4: StatCallout (value counts 0→N over REVEAL) ───────────────
         // Count-up = tween a counter object, write textContent on update.
         // power3.out ≈ Remotion's easeOutCubic; onUpdate fires per seeked frame.
-        slideFade("#stat .stat", 18, 6);
-        const valueEl = document.querySelector("#stat .value");
+        sceneFade("#stat .stat", 18, 6);
+        const stat = document.querySelector("#stat");
+        const valueEl = stat.querySelector(".value");
         const counter = { v: 0 };
         tl.to(
           counter,
@@ -688,37 +692,66 @@
           },
           18,
         );
+        riseIn(stat.querySelector(".label"), 18 + 3 * STAG);
 
-        // ─── cue 5: Outro ──────────────────────────────────────────────────────
-        slideFade("#outro .outro", 24, 6);
+        // ─── cue 5: Outro (diamond rise, title wipe, sub/small rise) ─────────
+        sceneFade("#outro .outro", 24, 6);
+        const outro = document.querySelector("#outro");
+        riseIn(outro.querySelector(".diamond"), 24 + 0 * STAG);
+        titleIn(outro.querySelector(".title"), 24 + 1 * STAG);
+        riseIn(outro.querySelector(".sub"), 24 + 3 * STAG);
+        riseIn(outro.querySelector(".small"), 24 + 3 * STAG);
 
-        // ─── cue 6: TitleBumper — fullBleed takeover ─────────────────────────
-        slideFade("#tb .tb", 30, 6);
+        // ─── cue 6: TitleBumper (kicker@0, title wipe@1) — fullBleed takeover ─
+        sceneFade("#tb .tb", 30, 6);
+        const tb = document.querySelector("#tb");
+        riseIn(tb.querySelector(".kicker"), 30 + 0 * STAG);
+        titleIn(tb.querySelector(".title"), 30 + 1 * STAG);
 
-        // ─── cue 7: KeypointCallout ──────────────────────────────────────────
-        slideFade("#key .key", 36, 6);
+        // ─── cue 7: KeypointCallout (text clip-wipe) ─────────────────────────
+        sceneFade("#key .key", 36, 6);
+        titleIn(document.querySelector("#key .text"), 36);
 
-        // ─── cue 8: ReframeCard ──────────────────────────────────────────────
-        slideFade("#reframe .reframe", 42, 6);
+        // ─── cue 8: ReframeCard (avoid rise, label, instead wipe) ────────────
+        sceneFade("#reframe .reframe", 42, 6);
+        const reframe = document.querySelector("#reframe");
+        riseIn(reframe.querySelector(".kicker"), 42 + 0 * STAG);
+        riseIn(reframe.querySelector(".avoid"), 42 + 1 * STAG);
+        riseIn(reframe.querySelector(".instead-label"), 42 + 2 * STAG);
+        titleIn(reframe.querySelector(".instead"), 42 + 3 * STAG);
 
-        // ─── cue 9: PromptCard ───────────────────────────────────────────────
-        slideFade("#prompt .prompt", 48, 6);
+        // ─── cue 9: PromptCard (kicker rise, body wipe) ──────────────────────
+        sceneFade("#prompt .prompt", 48, 6);
+        const prompt = document.querySelector("#prompt");
+        riseIn(prompt.querySelector(".kicker"), 48 + 0 * STAG);
+        titleIn(prompt.querySelector(".body"), 48 + 1 * STAG);
 
-        // ─── cue 10: BeforeAfter ─────────────────────────────────────────────
-        slideFade("#ba .ba", 54, 6);
+        // ─── cue 10: BeforeAfter (two columns rise together) ─────────────────
+        sceneFade("#ba .ba", 54, 6);
+        const ba = document.querySelector("#ba");
+        ba.querySelectorAll(".col").forEach((el, i) => riseIn(el, 54 + i * STAG));
 
-        // ─── cue 11: Checklist — list comes in with the card (no row stagger) ──
-        slideFade("#checklist .checklist", 60, 6);
+        // ─── cue 11: Checklist (kicker rise, rows stagger in) ────────────────
+        sceneFade("#checklist .checklist", 60, 6);
+        const checklist = document.querySelector("#checklist");
+        riseIn(checklist.querySelector(".kicker"), 60);
+        rowsIn(checklist.querySelectorAll(".row"), 60);
 
-        // ─── cue 12: CommandChips — comes in with the card ───────────────────
-        slideFade("#cmd .cmd", 66, 6);
+        // ─── cue 12: CommandChips (kicker rise, rows stagger in) ─────────────
+        sceneFade("#cmd .cmd", 66, 6);
+        const cmd = document.querySelector("#cmd");
+        riseIn(cmd.querySelector(".kicker"), 66);
+        rowsIn(cmd.querySelectorAll(".row"), 66);
 
-        // ─── cue 13: ListReveal — fullBleed, comes in with the wrapper ───────
-        slideFade("#list .list", 72, 6);
+        // ─── cue 13: ListReveal (title rise, rows stagger in) — fullBleed ────
+        sceneFade("#list .list", 72, 6);
+        const list = document.querySelector("#list");
+        riseIn(list.querySelector(".list-title"), 72);
+        rowsIn(list.querySelectorAll(".row"), 72);
 
         // Register the timeline — key MUST equal the stage's data-composition-id.
         window.__timelines = window.__timelines || {};
-        window.__timelines["v2hf-dotgrid"] = tl;
+        window.__timelines["v2hf-almanac"] = tl;
 
         // Gallery loop driver — dormant unless the URL hash asks for it, so
         // direct-open / shoot.mjs / the HF runtime are unaffected. The animated

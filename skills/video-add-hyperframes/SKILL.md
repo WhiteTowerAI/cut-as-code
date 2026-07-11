@@ -1,5 +1,5 @@
 ---
-name: video-to-hyperframes
+name: video-add-hyperframes
 description: >
   Watch a video's own content and auto-generate the HyperFrames (HTML + GSAP)
   motion-graphics it needs — no designer frames, no React. Transcribe the video
@@ -100,7 +100,7 @@ index.html               # *** THE COMPOSITION *** (scene divs + one GSAP timeli
 out/graphics-overlay.mov # transparent overlay (or a PNG sequence)
 out/final.mp4            # THE DELIVERABLE
 ```
-The worked composition is `examples/index.html` (almanac, 5 core cues). The
+The worked composition is `examples/index-almanac.html` (almanac, 5 core cues). The
 self-check harness is `examples/shoot.mjs`.
 
 ## The pipeline (6 steps)
@@ -133,7 +133,7 @@ Writes `work/cues.json` (de-stacked, durations clamped). See
 `reference/graphic-types.md` for the cue → scene mapping.
 
 ### 5. Write index.html (copy + scenes)
-Start from `examples/index.html`. For each kept cue, add/refill a scene div and
+Start from `examples/index-almanac.html`. For each kept cue, add/refill a scene div and
 its GSAP entrance (`reference/graphic-types.md` has the per-type table + the
 cue → HTML pattern). The real work is the **copy**, not the markup:
 - **Write, don't paste.** A lower-third is `line1` (the entity) + `line2` (a
@@ -186,9 +186,9 @@ Self-review the stills (from `shoot.mjs` or HF's `snapshot`), one mid-window per
 - **Alpha correct** — footage shows through non-card areas; fullBleed scenes are
   fully opaque (no gradient bleed-through).
 
-## Combining with captions (video-to-captions)
+## Combining with captions (video-add-captions)
 Both are bottom-anchored, so they'd overlap. Keep captions at the bottom; re-anchor
 these scenes to the TOP (flip the anchor wrappers' `justify-content` to
 `flex-start` and move padding to the top). Render both transparent overlays, then
 composite serially in one ffmpeg pass (captions first, graphics on top), copying
-audio. See `video-to-captions/SKILL.md` for the two-overlay command.
+audio. See `video-add-captions/SKILL.md` for the two-overlay command.
