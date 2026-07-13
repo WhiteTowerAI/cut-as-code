@@ -39,10 +39,10 @@ ad hoc by an agent following the skill's pipeline. When you change a skill, the 
 | `video-rough-cut` | Raw long video → compact first cut (download, transcribe, diagnose, hand-written JSON cut plan, varispeed, render, self-check) | Python · yt-dlp · ffmpeg · faster-whisper |
 | `video-edit-compare` | Split-screen diff (original vs cut on one timeline) to review an edit plan | Python · ffmpeg |
 | `video-color-grade` | Assess footage → corrective base + named looks → human picks → bake `.cube` LUT + apply | Python · ffmpeg · numpy · Pillow |
-| `video-overlay-cards` | Composite intro/chapter/lower-third/outro cards onto a video (no re-cut) | Python · ffmpeg · Pillow |
+| `video-overlay-cards(legacy)` | Composite intro/chapter/lower-third/outro cards onto a video (no re-cut) | Python · ffmpeg · Pillow |
 | `video-add-captions` | Every-line styled subtitles, optional karaoke | Remotion (React/TS) · ffmpeg · faster-whisper |
-| `video-to-remotion` | Watch content → auto-generate *selective* motion graphics (lower-thirds, stats, chapter cards) | Remotion (React/TS) · ffmpeg · faster-whisper |
-| `design-frames-to-motion` | Rebuild designer PNG frames as parametric Remotion components, transcript-synced | Remotion (React/TS) · ffmpeg |
+| `video-to-remotion(legacy)` | Watch content → auto-generate *selective* motion graphics (lower-thirds, stats, chapter cards) | Remotion (React/TS) · ffmpeg · faster-whisper |
+| `design-frames-to-motion(legacy)` | Rebuild designer PNG frames as parametric Remotion components, transcript-synced | Remotion (React/TS) · ffmpeg |
 
 ## Architecture that spans skills
 

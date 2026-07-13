@@ -156,7 +156,7 @@ Captions (this skill) and the `video-to-remotion` cards are both **bottom-anchor
 layering them as-is makes them overlap. To ship one video with BOTH:
 1. **Keep captions at the bottom** (unchanged — `Caption.tsx` is `justifyContent:"flex-end"`).
 2. **Re-anchor the remotion cards to the TOP** so they clear the captions: set `ANCHOR = "top"`
-   in `video-to-remotion/examples/anim.tsx`. That single knob flips every card's
+   in `video-to-remotion(legacy)/examples/anim.tsx`. That single knob flips every card's
    `justifyContent` + edge padding and the `Scrim` (top band, reversed gradient) together — no
    per-component edits. Its default is `"bottom"`; only flip it for this combined layout.
 3. **Render BOTH transparent overlays, then composite serially in one ffmpeg pass** (captions

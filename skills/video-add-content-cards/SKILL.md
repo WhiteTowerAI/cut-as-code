@@ -47,7 +47,7 @@ terracotta-coral) — re-theme by changing 5 CSS vars + the font `<link>`.
 This skill **reuses that skill's Python pipeline verbatim** (transcribe / analyze /
 draft_cues / probe) — the transcript and `cues.json` are framework-agnostic
 interchange formats. Only the render target differs: HTML+GSAP here, React there.
-The 5 themes and card catalog documented in `video-to-remotion/SKILL.md` are the
+The 5 themes and card catalog documented in `video-to-remotion(legacy)/SKILL.md` are the
 design reference; this skill ports the **almanac** look as the worked example.
 
 ## When to use
@@ -67,7 +67,7 @@ design reference; this skill ports the **almanac** look as the worked example.
   Default model is English-only (`base.en`); other languages pass a multilingual
   model + `--lang`.
 - The analyzer/cue scripts are reused by relative path from `video-to-remotion`
-  (no copy): `../video-to-remotion/scripts/analyze_content.py`, `draft_cues.py`,
+  (no copy): `../video-to-remotion(legacy)/scripts/analyze_content.py`, `draft_cues.py`,
   `probe.py`.
 - ffmpeg for scene detection (optional; single-shot talking-heads often find 0).
 
@@ -119,7 +119,7 @@ On Windows/PowerShell the bash `grep`/`sed` one-liner won't run — capture ffmp
 
 ### 3. Analyze the content → opportunities
 ```
-python ../video-to-remotion/scripts/analyze_content.py work/transcript.json work/content.json --scenes work/scenes.txt
+python "../video-to-remotion(legacy)/scripts/analyze_content.py" work/transcript.json work/content.json --scenes work/scenes.txt
 ```
 Surfaces `lower-third / stat / list / keypoint / section` opportunities, each with
 a word-accurate `at`, suggested `dur`, draft `props`, and the `quote` it came
@@ -127,7 +127,7 @@ from. **Detection is a draft** — read each `quote` and decide what earns scree
 
 ### 4. Draft the cue sheet
 ```
-python ../video-to-remotion/scripts/draft_cues.py work/content.json work/cues.json
+python "../video-to-remotion(legacy)/scripts/draft_cues.py" work/content.json work/cues.json
 ```
 Writes `work/cues.json` (de-stacked, durations clamped). See
 `reference/graphic-types.md` for the cue → scene mapping.
@@ -144,7 +144,7 @@ cue → HTML pattern). The real work is the **copy**, not the markup:
 - **Ground every scene** in what's said at its `at` — nothing invented.
 - Place **Intro** over the cold open, **Outro** over the sign-off (hand-placed).
 - Set the stage `data-width`/`data-height`/`data-fps`/`data-duration` to the
-  source (read it from `video-to-remotion/scripts/probe.py`'s `source-meta.json`).
+  source (read it from `video-to-remotion(legacy)/scripts/probe.py`'s `source-meta.json`).
 
 **Two seek-safety rules the linter enforces** (both are in the template):
 1. Fade an INNER wrapper, never the `.clip` div (the runtime owns clip visibility).
