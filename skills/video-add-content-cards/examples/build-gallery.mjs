@@ -102,7 +102,7 @@ const animCell = ([, , file], t) =>
 
 writeFileSync(
   join(here, "gallery.html"),
-  HEAD("video-add-hyperframes — 5 themes × 13 cards (static)") +
+  HEAD("video-add-content-cards — 5 themes × 13 cards (static)") +
     table(
       "Each still is the mid-window of a 6s cue (composition resolution 1920×1080). Checkerboard = transparent (footage would show through); opaque = fullBleed / card.",
       staticCell,
@@ -128,7 +128,7 @@ const CLOCK = `
 
 writeFileSync(
   join(here, "gallery-animated.html"),
-  HEAD("video-add-hyperframes — 5 themes × 13 cards (animated)") +
+  HEAD("video-add-content-cards — 5 themes × 13 cards (animated)") +
     table(
       "Each cell is the live composition looping its 6s cue (entrance → hold → exit). 65 iframes driven by a shared master clock. Same content as the static gallery, just moving.",
       animCell,

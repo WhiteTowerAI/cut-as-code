@@ -1,5 +1,5 @@
 ---
-name: video-add-hyperframes
+name: video-add-content-cards
 description: >
   Watch a video's own content and auto-generate the HyperFrames (HTML + GSAP)
   motion-graphics it needs — no designer frames, no React. Transcribe the video

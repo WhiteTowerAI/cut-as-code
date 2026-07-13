@@ -2,30 +2,36 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8">
-    <title>video-add-hyperframes — teal composition</title>
+    <title>video-add-content-cards — dotgrid composition</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 
-    <!-- teal theme: font "serif" = system Georgia/Times (no webfont <link>).
-         In video-to-remotion this is the "serif" family the old components
-         never set explicitly; here we spell it out on --serif. -->
+    <!-- dotgrid fonts: two families. Silkscreen (pixel/dot-matrix display face) for
+         titles/kickers/numbers/stat value/list nums; Space Mono (monospace body)
+         for sub/line2/labels/list items/desc. Google Fonts <link>, weights
+         enumerated (Silkscreen only ships 400/700). Swap the families here + the
+         vars below to re-theme. A proprietary face needs a self-hosted @font-face. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+    <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
 
     <style>
-      /* ── teal theme ────────────────────────────────────────────────────────
-         Dark overlay look. Light text rides a dark Scrim (full-width scenes) or
-         a dark semi-transparent card (small components). Teal accent. Change
-         these 5 vars + the fonts to re-color/re-font the whole piece. Sizes are
-         vh so the design reads at any output resolution — never hardcode px.
+      /* ── dotgrid theme ─────────────────────────────────────────────────────
+         Pixel-utilitarian card language: dot-matrix display type + monospace
+         body, pure black/white, one strictly-rationed yellow (#FFE600, reserved
+         for the section dot + list numbers only). Change these vars + the fonts
+         <link> to re-color/re-font. Sizes are vh so the design reads at any
+         output resolution — never hardcode px for type/spacing.
          Background is transparent: the render is an OVERLAY, composited onto the
-         footage by ffmpeg. teal is NOT fullBleed — full-width scenes paint no
-         opaque fill; each drops a bottom-gradient .scrim behind its text so the
-         text stays legible on busy footage. */
+         footage by ffmpeg. fullBleed scenes (.bleed) paint OPAQUE near-black so a
+         dark takeover isn't invisible over bright footage. */
       :root {
-        --ink: #f5f8f9; /* light text on dark scrim/card */
-        --muted: #b7c6ce; /* muted secondary text */
-        --accent: #26caa8; /* teal accent */
-        --scrim-base: #0c141c; /* dark scrim base */
-        --card-bg: rgba(12, 20, 28, 0.82); /* dark semi-transparent card fill */
-        --serif: Georgia, "Times New Roman", serif;
+        --ink: #f4f4f2; /* light text (polarity flips vs almanac: dark theme) */
+        --muted: #8c8c90; /* neutral grey, secondary text */
+        --accent: #ffe600; /* rationed yellow — dot + list numbers only */
+        --scrim: #0a0a0b; /* fullBleed + card fill base (near-black) */
+        --border: #2a2a2e; /* neutral grey box border (NOT yellow) */
+        --disp: "Silkscreen", monospace; /* display: titles, kickers, numbers */
+        --body: "Space Mono", monospace; /* body: sub, labels, items, desc */
       }
       html,
       body {
@@ -35,7 +41,7 @@
         height: 1080px;
         overflow: hidden;
         background: transparent;
-        font-family: var(--serif);
+        font-family: var(--body);
       }
       /* No opacity:0 here — the HF runtime windows each .clip by its
          data-start/data-duration via style.visibility. Pinning opacity:0 would
@@ -45,19 +51,9 @@
         position: absolute;
         inset: 0;
       }
-      /* Scrim: bottom gradient (transparent → dark scrimBase) behind a full-width
-         scene's text, so light text stays legible on bright footage. teal is NOT
-         fullBleed, so .bleed paints NO opaque fill — this layer is what carries
-         legibility. Absolutely positioned bottom band, painted BEHIND the text
-         (inner wrappers are position:relative + z-index so they sit on top). */
-      .scrim {
-        position: absolute;
-        left: 0;
-        right: 0;
-        top: 55%;
-        bottom: 0;
-        background: linear-gradient(to bottom, rgba(12, 20, 28, 0) 0%, rgba(12, 20, 28, 0.9) 100%);
-        z-index: 0;
+      /* full-bleed near-black takeover (a fullBleed scene) */
+      .bleed {
+        background: var(--scrim);
       }
       /* Anchor wrappers. flex-direction:column is load-bearing: a plain flex div
          defaults to row and maps justify/align to the wrong axes, landing cards
@@ -75,17 +71,8 @@
         justify-content: center;
         align-items: center;
       }
-      /* Inner wrappers of full-width scenes ride ABOVE the .scrim layer. */
-      .intro,
-      .section,
-      .outro,
-      .tb,
-      .list {
-        position: relative;
-        z-index: 1;
-      }
 
-      /* ── Intro (Scrim): kicker → title → sub, left accent bar ─────────────── */
+      /* ── Intro (fullBleed): kicker → title → sub, left accent bar ─────────── */
       .intro-wrap {
         display: flex;
         gap: 2.4vh;
@@ -94,18 +81,20 @@
       .accent-bar {
         width: 0.8vh;
         background: var(--accent);
-        border-radius: 0.4vh;
+        border-radius: 0;
       }
       .kicker {
         color: var(--accent);
+        font-family: var(--disp);
         font-size: 2.6vh;
-        font-weight: 600;
-        letter-spacing: 0.18em;
+        font-weight: 400;
+        letter-spacing: 0.16em;
         text-transform: uppercase;
       }
       .title {
         color: var(--ink);
-        font-weight: 600;
+        font-family: var(--disp);
+        font-weight: 700;
         line-height: 0.98;
         letter-spacing: -1.5px;
       }
@@ -115,12 +104,13 @@
       }
       .sub {
         color: var(--muted);
+        font-family: var(--body);
         font-size: 3.4vh;
         font-weight: 400;
         margin-top: 1.4vh;
       }
 
-      /* ── SectionCard (Scrim): kicker + title + teal rule bar ──────────────── */
+      /* ── SectionCard (fullBleed): kicker + title + yellow square dot ──────── */
       .section-wrap {
         padding: 0 0 9vh 6vh;
       }
@@ -129,34 +119,39 @@
         letter-spacing: -1px;
         line-height: 1;
       }
+      /* rule = dot: a rationed yellow SQUARE (not a bar). Its entrance animates
+         opacity only, so it never stretches. */
       .rule-bar {
-        height: 0.6vh;
-        width: 36vh;
+        height: 3vh;
+        width: 3vh;
         background: var(--accent);
-        border-radius: 0.3vh;
+        border-radius: 0;
         margin-top: 2vh;
-        transform-origin: left center;
       }
 
-      /* ── LowerThird: dark semi-transparent card, teal left border, line1+line2 */
+      /* ── LowerThird: dark box-border card, line1 + line2 ─────────────────── */
       .lt-wrap {
         padding: 0 0 8vh 5vh;
       }
+      /* Cards = box border (all sides), 0 radius, no shadow. Neutral grey border
+         (yellow is reserved for the dot + list nums). */
       .card {
-        background: var(--card-bg);
-        border-left: 0.8vh solid var(--accent);
-        border-radius: 1.2vh;
-        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+        background: rgba(10, 10, 11, 0.92);
+        border: 0.2vh solid var(--border);
+        border-radius: 0;
+        box-shadow: none;
       }
       .lt .line1 {
         color: var(--ink);
+        font-family: var(--disp);
         font-size: 6vh;
-        font-weight: 600;
+        font-weight: 700;
         letter-spacing: -0.5px;
         line-height: 1.05;
       }
       .lt .line2 {
         color: var(--muted);
+        font-family: var(--body);
         font-size: 3.6vh;
         font-weight: 400;
         margin-top: 0.8vh;
@@ -165,7 +160,7 @@
         padding: 2.2vh 3vh;
       }
 
-      /* ── StatCallout: dark card, teal bottom border, count-up + label ─────── */
+      /* ── StatCallout: dark box-border card, count-up + label ─────────────── */
       .stat-wrap {
         display: flex;
         flex-direction: column;
@@ -174,27 +169,27 @@
         padding: 0 5vh 8vh 0;
       }
       .stat .card {
-        border-left: none;
-        border-bottom: 0.6vh solid var(--accent);
         display: flex;
         align-items: baseline;
         gap: 1.6vh;
         padding: 1.8vh 3vh;
       }
       .stat .value {
-        color: var(--accent);
+        color: var(--ink);
+        font-family: var(--disp);
         font-size: 9vh;
-        font-weight: 600;
+        font-weight: 700;
         letter-spacing: -1px;
         line-height: 1;
       }
       .stat .label {
-        color: var(--ink);
+        color: var(--muted);
+        font-family: var(--body);
         font-size: 3.4vh;
-        font-weight: 500;
+        font-weight: 400;
       }
 
-      /* ── Outro (Scrim): centered teal diamond + wordmark lockup ───────────── */
+      /* ── Outro (fullBleed): centered yellow diamond + wordmark lockup ─────── */
       .outro-wrap {
         display: flex;
         flex-direction: column;
@@ -205,7 +200,7 @@
         width: 2.6vh;
         height: 2.6vh;
         background: var(--accent);
-        border-radius: 0.3vh;
+        border-radius: 0;
         transform: rotate(45deg);
         margin-bottom: 3vh;
       }
@@ -219,12 +214,13 @@
       }
       .outro .small {
         color: var(--muted);
+        font-family: var(--body);
         font-size: 2.8vh;
         font-weight: 400;
         margin-top: 0.8vh;
       }
 
-      /* ── TitleBumper (Scrim): big kicker + huge title, bottom-left ────────── */
+      /* ── TitleBumper (fullBleed): big kicker + huge title, bottom-left ────── */
       .tb-wrap {
         padding: 0 0 12vh 8vh;
       }
@@ -238,7 +234,7 @@
         max-width: 72%;
       }
 
-      /* ── KeypointCallout: dark card, teal left, one big line ──────────────── */
+      /* ── KeypointCallout: dark box-border card, one big line ─────────────── */
       .key-wrap {
         padding: 0 8vh 8vh 5vh;
       }
@@ -248,12 +244,13 @@
       }
       .key .text {
         color: var(--ink);
+        font-family: var(--body);
         font-size: 5vh;
-        font-weight: 500;
+        font-weight: 700;
         line-height: 1.18;
       }
 
-      /* ── ReframeCard: avoid(strike) → INSTEAD SAY → teal instead ──────────── */
+      /* ── ReframeCard: avoid(strike) → INSTEAD SAY → accent instead ───────── */
       .reframe-wrap {
         padding: 0 6vh 8vh 6vh;
       }
@@ -266,6 +263,7 @@
       }
       .reframe .avoid {
         color: var(--muted);
+        font-family: var(--body);
         font-size: 3.4vh;
         font-weight: 400;
         text-decoration: line-through;
@@ -273,20 +271,22 @@
       }
       .reframe .instead-label {
         color: var(--muted);
+        font-family: var(--body);
         font-size: 2.2vh;
-        font-weight: 600;
+        font-weight: 700;
         letter-spacing: 0.18em;
         text-transform: uppercase;
         margin-bottom: 1vh;
       }
       .reframe .instead {
-        color: var(--accent);
+        color: var(--ink);
+        font-family: var(--disp);
         font-size: 5vh;
-        font-weight: 600;
+        font-weight: 700;
         line-height: 1.15;
       }
 
-      /* ── PromptCard: dark card, quote body, teal highlight words ──────────── */
+      /* ── PromptCard: dark box-border card, quote body, highlight words ───── */
       .prompt-wrap {
         padding: 0 6vh 8vh 6vh;
       }
@@ -298,17 +298,19 @@
         margin-bottom: 1.6vh;
       }
       .prompt .body {
+        font-family: var(--body);
         font-size: 4.4vh;
-        font-weight: 500;
+        font-weight: 400;
         line-height: 1.32;
         color: var(--ink);
       }
       .prompt .hl {
-        color: var(--accent);
-        font-weight: 600;
+        color: var(--ink);
+        font-weight: 700;
+        text-decoration: underline;
       }
 
-      /* ── BeforeAfter: two columns split by a hairline divider ─────────────── */
+      /* ── BeforeAfter: two columns split by a hairline divider ────────────── */
       .ba-wrap {
         padding: 0 6vh 8vh 6vh;
       }
@@ -322,18 +324,20 @@
       }
       .ba .col-label {
         color: var(--muted);
+        font-family: var(--body);
         font-size: 2.2vh;
-        font-weight: 600;
+        font-weight: 700;
         letter-spacing: 0.18em;
         text-transform: uppercase;
         margin-bottom: 1.2vh;
       }
       .ba .col-label.after {
-        color: var(--accent);
+        color: var(--ink);
       }
       .ba .value {
+        font-family: var(--body);
         font-size: 4.6vh;
-        font-weight: 500;
+        font-weight: 400;
         line-height: 1.15;
       }
       .ba .value.before {
@@ -350,7 +354,7 @@
         opacity: 0.35;
       }
 
-      /* ── Checklist: dark card, teal 01/02/03 numbers, rows ────────────────── */
+      /* ── Checklist: dark card, 01/02/03 numbers, staggered rows ──────────── */
       .checklist-wrap {
         padding: 0 0 8vh 6vh;
       }
@@ -369,18 +373,20 @@
         gap: 2vh;
       }
       .checklist .num {
-        color: var(--accent);
+        color: var(--ink);
+        font-family: var(--disp);
         font-size: 3.4vh;
-        font-weight: 600;
+        font-weight: 700;
         font-variant-numeric: tabular-nums;
       }
       .checklist .item {
         color: var(--ink);
+        font-family: var(--body);
         font-size: 4vh;
-        font-weight: 500;
+        font-weight: 400;
       }
 
-      /* ── CommandChips: monospace cmd chip + serif desc rows ───────────────── */
+      /* ── CommandChips: mono cmd chip + mono desc, staggered rows ─────────── */
       .cmd-wrap {
         padding: 0 0 8vh 6vh;
       }
@@ -399,23 +405,24 @@
         gap: 2vh;
       }
       .cmd .chip {
-        font-family: ui-monospace, monospace;
+        font-family: var(--body);
         font-size: 2.8vh;
-        font-weight: 500;
-        color: var(--accent);
-        background: rgba(38, 202, 168, 0.1);
-        border: 0.12vh solid rgba(38, 202, 168, 0.5);
-        border-radius: 0.6vh;
+        font-weight: 700;
+        color: var(--ink);
+        background: rgba(244, 244, 242, 0.08);
+        border: 0.12vh solid var(--border);
+        border-radius: 0;
         padding: 0.6vh 1.2vh;
         white-space: nowrap;
       }
       .cmd .desc {
-        color: var(--ink);
+        color: var(--muted);
+        font-family: var(--body);
         font-size: 3.4vh;
         font-weight: 400;
       }
 
-      /* ── ListReveal (Scrim): teal title + numbered rows ───────────────────── */
+      /* ── ListReveal (fullBleed): title + numbered rows (yellow nums) ─────── */
       .list-wrap {
         display: flex;
         flex-direction: column;
@@ -423,9 +430,10 @@
         padding: 0 0 8vh 6vh;
       }
       .list .list-title {
-        color: var(--accent);
+        color: var(--ink);
+        font-family: var(--disp);
         font-size: 3vh;
-        font-weight: 600;
+        font-weight: 700;
         letter-spacing: 0.3vh;
         margin-bottom: 1vh;
       }
@@ -436,27 +444,29 @@
       }
       .list .num {
         color: var(--accent);
+        font-family: var(--disp);
         font-size: 4vh;
-        font-weight: 600;
+        font-weight: 700;
       }
       .list .item {
         color: var(--ink);
+        font-family: var(--body);
         font-size: 5vh;
-        font-weight: 500;
+        font-weight: 400;
       }
     </style>
   </head>
   <body>
     <!-- Worked example: all 13 cards packed back-to-back at 6s each (78s) so
-         every card is eyeballable in one render — the teal port of the almanac
-         card catalog. teal is NOT fullBleed: full-width scenes drop a .scrim
-         gradient (not an opaque fill) behind light text. In production, keep
-         each cue's transcript-derived at/dur (from work/cues.json) and set the
-         stage data-duration to the SOURCE length; scenes fire on the spoken word. -->
-    <div data-hf-id="hf-r0kp" id="stage" data-composition-id="v2hf-teal" data-start="0" data-duration="78" data-fps="24" data-width="1920" data-height="1080">
-      <!-- cue 1: Intro (0–6s) — Scrim -->
+         every card is eyeballable in one render — the dotgrid port of
+         video-to-remotion's card catalog. In production, keep each cue's
+         transcript-derived at/dur (from work/cues.json) and set the stage
+         data-duration to the SOURCE length; scenes fire on the spoken word.
+         Set data-width/height/fps to the source (scripts/probe.py of
+         video-to-remotion writes source-meta.json you can read). -->
+    <div data-hf-id="hf-r0kp" id="stage" data-composition-id="v2hf-dotgrid" data-start="0" data-duration="78" data-fps="24" data-width="1920" data-height="1080">
+      <!-- cue 1: Intro (0–6s) — fullBleed -->
       <div data-hf-id="hf-n4ne" id="intro" class="scene bleed anchor-bl clip" data-start="0" data-duration="6" data-track-index="0">
-        <div data-hf-id="hf-scr1" class="scrim"></div>
         <div data-hf-id="hf-hdnq" class="intro">
           <div data-hf-id="hf-xgk7" class="intro-wrap">
             <div data-hf-id="hf-ty56" class="accent-bar"></div>
@@ -469,9 +479,8 @@
         </div>
       </div>
 
-      <!-- cue 2: SectionCard (6–12s) — Scrim -->
+      <!-- cue 2: SectionCard (6–12s) — fullBleed -->
       <div data-hf-id="hf-eqkj" id="section" class="scene bleed anchor-bl clip" data-start="6" data-duration="6" data-track-index="0">
-        <div data-hf-id="hf-scr2" class="scrim"></div>
         <div data-hf-id="hf-pvpx" class="section">
           <div data-hf-id="hf-ysym" class="section-wrap">
             <div data-hf-id="hf-hra9" class="kicker">PART 1</div>
@@ -503,9 +512,8 @@
         </div>
       </div>
 
-      <!-- cue 5: Outro (24–30s) — Scrim -->
+      <!-- cue 5: Outro (24–30s) — fullBleed -->
       <div data-hf-id="hf-ul5o" id="outro" class="scene bleed anchor-center clip" data-start="24" data-duration="6" data-track-index="0">
-        <div data-hf-id="hf-scr3" class="scrim"></div>
         <div data-hf-id="hf-e0lx" class="outro">
           <div data-hf-id="hf-qq1q" class="outro-wrap">
             <div data-hf-id="hf-k2l8" class="diamond"></div>
@@ -516,9 +524,8 @@
         </div>
       </div>
 
-      <!-- cue 6: TitleBumper (30–36s) — Scrim full-screen title takeover -->
+      <!-- cue 6: TitleBumper (30–36s) — fullBleed full-screen title takeover -->
       <div data-hf-id="hf-1okx" id="tb" class="scene bleed anchor-bl clip" data-start="30" data-duration="6" data-track-index="0">
-        <div data-hf-id="hf-scr4" class="scrim"></div>
         <div data-hf-id="hf-ash2" class="tb">
           <div data-hf-id="hf-b7br" class="tb-wrap">
             <div data-hf-id="hf-3f9t" class="kicker">EPISODE 14</div>
@@ -538,7 +545,7 @@
         </div>
       </div>
 
-      <!-- cue 8: ReframeCard (42–48s) — avoid → INSTEAD SAY → teal instead -->
+      <!-- cue 8: ReframeCard (42–48s) — avoid → INSTEAD SAY → accent instead -->
       <div data-hf-id="hf-xoxn" id="reframe" class="scene anchor-bl clip" data-start="42" data-duration="6" data-track-index="1" data-hidden="">
         <div data-hf-id="hf-og1i" class="reframe">
           <div data-hf-id="hf-fqhz" class="reframe-wrap">
@@ -552,7 +559,7 @@
         </div>
       </div>
 
-      <!-- cue 9: PromptCard (48–54s) — quote body, teal highlight words -->
+      <!-- cue 9: PromptCard (48–54s) — quote body, highlight words -->
       <div data-hf-id="hf-rbmj" id="prompt" class="scene anchor-bl clip" data-start="48" data-duration="6" data-track-index="1" data-hidden="">
         <div data-hf-id="hf-3k5u" class="prompt">
           <div data-hf-id="hf-f4gb" class="prompt-wrap">
@@ -583,7 +590,7 @@
         </div>
       </div>
 
-      <!-- cue 11: Checklist (60–66s) — teal 01/02/03 rows on a card -->
+      <!-- cue 11: Checklist (60–66s) — 01/02/03 rows on a card -->
       <div data-hf-id="hf-ilkl" id="checklist" class="scene anchor-bl clip" data-start="60" data-duration="6" data-track-index="1" data-hidden="">
         <div data-hf-id="hf-g1yo" class="checklist">
           <div data-hf-id="hf-q8el" class="checklist-wrap">
@@ -597,7 +604,7 @@
         </div>
       </div>
 
-      <!-- cue 12: CommandChips (66–72s) — mono chip + serif desc rows -->
+      <!-- cue 12: CommandChips (66–72s) — mono chip + mono desc rows -->
       <div data-hf-id="hf-mz8b" id="cmd" class="scene anchor-bl clip" data-start="66" data-duration="6" data-track-index="1" data-hidden="">
         <div data-hf-id="hf-03wg" class="cmd">
           <div data-hf-id="hf-wba5" class="cmd-wrap">
@@ -611,9 +618,8 @@
         </div>
       </div>
 
-      <!-- cue 13: ListReveal (72–78s) — Scrim numbered enumeration -->
+      <!-- cue 13: ListReveal (72–78s) — fullBleed numbered enumeration -->
       <div data-hf-id="hf-josl" id="list" class="scene bleed anchor-bl clip" data-start="72" data-duration="6" data-track-index="0">
-        <div data-hf-id="hf-scr5" class="scrim"></div>
         <div data-hf-id="hf-33o8" class="list">
           <div data-hf-id="hf-95qt" class="list-wrap">
             <div data-hf-id="hf-8kx6" class="list-title">THREE THINGS TO WATCH</div>
@@ -627,28 +633,26 @@
       <script>
         // ────────────────────────────────────────────────────────────────────
         // One paused GSAP timeline, keyed in SECONDS (HF seeks it per frame).
-        // teal is a FADE theme (themes.ts motion:"fade"): NO per-element stagger.
-        // Each scene's inner wrapper does ONE slide+fade entrance as a unit
-        // (mirrors anim.tsx useFade + the outer translateY over TIMING.overlayIn).
-        //   fade 0.292s · reveal 0.542s · overlay-in slide 0.417s
-        // Two motion-independent exceptions survive fade mode:
-        //   • StatCallout count-up (0→N) — tween a counter, write textContent.
-        //   • SectionCard rule-bar draw (scaleX 0→1) — no stagger offset.
+        // dotgrid motion = "fade": each scene does ONE slide+fade on its inner
+        // wrapper — no per-element stagger (that's the almanac/stagger language).
+        //   fade 0.292s · reveal 0.542s. EASE_OUT bezier(0.16,1,0.3,1)≈power4.out.
         //
         // Two seek-safety rules the HF linter enforces (learned the hard way):
-        //   1. Fade/animate an INNER wrapper, never the .clip div — the runtime
-        //      owns clip visibility; animating it leaves stale state on seeks.
-        //   2. Animate a CSS-initialized transform (scaleX) with fromTo (not to),
-        //      so GSAP owns the whole transform (no scaleX clobber).
+        //   1. Fade an INNER wrapper, never the .clip div — the runtime owns clip
+        //      visibility; animating it leaves stale state on non-linear seeks.
+        //   2. Animate a transform with fromTo (not to) when CSS sets its initial
+        //      value, so GSAP owns the whole transform. (The dot animates opacity
+        //      only, so it's fine either way.)
         // ────────────────────────────────────────────────────────────────────
         const EO = "power4.out";
         const FADE = 0.292,
-          REVEAL = 0.542,
-          IN = 0.417;
+          REVEAL = 0.542;
 
         const tl = gsap.timeline({ paused: true });
 
-        // fade-motion entrance: inner wrapper fades in + slides up, holds, fades out.
+        // motion="fade": slide (y: dy→0) + fade IN over REVEAL at `start`, then a
+        // straight fade OUT over the last FADE seconds, then a hard opacity kill.
+        // Animates a scene's inner wrapper — never the .clip div (seek-safe).
         function slideFade(sel, start, dur, dy = "1.6vh") {
           const el = document.querySelector(sel);
           tl.fromTo(el, { opacity: 0, y: dy }, { opacity: 1, y: 0, duration: REVEAL, ease: EO }, start);
@@ -659,14 +663,14 @@
         // ─── cue 1: Intro ────────────────────────────────────────────────────
         slideFade("#intro .intro", 0, 6);
 
-        // ─── cue 2: SectionCard — rule-bar draws with the scene (no stagger) ──
+        // ─── cue 2: SectionCard — dot appears with an opacity fromTo at start ──
         slideFade("#section .section", 6, 6);
-        tl.fromTo(document.querySelector("#section .rule-bar"), { scaleX: 0 }, { scaleX: 1, duration: IN, ease: EO }, 6);
+        tl.fromTo(document.querySelector("#section .rule-bar"), { opacity: 0 }, { opacity: 1, duration: REVEAL, ease: EO }, 6);
 
-        // ─── cue 3: LowerThird ────────────────────────────────────────────────
+        // ─── cue 3: LowerThird ─────────────────────────────────────────────────
         slideFade("#lt .lt", 12, 6);
 
-        // ─── cue 4: StatCallout — value counts 0→N (motion-independent) ───────
+        // ─── cue 4: StatCallout — count-up survives (0→N over REVEAL) ─────────
         // Count-up = tween a counter object, write textContent on update.
         // power3.out ≈ Remotion's easeOutCubic; onUpdate fires per seeked frame.
         slideFade("#stat .stat", 18, 6);
@@ -685,36 +689,36 @@
           18,
         );
 
-        // ─── cue 5: Outro ─────────────────────────────────────────────────────
+        // ─── cue 5: Outro ──────────────────────────────────────────────────────
         slideFade("#outro .outro", 24, 6);
 
-        // ─── cue 6: TitleBumper ───────────────────────────────────────────────
+        // ─── cue 6: TitleBumper — fullBleed takeover ─────────────────────────
         slideFade("#tb .tb", 30, 6);
 
-        // ─── cue 7: KeypointCallout ───────────────────────────────────────────
+        // ─── cue 7: KeypointCallout ──────────────────────────────────────────
         slideFade("#key .key", 36, 6);
 
-        // ─── cue 8: ReframeCard ───────────────────────────────────────────────
+        // ─── cue 8: ReframeCard ──────────────────────────────────────────────
         slideFade("#reframe .reframe", 42, 6);
 
-        // ─── cue 9: PromptCard ────────────────────────────────────────────────
+        // ─── cue 9: PromptCard ───────────────────────────────────────────────
         slideFade("#prompt .prompt", 48, 6);
 
-        // ─── cue 10: BeforeAfter ──────────────────────────────────────────────
+        // ─── cue 10: BeforeAfter ─────────────────────────────────────────────
         slideFade("#ba .ba", 54, 6);
 
-        // ─── cue 11: Checklist — rows appear with the card (no per-row stagger)─
+        // ─── cue 11: Checklist — list comes in with the card (no row stagger) ──
         slideFade("#checklist .checklist", 60, 6);
 
-        // ─── cue 12: CommandChips — rows appear with the card ─────────────────
+        // ─── cue 12: CommandChips — comes in with the card ───────────────────
         slideFade("#cmd .cmd", 66, 6);
 
-        // ─── cue 13: ListReveal — rows appear with the card ───────────────────
+        // ─── cue 13: ListReveal — fullBleed, comes in with the wrapper ───────
         slideFade("#list .list", 72, 6);
 
         // Register the timeline — key MUST equal the stage's data-composition-id.
         window.__timelines = window.__timelines || {};
-        window.__timelines["v2hf-teal"] = tl;
+        window.__timelines["v2hf-dotgrid"] = tl;
 
         // Gallery loop driver — dormant unless the URL hash asks for it, so
         // direct-open / shoot.mjs / the HF runtime are unaffected. The animated
@@ -750,5 +754,3 @@
     </div>
   </body>
 </html>
-
-
