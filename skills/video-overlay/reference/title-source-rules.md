@@ -41,7 +41,7 @@ Do not invent a fallback title. Ask the user for a manual title instead.
 
 ## Future Source C: captions Summary
 
-Future versions may read `video-to-captions` output or short-relative captions
+Future versions may read `video-add-captions` output or short-relative captions
 and use an LLM to summarize a title. V1 does not implement this path.
 
 If this is added later, it should remain explicit in config and should not

@@ -14,7 +14,7 @@ description: >
   looks too flat / muted / too warm", "give it a cinematic / teal-orange / film look",
   "convert S-Log/log to Rec.709", "bake a LUT / .cube", 调色, 校色, 给视频做调色/电影感/青橙调色,
   把 log 转 Rec.709, 出几个调色风格让我选, 生成 LUT. NOT for cutting footage (video-rough-cut),
-  every-line subtitles (video-to-captions), overlay cards/lower-thirds (video-overlay-cards),
+  every-line subtitles (video-add-captions), overlay cards/lower-thirds (video-overlay-cards),
   or motion graphics (video-to-remotion).
 ---
 

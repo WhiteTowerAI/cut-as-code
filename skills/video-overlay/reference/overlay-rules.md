@@ -14,7 +14,7 @@ clearly instead of reframing inside this skill.
 
 ## Visual Direction
 
-The default title style should be close to the `video-to-captions` shorts visual
+The default title style should be close to the `video-add-captions` shorts visual
 language:
 
 - bold short-video typography;
@@ -39,7 +39,7 @@ Supported v1 positions:
 - custom y ratio.
 
 The title must avoid the bottom captions area. Do not place the v1 title in the
-lower-third region by default, because `video-to-captions` shorts captions are
+lower-third region by default, because `video-add-captions` shorts captions are
 expected to occupy the lower part of the frame.
 
 ## Vertical Input and Future Extensibility

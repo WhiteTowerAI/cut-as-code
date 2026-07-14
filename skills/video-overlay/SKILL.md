@@ -72,7 +72,7 @@ See `reference/title-source-rules.md` for selection and failure rules.
 ## Style and Layout
 
 The v1 visual target is a short-form title that feels close to the
-`video-to-captions` shorts caption style: bold, readable, high-contrast, and
+`video-add-captions` shorts caption style: bold, readable, high-contrast, and
 suited to vertical short video.
 
 Use one preset concept:
@@ -125,6 +125,6 @@ skills/video-overlay/
   reference/
 ```
 
-Keep this skill independent from `video-to-captions`, `video-to-shorts`, and
+Keep this skill independent from `video-add-captions`, `video-to-shorts`, and
 `video-vertical-reframe`. It may read their durable outputs, but it must not
 change their implementations or owned artifacts.

@@ -16,7 +16,7 @@ const remotionArgs = process.env.REMOTION_BIN ? [] : ["remotion"];
 
 if (missing.length > 0 && !dryRun) {
   console.error(`[captions] missing Remotion preview inputs: ${missing.join(", ")}`);
-  console.error("[captions] run this from the video-to-captions skill directory.");
+  console.error("[captions] run this from the video-add-captions skill directory.");
   process.exit(1);
 }
 
