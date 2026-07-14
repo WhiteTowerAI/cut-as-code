@@ -1,98 +1,60 @@
 {
-  "schema_version": "shorts-plan.v1",
-  "video": {
-    "source": "work/source.mp4",
-    "width": 1280,
-    "height": 720,
-    "fps": 60.0,
-    "duration_s": 96.0,
-    "kind": "source"
-  },
-  "transcript": {
-    "path": "work/shorts/transcript.json",
-    "timebase": "input_video_relative",
-    "source": "provided"
-  },
-  "producer": {
-    "skill": "video-to-shorts",
-    "created_at": "2026-07-07T00:00:00Z",
-    "planner": "example"
-  },
+  "schema_version": "shorts-plan.v2",
+  "producer": {"skill": "video-to-shorts", "planner": "deterministic"},
   "source_candidates": {
     "path": "work/shorts/shorts_candidates.json",
-    "schema_version": "shorts-candidates.v1"
+    "schema_version": "shorts-candidates.v2"
   },
-  "target": {
-    "aspect_ratio": "9:16",
-    "downstream_reframe_skill": "video-vertical-reframe"
-  },
+  "transcript": {"path": "work/shorts/transcript.json", "timebase": "input_video_relative"},
   "shorts": [
     {
       "id": "short_01",
       "short_id": "short_01",
-      "candidate_id": "cand-002",
-      "source_candidate_index": 2,
+      "candidate_id": "cand-001",
+      "source_candidate_index": 1,
       "order": 1,
-      "title": "SQL Three Times Faster",
-      "start_time": 52.0,
-      "end_time": 74.0,
-      "duration": 22.0,
-      "duration_s": 22.0,
-      "score": 91,
-      "hook_sentence": "This is SQL running three times faster.",
-      "virality_reason": "A concrete performance claim is immediately understandable and can stand alone as a short technical highlight.",
-      "reason": "Approved because it is concrete, short, and technically memorable.",
-      "transcript_excerpt": "This is SQL running three times faster, not ten percent faster, three times faster.",
-      "validation": {
-        "passed": true,
-        "errors": [],
-        "warnings": []
+      "title": "Growth Driver and Qualified Platform",
+      "scene_type": "product_demo",
+      "evidence_mode": "text_only",
+      "start_time": 0.0,
+      "end_time": 23.5,
+      "duration": 23.5,
+      "score_breakdown": {
+        "hook": {"score": 18, "reason": "The growth-driver promise establishes importance immediately."},
+        "completeness": {"score": 18, "reason": "The claim is followed by concrete adoption evidence."},
+        "audience_value": {"score": 17, "reason": "The platform qualification statement is understandable business evidence."},
+        "emotion_tension": {"score": 8, "reason": "The claim carries clear business stakes."},
+        "quotability": {"score": 12, "reason": "The growth-driver line can stand alone."},
+        "pace_editability": {"score": 8, "reason": "The two concise statements require no internal restructuring."}
       },
+      "score": 81,
+      "hook_sentence": "",
+      "editorial_reason": "",
+      "transcript_excerpt": "This is um going to be our new major growth driver. Every company that works with NVIDIA on AI has already qualified this platform.",
+      "requested_filler_drop_spans": [
+        {"type": "filler", "start_time": 0.8, "end_time": 1.1, "reason": "Independent filler word.", "review_status": "approved"}
+      ],
+      "filler_drop_spans": [
+        {"type": "filler", "start_time": 0.8, "end_time": 1.1, "reason": "Independent filler word.", "review_status": "approved", "words": ["um"]}
+      ],
+      "rejected_filler_drop_spans": [],
+      "keep_spans": [
+        {"start_time": 0.0, "end_time": 0.8},
+        {"start_time": 1.1, "end_time": 23.5}
+      ],
+      "source_duration": 23.5,
+      "filler_removed_duration": 0.3,
+      "estimated_output_duration": 23.2,
+      "validation": {"passed": true, "errors": [], "warnings": []},
       "outputs": {
         "directory": "work/shorts/short_01",
         "source_video": "work/shorts/short_01/source.mp4",
         "transcript": "work/shorts/short_01/transcript.json",
-        "vertical_reframe_dir": "work/shorts/short_01/vertical-reframe"
+        "extraction_report": "work/shorts/short_01/extraction_report.json"
       },
-      "status": "planned",
-      "metadata": {
-        "review_note": "Run video-vertical-reframe after source.mp4 is extracted."
-      }
-    },
-    {
-      "id": "short_02",
-      "short_id": "short_02",
-      "candidate_id": "cand-001",
-      "source_candidate_index": 1,
-      "order": 2,
-      "title": "The New Growth Driver",
-      "start_time": 0.0,
-      "end_time": 34.0,
-      "duration": 34.0,
-      "duration_s": 34.0,
-      "score": 86,
-      "hook_sentence": "This is going to be our new major growth driver.",
-      "virality_reason": "The opening line frames the section as a major business shift and gives the viewer a clear reason to keep watching.",
-      "reason": "Approved as a broader setup clip with a strong opening line.",
-      "transcript_excerpt": "This is going to be our new major growth driver... Every company that works with NVIDIA on AI has already qualified this platform.",
-      "validation": {
-        "passed": true,
-        "errors": [],
-        "warnings": []
-      },
-      "outputs": {
-        "directory": "work/shorts/short_02",
-        "source_video": "work/shorts/short_02/source.mp4",
-        "transcript": "work/shorts/short_02/transcript.json",
-        "vertical_reframe_dir": "work/shorts/short_02/vertical-reframe"
-      },
-      "status": "planned",
-      "metadata": {
-        "review_note": "Check whether the reframe should preserve slides or track the speaker."
-      }
+      "status": "planned"
     }
   ],
-  "metadata": {
-    "notes": "Example only. Phase 2 will consume this plan to extract horizontal short sources."
-  }
+  "rejected_candidates": [],
+  "metadata": {"notes": "The approved filler_drop_span is normalized and converted to keep_spans before extraction."}
 }

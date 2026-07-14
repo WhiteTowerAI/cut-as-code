@@ -1,292 +1,198 @@
 #!/usr/bin/env python3
-"""Generate video-to-shorts candidate highlights."""
+"""Validate agent-authored short candidates and generate review previews."""
 
 import argparse
-import json
-import re
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from preview import write_candidates_preview_html, write_candidates_preview_md
+from transcript_utils import excerpt_for_range, load_json, overlap_ratio, transcript_duration, write_json
 
-def repo_root_from_package():
-    return Path(__file__).resolve().parents[3]
 
-
-REPO_ROOT = repo_root_from_package()
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
-from skills._shared.openai_compatible_llm import (  # noqa: E402
-    LLMConfigError,
-    LLMRequestError,
-    chat_completion,
-    resolve_config,
-)
-from criteria import criteria_for_prompt  # noqa: E402
-from preview import write_candidates_preview_html, write_candidates_preview_md  # noqa: E402
-from transcript_utils import (  # noqa: E402
-    excerpt_for_range,
-    fmt_time,
-    load_json,
-    overlap_ratio,
-    transcript_duration,
-    transcript_text,
-    write_json,
-)
+SCORE_LIMITS = {
+    "hook": 20,
+    "completeness": 20,
+    "audience_value": 20,
+    "emotion_tension": 15,
+    "quotability": 15,
+    "pace_editability": 10,
+}
+EVIDENCE_MODES = {"text_only", "text_visual"}
+SCENE_TYPES = {"product_demo", "conversation_interview", "solo_talk", "tutorial_story"}
+ALLOWED_TOP_LEVEL = {"schema_version", "video", "transcript", "producer", "selection", "candidates"}
+ALLOWED_CANDIDATE = {
+    "candidate_id", "title", "scene_type", "start_time", "end_time", "transcript_excerpt",
+    "evidence_mode", "score_breakdown", "warnings", "filler_drop_spans", "visual_observations",
+    "visual_risks", "visual_keyframes", "review_status", "metadata",
+}
 
 
 def fail(message):
     raise SystemExit(message)
 
 
-def parse_json_loose(raw):
-    text = raw.strip()
-    text = re.sub(r"^```(?:json)?\s*", "", text)
-    text = re.sub(r"\s*```$", "", text)
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        start = text.find("{")
-        end = text.rfind("}")
-        if start != -1 and end != -1 and end > start:
-            return json.loads(text[start : end + 1])
-        raise
+def require_type(value, expected, path):
+    if not isinstance(value, expected):
+        fail(f"{path} must be {expected.__name__}")
 
 
-def build_prompt(transcript, max_candidates, min_duration, max_duration):
-    duration = transcript_duration(transcript)
-    text = transcript_text(transcript)
-    target = max(8, min(12, max_candidates))
-    return f"""You are selecting high-potential YouTube Shorts from a transcript.
-
-{criteria_for_prompt()}
-
-Task:
-- Generate {target} candidate shorts if the transcript supports it.
-- Target duration: {min_duration:.0f}-{max_duration:.0f} seconds.
-- Every candidate must start with a strong hook and feel self-contained.
-- Never cut mid-sentence or mid-thought.
-- start_time must begin at the first word of a complete sentence or complete thought.
-- end_time must land after the final word of a complete sentence or complete thought.
-- Do not start with fragment phrases like "Has arrived now" when prior context is needed.
-- Do not end with dangling words or incomplete clauses such as "and", "that", "our", "to", "of", or "in fact, that".
-- Prefer a slightly longer complete clip over a shorter fragment, as long as it stays within the duration range.
-- Avoid overlapping candidates. If two candidates cover the same idea, keep the stronger one.
-- Score each candidate 0-100 for short-form potential, not general quality.
-- Use transcript timestamps only. Do not invent content.
-- transcript_excerpt must be copied or tightly paraphrased from the exact candidate time range.
-
-Return ONLY valid JSON:
-{{
-  "content_type": "lecture|podcast|interview|tutorial|commentary|other",
-  "density": "low|medium|high",
-  "candidates": [
-    {{
-      "title": "string",
-      "start_time": 0.0,
-      "end_time": 45.0,
-      "score": 85,
-      "hook_sentence": "string",
-      "virality_reason": "string"
-    }}
-  ]
-}}
-
-Transcript duration: {duration:.3f}s
-
-Transcript:
-{text}
-"""
+def validate_score_breakdown(value, path):
+    require_type(value, dict, path)
+    if set(value) != set(SCORE_LIMITS):
+        fail(f"{path} must contain exactly: {', '.join(SCORE_LIMITS)}")
+    normalized = {}
+    for dimension, maximum in SCORE_LIMITS.items():
+        entry = value[dimension]
+        require_type(entry, dict, f"{path}.{dimension}")
+        if set(entry) != {"score", "reason"}:
+            fail(f"{path}.{dimension} must contain exactly score and reason")
+        score = entry["score"]
+        if isinstance(score, bool) or not isinstance(score, (int, float)):
+            fail(f"{path}.{dimension}.score must be a number")
+        if score < 0 or score > maximum:
+            fail(f"{path}.{dimension}.score must be between 0 and {maximum}")
+        reason = entry["reason"]
+        require_type(reason, str, f"{path}.{dimension}.reason")
+        if not reason.strip():
+            fail(f"{path}.{dimension}.reason must not be empty")
+        normalized[dimension] = {"score": score, "reason": reason.strip()}
+    return normalized, sum(item["score"] for item in normalized.values())
 
 
-def normalize_candidate(item, idx, duration, min_duration, max_duration, transcript):
-    start = float(item.get("start_time", -1))
-    end = float(item.get("end_time", -1))
-    if start < 0 or end <= start:
-        return None
-    start = max(0.0, min(duration, start))
-    end = max(0.0, min(duration, end))
-    if end <= start:
-        return None
-    cand_duration = round(end - start, 3)
-    warnings = []
-    if cand_duration < min_duration:
-        warnings.append("SHORT_DURATION")
-    if cand_duration > max_duration:
-        warnings.append("LONG_DURATION")
-    excerpt = excerpt_for_range(transcript, start, end)
-    if not excerpt:
-        return None
-    score = int(float(item.get("score", 0)))
-    score = max(0, min(100, score))
+def validate_string_list(value, path):
+    require_type(value, list, path)
+    if any(not isinstance(item, str) for item in value):
+        fail(f"{path} must contain only strings")
+    return [item.strip() for item in value if item.strip()]
+
+
+def validate_filler_spans(value, start, end, path):
+    require_type(value, list, path)
+    spans = []
+    for index, item in enumerate(value):
+        item_path = f"{path}[{index}]"
+        require_type(item, dict, item_path)
+        required = {"type", "start_time", "end_time", "reason", "review_status"}
+        if set(item) != required:
+            fail(f"{item_path} must contain exactly type, start_time, end_time, reason, review_status")
+        if item["type"] != "filler":
+            fail(f"{item_path}.type must be filler")
+        if item["review_status"] not in ("approved", "rejected"):
+            fail(f"{item_path}.review_status must be approved or rejected")
+        span_start = item["start_time"]
+        span_end = item["end_time"]
+        if any(isinstance(number, bool) or not isinstance(number, (int, float)) for number in (span_start, span_end)):
+            fail(f"{item_path} times must be numbers")
+        if span_start < start or span_end > end or span_end <= span_start:
+            fail(f"{item_path} must be a valid range inside the candidate")
+        require_type(item["reason"], str, f"{item_path}.reason")
+        spans.append({
+            "type": "filler", "start_time": span_start, "end_time": span_end,
+            "reason": item["reason"].strip(), "review_status": item["review_status"],
+        })
+    return spans
+
+
+def normalize_candidate(item, index, transcript, transcript_duration_s):
+    path = f"candidates[{index}]"
+    require_type(item, dict, path)
+    unknown = set(item) - ALLOWED_CANDIDATE
+    if "score" in item:
+        fail(f"{path}.score is not allowed; candidates.py computes score from score_breakdown")
+    if unknown:
+        fail(f"{path} contains unsupported fields: {', '.join(sorted(unknown))}")
+    required = {"candidate_id", "title", "scene_type", "start_time", "end_time", "transcript_excerpt", "evidence_mode", "score_breakdown"}
+    missing = required - set(item)
+    if missing:
+        fail(f"{path} missing required fields: {', '.join(sorted(missing))}")
+    for field in ("candidate_id", "title", "transcript_excerpt", "evidence_mode", "scene_type"):
+        require_type(item[field], str, f"{path}.{field}")
+        if not item[field].strip():
+            fail(f"{path}.{field} must not be empty")
+    if item["scene_type"] not in SCENE_TYPES:
+        fail(f"{path}.scene_type must be one of: {', '.join(sorted(SCENE_TYPES))}")
+    if item["evidence_mode"] not in EVIDENCE_MODES:
+        fail(f"{path}.evidence_mode must be text_only or text_visual")
+    start = item["start_time"]
+    end = item["end_time"]
+    if any(isinstance(number, bool) or not isinstance(number, (int, float)) for number in (start, end)):
+        fail(f"{path} start_time and end_time must be numbers")
+    if start < 0 or end <= start or end > transcript_duration_s:
+        fail(f"{path} time range must be within 0-{transcript_duration_s:.3f}s and end after start")
+    actual_excerpt = excerpt_for_range(transcript, start, end, max_chars=100000).strip()
+    supplied_excerpt = item["transcript_excerpt"].strip()
+    if supplied_excerpt != actual_excerpt:
+        fail(f"{path}.transcript_excerpt must exactly match transcript words in the candidate time range")
+    score_breakdown, score = validate_score_breakdown(item["score_breakdown"], f"{path}.score_breakdown")
+    warnings = validate_string_list(item.get("warnings", []), f"{path}.warnings")
+    filler_spans = validate_filler_spans(item.get("filler_drop_spans", []), start, end, f"{path}.filler_drop_spans")
+    visual_observations = validate_string_list(item.get("visual_observations", []), f"{path}.visual_observations")
+    visual_risks = validate_string_list(item.get("visual_risks", []), f"{path}.visual_risks")
+    visual_keyframes = validate_string_list(item.get("visual_keyframes", []), f"{path}.visual_keyframes")
+    if item["evidence_mode"] == "text_only" and (visual_observations or visual_risks or visual_keyframes):
+        fail(f"{path} text_only candidates must not contain visual evidence")
     return {
-        "candidate_id": f"cand-{idx:03d}",
-        "title": str(item.get("title") or f"Candidate {idx}").strip(),
-        "start_time": round(start, 3),
-        "end_time": round(end, 3),
-        "duration": cand_duration,
-        "score": score,
-        "hook_sentence": str(item.get("hook_sentence") or "").strip(),
-        "virality_reason": str(item.get("virality_reason") or "").strip(),
-        "transcript_excerpt": excerpt,
-        "warnings": warnings,
-        "review_status": "candidate",
-        "metadata": {},
+        "candidate_id": item["candidate_id"].strip(), "title": item["title"].strip(),
+        "scene_type": item["scene_type"], "start_time": start, "end_time": end,
+        "duration": round(end - start, 3), "transcript_excerpt": supplied_excerpt,
+        "evidence_mode": item["evidence_mode"], "score_breakdown": score_breakdown, "score": score,
+        "warnings": warnings, "filler_drop_spans": filler_spans,
+        "visual_observations": visual_observations, "visual_risks": visual_risks,
+        "visual_keyframes": visual_keyframes, "review_status": item.get("review_status", "candidate"),
+        "metadata": item.get("metadata", {}),
     }
 
 
 def dedupe_candidates(candidates):
-    ordered = sorted(candidates, key=lambda c: c["score"], reverse=True)
     kept = []
-    for cand in ordered:
-        too_close = False
-        for existing in kept:
-            if overlap_ratio(cand, existing) > 0.5:
-                too_close = True
-                break
-        if not too_close:
-            kept.append(cand)
-    for idx, cand in enumerate(kept, start=1):
-        cand["candidate_id"] = f"cand-{idx:03d}"
-    return kept
-
-
-def validate_and_build(parsed, transcript, video_path, transcript_path, args, config):
-    duration = transcript_duration(transcript)
-    raw_candidates = parsed.get("candidates")
-    if not isinstance(raw_candidates, list):
-        raw_candidates = parsed.get("highlights")
-    if not isinstance(raw_candidates, list):
-        raise ValueError("LLM JSON must contain a candidates array.")
-
-    normalized = []
-    for idx, item in enumerate(raw_candidates, start=1):
-        if not isinstance(item, dict):
+    for candidate in sorted(candidates, key=lambda item: item["score"], reverse=True):
+        if any(overlap_ratio(candidate, existing) > 0.5 for existing in kept):
             continue
-        cand = normalize_candidate(
-            item,
-            idx,
-            duration,
-            args.min_duration,
-            args.max_duration,
-            transcript,
-        )
-        if cand:
-            normalized.append(cand)
-
-    if not normalized:
-        raise ValueError("No valid candidates after validation.")
-
-    normalized = dedupe_candidates(normalized)[: args.max_candidates]
-    return {
-        "schema_version": "shorts-candidates.v1",
-        "video": {
-            "source": str(video_path),
-            "duration_s": round(duration, 3),
-        },
-        "transcript": {
-            "path": str(transcript_path),
-            "timebase": "input_video_relative",
-            "source": "provided",
-        },
-        "producer": {
-            "skill": "video-to-shorts",
-            "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-            "llm_provider": config["provider"],
-            "llm_model": config["model"],
-        },
-        "selection": {
-            "target_count": args.max_candidates,
-            "target_aspect_ratio": "9:16",
-            "duration_range_s": {
-                "min": args.min_duration,
-                "max": args.max_duration,
-            },
-            "content_type": str(parsed.get("content_type") or "other"),
-            "density": str(parsed.get("density") or "medium"),
-        },
-        "candidates": normalized,
-        "metadata": {
-            "notes": "Generated by Phase 1 highlight selection. Review before creating shorts_plan.json.",
-        },
-    }
-
-
-def write_error_files(out_dir, message, raw_response=""):
-    write_json(out_dir / "llm_error.json", {"error": message})
-    (out_dir / "llm_raw_response.txt").write_text(raw_response or "", encoding="utf-8")
-
-
-def call_and_parse(prompt, args, out_dir):
-    raw = ""
-    try:
-        config = resolve_config(base_url=args.base_url, model=args.model)
-        raw = chat_completion(prompt, base_url=args.base_url, model=args.model, temperature=0.2)
-        try:
-            return parse_json_loose(raw), raw, config
-        except Exception:
-            repair_prompt = (
-                "Repair this response into valid JSON only. Preserve all candidate fields.\n\n"
-                + raw
-            )
-            repaired = chat_completion(repair_prompt, base_url=args.base_url, model=args.model, temperature=0.0)
-            raw = repaired
-            return parse_json_loose(repaired), raw, config
-    except (LLMConfigError, LLMRequestError, Exception) as e:
-        write_error_files(out_dir, str(e), raw)
-        raise
+        kept.append(candidate)
+    return kept
 
 
 def run_candidates(args):
     out_dir = Path(args.out).resolve()
-    out_dir.mkdir(parents=True, exist_ok=True)
-    video_path = Path(args.video).resolve()
-    if not video_path.exists():
-        fail(f"video not found: {video_path}")
-    transcript_path = out_dir / "transcript.json"
+    input_path = Path(args.candidates).resolve() if args.candidates else out_dir / "shorts_candidates.json"
+    transcript_path = Path(args.transcript).resolve() if args.transcript else out_dir / "transcript.json"
+    if not input_path.exists():
+        fail(f"agent-authored candidates file not found: {input_path}")
     if not transcript_path.exists():
-        fail(f"transcript not found: {transcript_path}. Run prepare_transcript.py first.")
-
+        fail(f"transcript not found: {transcript_path}")
+    raw = load_json(input_path)
+    require_type(raw, dict, "root")
+    unknown = set(raw) - ALLOWED_TOP_LEVEL
+    if unknown:
+        fail(f"root contains unsupported fields: {', '.join(sorted(unknown))}")
+    require_type(raw.get("candidates"), list, "candidates")
     transcript = load_json(transcript_path)
-    prompt = build_prompt(transcript, args.max_candidates, args.min_duration, args.max_duration)
-    try:
-        parsed, raw, config = call_and_parse(prompt, args, out_dir)
-        result = validate_and_build(parsed, transcript, video_path, transcript_path, args, config)
-    except Exception as e:
-        print(f"[video-to-shorts] LLM candidate generation failed: {e}", file=sys.stderr)
-        print(f"[video-to-shorts] wrote: {out_dir / 'llm_error.json'}", file=sys.stderr)
-        print(f"[video-to-shorts] wrote: {out_dir / 'llm_raw_response.txt'}", file=sys.stderr)
-        raise SystemExit(1)
-
-    candidates_path = out_dir / "shorts_candidates.json"
-    preview_md = out_dir / "shorts_candidates_preview.md"
-    preview_html = out_dir / "shorts_candidates_preview.html"
-    write_json(candidates_path, result)
-    write_candidates_preview_md(preview_md, result)
-    write_candidates_preview_html(preview_html, result)
-    print(f"[video-to-shorts] candidates: {candidates_path}")
-    print(f"[video-to-shorts] preview md: {preview_md}")
-    print(f"[video-to-shorts] preview html: {preview_html}")
+    duration = transcript_duration(transcript)
+    normalized = [normalize_candidate(item, index, transcript, duration) for index, item in enumerate(raw["candidates"])]
+    result = dict(raw)
+    result["schema_version"] = "shorts-candidates.v2"
+    result["producer"] = {"skill": "video-to-shorts", "mode": "agent_first", "validated_at": datetime.now(timezone.utc).isoformat()}
+    result["transcript"] = {**raw.get("transcript", {}), "path": str(transcript_path), "timebase": "input_video_relative"}
+    result["candidates"] = dedupe_candidates(normalized)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    output_path = out_dir / "shorts_candidates.json"
+    write_json(output_path, result)
+    write_candidates_preview_md(out_dir / "shorts_candidates_preview.md", result)
+    write_candidates_preview_html(out_dir / "shorts_candidates_preview.html", result)
+    print(f"[video-to-shorts] validated candidates: {output_path}")
+    print(f"[video-to-shorts] kept after overlap dedupe: {len(result['candidates'])}")
 
 
 def build_parser():
-    parser = argparse.ArgumentParser(
-        description="Generate reviewable short-form candidates from work/shorts/transcript.json."
-    )
-    parser.add_argument("--video", required=True, help="Input video path.")
-    parser.add_argument("--out", required=True, help="Output work/shorts directory.")
-    parser.add_argument("--model", help="LLM model. Overrides LLM_MODEL.")
-    parser.add_argument("--base-url", help="OpenAI-compatible base URL. Overrides LLM_BASE_URL.")
-    parser.add_argument("--max-candidates", type=int, default=12, help="Maximum candidates to keep.")
-    parser.add_argument("--min-duration", type=float, default=20.0, help="Minimum candidate duration in seconds.")
-    parser.add_argument("--max-duration", type=float, default=90.0, help="Maximum candidate duration in seconds.")
+    parser = argparse.ArgumentParser(description="Validate agent-authored shorts_candidates.json and generate previews.")
+    parser.add_argument("--out", required=True, help="Output directory containing transcript.json by default.")
+    parser.add_argument("--candidates", help="Agent-authored candidate JSON. Defaults to OUT/shorts_candidates.json.")
+    parser.add_argument("--transcript", help="Transcript JSON. Defaults to OUT/transcript.json.")
     return parser
 
 
 def main(argv=None):
-    args = build_parser().parse_args(argv)
-    run_candidates(args)
+    run_candidates(build_parser().parse_args(argv))
 
 
 if __name__ == "__main__":

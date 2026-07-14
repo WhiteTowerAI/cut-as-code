@@ -5,18 +5,19 @@
     {
       "start": 0.0,
       "end": 8.4,
-      "text": "This is going to be our new major growth driver.",
+      "text": "This is um going to be our new major growth driver.",
       "words": [
         { "start": 0.0, "end": 0.4, "word": "This" },
         { "start": 0.4, "end": 0.7, "word": "is" },
-        { "start": 0.7, "end": 1.1, "word": "going" },
-        { "start": 1.1, "end": 1.3, "word": "to" },
-        { "start": 1.3, "end": 1.5, "word": "be" },
-        { "start": 1.5, "end": 1.9, "word": "our" },
-        { "start": 1.9, "end": 2.4, "word": "new" },
-        { "start": 2.4, "end": 3.0, "word": "major" },
-        { "start": 3.0, "end": 3.7, "word": "growth" },
-        { "start": 3.7, "end": 4.4, "word": "driver." }
+        { "start": 0.8, "end": 1.1, "word": "um" },
+        { "start": 1.2, "end": 1.6, "word": "going" },
+        { "start": 1.6, "end": 1.8, "word": "to" },
+        { "start": 1.8, "end": 2.0, "word": "be" },
+        { "start": 2.0, "end": 2.4, "word": "our" },
+        { "start": 2.4, "end": 2.8, "word": "new" },
+        { "start": 2.8, "end": 3.3, "word": "major" },
+        { "start": 3.3, "end": 3.9, "word": "growth" },
+        { "start": 3.9, "end": 4.4, "word": "driver." }
       ]
     },
     {

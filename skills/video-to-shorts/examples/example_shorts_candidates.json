@@ -1,90 +1,29 @@
 {
-  "schema_version": "shorts-candidates.v1",
-  "video": {
-    "source": "work/source.mp4",
-    "width": 1280,
-    "height": 720,
-    "fps": 60.0,
-    "duration_s": 96.0,
-    "kind": "source"
-  },
-  "transcript": {
-    "path": "work/shorts/transcript.json",
-    "timebase": "input_video_relative",
-    "source": "provided"
-  },
-  "producer": {
-    "skill": "video-to-shorts",
-    "created_at": "2026-07-07T00:00:00Z",
-    "llm_provider": "openai_compatible",
-    "llm_model": "deepseek-chat"
-  },
-  "selection": {
-    "target_count": 2,
-    "target_aspect_ratio": "9:16",
-    "duration_range_s": {
-      "min": 20.0,
-      "max": 90.0
-    },
-    "content_type": "lecture",
-    "density": "high"
-  },
+  "schema_version": "shorts-candidates.v2",
+  "video": {"source": "work/source.mp4", "duration_s": 96.0},
+  "transcript": {"path": "work/shorts/transcript.json", "timebase": "input_video_relative"},
+  "selection": {"target_count": 2},
   "candidates": [
     {
       "candidate_id": "cand-001",
-      "title": "The New Growth Driver",
+      "title": "Growth Driver and Qualified Platform",
+      "scene_type": "product_demo",
       "start_time": 0.0,
-      "end_time": 34.0,
-      "duration": 34.0,
-      "score": 86,
-      "hook_sentence": "This is going to be our new major growth driver.",
-      "virality_reason": "The opening line frames the section as a major business shift and gives the viewer a clear reason to keep watching.",
-      "source_excerpt": "This is going to be our new major growth driver... Every company that works with NVIDIA on AI has already qualified this platform.",
-      "transcript_excerpt": "This is going to be our new major growth driver... Every company that works with NVIDIA on AI has already qualified this platform.",
+      "end_time": 23.5,
+      "transcript_excerpt": "This is um going to be our new major growth driver. Every company that works with NVIDIA on AI has already qualified this platform.",
+      "evidence_mode": "text_only",
+      "score_breakdown": {
+        "hook": {"score": 18, "reason": "The growth-driver promise establishes importance immediately."},
+        "completeness": {"score": 18, "reason": "The claim is followed by concrete adoption evidence."},
+        "audience_value": {"score": 17, "reason": "The platform qualification statement is understandable business evidence."},
+        "emotion_tension": {"score": 8, "reason": "The claim carries clear business stakes."},
+        "quotability": {"score": 12, "reason": "The growth-driver line can stand alone."},
+        "pace_editability": {"score": 8, "reason": "The two concise statements require no internal restructuring."}
+      },
       "warnings": [],
-      "review_status": "candidate",
-      "metadata": {
-        "review_note": "Strong opening, but may need a little context before vertical framing."
-      }
-    },
-    {
-      "candidate_id": "cand-002",
-      "title": "SQL Three Times Faster",
-      "start_time": 52.0,
-      "end_time": 74.0,
-      "duration": 22.0,
-      "score": 91,
-      "hook_sentence": "This is SQL running three times faster.",
-      "virality_reason": "A concrete performance claim is immediately understandable and can stand alone as a short technical highlight.",
-      "source_excerpt": "This is SQL running three times faster, not ten percent faster, three times faster.",
-      "transcript_excerpt": "This is SQL running three times faster, not ten percent faster, three times faster.",
-      "warnings": [],
-      "review_status": "candidate",
-      "metadata": {
-        "review_note": "Best candidate for the first short."
-      }
-    },
-    {
-      "candidate_id": "cand-003",
-      "title": "Real Time AI Decisions",
-      "start_time": 78.0,
-      "end_time": 94.0,
-      "duration": 16.0,
-      "score": 74,
-      "hook_sentence": "Real time stream processing is where AI systems start making decisions as events happen.",
-      "virality_reason": "The idea is useful, but the clip may be too short unless paired with nearby context.",
-      "source_excerpt": "Real time stream processing is where AI systems start making decisions as events happen.",
-      "transcript_excerpt": "Real time stream processing is where AI systems start making decisions as events happen.",
-      "warnings": [
-        "SHORT_DURATION"
-      ],
-      "review_status": "candidate",
-      "metadata": {
-        "review_note": "Consider extending this if the surrounding transcript supports it."
-      }
+      "filler_drop_spans": [
+        {"type": "filler", "start_time": 0.8, "end_time": 1.1, "reason": "Independent filler word.", "review_status": "approved"}
+      ]
     }
-  ],
-  "metadata": {
-    "notes": "Example only. Candidates are review artifacts, not final extraction commands."
-  }
+  ]
 }

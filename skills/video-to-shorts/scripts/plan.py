@@ -1,19 +1,26 @@
 #!/usr/bin/env python3
-"""Build a human-editable shorts plan from candidate highlights."""
+"""Build shorts_plan.v2 from validated shorts-candidates.v2 data."""
 
 import argparse
 from datetime import datetime, timezone
 from pathlib import Path
 
 from preview import write_plan_preview_html, write_plan_preview_md
-from transcript_utils import (
-    excerpt_for_range,
-    fmt_time,
-    load_json,
-    overlap_ratio,
-    transcript_duration,
-    write_json,
-)
+from transcript_utils import load_json, overlap_ratio, transcript_duration, write_json
+
+
+SCORE_DIMENSIONS = {
+    "hook": 20,
+    "completeness": 20,
+    "audience_value": 20,
+    "emotion_tension": 15,
+    "quotability": 15,
+    "pace_editability": 10,
+}
+MAX_FILLER_SPAN_S = 1.5
+MAX_FILLER_RATIO = 0.15
+MIN_KEEP_SPAN_S = 0.15
+WORD_BOUNDARY_TOLERANCE_S = 0.06
 
 
 def fail(message):
@@ -31,247 +38,297 @@ def as_bool(value):
     raise ValueError("expected true or false")
 
 
-def duration_of(candidate):
-    if isinstance(candidate.get("duration"), (int, float)):
-        return float(candidate["duration"])
-    if isinstance(candidate.get("duration_s"), (int, float)):
-        return float(candidate["duration_s"])
-    return float(candidate["end_time"]) - float(candidate["start_time"])
+def transcript_words(transcript):
+    words = []
+    for segment in transcript.get("segments") or []:
+        for word in segment.get("words") or []:
+            try:
+                start = float(word["start"])
+                end = float(word["end"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if end >= start:
+                words.append({"start": start, "end": end, "word": str(word.get("word", ""))})
+    return sorted(words, key=lambda item: (item["start"], item["end"]))
+
+
+def complement_spans(start, end, drops):
+    keep = []
+    cursor = start
+    for drop in drops:
+        if drop["start_time"] > cursor:
+            keep.append({"start_time": round(cursor, 3), "end_time": round(drop["start_time"], 3)})
+        cursor = drop["end_time"]
+    if cursor < end:
+        keep.append({"start_time": round(cursor, 3), "end_time": round(end, 3)})
+    return keep
+
+
+def rejected_span(span, reason):
+    return {"requested": span, "reason": reason}
+
+
+def normalize_filler_drop_spans(candidate, transcript):
+    requested = candidate.get("filler_drop_spans") or []
+    if not isinstance(requested, list):
+        return [], [], [rejected_span(requested, "FILLER_DROP_SPANS_NOT_ARRAY")], ["INVALID_FILLER_DROP_SPANS"]
+    candidate_start = candidate.get("start_time")
+    candidate_end = candidate.get("end_time")
+    if not isinstance(candidate_start, (int, float)) or not isinstance(candidate_end, (int, float)):
+        return requested, [], [], []
+    source_duration = candidate_end - candidate_start
+    words = transcript_words(transcript)
+    accepted = []
+    rejected = []
+    warnings = []
+    for raw in requested:
+        if not isinstance(raw, dict):
+            rejected.append(rejected_span(raw, "SPAN_NOT_OBJECT"))
+            continue
+        if raw.get("review_status", "approved") == "rejected":
+            rejected.append(rejected_span(raw, "REVIEW_STATUS_REJECTED"))
+            continue
+        if raw.get("type") != "filler":
+            rejected.append(rejected_span(raw, "TYPE_NOT_FILLER"))
+            continue
+        try:
+            requested_start = float(raw["start_time"])
+            requested_end = float(raw["end_time"])
+        except (KeyError, TypeError, ValueError):
+            rejected.append(rejected_span(raw, "INVALID_TIME_RANGE"))
+            continue
+        if requested_end <= requested_start:
+            rejected.append(rejected_span(raw, "INVALID_TIME_RANGE"))
+            continue
+        if requested_start < candidate_start or requested_end > candidate_end:
+            rejected.append(rejected_span(raw, "OUTSIDE_CANDIDATE_RANGE"))
+            continue
+        if requested_end - requested_start > MAX_FILLER_SPAN_S + 0.001:
+            rejected.append(rejected_span(raw, "SPAN_EXCEEDS_1_5_SECONDS"))
+            continue
+        overlapping_words = [word for word in words if word["start"] < requested_end and word["end"] > requested_start]
+        if not overlapping_words:
+            rejected.append(rejected_span(raw, "NO_WORD_IN_SPAN"))
+            continue
+        first_word = overlapping_words[0]
+        last_word = overlapping_words[-1]
+        if abs(requested_start - first_word["start"]) > WORD_BOUNDARY_TOLERANCE_S or abs(requested_end - last_word["end"]) > WORD_BOUNDARY_TOLERANCE_S:
+            rejected.append(rejected_span(raw, "UNSAFE_WORD_OVERLAP"))
+            continue
+        normalized = {
+            "type": "filler",
+            "start_time": round(first_word["start"], 3),
+            "end_time": round(last_word["end"], 3),
+            "reason": str(raw.get("reason") or ""),
+            "review_status": "approved",
+            "words": [word["word"] for word in overlapping_words],
+        }
+        if any(normalized["start_time"] < existing["end_time"] and normalized["end_time"] > existing["start_time"] for existing in accepted):
+            rejected.append(rejected_span(raw, "OVERLAPPING_FILLER_DROP_SPAN"))
+            continue
+        tentative = sorted(accepted + [normalized], key=lambda item: item["start_time"])
+        removed = sum(item["end_time"] - item["start_time"] for item in tentative)
+        if source_duration <= 0 or removed > source_duration * MAX_FILLER_RATIO + 0.001:
+            rejected.append(rejected_span(raw, "TOTAL_REMOVAL_RATIO_EXCEEDED"))
+            continue
+        keep = complement_spans(candidate_start, candidate_end, tentative)
+        if any(item["end_time"] - item["start_time"] < MIN_KEEP_SPAN_S for item in keep):
+            rejected.append(rejected_span(raw, "KEEP_SPAN_TOO_SHORT"))
+            continue
+        accepted = tentative
+    if rejected:
+        warnings.append("FILLER_DROP_SPANS_REJECTED")
+    return requested, accepted, rejected, warnings
+
+
+def normalize_candidate(item, index, transcript):
+    if not isinstance(item, dict):
+        return {"source_candidate_index": index, "candidate_id": f"candidate-{index}", "normalization_errors": ["CANDIDATE_NOT_OBJECT"]}
+    candidate = dict(item)
+    candidate["source_candidate_index"] = index
+    candidate["candidate_id"] = str(item.get("candidate_id") or f"candidate-{index}")
+    candidate["normalization_errors"] = []
+    for field in ("start_time", "end_time", "duration", "score"):
+        value = item.get(field)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            candidate["normalization_errors"].append(f"INVALID_{field.upper()}")
+        else:
+            candidate[field] = value
+    candidate["title"] = str(item.get("title") or "")
+    candidate["scene_type"] = str(item.get("scene_type") or "")
+    candidate["evidence_mode"] = str(item.get("evidence_mode") or "")
+    candidate["transcript_excerpt"] = str(item.get("transcript_excerpt") or "").strip()
+    candidate["hook_sentence"] = str(item.get("hook_sentence") or "")
+    candidate["editorial_reason"] = str(item.get("editorial_reason") or "")
+    requested, normalized, rejected, filler_warnings = normalize_filler_drop_spans(candidate, transcript)
+    candidate["requested_filler_drop_spans"] = requested
+    candidate["filler_drop_spans"] = normalized
+    candidate["rejected_filler_drop_spans"] = rejected
+    candidate["filler_warnings"] = filler_warnings
+    if isinstance(candidate.get("start_time"), (int, float)) and isinstance(candidate.get("end_time"), (int, float)):
+        candidate["keep_spans"] = complement_spans(candidate["start_time"], candidate["end_time"], normalized)
+        candidate["source_duration"] = round(candidate["end_time"] - candidate["start_time"], 3)
+        candidate["filler_removed_duration"] = round(sum(span["end_time"] - span["start_time"] for span in normalized), 3)
+        candidate["estimated_output_duration"] = round(candidate["source_duration"] - candidate["filler_removed_duration"], 3)
+    candidate["score_breakdown"] = item.get("score_breakdown")
+    return candidate
 
 
 def validation_for(candidate, transcript_duration_s, args):
-    errors = []
-    warnings = []
-    start = candidate["start_time"]
-    end = candidate["end_time"]
-    duration = candidate["duration"]
-    if end <= start:
-        errors.append("END_NOT_AFTER_START")
-    if start < 0 or end > transcript_duration_s:
-        errors.append("TIME_OUT_OF_RANGE")
-    if duration < args.min_duration:
-        errors.append("SHORT_DURATION")
-    if duration > args.max_duration:
-        errors.append("LONG_DURATION")
-    if candidate["score"] < args.min_score:
-        errors.append("LOW_SCORE")
+    errors = list(candidate.get("normalization_errors") or [])
+    warnings = list(candidate.get("warnings") or []) + list(candidate.get("filler_warnings") or [])
+    breakdown = candidate.get("score_breakdown")
+    if not isinstance(breakdown, dict) or set(breakdown) != set(SCORE_DIMENSIONS):
+        errors.append("INVALID_SCORE_BREAKDOWN")
+    else:
+        completeness = breakdown.get("completeness")
+        if not isinstance(completeness, dict) or isinstance(completeness.get("score"), bool) or not isinstance(completeness.get("score"), (int, float)):
+            errors.append("INVALID_COMPLETENESS")
+        elif completeness["score"] < args.min_completeness:
+            errors.append("LOW_COMPLETENESS")
+    if not errors:
+        start = candidate["start_time"]
+        end = candidate["end_time"]
+        duration = candidate["duration"]
+        estimated_output_duration = candidate.get("estimated_output_duration", duration)
+        if start < 0 or end <= start:
+            errors.append("INVALID_TIME_RANGE")
+        if end > transcript_duration_s:
+            errors.append("TIME_OUT_OF_RANGE")
+        if abs(duration - (end - start)) > 0.01:
+            errors.append("DURATION_MISMATCH")
+        if estimated_output_duration < args.min_duration:
+            errors.append("SHORT_DURATION")
+        if estimated_output_duration > args.max_duration:
+            errors.append("LONG_DURATION")
+        if candidate["score"] < args.min_score:
+            errors.append("LOW_SCORE")
     if not candidate.get("transcript_excerpt"):
         errors.append("EMPTY_EXCERPT")
-    return {
-        "passed": not errors,
-        "errors": errors,
-        "warnings": warnings,
-    }
-
-
-def normalize_candidates(candidates_data, transcript):
-    raw = candidates_data.get("candidates")
-    if not isinstance(raw, list):
-        fail("shorts_candidates.json must contain a candidates array")
-    duration = transcript_duration(transcript)
-    normalized = []
-    for index, item in enumerate(raw, start=1):
-        try:
-            start = float(item.get("start_time"))
-            end = float(item.get("end_time"))
-        except (TypeError, ValueError):
-            continue
-        cand_duration = round(end - start, 3)
-        excerpt = str(item.get("transcript_excerpt") or "").strip()
-        if not excerpt:
-            excerpt = excerpt_for_range(transcript, start, end, max_chars=520)
-        normalized.append({
-            "source_candidate_index": index,
-            "candidate_id": str(item.get("candidate_id") or f"cand-{index:03d}"),
-            "title": str(item.get("title") or f"Candidate {index}").strip(),
-            "start_time": round(start, 3),
-            "end_time": round(end, 3),
-            "duration": cand_duration,
-            "score": int(float(item.get("score", 0))),
-            "hook_sentence": str(item.get("hook_sentence") or "").strip(),
-            "virality_reason": str(item.get("virality_reason") or "").strip(),
-            "transcript_excerpt": excerpt,
-            "candidate_warnings": list(item.get("warnings") or []),
-        })
-    return normalized, duration
+    return {"passed": not errors, "errors": errors, "warnings": warnings}
 
 
 def select_candidates(candidates, transcript_duration_s, args):
-    ordered = sorted(candidates, key=lambda c: c["score"], reverse=True)
+    evaluated = []
+    for candidate in candidates:
+        evaluated.append((candidate, validation_for(candidate, transcript_duration_s, args)))
+    eligible = sorted((item for item in evaluated if item[1]["passed"]), key=lambda item: item[0]["score"], reverse=True)
     selected = []
-    rejected = []
-    for cand in ordered:
-        validation = validation_for(cand, transcript_duration_s, args)
-        if not validation["passed"]:
-            rejected.append((cand, validation, "validation_failed"))
+    rejected = [(candidate, validation) for candidate, validation in evaluated if not validation["passed"]]
+    for candidate, validation in eligible:
+        if not args.allow_overlap and any(overlap_ratio(candidate, kept) > 0.5 for kept, _ in selected):
+            rejected.append((candidate, {"passed": False, "errors": ["OVERLAPS_HIGHER_SCORE"], "warnings": validation["warnings"]}))
             continue
-        if not args.allow_overlap:
-            overlapping = [other for other in selected if overlap_ratio(cand, other) > 0.5]
-            if overlapping:
-                validation = dict(validation)
-                validation["passed"] = False
-                validation["errors"] = ["OVERLAPS_SELECTED"]
-                rejected.append((cand, validation, "overlap"))
-                continue
-        selected.append(cand)
         if len(selected) >= args.max_shorts:
-            break
+            rejected.append((candidate, {"passed": False, "errors": ["MAX_SHORTS_REACHED"], "warnings": validation["warnings"]}))
+            continue
+        selected.append((candidate, validation))
     return selected, rejected
 
 
-def build_plan(selected, candidates_data, transcript_data, transcript_path, args):
-    shorts = []
-    for order, cand in enumerate(selected, start=1):
-        short_id = f"short_{order:02d}"
-        validation = validation_for(cand, transcript_duration(transcript_data), args)
-        shorts.append({
-            "id": short_id,
-            "short_id": short_id,
-            "candidate_id": cand["candidate_id"],
-            "source_candidate_index": cand["source_candidate_index"],
-            "order": order,
-            "title": cand["title"],
-            "start_time": cand["start_time"],
-            "end_time": cand["end_time"],
-            "duration": cand["duration"],
-            "duration_s": cand["duration"],
-            "score": cand["score"],
-            "hook_sentence": cand["hook_sentence"],
-            "virality_reason": cand["virality_reason"],
-            "reason": cand["virality_reason"],
-            "transcript_excerpt": cand["transcript_excerpt"],
-            "validation": validation,
-            "outputs": {
-                "directory": f"work/shorts/{short_id}",
-                "source_video": f"work/shorts/{short_id}/source.mp4",
-                "transcript": f"work/shorts/{short_id}/transcript.json",
-                "vertical_reframe_dir": f"work/shorts/{short_id}/vertical-reframe",
-            },
-            "status": "planned",
-            "metadata": {
-                "candidate_warnings": cand.get("candidate_warnings", []),
-            },
-        })
-
+def output_paths(short_id):
+    directory = f"work/shorts/{short_id}"
     return {
-        "schema_version": "shorts-plan.v1",
-        "video": candidates_data.get("video", {
-            "source": "",
-            "duration_s": transcript_duration(transcript_data),
-        }),
-        "transcript": candidates_data.get("transcript", {
-            "path": str(transcript_path),
-            "timebase": "input_video_relative",
-            "source": "provided",
-        }),
-        "producer": {
-            "skill": "video-to-shorts",
-            "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-            "planner": "score-duration-overlap-filter",
-        },
-        "source_candidates": {
-            "path": "work/shorts/shorts_candidates.json",
-            "schema_version": "shorts-candidates.v1",
-        },
-        "target": {
-            "aspect_ratio": "9:16",
-            "downstream_reframe_skill": "video-vertical-reframe",
-        },
-        "shorts": shorts,
-        "metadata": {
-            "selection": {
-                "max_shorts": args.max_shorts,
-                "min_duration": args.min_duration,
-                "max_duration": args.max_duration,
-                "min_score": args.min_score,
-                "allow_overlap": args.allow_overlap,
-            },
-            "notes": "Generated from shorts_candidates.json for human confirmation/editing. No video cutting was performed.",
-        },
+        "directory": directory,
+        "source_video": f"{directory}/source.mp4",
+        "transcript": f"{directory}/transcript.json",
+        "extraction_report": f"{directory}/extraction_report.json",
     }
 
 
-def validate_plan(plan):
-    required = ["schema_version", "video", "transcript", "producer", "target", "shorts"]
-    missing = [key for key in required if key not in plan]
-    if missing:
-        fail("shorts_plan.json missing required fields: " + ", ".join(missing))
-    if plan["schema_version"] != "shorts-plan.v1":
-        fail("shorts_plan.json schema_version must be shorts-plan.v1")
-    if not plan["shorts"]:
-        fail("shorts_plan.json contains no shorts")
-    for item in plan["shorts"]:
-        for key in [
-            "id",
-            "title",
-            "start_time",
-            "end_time",
-            "duration",
-            "hook_sentence",
-            "virality_reason",
-            "transcript_excerpt",
-            "source_candidate_index",
-        ]:
-            if key not in item:
-                fail(f"short item missing {key}: {item.get('id') or item.get('short_id')}")
-        if item["end_time"] <= item["start_time"]:
-            fail(f"short item has invalid time range: {item['id']}")
-        if round(item["end_time"] - item["start_time"], 3) != round(item["duration"], 3):
-            fail(f"short item duration does not match time range: {item['id']}")
+def build_plan(selected, rejected, candidates_path, candidates_data, transcript_path):
+    shorts = []
+    for order, (candidate, validation) in enumerate(selected, 1):
+        short_id = f"short_{order:02d}"
+        shorts.append({
+            "id": short_id,
+            "short_id": short_id,
+            "candidate_id": candidate["candidate_id"],
+            "source_candidate_index": candidate["source_candidate_index"],
+            "order": order,
+            "title": candidate["title"],
+            "scene_type": candidate["scene_type"],
+            "evidence_mode": candidate["evidence_mode"],
+            "start_time": candidate["start_time"],
+            "end_time": candidate["end_time"],
+            "duration": candidate["duration"],
+            "score_breakdown": candidate["score_breakdown"],
+            "score": candidate["score"],
+            "hook_sentence": candidate["hook_sentence"],
+            "editorial_reason": candidate["editorial_reason"],
+            "transcript_excerpt": candidate["transcript_excerpt"],
+            "requested_filler_drop_spans": candidate["requested_filler_drop_spans"],
+            "filler_drop_spans": candidate["filler_drop_spans"],
+            "rejected_filler_drop_spans": candidate["rejected_filler_drop_spans"],
+            "keep_spans": candidate["keep_spans"],
+            "source_duration": candidate["source_duration"],
+            "filler_removed_duration": candidate["filler_removed_duration"],
+            "estimated_output_duration": candidate["estimated_output_duration"],
+            "validation": validation,
+            "outputs": output_paths(short_id),
+            "status": "planned",
+        })
+    rejected_items = [{
+        "candidate_id": candidate["candidate_id"],
+        "source_candidate_index": candidate["source_candidate_index"],
+        "title": candidate.get("title", ""),
+        "score": candidate.get("score"),
+        "validation": validation,
+    } for candidate, validation in sorted(rejected, key=lambda item: item[0]["source_candidate_index"])]
+    return {
+        "schema_version": "shorts-plan.v2",
+        "producer": {"skill": "video-to-shorts", "planner": "deterministic", "created_at": datetime.now(timezone.utc).isoformat()},
+        "source_candidates": {"path": str(candidates_path), "schema_version": candidates_data.get("schema_version")},
+        "transcript": {"path": str(transcript_path), "timebase": "input_video_relative"},
+        "shorts": shorts,
+        "rejected_candidates": rejected_items,
+        "metadata": {"notes": "Approved filler_drop_spans were normalized to transcript word boundaries and converted to keep_spans. Media extraction has not yet been performed."},
+    }
 
 
 def run_plan(args):
-    args.allow_overlap = as_bool(args.allow_overlap)
     out_dir = Path(args.out).resolve()
-    candidates_path = out_dir / "shorts_candidates.json"
-    transcript_path = out_dir / "transcript.json"
+    candidates_path = Path(args.candidates).resolve() if args.candidates else out_dir / "shorts_candidates.json"
+    transcript_path = Path(args.transcript).resolve() if args.transcript else out_dir / "transcript.json"
     if not candidates_path.exists():
         fail(f"shorts_candidates.json not found: {candidates_path}")
     if not transcript_path.exists():
         fail(f"transcript.json not found: {transcript_path}")
     candidates_data = load_json(candidates_path)
+    if candidates_data.get("schema_version") != "shorts-candidates.v2":
+        fail("plan.py requires shorts-candidates.v2")
+    raw_candidates = candidates_data.get("candidates")
+    if not isinstance(raw_candidates, list):
+        fail("shorts_candidates.json must contain a candidates array")
     transcript_data = load_json(transcript_path)
-    candidates, transcript_duration_s = normalize_candidates(candidates_data, transcript_data)
-    selected, rejected = select_candidates(candidates, transcript_duration_s, args)
-    if not selected:
-        fail("No candidates passed plan filters. Lower --min-score or adjust duration limits.")
-    plan = build_plan(selected, candidates_data, transcript_data, transcript_path, args)
-    plan["metadata"]["rejected_count"] = len(rejected)
-    validate_plan(plan)
-
-    plan_path = out_dir / "shorts_plan.json"
-    preview_md = out_dir / "shorts_plan_preview.md"
-    preview_html = out_dir / "shorts_plan_preview.html"
-    write_json(plan_path, plan)
-    write_plan_preview_md(preview_md, plan)
-    write_plan_preview_html(preview_html, plan)
-    print(f"[video-to-shorts] plan: {plan_path}")
-    print(f"[video-to-shorts] preview md: {preview_md}")
-    print(f"[video-to-shorts] preview html: {preview_html}")
+    candidates = [normalize_candidate(item, index, transcript_data) for index, item in enumerate(raw_candidates, 1)]
+    selected, rejected = select_candidates(candidates, transcript_duration(transcript_data), args)
+    plan = build_plan(selected, rejected, candidates_path, candidates_data, transcript_path)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    write_json(out_dir / "shorts_plan.json", plan)
+    write_plan_preview_md(out_dir / "shorts_plan_preview.md", plan)
+    write_plan_preview_html(out_dir / "shorts_plan_preview.html", plan)
+    print(f"[video-to-shorts] plan: {out_dir / 'shorts_plan.json'}")
     print(f"[video-to-shorts] selected: {len(selected)}")
     print(f"[video-to-shorts] rejected: {len(rejected)}")
 
 
 def build_parser():
-    parser = argparse.ArgumentParser(
-        description="Generate shorts_plan.json from reviewed shorts_candidates.json."
-    )
-    parser.add_argument("--out", required=True, help="Output work/shorts directory.")
-    parser.add_argument("--max-shorts", type=int, default=5, help="Maximum shorts to select.")
-    parser.add_argument("--min-duration", type=float, default=20.0, help="Minimum short duration in seconds.")
-    parser.add_argument("--max-duration", type=float, default=90.0, help="Maximum short duration in seconds.")
-    parser.add_argument("--min-score", type=int, default=70, help="Minimum candidate score.")
-    parser.add_argument(
-        "--allow-overlap",
-        default="false",
-        help="Allow obvious overlap between selected shorts: true or false.",
-    )
+    parser = argparse.ArgumentParser(description="Build shorts-plan.v2 from validated shorts-candidates.v2.")
+    parser.add_argument("--out", required=True)
+    parser.add_argument("--candidates")
+    parser.add_argument("--transcript")
+    parser.add_argument("--max-shorts", type=int, default=5)
+    parser.add_argument("--min-duration", type=float, default=20.0)
+    parser.add_argument("--max-duration", type=float, default=90.0)
+    parser.add_argument("--min-score", type=float, default=70.0)
+    parser.add_argument("--min-completeness", type=float, default=15.0)
+    parser.add_argument("--allow-overlap", type=as_bool, default=False)
     return parser
 
 
 def main(argv=None):
-    args = build_parser().parse_args(argv)
-    run_plan(args)
+    run_plan(build_parser().parse_args(argv))
 
 
 if __name__ == "__main__":
