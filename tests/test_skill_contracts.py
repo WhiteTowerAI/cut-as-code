@@ -60,6 +60,9 @@ class SkillContractTests(unittest.TestCase):
             "gallery-animated.html",
             "present + stop",
             "brief",
+            "scripts/build_review_page.py",
+            "scripts/apply_cards_review.py",
+            "content-cards-review.json",
         ):
             self.assertIn(required, skill)
 

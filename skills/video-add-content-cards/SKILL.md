@@ -25,6 +25,8 @@ work/cache/content-cards-overlay.mov        # transparent render contribution
 review/03-content-cards/card-stills/        # one useful still per card
 review/03-content-cards/content-cards-preview.mp4  # optional short cue windows
 review/03-content-cards/content-cards-summary.md
+review/03-content-cards/content-cards-review.html  # local candidate review board
+review/03-content-cards/content-cards-review.json  # exported human choices
 ```
 
 Keep the plan outside `cache/`. The HTML, overlay, and preview renders are reproducible.
@@ -107,11 +109,40 @@ Use these mappings as a starting point:
 
 `repetition`, `tangent`, and `risk` are editorial evidence, not automatic cards.
 
-Present the candidate IDs, program times, evidence summaries, and suggested copy. Aim for the
-brief's target card count, but keep a stronger or sparser set when the evidence warrants it.
-Wait for the user to choose the candidate IDs before authoring HTML.
+Keep all evidence-backed candidates at this stage. Aim for the brief's target card count, but
+allow a stronger or sparser set when the evidence warrants it.
 
-### 4. Author one HyperFrames composition
+### 4. Review and apply candidate choices
+
+Generate a project-specific browser review after the candidate plan exists:
+
+```powershell
+python skills/video-add-content-cards/scripts/build_review_page.py `
+  work/content-cards/cards-plan.json `
+  review/03-content-cards/content-cards-review.html `
+  --open
+```
+
+The page shows card IDs, program times, evidence references, draft copy, and placement. The
+user selects cards, edits copy, chooses placement, and downloads
+`content-cards-review.json`. Put that export at
+`review/03-content-cards/content-cards-review.json`.
+
+**Present + STOP.** Wait for the exported review. Do not author HTML from unchecked draft
+candidates. Apply the review only after the file exists:
+
+```powershell
+python skills/video-add-content-cards/scripts/apply_cards_review.py `
+  work/content-cards/cards-plan.json `
+  review/03-content-cards/content-cards-review.json
+```
+
+The apply step rejects unknown, duplicate, or missing card IDs, blank selected copy, and
+invalid placement without changing the plan. On success it keeps selected cards and marks
+their copy, placement, visual treatment, and top-level review `approved`. Read the resulting
+selected count against the brief target before continuing.
+
+### 5. Author one HyperFrames composition
 
 Use one `index.html` and a paused GSAP timeline. Each approved card becomes one `.clip` keyed by the plan's `program_start_s` and `duration_s`. Keep motion seek-safe and derive timing from data attributes rather than wall-clock timers.
 
@@ -132,7 +163,7 @@ npx hyperframes lint
 npx hyperframes validate
 ```
 
-### 5. Review small artifacts
+### 6. Review small artifacts
 
 Capture a still near the middle of every cue. Render short motion windows only for timing or transition decisions. Do not render a full preview by default.
 
@@ -148,7 +179,7 @@ Check:
 **Present + STOP.** Show the card stills and any short motion windows, name the card IDs, and
 wait for approval. Do not render the full overlay while copy, placement, or timing is disputed.
 
-### 6. Render the transparent contribution
+### 7. Render the transparent contribution
 
 ```powershell
 npx hyperframes render --format mov -o work/cache/content-cards-overlay.mov

@@ -1,3 +1,4 @@
+import copy
 import inspect
 import json
 import re
@@ -16,6 +17,7 @@ EXAMPLES = ROOT / "skills/video-add-content-cards/examples"
 OPENER_PATH = ROOT / "skills/video-add-content-cards/scripts/open_gallery.py"
 BUILDER_PATH = ROOT / "skills/video-add-content-cards/scripts/build_cards_plan.py"
 REVIEW_PAGE_PATH = ROOT / "skills/video-add-content-cards/scripts/build_review_page.py"
+APPLY_REVIEW_PATH = ROOT / "skills/video-add-content-cards/scripts/apply_cards_review.py"
 
 
 def plan_fixture(copy="200 customers"):
@@ -36,6 +38,32 @@ def plan_fixture(copy="200 customers"):
                 "visual_treatment": {"status": "draft"},
                 "renderer": {},
             }
+        ],
+    }
+
+
+def two_card_plan_fixture():
+    plan = copy.deepcopy(plan_fixture())
+    second = copy.deepcopy(plan["cards"][0])
+    second["id"] = "card-002"
+    second["evidence_ref"] = "moment-002"
+    second["copy"]["suggested_text"] = "A second idea"
+    plan["cards"].append(second)
+    return plan
+
+
+def review_fixture(plan=None, selected_ids=("card-001",)):
+    plan = plan or two_card_plan_fixture()
+    return {
+        "schema_version": 1,
+        "cards": [
+            {
+                "id": card["id"],
+                "selected": card["id"] in selected_ids,
+                "copy": f"Approved {card['id']}",
+                "placement": "top" if card["id"] in selected_ids else "",
+            }
+            for card in plan["cards"]
         ],
     }
 
@@ -216,6 +244,77 @@ class ReviewPageTests(unittest.TestCase):
         self.assertIn(".header-inner, .toolbar {", document)
         self.assertIn("flex-direction: column", document)
         self.assertIn(".toolbar button { width: 100%; }", document)
+
+
+class ApplyReviewTests(unittest.TestCase):
+    def load_apply_review(self):
+        self.assertTrue(APPLY_REVIEW_PATH.is_file(), APPLY_REVIEW_PATH)
+        return load_script(
+            "skills/video-add-content-cards/scripts/apply_cards_review.py",
+            "apply_cards_review",
+        )
+
+    def test_review_keeps_selected_cards_and_approves_fields(self):
+        apply_review = self.load_apply_review()
+        updated = apply_review.apply_review(two_card_plan_fixture(), review_fixture())
+        self.assertEqual(["card-001"], [card["id"] for card in updated["cards"]])
+        card = updated["cards"][0]
+        self.assertEqual("approved", card["copy"]["status"])
+        self.assertEqual("Approved card-001", card["copy"]["text"])
+        self.assertEqual("approved", card["placement"]["status"])
+        self.assertEqual("top", card["placement"]["region"])
+        self.assertEqual("approved", card["visual_treatment"]["status"])
+        self.assertEqual("editorial", card["visual_treatment"]["theme"])
+        self.assertEqual("approved", updated["review"]["status"])
+        self.assertEqual(["card-001"], updated["review"]["selected_card_ids"])
+
+    def test_review_rejects_unknown_duplicate_missing_and_invalid_choices(self):
+        apply_review = self.load_apply_review()
+        plan = two_card_plan_fixture()
+        valid = review_fixture(plan)
+
+        unknown = copy.deepcopy(valid)
+        unknown["cards"].append(
+            {"id": "card-999", "selected": False, "copy": "", "placement": ""}
+        )
+        duplicate = copy.deepcopy(valid)
+        duplicate["cards"].append(copy.deepcopy(duplicate["cards"][0]))
+        missing = copy.deepcopy(valid)
+        missing["cards"].pop()
+        invalid_placement = copy.deepcopy(valid)
+        invalid_placement["cards"][0]["placement"] = "diagonal"
+        blank_copy = copy.deepcopy(valid)
+        blank_copy["cards"][0]["copy"] = "   "
+
+        for review in (unknown, duplicate, missing, invalid_placement, blank_copy):
+            with self.subTest(review=review), self.assertRaises(ValueError):
+                apply_review.apply_review(plan, review)
+
+    def test_cli_validates_then_writes_requested_output(self):
+        self.assertTrue(APPLY_REVIEW_PATH.is_file(), APPLY_REVIEW_PATH)
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            plan_path = tmp / "cards-plan.json"
+            review_path = tmp / "content-cards-review.json"
+            output = tmp / "approved-plan.json"
+            plan_path.write_text(json.dumps(plan_fixture()), encoding="utf-8")
+            review_path.write_text(
+                json.dumps(review_fixture(plan_fixture())), encoding="utf-8"
+            )
+            subprocess.run(
+                [
+                    "python",
+                    str(APPLY_REVIEW_PATH),
+                    str(plan_path),
+                    str(review_path),
+                    str(output),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            approved = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual("approved", approved["review"]["status"])
 
 
 if __name__ == "__main__":
