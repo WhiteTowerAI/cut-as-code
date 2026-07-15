@@ -38,16 +38,20 @@ const THEMES = [
 
 const HEAD = (title) => `<!doctype html>
 <html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title}</title>
 <style>
   /* --scale is UNITLESS (CSS scale() rejects lengths); cell width derives from it. */
   :root { --scale: 0.1771; --cw: calc(1920px * var(--scale)); }
   body { margin: 0; background: #1a1a1e; color: #e8e8ea;
          font: 14px/1.4 system-ui, sans-serif; }
-  h1 { font-size: 18px; font-weight: 600; padding: 20px 24px 4px; margin: 0; }
-  p.sub { padding: 0 24px 16px; margin: 0; color: #9a9aa2; }
+  h1 { font-size: 18px; font-weight: 600; padding: 20px 24px 4px; margin: 0;
+       overflow-wrap: anywhere; }
+  p.sub { padding: 0 24px 16px; margin: 0; color: #9a9aa2; overflow-wrap: anywhere; }
+  h1, p.sub { width: 100vw; max-width: 100vw; box-sizing: border-box; }
   .theme-picker { position: sticky; top: 0; z-index: 6; display: flex; gap: 16px;
                   align-items: center; min-height: 52px; box-sizing: border-box;
+                  min-width: 0; width: 100vw; max-width: 100vw;
                   margin: 0; padding: 8px 24px; border: 0; border-bottom: 1px solid #3a3a42;
                   background: #202027; }
   .theme-picker legend { padding: 0 12px 0 0; font-weight: 600; }
@@ -74,12 +78,12 @@ const HEAD = (title) => `<!doctype html>
   .frame iframe { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px;
                   transform-origin: top left; transform: scale(var(--scale));
                   border: 0; }
-  body:not([data-theme="all"]) { --scale: 0.42; --cw: calc(1920px * var(--scale)); }
+  body:not([data-theme="all"]) { --scale: 0.42; --cw: calc(1920px * var(--scale)); overflow-x: hidden; }
   body:not([data-theme="all"]) [data-theme] { display: none; }
   ${THEMES.map(([name]) => `body[data-theme="${name}"] [data-theme="${name}"] { display: table-cell; }`).join("\n  ")}
   @media (max-width: 900px) {
     :root { --scale: 0.12; }
-    body:not([data-theme="all"]) { --scale: 0.28; }
+    body:not([data-theme="all"]) { --scale: 0.11; }
     .theme-picker { position: static; flex-wrap: wrap; gap: 10px 14px; }
     thead th { top: 0; }
   }

@@ -100,6 +100,23 @@ class GalleryTests(unittest.TestCase):
         self.assertIn("--scale: 0.42", focused_rule.group(1))
         self.assertIn("--cw: calc(1920px * var(--scale))", focused_rule.group(1))
 
+    def test_focused_theme_fits_a_narrow_screen(self):
+        self.assertIn(
+            '<meta name="viewport" content="width=device-width, initial-scale=1">',
+            self.document,
+        )
+        self.assertIn(
+            'body:not([data-theme="all"]) { --scale: 0.11; }', self.document
+        )
+
+    def test_focused_gallery_prevents_page_level_horizontal_scroll(self):
+        focused_rule = re.search(
+            r'body:not\(\[data-theme="all"\]\) \{([^}]+)\}', self.document
+        )
+        self.assertIsNotNone(focused_rule)
+        self.assertIn("overflow-x: hidden", focused_rule.group(1))
+        self.assertIn("width: 100vw; max-width: 100vw", self.document)
+
 
 class GalleryOpenerTests(unittest.TestCase):
     def load_opener(self):
