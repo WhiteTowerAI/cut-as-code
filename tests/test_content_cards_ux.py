@@ -1,15 +1,20 @@
+import inspect
+import json
 import re
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
 
-from tests.protocol_testlib import load_script
+from tests.protocol_testlib import load_script, timeline_fixture
+from tests.test_cards_plan import understanding_fixture
 
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES = ROOT / "skills/video-add-content-cards/examples"
 OPENER_PATH = ROOT / "skills/video-add-content-cards/scripts/open_gallery.py"
+BUILDER_PATH = ROOT / "skills/video-add-content-cards/scripts/build_cards_plan.py"
 
 
 class GalleryTests(unittest.TestCase):
@@ -63,6 +68,85 @@ class GalleryOpenerTests(unittest.TestCase):
         with mock.patch.object(opener.webbrowser, "open", return_value=True) as browser:
             uri = opener.open_gallery()
         browser.assert_called_once_with(uri)
+
+
+class BriefTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.builder = load_script(
+            "skills/video-add-content-cards/scripts/build_cards_plan.py", "build_cards_plan_ux"
+        )
+
+    @staticmethod
+    def brief():
+        return {
+            "purpose": "emphasize",
+            "audience": "existing customers",
+            "target_card_count": 3,
+            "theme": "editorial",
+            "must_include_types": ["stat"],
+            "avoid_regions": ["bottom"],
+            "notes": "Keep product names verbatim",
+        }
+
+    def test_guided_brief_is_persisted(self):
+        self.assertIn("brief", inspect.signature(self.builder.build_plan).parameters)
+        plan = self.builder.build_plan(
+            understanding_fixture(), timeline_fixture(), self.brief()
+        )
+        self.assertEqual(self.brief(), plan["brief"])
+
+    def test_invalid_brief_is_rejected(self):
+        self.assertTrue(hasattr(self.builder, "validate_brief"))
+        invalid_briefs = (
+            {"target_card_count": 0},
+            {"theme": "unknown"},
+            {"must_include_types": ["chart"]},
+            {"must_include_types": [{}]},
+            {"avoid_regions": ["diagonal"]},
+            {"unexpected": True},
+        )
+        for brief in invalid_briefs:
+            with self.subTest(brief=brief), self.assertRaises(ValueError):
+                self.builder.validate_brief(brief)
+
+    def test_cli_flags_write_brief(self):
+        self.assertIn("--purpose", BUILDER_PATH.read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            understanding = tmp / "understanding.json"
+            timeline = tmp / "timeline.json"
+            output = tmp / "cards-plan.json"
+            understanding.write_text(json.dumps(understanding_fixture()), encoding="utf-8")
+            timeline.write_text(json.dumps(timeline_fixture()), encoding="utf-8")
+            subprocess.run(
+                [
+                    "python",
+                    str(BUILDER_PATH),
+                    str(understanding),
+                    str(timeline),
+                    str(output),
+                    "--purpose",
+                    "emphasize",
+                    "--audience",
+                    "existing customers",
+                    "--target-card-count",
+                    "3",
+                    "--theme",
+                    "editorial",
+                    "--must-include-type",
+                    "stat",
+                    "--avoid-region",
+                    "bottom",
+                    "--notes",
+                    "Keep product names verbatim",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            plan = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(self.brief(), plan["brief"])
 
 
 if __name__ == "__main__":
