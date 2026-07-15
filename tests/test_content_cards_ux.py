@@ -2,10 +2,14 @@ import re
 import subprocess
 import unittest
 from pathlib import Path
+from unittest import mock
+
+from tests.protocol_testlib import load_script
 
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES = ROOT / "skills/video-add-content-cards/examples"
+OPENER_PATH = ROOT / "skills/video-add-content-cards/scripts/open_gallery.py"
 
 
 class GalleryTests(unittest.TestCase):
@@ -39,6 +43,26 @@ class GalleryTests(unittest.TestCase):
         self.assertIsNotNone(focused_rule)
         self.assertIn("--scale: 0.42", focused_rule.group(1))
         self.assertIn("--cw: calc(1920px * var(--scale))", focused_rule.group(1))
+
+
+class GalleryOpenerTests(unittest.TestCase):
+    def load_opener(self):
+        self.assertTrue(OPENER_PATH.is_file(), OPENER_PATH)
+        return load_script(
+            "skills/video-add-content-cards/scripts/open_gallery.py", "open_gallery"
+        )
+
+    def test_resolves_committed_animated_gallery(self):
+        opener = self.load_opener()
+        uri = opener.open_gallery(launch=False)
+        self.assertTrue(uri.startswith("file:"))
+        self.assertTrue(opener.gallery_path().is_file())
+
+    def test_launch_uses_default_browser(self):
+        opener = self.load_opener()
+        with mock.patch.object(opener.webbrowser, "open", return_value=True) as browser:
+            uri = opener.open_gallery()
+        browser.assert_called_once_with(uri)
 
 
 if __name__ == "__main__":
