@@ -31,18 +31,67 @@ Keep the plan outside `cache/`. The HTML, overlay, and preview renders are repro
 
 ## Workflow
 
-### 1. Draft cards from shared understanding
+### 1. Interview before drafting
+
+Read `understanding.json` and the active timeline first. Count eligible graphic moments and
+recommend a target card count:
+
+```text
+min(eligible moments, max(1, round(program minutes / 0.75)))
+```
+
+This is a target, not an automatic truncation rule. Ask one question at a time and give the
+recommendation as the default:
+
+1. What should the cards help this audience do: explain, emphasize, navigate, or convert?
+2. What target card count should this edit use?
+3. Are any `intro`, `key-quote`, `stat`, `list`, or `outro` cards required?
+4. Will captions be present, and which of `top`, `bottom`, `left`, `right`, or `center` must
+   remain clear?
+
+Immediately before asking about theme, open the real animated examples:
+
+```powershell
+python skills/video-add-content-cards/scripts/open_gallery.py
+```
+
+This opens `examples/gallery-animated.html`. If the browser cannot launch, the command prints
+the file URI for the user to open. Ask the user to compare all five themes or focus a column
+with the native picker:
+
+| Theme | Starting character |
+|---|---|
+| `almanac` | warm cream, serif, considered |
+| `teal` | dark broadcast, cyan accent |
+| `editorial` | documentary, ink and amber |
+| `dotgrid` | pixel-mono, technical |
+| `apex` | high-energy sports, red accent |
+
+**Present + STOP.** Wait for one theme choice. Then summarize the purpose, audience, target
+count, required types, clear regions, theme, and notes; ask for confirmation. If the user
+cancels, retain analysis, leave the operation `draft`, and do not author or render cards.
+
+### 2. Draft cards from shared understanding
 
 ```powershell
 python skills/video-add-content-cards/scripts/build_cards_plan.py `
   work/understand/understanding.json `
   work/timeline.json `
-  work/content-cards/cards-plan.json
+  work/content-cards/cards-plan.json `
+  --purpose "emphasize" `
+  --audience "existing customers" `
+  --target-card-count 6 `
+  --theme editorial `
+  --must-include-type stat `
+  --avoid-region bottom `
+  --notes "Keep product names verbatim"
 ```
 
 The script maps kept semantic moments into program time and omits moments removed by rough cut. It preserves source ranges and evidence references, clamps duration to the containing clip, and marks copy/placement/visual treatment as `draft`.
+The confirmed interview is stored as `brief` in `cards-plan.json`. Repeat
+`--must-include-type` or `--avoid-region` for multiple values; omit flags that do not apply.
 
-### 2. Make editorial choices
+### 3. Make editorial choices
 
 Read the evidence at each card time. Correct ASR names and numbers, prune weak candidates, write concise copy, choose placement that clears faces and captions, and approve the visual treatment. Never treat analyzer text as final copy.
 
@@ -58,7 +107,11 @@ Use these mappings as a starting point:
 
 `repetition`, `tangent`, and `risk` are editorial evidence, not automatic cards.
 
-### 3. Author one HyperFrames composition
+Present the candidate IDs, program times, evidence summaries, and suggested copy. Aim for the
+brief's target card count, but keep a stronger or sparser set when the evidence warrants it.
+Wait for the user to choose the candidate IDs before authoring HTML.
+
+### 4. Author one HyperFrames composition
 
 Use one `index.html` and a paused GSAP timeline. Each approved card becomes one `.clip` keyed by the plan's `program_start_s` and `duration_s`. Keep motion seek-safe and derive timing from data attributes rather than wall-clock timers.
 
@@ -79,7 +132,7 @@ npx hyperframes lint
 npx hyperframes validate
 ```
 
-### 4. Review small artifacts
+### 5. Review small artifacts
 
 Capture a still near the middle of every cue. Render short motion windows only for timing or transition decisions. Do not render a full preview by default.
 
@@ -92,7 +145,10 @@ Check:
 - animation lands on the spoken phrase;
 - alpha is transparent outside card regions.
 
-### 5. Render the transparent contribution
+**Present + STOP.** Show the card stills and any short motion windows, name the card IDs, and
+wait for approval. Do not render the full overlay while copy, placement, or timing is disputed.
+
+### 6. Render the transparent contribution
 
 ```powershell
 npx hyperframes render --format mov -o work/cache/content-cards-overlay.mov

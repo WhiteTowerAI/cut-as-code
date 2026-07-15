@@ -52,6 +52,17 @@ class SkillContractTests(unittest.TestCase):
         self.assertIn("scripts/build_cards_plan.py", skill)
         self.assertIn("work/content-cards/cards-plan.json", skill)
 
+    def test_content_cards_documents_guided_human_choices(self):
+        skill = text("skills/video-add-content-cards/SKILL.md").lower()
+        for required in (
+            "target card count",
+            "scripts/open_gallery.py",
+            "gallery-animated.html",
+            "present + stop",
+            "brief",
+        ):
+            self.assertIn(required, skill)
+
     def test_rough_cut_documents_canonical_timeline_and_legacy_adapter(self):
         skill = text("skills/video-rough-cut/SKILL.md")
         self.assertIn("work/rough-cut/edit-plan.json", skill)
