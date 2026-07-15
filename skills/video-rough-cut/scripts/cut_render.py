@@ -32,10 +32,24 @@ def atempo_chain(spd):
     factors.append(s)
     return ",".join(f"atempo={f:.6f}" for f in factors)
 
+
+def load_segments(edit):
+    """Normalize a canonical timeline or legacy edit into render segments."""
+    if "clips" in edit:
+        return [
+            {
+                "in": clip["source_range"]["start_s"],
+                "out": clip["source_range"]["end_s"],
+                "speed": clip.get("speed", 1.0),
+            }
+            for clip in edit["clips"]
+        ]
+    return list(edit["keep"])
+
 def main():
     edit_p, src, out = sys.argv[1], sys.argv[2], sys.argv[3]
     edit = json.load(open(edit_p, encoding="utf-8"))
-    keep = [k for k in edit["keep"] if float(k["out"]) - float(k["in"]) > 0.05]
+    keep = [k for k in load_segments(edit) if float(k["out"]) - float(k["in"]) > 0.05]
     keep.sort(key=lambda k: float(k["in"]))
     n = len(keep)
 

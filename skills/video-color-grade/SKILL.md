@@ -47,10 +47,55 @@ Requirements: `ffmpeg`/`ffprobe` on PATH, Python with `numpy` + `Pillow`.
 - **Two-phase by design:** present the looks and STOP — never render the full video or bake a
   LUT until the human has chosen.
 
-## Inputs
+## Project protocol workflow
+
+Store the durable decision in `work/color-grade/grade-plan.json`:
+
+```json
+{
+  "schema_version": 1,
+  "target": "base-video",
+  "base": "eq=contrast=1.05",
+  "looks": [{"name": "clean", "chain": "null"}],
+  "selected_look": "clean",
+  "evidence_refs": ["media:source"]
+}
+```
+
+Use `base-video` by default so content cards and captions are not recolored. `composite`
+is valid only when intentionally grading already-composited pixels. Read shared
+`work/understand/media.json` and visual evidence, generate the existing contact sheet and
+skin strip under `review/02-color-grade/`, then stop for the human selection. Write
+`selected_look` only after that choice.
+
+Record the operation's exact input revisions in `based_on`, increment its integer
+`revision` when the plan or selected input changes, and contribute:
+
+```json
+{
+  "kind": "video-filter",
+  "target": "base-video",
+  "plan": "color-grade/grade-plan.json"
+}
+```
+
+The shared renderer validates that `selected_look` exists, applies the grade after timeline
+transforms and before overlays, and encodes the final video once:
+
+```powershell
+python skills/video-understand/scripts/build_render_plan.py .
+python skills/video-understand/scripts/render_project.py work/render/render-plan.json
+```
+
+## Standalone compatibility inputs
+
 - The source video.
 - A `looks.json` (`base` + named `looks`); start from `looks.example.json` and **retune the
   `base`** from what `assess.py` reports.
+
+All existing scripts continue to accept legacy `looks.json`. `gradelib.load_spec()` also
+accepts canonical `grade-plan.json`, so contact-sheet, clip, LUT, and standalone apply
+commands remain compatible during migration.
 
 ## looks.json schema
 ```jsonc

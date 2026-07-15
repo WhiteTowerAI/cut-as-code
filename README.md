@@ -1,78 +1,98 @@
 <h1 align="center">Open-Recut</h1>
 
-<p align="center">
-  <strong>The open skill stack for agentic video editing.</strong>
-</p>
+<p align="center"><strong>The open skill stack for agentic video editing.</strong></p>
 
 <p align="center">
-  <a href=""><img src="https://img.shields.io/badge/Discord-Join%20chat-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/Codex-supported-10A37F" alt="Codex supported">
   <img src="https://img.shields.io/badge/Claude%20Code-supported-D97757" alt="Claude Code supported">
 </p>
 
+Open-Recut is a collection of self-contained agent skills, not a timeline-editor application. Agents inspect media, write readable JSON edit decisions, generate review artifacts, and render with ffmpeg, HyperFrames, or Remotion.
 
-Open-Recut aims to make video editing as simple as possible. Timeline editors like Premiere Pro and CapCut are powerful, but they can be complex and time-consuming to use. **Open-Recut takes a different approach: it leverages the coding ability of AI models so that editing tasks can be handled by agents, much like software development.** Instead of clicking through complex timelines, humans can let agents inspect or search media files, write edit plans, generate action code, run renders, and refine cuts iteratively.
+## Project Model
 
-## Why Open-Recut?
-
-- **Make timeline editing agent-friendly.** Agents can trim, split, reorder, crop, caption, add transitions, and export videos through code instead of manual timeline clicks.
-
-- **Let agents understand raw media.** Open-Recut gives agents tools to transcribe videos, detect scenes, find key moments, and remove bad takes before editing begins.
-
-- **Bring polished motion into the workflow.** With Remotion, HyperFrames, and code-based renderers, agents can create AE-style animations, overlays, and motion graphics as part of the same editing pipeline.
-
-
-## See it in action
-
-### Demo 1: XXX
-<p align="center">
-  <video
-    src="https://github.com/user-attachments/assets/363bb325-29bb-449f-8e62-ac41d7572a73"
-    width="720"
-    controls
-    muted
-    playsinline
-  >
-    Your browser does not support the video tag.
-  </video>
-</p>
+Editing skills are optional and composable. A project can add content cards directly, or run rough cut, color grade, and cards in sequence. There is no fixed global pipeline.
 
 ```text
-User    ❯ XXX
-
-Agent   ❯ XXX
+source -> video-understand -> optional edit operations -> final render -> compare
+                              rough cut / grade / cards
 ```
 
+`work/project.json` records active operations, dependencies, integer `revision` values, and `based_on` checks. `work/timeline.json` is a small custom source-to-program mapping; OpenTimelineIO is not required. Approved render contributions are compiled once so the final video is encoded in one delivery pass.
+
+```text
+my-video-project/
+|-- START-HERE.md
+|-- input/original-video.mp4
+|-- review/                         # summaries, stills, and short previews
+|-- final/final-video.mp4
+`-- work/                           # machine-facing JSON and disposable cache
+    |-- project.json
+    |-- timeline.json
+    |-- understand/
+    |-- rough-cut/
+    |-- color-grade/
+    |-- content-cards/
+    |-- edit-compare/
+    |-- render/
+    `-- cache/
+```
+
+Only directories for selected operations need to exist. Durable decisions stay outside `work/cache/`.
+
+## Skills
+
+| Skill | Purpose |
+|---|---|
+| `video-understand` | Probe, transcribe, analyze, and author evidence-backed semantic understanding. |
+| `video-rough-cut` | Make hand-reviewed keep/drop decisions, generate the canonical timeline, and verify a compact cut. |
+| `video-color-grade` | Assess footage, present named looks, record the human selection, and bake/apply a LUT. |
+| `video-add-content-cards` | Map semantic moments to HyperFrames cards and render a transparent graphics overlay. |
+| `video-edit-compare` | Compare original and actual final pixels on the original source clock. |
+| `video-add-captions` | Render styled every-line captions with optional karaoke timing. |
+| `video-overlay-cards(legacy)` | Composite static card families without the shared project protocol. |
+| `video-to-remotion(legacy)` | Generate selective transcript-timed graphics with Remotion. |
+| `design-frames-to-motion(legacy)` | Rebuild supplied design frames as transcript-synced Remotion components. |
+
+Read a skill's `SKILL.md` before running its scripts. Editorial choices remain human-reviewed; scripts handle timestamp precision, compositing, and checks.
 
 ## Quick Start
 
-### 1. Install with `npx skills`
+Check the shared dependencies:
 
-```bash
-npx XXX
+```powershell
+ffmpeg -version
+ffprobe -version
+python -c "import faster_whisper"
 ```
 
-### 2. Just use it
+Initialize the understandable user/machine directory layout, then run the shared evidence layer:
 
-Now tell your AI: `XXX`
+```powershell
+python skills/video-understand/scripts/init_project.py path/to/source.mp4 my-video-project
+Set-Location my-video-project
+ffmpeg -y -i input/original-video.mp4 -ac 1 -ar 16000 work/cache/audio16k.wav
+python skills/video-understand/scripts/transcribe.py work/cache/audio16k.wav work/understand/transcript
+python skills/video-understand/scripts/analyze.py work/understand/transcript.json work/understand/analysis.json
+```
 
+After selected operations are approved and revision checks pass:
 
-## What's Included
+```powershell
+python skills/video-understand/scripts/build_render_plan.py .
+python skills/video-understand/scripts/render_project.py work/render/render-plan.json
+python skills/video-edit-compare/scripts/make_compare.py work/timeline.json input/original-video.mp4 final/final-video.mp4 review/04-edit-compare/original-vs-final-source-time.mp4
+```
 
-| Skill | Purpose |
-|-------|---------|
-| `XXX` | XXX |
-| `XXX` | XXX |
+Each skill still supports focused review artifacts and legacy adapters where documented. Do not use a full delivery render as the default preview.
 
+## Verification
 
-## How it works
+The protocol and ffmpeg integrations use Python's standard `unittest` runner:
 
-XXX
+```powershell
+python -m unittest discover -s tests -p 'test_*.py' -v
+```
 
-
-## Roadmap
-
-- XXX
-- XXX
-- XXX
+Tests cover schema validation, revision checks, timeline mapping, legacy compatibility, real one-pass delivery rendering, source-time comparison, audio continuity, and pixel samples.

@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "timeline_id": "source",
+  "overview": {
+    "title": "Three onboarding steps",
+    "content_type": "talking-head",
+    "summary": "Alice explains a three-step onboarding process.",
+    "primary_language": "en"
+  },
+  "chapters": [
+    {
+      "id": "chapter-001",
+      "start_s": 0.0,
+      "end_s": 42.0,
+      "title": "Onboarding steps",
+      "summary": "The complete process.",
+      "confidence": 0.92,
+      "evidence_refs": ["segment:0", "segment:4"]
+    }
+  ],
+  "entities": [
+    {
+      "id": "entity-001",
+      "name": "Alice",
+      "type": "person",
+      "confidence": 0.98,
+      "evidence_refs": ["segment:0"]
+    }
+  ],
+  "moments": [
+    {
+      "id": "moment-001",
+      "kind": "list",
+      "start_s": 5.2,
+      "end_s": 8.4,
+      "summary": "Three onboarding steps",
+      "confidence": 0.9,
+      "evidence_refs": ["segment:1"]
+    }
+  ],
+  "transcript_corrections": [],
+  "uncertainties": []
+}

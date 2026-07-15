@@ -5,6 +5,7 @@ __pycache__/
 .superpowers/
 
 work/
+docs/
 
 .claude/worktrees/
 # HyperFrames preview cache + regenerable self-check stills/gallery
