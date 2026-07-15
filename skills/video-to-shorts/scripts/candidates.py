@@ -93,6 +93,15 @@ def validate_filler_spans(value, start, end, path):
     return spans
 
 
+def validate_metadata(value, path):
+    require_type(value, dict, path)
+    editorial_reason = value.get("editorial_reason")
+    require_type(editorial_reason, str, f"{path}.editorial_reason")
+    if not editorial_reason.strip():
+        fail(f"{path}.editorial_reason must not be empty")
+    return {**value, "editorial_reason": editorial_reason.strip()}
+
+
 def normalize_candidate(item, index, transcript, transcript_duration_s):
     path = f"candidates[{index}]"
     require_type(item, dict, path)
@@ -101,7 +110,7 @@ def normalize_candidate(item, index, transcript, transcript_duration_s):
         fail(f"{path}.score is not allowed; candidates.py computes score from score_breakdown")
     if unknown:
         fail(f"{path} contains unsupported fields: {', '.join(sorted(unknown))}")
-    required = {"candidate_id", "title", "scene_type", "start_time", "end_time", "transcript_excerpt", "evidence_mode", "score_breakdown"}
+    required = {"candidate_id", "title", "scene_type", "start_time", "end_time", "transcript_excerpt", "evidence_mode", "score_breakdown", "metadata"}
     missing = required - set(item)
     if missing:
         fail(f"{path} missing required fields: {', '.join(sorted(missing))}")
@@ -129,6 +138,7 @@ def normalize_candidate(item, index, transcript, transcript_duration_s):
     visual_observations = validate_string_list(item.get("visual_observations", []), f"{path}.visual_observations")
     visual_risks = validate_string_list(item.get("visual_risks", []), f"{path}.visual_risks")
     visual_keyframes = validate_string_list(item.get("visual_keyframes", []), f"{path}.visual_keyframes")
+    metadata = validate_metadata(item["metadata"], f"{path}.metadata")
     if item["evidence_mode"] == "text_only" and (visual_observations or visual_risks or visual_keyframes):
         fail(f"{path} text_only candidates must not contain visual evidence")
     return {
@@ -139,7 +149,7 @@ def normalize_candidate(item, index, transcript, transcript_duration_s):
         "warnings": warnings, "filler_drop_spans": filler_spans,
         "visual_observations": visual_observations, "visual_risks": visual_risks,
         "visual_keyframes": visual_keyframes, "review_status": item.get("review_status", "candidate"),
-        "metadata": item.get("metadata", {}),
+        "metadata": metadata,
     }
 
 
@@ -150,6 +160,15 @@ def dedupe_candidates(candidates):
             continue
         kept.append(candidate)
     return kept
+
+
+def validate_selection(value):
+    require_type(value, dict, "selection")
+    evidence_mode = value.get("evidence_mode")
+    require_type(evidence_mode, str, "selection.evidence_mode")
+    if evidence_mode not in EVIDENCE_MODES:
+        fail("selection.evidence_mode must be text_only or text_visual")
+    return {**value, "evidence_mode": evidence_mode}
 
 
 def run_candidates(args):
@@ -166,13 +185,23 @@ def run_candidates(args):
     if unknown:
         fail(f"root contains unsupported fields: {', '.join(sorted(unknown))}")
     require_type(raw.get("candidates"), list, "candidates")
+    selection = validate_selection(raw.get("selection"))
     transcript = load_json(transcript_path)
     duration = transcript_duration(transcript)
     normalized = [normalize_candidate(item, index, transcript, duration) for index, item in enumerate(raw["candidates"])]
+    present_modes = {candidate["evidence_mode"] for candidate in normalized}
+    if present_modes != {selection["evidence_mode"]}:
+        fail("every candidate evidence_mode must match selection.evidence_mode")
     result = dict(raw)
     result["schema_version"] = "shorts-candidates.v2"
-    result["producer"] = {"skill": "video-to-shorts", "mode": "agent_first", "validated_at": datetime.now(timezone.utc).isoformat()}
+    result["producer"] = {
+        "skill": "video-to-shorts",
+        "mode": "agent_first",
+        "evidence_mode": selection["evidence_mode"],
+        "validated_at": datetime.now(timezone.utc).isoformat(),
+    }
     result["transcript"] = {**raw.get("transcript", {}), "path": str(transcript_path), "timebase": "input_video_relative"}
+    result["selection"] = selection
     result["candidates"] = dedupe_candidates(normalized)
     out_dir.mkdir(parents=True, exist_ok=True)
     output_path = out_dir / "shorts_candidates.json"
@@ -180,6 +209,7 @@ def run_candidates(args):
     write_candidates_preview_md(out_dir / "shorts_candidates_preview.md", result)
     write_candidates_preview_html(out_dir / "shorts_candidates_preview.html", result)
     print(f"[video-to-shorts] validated candidates: {output_path}")
+    print(f"[video-to-shorts] evidence mode: {selection['evidence_mode']}")
     print(f"[video-to-shorts] kept after overlap dedupe: {len(result['candidates'])}")
 
 

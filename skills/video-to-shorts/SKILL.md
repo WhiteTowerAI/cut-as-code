@@ -1,6 +1,6 @@
 ---
 name: video-to-shorts
-description: Select complete horizontal short-form moments from a transcript, validate an agent-authored candidate contract, review candidates, then hand approved work to later planning and extraction steps.
+description: Select complete horizontal short-form moments, extract approved shorts, and optionally deliver deterministic Agent-planned vertical versions.
 ---
 
 # Video To Shorts
@@ -69,30 +69,255 @@ python skills/video-to-shorts/scripts/prepare_visual_context.py VIDEO.mp4 `
 
 This writes timestamped source frames, paged `contact_sheets/contact_sheet_XX.jpg`, and `visual_manifest.json`. The Agent may inspect global sheets and then individual first/middle/last frames around a potential candidate. These artifacts are review context only and never add to or subtract from candidate scores.
 
+## Required Dual Candidate Evidence
+
+Candidate evidence mode and delivery mode remain independent. Candidate selection must run both evidence modes every time so the human reviewer can compare transcript-only judgment against transcript-plus-visual judgment before plan generation.
+
+**Required candidate evidence passes:**
+
+- `text_only`: select candidate moments from transcript evidence only.
+- `text_visual`: separately select candidate moments from transcript evidence plus visual review context.
+
+The two passes are isolated experiments and must not reference, reuse, copy, refine, or react to each other's candidate IDs, titles, boundaries, excerpts, scores, score reasons, editorial reasons, warnings, or conclusions. Complete and freeze the `text_only` pass before opening visual evidence or any `text_visual` working files. During the `text_visual` pass, do not read the completed `text_only` JSON or preview. Similar or identical results are acceptable only when they were reached independently from the allowed evidence.
+
+Do not combine the two modes in one candidate file or one preview. Store the required review artifacts separately:
+
+```text
+WORK/shorts/preview/
+  text_only/
+    shorts_candidates.json
+    shorts_candidates_preview.html
+  text_visual/
+    shorts_candidates.json
+    shorts_candidates_preview.html
+```
+
+Each `shorts_candidates.json` contains candidates from exactly one evidence mode. The two folders are not drafts of one another and neither folder is the source for generating the other.
+
+**Delivery mode:**
+
+- `horizontal_only`: stop after approved horizontal shorts are extracted.
+- `horizontal_and_vertical`: continue each approved horizontal short through Optional Vertical Delivery.
+
+`text_only` and `text_visual` only determine how the Agent selects content worth cutting. They do not determine vertical crop decisions. For every requested vertical delivery, the Agent must generate and inspect new dense visual evidence from that extracted short. Do not reuse sparse long-video candidate contact sheets as the basis for vertical cropping.
+
 ## Boundary
 
-This skill owns transcript-based selection of horizontal short-source moments. It does not own vertical reframing, captions, graphics, color grading, or publishing. Step 1 stops after candidate validation and previews; it does not change planning, transcript preparation, boundary refinement, or extraction behavior.
+This skill owns transcript-based selection and extraction of horizontal short-source moments plus the formal optional vertical delivery workflow defined below. It does not own captions, graphics, color grading, or publishing. Vertical delivery currently supports fixed crops, scene-bounded fixed crops, and letterboxing; it does not claim continuous dynamic subject tracking.
+
+## Optional Vertical Delivery
+
+Vertical delivery begins only after a horizontal short has been extracted and approved. Required inputs are `short_XX/source.mp4` and `short_XX/transcript.json`.
+
+Do not plan all vertical crops directly from the original long video. Each approved short has its own short-relative timeline, dense visual evidence, Agent-authored plan, preview, review decision, and final output under `short_XX/vertical-agent/`.
+
+### Required Workflow
+
+1. Create `short_XX/vertical-agent/`.
+2. Generate dense visual context from `short_XX/source.mp4`. Sample every `1` second by default; use `0.5` seconds when subject or key-content movement is visually significant.
+3. Inspect every paged contact sheet. Inspect individual original frames when a sheet is insufficient to judge a crop boundary or key content.
+4. Choose exactly one top-level strategy: `STATIC_CROP`, `SCENE_CROP`, `LETTERBOX`, or `REVIEW_REQUIRED`.
+5. Write `short_XX/vertical-agent/agent_vertical_plan.json` using the Vertical Plan Contract.
+6. Run `vertical_plan.py` to probe the real media, validate the Agent's choices, and write normalized plan and preview documents.
+7. Run `render_vertical.py --mode preview` before any formal render.
+8. Inspect `preview/vertical_preview.mp4`, `preview/preview_contact_sheet.jpg`, and `preview/preview_summary.md`.
+9. Stop for human review. Do not render `out/vertical.mp4` yet.
+10. Only after the plan and preview are approved, run `render_vertical.py --mode final`.
+
+```powershell
+python skills/video-to-shorts/scripts/prepare_visual_context.py SHORT\source.mp4 `
+  --out SHORT\vertical-agent\visual `
+  --interval 1
+```
+
+The resulting `visual_manifest.json`, contact-sheet pages, and original frames are vertical planning evidence only. `visual_evidence` entries do not participate in candidate scoring.
+
+### Composition Decision Order
+
+Plan vertical delivery scene by scene. Do not choose one conservative strategy for the complete short merely because some scenes require full horizontal context.
+
+Apply these priorities in order:
+
+1. In presenter-led scenes, keep the speaker's head and torso complete, stable, and large enough for vertical viewing. Partial hand or forearm clipping is less severe than reducing the speaker to a small LETTERBOX foreground.
+2. Preserve essential slides, diagrams, products, multiple subjects, and other information that would become incomplete or misleading when cropped.
+3. Prefer `STATIC_CROP` or scene-bounded fixed crops for stable presenter and product scenes.
+4. Use `LETTERBOX` only for the specific scenes where no safe fixed 9:16 crop preserves the essential horizontal information.
+5. Use `REVIEW_REQUIRED` when safe composition would require continuous dynamic tracking or the evidence does not support a stable scene crop.
+
+For a presenter-led or mixed short, first attempt a `SCENE_CROP` plan that uses fixed crops for stable presenter scenes and `LETTERBOX` only for wide-information scenes. The existence of one wide slide or product shot is not sufficient reason to LETTERBOX the complete short.
+
+If the Agent chooses top-level `LETTERBOX`, its segment reason and visual evidence must explain why each stable presenter or product scene cannot use a safe fixed crop. The Agent must explicitly compare the full-LETTERBOX choice against a scene-bounded alternative.
+
+### Vertical Strategies
+
+#### STATIC_CROP
+
+Use one fixed crop for the entire short when a single person remains in a small area, the camera is fixed, or all key content stays in the same region.
+
+#### SCENE_CROP
+
+Use different fixed crops for different time ranges when the short alternates between a speaker and slides, product and presenter, or multiple stable camera setups. Crop changes should occur at scene boundaries. Do not create frequent left-right jumps inside one continuous shot.
+
+#### LETTERBOX
+
+Scale the complete horizontal image into the vertical canvas and place it over a blurred, darkened full-canvas version of the same frame. Use it as a scene-level fallback for distant groups, wide slides, horizontally distributed products, or any case where a forced 9:16 crop would remove essential information. Do not use LETTERBOX only to preserve peripheral background or every part of a presenter's widest hand gesture. The complete foreground frame must remain sharp, centered, and fully visible; do not use a plain black background for LETTERBOX delivery. The renderer samples multiple frames to identify only stable pure-black borders. When stable borders are found, only the blurred background layer uses the complete active-picture area; when detection is unstable, the background safely falls back to the complete source frame. The sharp foreground is never cropped by this process.
+
+#### REVIEW_REQUIRED
+
+Use this when the subject moves continuously, people cross frequently, key content changes position too much, a safe crop needs continuous dynamic tracking, or none of the other strategies is safe. `REVIEW_REQUIRED` is a valid review outcome, not a failed run. Its plan and preview summary may be generated, but formal rendering is prohibited.
+
+### Vertical Preview Review
+
+Review both information safety and vertical viewing quality:
+
+- Confirm that heads and torsos remain inside every presenter crop.
+- Confirm that presenter-led scenes are not unnecessarily reduced to a small LETTERBOX foreground.
+- Confirm that wide slides, products, and diagrams retain their essential information.
+- Confirm that LETTERBOX is limited to the scenes that require complete horizontal context.
+- Confirm that crop and LETTERBOX changes occur at real scene boundaries rather than inside a continuous shot.
+- Review the strategy-duration percentages and every validator warning before approving the plan.
+
+### Vertical Plan Contract
+
+Write the Agent-authored input directly as JSON; do not create a separate schemas directory.
+
+```json
+{
+  "source_video": "short_01/source.mp4",
+  "target_aspect_ratio": "9:16",
+  "source_width": 1280,
+  "source_height": 720,
+  "output_width": 406,
+  "output_height": 720,
+  "strategy": "STATIC_CROP",
+  "segments": [
+    {
+      "start_time": 0.0,
+      "end_time": 42.5,
+      "strategy": "STATIC_CROP",
+      "content_type": "PRESENTER",
+      "crop_x": 420,
+      "crop_y": 0,
+      "crop_width": 406,
+      "crop_height": 720,
+      "reason": "The main speaker remains inside this crop across all sampled frames."
+    }
+  ],
+  "visual_evidence": [
+    {
+      "timestamp_s": 0.0,
+      "frame_path": "visual/visual_frames/frame_0001_000000s.jpg",
+      "observation": "Speaker is centered."
+    }
+  ],
+  "warnings": []
+}
+```
+
+Contract rules:
+
+- All times use the extracted short-relative timeline.
+- `segments` must be sorted, non-overlapping, and fully cover the short duration.
+- Every segment requires a non-empty Agent-authored `reason`.
+- Every newly authored segment requires `content_type`: `PRESENTER`, `WIDE_INFORMATION`, `PRODUCT`, `MULTI_SUBJECT`, or `OTHER`. This is an Agent-authored visual classification, not model detection. The validator accepts omitted values as `UNSPECIFIED` only for compatibility and emits a warning.
+- `STATIC_CROP` uses exactly one `STATIC_CROP` segment.
+- `SCENE_CROP` may contain multiple scene-bounded fixed-crop segments and may use `LETTERBOX` for a scene that cannot be safely cropped.
+- `PRESENTER` scenes should prefer a fixed crop when sampled evidence keeps the head and torso safe. Cropping part of a wide gesture is not by itself sufficient reason to use LETTERBOX.
+- `WIDE_INFORMATION`, `PRODUCT`, or `MULTI_SUBJECT` scenes may use LETTERBOX when a fixed crop would remove essential information.
+- `LETTERBOX` segments do not use crop fields. A full-duration LETTERBOX plan must explain why scene-bounded crops are unsafe for every stable scene.
+- Crop rectangles must stay inside the real source dimensions and match `9:16` within integer-pixel tolerance.
+- `vertical_plan.py` obtains source width, height, FPS, and duration with `ffprobe`; Agent-provided media metadata is not authoritative.
+- Formal output keeps the source height by default. Output width is `round(source_height * 9 / 16)`, adjusted upward to an even integer.
+- `REVIEW_REQUIRED` segments contain no crop fields and cannot be formally rendered.
+- `visual_evidence` documents reviewed frames and observations; it never changes candidate score.
+- The normalized plan includes deterministic strategy durations, percentages, and non-blocking validator warnings for full-duration LETTERBOX, presenter scenes using LETTERBOX, and missing `content_type`.
+- Python validates the Agent's choices but never moves, generates, or replaces a crop.
+
+### Vertical Commands
+
+```powershell
+python skills/video-to-shorts/scripts/vertical_plan.py `
+  --video SHORT\source.mp4 `
+  --input SHORT\vertical-agent\agent_vertical_plan.json `
+  --out SHORT\vertical-agent
+
+python skills/video-to-shorts/scripts/render_vertical.py `
+  --video SHORT\source.mp4 `
+  --plan SHORT\vertical-agent\vertical_plan.json `
+  --out SHORT\vertical-agent `
+  --mode preview
+
+python skills/video-to-shorts/scripts/render_vertical.py `
+  --video SHORT\source.mp4 `
+  --plan SHORT\vertical-agent\vertical_plan.json `
+  --out SHORT\vertical-agent `
+  --mode final
+```
+
+`vertical_plan.py` writes `vertical_plan.json`, `vertical_plan_preview.md`, and `vertical_plan_preview.html`. It does not detect subjects, call models, generate crops, or alter Agent-authored crop coordinates.
+
+`render_vertical.py` consumes only a validated plan. It deterministically renders fixed crops, scene-bounded fixed crops, and letterboxing; preserves segment order and continuous short-relative audio; never overwrites `source.mp4`; writes media probes, contact sheets, and summaries; and refuses formal `REVIEW_REQUIRED` rendering.
+
+### Vertical Output Layout
+
+```text
+short_XX/
+  source.mp4
+  transcript.json
+  vertical-agent/
+    agent_vertical_plan.json
+    vertical_plan.json
+    vertical_plan_preview.md
+    vertical_plan_preview.html
+    visual/
+      visual_manifest.json
+      visual_frames/
+      contact_sheets/
+    preview/
+      vertical_preview.mp4
+      preview_contact_sheet.jpg
+      preview_summary.md
+      media_probe.json
+    out/
+      vertical.mp4
+      final_contact_sheet.jpg
+      final_summary.md
+      media_probe.json
+```
 
 ## Agent-First Candidate Workflow
 
-1. Read `transcript.json` and identify complete, self-contained moments.
-2. Optionally inspect visual evidence when it materially helps review risk.
-3. Write `shorts_candidates.json` directly using `shorts-candidates.v2`; do not write `score`.
-4. Run `candidates.py`, which validates fields, computes the arithmetic score, checks transcript/time evidence, removes overlaps, and writes Markdown/HTML previews.
-5. Perform Candidate Artifact Text QA on the normalized JSON and generated previews.
-6. Stop for human review before plan generation.
+1. Create `WORK/shorts/preview/text_only/`.
+2. Read only `transcript.json`. Do not open contact sheets, visual frames, `visual_manifest.json`, or any prior `text_visual` artifact.
+3. Independently author `preview/text_only/shorts_candidates.json` using `shorts-candidates.v2`; every candidate must use `evidence_mode=text_only`. Do not write `score`.
+4. Validate the text-only file and write `preview/text_only/shorts_candidates_preview.html`.
+5. Complete Candidate Artifact Text QA for the text-only JSON and HTML, then freeze that folder. Do not reopen it while authoring the visual pass.
+6. Create `WORK/shorts/preview/text_visual/` and begin a separate selection pass from the prepared transcript plus visual context. Do not read, copy, or revise from `preview/text_only/`.
+7. Independently author `preview/text_visual/shorts_candidates.json`; every candidate must use `evidence_mode=text_visual`. Do not write `score`.
+8. Validate the text-visual file and write `preview/text_visual/shorts_candidates_preview.html`.
+9. Complete Candidate Artifact Text QA for the text-visual JSON and HTML.
+10. Only after both folders are finalized may the Agent or human open both outputs for side-by-side review.
+11. Stop for human review before creating a promoted candidate file or running plan generation.
 
 ```powershell
-python skills/video-to-shorts/scripts/candidates.py --out WORK\shorts
+python skills/video-to-shorts/scripts/candidates.py `
+  --out WORK\shorts\preview\text_only `
+  --candidates WORK\shorts\preview\text_only\shorts_candidates.json `
+  --transcript WORK\shorts\transcript.json
+
+python skills/video-to-shorts/scripts/candidates.py `
+  --out WORK\shorts\preview\text_visual `
+  --candidates WORK\shorts\preview\text_visual\shorts_candidates.json `
+  --transcript WORK\shorts\transcript.json
 ```
 
-The default input is `WORK/shorts/shorts_candidates.json` and the default transcript is `WORK/shorts/transcript.json`. `--candidates` and `--transcript` may point to explicit files. The script never calls a model API and never revises an Agent's dimension scores based on transcript content.
+Use explicit `--candidates` and `--transcript` paths for both passes. The script never calls a model API and never revises an Agent's dimension scores based on transcript content.
 
 ### Candidate Artifact Text QA
 
-Before review, inspect every candidate title, all six score reasons, editorial reason, warnings, and visual observations/risks as standalone text. Correct grammar, missing quotation boundaries, repeated words, incomplete phrases, and unclear references. Deterministic validation does not prove that Agent-authored prose is natural or grammatically correct.
+Before review, inspect every candidate title, all six score reasons, editorial reason, warnings, and visual observations/risks as standalone text. `metadata.editorial_reason` is required and must explain why the exact moment is worth promoting as a short; it must not repeat only the title or a generic phrase such as `good candidate`. Correct grammar, missing quotation boundaries, repeated words, incomplete phrases, and unclear references. Deterministic validation does not prove that Agent-authored prose is natural or grammatically correct.
 
-Inspect both generated previews and confirm that candidate IDs, titles, duration, transcript excerpt, score reasons, script-generated score, warnings, `filler_drop_spans`, and the three visual fields render correctly. Suspicious `?` or the Unicode `U+FFFD` replacement character in Agent-authored metadata may indicate encoding damage, but do not remove legitimate question marks from transcript excerpts or intentional questions.
+Inspect each mode's JSON and HTML inside its own folder and confirm that candidate IDs, titles, duration, transcript excerpt, score reasons, script-generated score, warnings, and `filler_drop_spans` render correctly. For `text_visual`, also inspect the three visual fields. Do not use QA findings from one mode to rewrite candidate judgment in the other mode. Suspicious `?` or the Unicode `U+FFFD` replacement character in Agent-authored metadata may indicate encoding damage, but do not remove legitimate question marks from transcript excerpts or intentional questions.
 
 On Windows, prefer ASCII straight quotes, apostrophes, and hyphens in Agent-authored metadata. Do not pipe Unicode-rich generated source through Windows PowerShell when the pipeline encoding is unknown. Save generated scripts as UTF-8 files, use ASCII Unicode escapes in source, or use HTML entities for typographic separators. `preview.py` uses ASCII structural separators and writes UTF-8 Markdown/HTML directly.
 
@@ -151,6 +376,7 @@ Use these signals together with the scene strategy and six scoring dimensions. D
 - Every candidate must be complete and self-contained.
 - `start_time` is the first word of the complete sentence or thought.
 - `end_time` is after the final word of the complete sentence or thought.
+- Any extraction pre-roll must remain outside the previous word's release tail; never include audible residue from the preceding sentence.
 - Do not start with a fragment that depends on prior context.
 - Do not end on dangling connectors such as `and`, `that`, `our`, `to`, or `of`.
 - Prefer a slightly longer complete candidate over a short incomplete one.
@@ -231,7 +457,7 @@ The Agent supplies each dimension's numeric `score` and a short `reason`. The Ag
 
 ## Candidate v2 Contract
 
-Top-level fields: `schema_version`, optional `video`, optional `transcript`, optional `producer`, optional `selection`, and required `candidates` array. Output `schema_version` is `shorts-candidates.v2`.
+Top-level fields: `schema_version`, optional `video`, optional `transcript`, optional `producer`, required `selection`, and required `candidates` array. Each mode-specific file must set `selection.evidence_mode` to the folder's single mode: `text_only` or `text_visual`. Output `schema_version` is `shorts-candidates.v2`.
 
 Each candidate requires:
 
@@ -242,6 +468,7 @@ Each candidate requires:
 - `transcript_excerpt`: non-empty exact excerpt for that time range.
 - `evidence_mode`: `text_only` or `text_visual`.
 - `score_breakdown`: exactly the six dimensions; each contains only numeric `score` and non-empty string `reason`.
+- `metadata`: object containing non-empty string `editorial_reason`.
 
 Optional candidate fields:
 
@@ -249,15 +476,16 @@ Optional candidate fields:
 - `filler_drop_spans`: Agent-authored array of `{type, start_time, end_time, reason, review_status}` fully inside the candidate range. `type` must be `filler`.
 - `visual_observations`, `visual_risks`, `visual_keyframes`: string arrays; non-empty only for `text_visual`.
 - `review_status`: string, default `candidate`.
-- `metadata`: object.
+- Additional `metadata` fields such as `boundary_risk` or comparison notes.
 
-The validator adds `duration` and computed `score`. Candidates overlapping more than 50% of the shorter candidate are deduplicated after sorting by computed score; the higher-scoring candidate is kept.
+The validator adds `duration` and computed `score`. Candidates overlapping more than 50% of the shorter candidate are deduplicated only within the current mode-specific file. Cross-mode deduplication, merging, promotion, or ranking is forbidden before human review.
 
 ### Template
 
 ```json
 {
   "schema_version": "shorts-candidates.v2",
+  "selection": {"evidence_mode": "text_only"},
   "candidates": [{
     "candidate_id": "cand-001",
     "title": "A complete standalone moment",
@@ -274,25 +502,48 @@ The validator adds `duration` and computed `score`. Candidates overlapping more 
       "quotability": {"score": 12, "reason": "Contains a concise line."},
       "pace_editability": {"score": 8, "reason": "Dense delivery with removable filler."}
     },
+    "metadata": {"editorial_reason": "The claim and adoption evidence form a complete, useful short."},
     "warnings": [],
     "filler_drop_spans": []
   }]
 }
 ```
 
+Apply the template independently in each preview folder. For the visual file, set `selection.evidence_mode` and every candidate `evidence_mode` to `text_visual`, then include the optional visual evidence fields. Never create the visual file by copying or transforming the text-only file.
+
 ## Review Stop
 
-Review transcript/contact-sheet artifacts before authoring candidates, then review `shorts_candidates_preview.md` or `.html` before promoting candidates into the deterministic plan. This workflow does not implement a future transcript skill, short-transcript remapping, filler extraction, boundary refinement changes, or clip extraction changes.
+Review `preview/text_only/shorts_candidates.json` with `preview/text_only/shorts_candidates_preview.html`, and separately review `preview/text_visual/shorts_candidates.json` with `preview/text_visual/shorts_candidates_preview.html`. Only after both isolated passes are finalized may they be compared side by side.
+
+Always stop here and wait for explicit human confirmation. The existence of both previews, the original request for short videos, or a requested target count is not permission to select or cut candidates.
+
+- If the human names candidate IDs or exact clips, promote only those instructed candidates into an explicit reviewed `WORK/shorts/shorts_candidates.json`, preserving the human's requested order, then run `plan.py --candidates WORK/shorts/shorts_candidates.json`.
+- If the human confirms continuation but does not name candidate IDs, use the default selection rule: select the five highest-scoring eligible candidates from `preview/text_visual/shorts_candidates.json`. Run `plan.py --use-default-selection`; do not use `text_only` candidates in default mode.
+- Never apply the default merely because the human is silent or ambiguous. Ask for confirmation and remain stopped.
+
+Continue to plan generation or clip extraction only after one of these two human-approved paths is explicit. This workflow does not implement a future transcript skill, short-transcript remapping, filler extraction, boundary refinement changes, or clip extraction changes.
 
 ## Shorts Plan v2
 
-After a human reviews the validated candidates, generate a deterministic plan:
+After human review, generate a deterministic plan using exactly one approved selection path.
+
+For explicit user-selected candidates:
 
 ```powershell
-python skills/video-to-shorts/scripts/plan.py --out WORK\shorts
+python skills/video-to-shorts/scripts/plan.py `
+  --out WORK\shorts `
+  --candidates WORK\shorts\shorts_candidates.json
 ```
 
-`plan.py` requires `shorts-candidates.v2`. It uses the script-generated candidate `score` and existing `score_breakdown`; it never recalculates editorial dimensions, changes their reasons, reads visual observations for scoring, or calls a model.
+For human-approved default selection, which means the five highest-scoring eligible `text_visual` candidates:
+
+```powershell
+python skills/video-to-shorts/scripts/plan.py `
+  --out WORK\shorts `
+  --use-default-selection
+```
+
+Without `--candidates` or `--use-default-selection`, `plan.py` must fail instead of inferring permission. `plan.py` requires `shorts-candidates.v2`. It uses the script-generated candidate `score` and existing `score_breakdown`; it never recalculates editorial dimensions, changes their reasons, reads visual observations for scoring, or calls a model.
 
 ### Selection Rules
 
@@ -311,7 +562,7 @@ python skills/video-to-shorts/scripts/plan.py --out WORK\shorts
 
 Every item in `shorts` contains `id`, `short_id`, `candidate_id`, `source_candidate_index`, `order`, `title`, `scene_type`, `evidence_mode`, `start_time`, `end_time`, `duration`, `score_breakdown`, `score`, `hook_sentence`, `editorial_reason`, `transcript_excerpt`, `filler_drop_spans`, `validation`, `outputs`, and `status`.
 
-`hook_sentence` and `editorial_reason` are carried when present and otherwise remain empty; the planner does not invent editorial text.
+`editorial_reason` is required at candidate `metadata.editorial_reason` and is carried into the plan. `hook_sentence` remains optional and empty when absent; the planner does not invent editorial text.
 
 ## Filler Drop Spans and Keep Spans
 

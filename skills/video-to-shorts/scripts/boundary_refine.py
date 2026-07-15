@@ -248,13 +248,13 @@ def choose_end(words, segments, original_start, original_end, max_expand, pause_
     return end, reasons
 
 
-def cap_handle_before(words, content_start, desired_start):
+def cap_handle_before(words, content_start, desired_start, previous_release_guard=0.12):
     previous = [w for w in words if w["end"] <= content_start]
     if not previous:
         return desired_start
     prev_end = previous[-1]["end"]
-    if desired_start < prev_end:
-        return min(content_start, prev_end + 0.05)
+    if desired_start < prev_end + previous_release_guard:
+        return min(content_start, prev_end + previous_release_guard)
     return desired_start
 
 

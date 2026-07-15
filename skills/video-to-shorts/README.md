@@ -1,6 +1,10 @@
 # Video To Shorts
 
-`video-to-shorts` selects complete horizontal short-source moments from a transcript. Candidate selection is Agent-first: the Agent reads the transcript, optionally reviews visual evidence, and writes `shorts_candidates.json`; `candidates.py` performs deterministic validation, score summation, overlap dedupe, and preview generation.
+`video-to-shorts` selects complete horizontal short-source moments through two required, isolated Agent-first passes. The `text_only` pass uses only the transcript; the separately authored `text_visual` pass uses the transcript plus visual context without reading or copying the text-only output. `candidates.py` validates each mode-specific `shorts_candidates.json`, computes score totals, deduplicates overlaps within that file, and generates its review preview. Approved horizontal shorts can optionally continue through an Agent-planned deterministic vertical delivery workflow.
+
+Candidate evidence mode (`text_only` or `text_visual`) is independent from delivery mode (`horizontal_only` or `horizontal_and_vertical`). Vertical delivery always regenerates dense visual evidence from each extracted short, validates an Agent-authored plan, renders a low-resolution preview for review, and only then permits a formal render.
+
+Current vertical strategies are `STATIC_CROP`, `SCENE_CROP`, `LETTERBOX`, and `REVIEW_REQUIRED`. Planning is scene-first: stable presenter scenes should use fixed crops that keep the head and torso large and complete, while `LETTERBOX` is reserved for specific scenes that require full horizontal information. The validator reports strategy-duration percentages and non-blocking warnings for complete-short LETTERBOX and presenter scenes classified as LETTERBOX. `LETTERBOX` preserves the complete sharp foreground frame over a blurred, darkened background rather than a plain black background. Stable pure-black borders are removed only from the background layer after multi-frame confirmation; uncertain detection falls back to complete-frame blur, and the sharp foreground is never cropped. The workflow does not provide continuous dynamic subject tracking.
 
 ## Transcript Input
 
@@ -23,20 +27,30 @@ python skills/video-to-shorts/scripts/prepare_visual_context.py VIDEO.mp4 `
   --out WORK\shorts\visual_context
 ```
 
-This creates timestamped frames, paged contact sheets, and `visual_manifest.json` for optional `text_visual` review. Visual evidence never affects candidate scoring.
+This creates timestamped frames, paged contact sheets, and `visual_manifest.json` for the required `text_visual` candidate pass. Visual evidence never affects candidate scoring.
 
 ## Candidate Step
 
 1. Prepare or provide `WORK/shorts/transcript.json`.
-2. Follow `SKILL.md` to write `WORK/shorts/shorts_candidates.json` using `shorts-candidates.v2`.
-3. Do not write candidate total `score`; provide all six `score_breakdown` entries and reasons.
-4. Validate and render previews:
+2. Independently author the transcript-only pass at `WORK/shorts/preview/text_only/shorts_candidates.json`. Set `selection.evidence_mode` and every candidate `evidence_mode` to `text_only`.
+3. Freeze the text-only folder before inspecting visual evidence.
+4. Independently author the visual pass at `WORK/shorts/preview/text_visual/shorts_candidates.json`. Set `selection.evidence_mode` and every candidate `evidence_mode` to `text_visual`; do not read or copy the text-only output.
+5. Provide a non-empty `metadata.editorial_reason` for every candidate. Do not write candidate total `score`; provide all six `score_breakdown` entries and reasons.
+6. Validate each mode into its own preview folder:
 
 ```powershell
-python skills/video-to-shorts/scripts/candidates.py --out WORK\shorts
+python skills/video-to-shorts/scripts/candidates.py `
+  --out WORK\shorts\preview\text_only `
+  --candidates WORK\shorts\preview\text_only\shorts_candidates.json `
+  --transcript WORK\shorts\transcript.json
+
+python skills/video-to-shorts/scripts/candidates.py `
+  --out WORK\shorts\preview\text_visual `
+  --candidates WORK\shorts\preview\text_visual\shorts_candidates.json `
+  --transcript WORK\shorts\transcript.json
 ```
 
-5. Review the normalized JSON and both previews for title/reason grammar and encoding damage before plan generation. On Windows, prefer ASCII punctuation in Agent-authored metadata and avoid piping Unicode-rich generated source through PowerShell with an unknown pipeline encoding.
+7. Review each mode's normalized JSON and HTML only after both isolated passes are complete. On Windows, prefer ASCII punctuation in Agent-authored metadata and avoid piping Unicode-rich generated source through PowerShell with an unknown pipeline encoding.
 
 Explicit paths are supported:
 
@@ -53,15 +67,29 @@ Outputs:
 - `shorts_candidates_preview.md`: human-readable contract review.
 - `shorts_candidates_preview.html`: visual review including duration, dimensions and reasons, script-generated score, warnings, filler spans, separately labeled visual observations/risks/keyframes, and local keyframe thumbnails when the files exist.
 
-The validator does not call external model services, repair JSON through a provider, or reinterpret the Agent's scores. `text_visual` evidence is displayed but never changes scoring.
+The validator does not call external model services, repair JSON through a provider, or reinterpret the Agent's scores. Each invocation accepts exactly one evidence mode, requires every candidate to match `selection.evidence_mode`, deduplicates only inside that file, and displays visual evidence without changing scoring.
 
 ## Plan Generation
 
+Always stop for human review after both isolated candidate previews exist. If the human specifies candidate IDs, create an explicit reviewed `WORK/shorts/shorts_candidates.json` containing only those candidates and pass it with `--candidates`. If the human confirms continuation without specifying IDs, explicitly authorize the default rule with `--use-default-selection`; this selects the five highest-scoring eligible candidates from `preview/text_visual/shorts_candidates.json`.
+
+Explicit user selection:
+
 ```powershell
-python skills/video-to-shorts/scripts/plan.py --out WORK\shorts
+python skills/video-to-shorts/scripts/plan.py `
+  --out WORK\shorts `
+  --candidates WORK\shorts\shorts_candidates.json
 ```
 
-This consumes validated `shorts-candidates.v2`, applies deterministic score, completeness, duration, timeline, excerpt, overlap, and maximum-count filters, then writes:
+Human-approved default selection:
+
+```powershell
+python skills/video-to-shorts/scripts/plan.py `
+  --out WORK\shorts `
+  --use-default-selection
+```
+
+Calling `plan.py` without either selection option fails. The planner consumes validated `shorts-candidates.v2`, applies deterministic score, completeness, duration, timeline, excerpt, overlap, and maximum-count filters, then writes:
 
 - `shorts_plan.json`
 - `shorts_plan_preview.md`
@@ -90,5 +118,6 @@ Planning, short-relative transcript generation, extraction, boundary refinement,
 ## Examples
 
 - `examples/example_transcript.json`: compact word-level transcript.
-- `examples/example_shorts_candidates.json`: Agent-authored candidate v2 input without total scores.
+- `examples/example_shorts_candidates.json`: isolated `text_only` candidate v2 input without total scores.
+- `examples/example_shorts_candidates_text_visual.json`: separately authored `text_visual` candidate v2 input without total scores.
 - `examples/example_shorts_plan.json`: deterministic `shorts-plan.v2` output example.

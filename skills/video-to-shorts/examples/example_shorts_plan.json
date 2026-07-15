@@ -29,7 +29,7 @@
       },
       "score": 81,
       "hook_sentence": "",
-      "editorial_reason": "",
+      "editorial_reason": "The growth claim and qualification evidence form a complete business short.",
       "transcript_excerpt": "This is um going to be our new major growth driver. Every company that works with NVIDIA on AI has already qualified this platform.",
       "requested_filler_drop_spans": [
         {"type": "filler", "start_time": 0.8, "end_time": 1.1, "reason": "Independent filler word.", "review_status": "approved"}

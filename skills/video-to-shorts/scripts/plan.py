@@ -159,7 +159,10 @@ def normalize_candidate(item, index, transcript):
     candidate["evidence_mode"] = str(item.get("evidence_mode") or "")
     candidate["transcript_excerpt"] = str(item.get("transcript_excerpt") or "").strip()
     candidate["hook_sentence"] = str(item.get("hook_sentence") or "")
-    candidate["editorial_reason"] = str(item.get("editorial_reason") or "")
+    metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+    candidate["editorial_reason"] = str(metadata.get("editorial_reason") or "").strip()
+    if not candidate["editorial_reason"]:
+        candidate["normalization_errors"].append("EMPTY_EDITORIAL_REASON")
     requested, normalized, rejected, filler_warnings = normalize_filler_drop_spans(candidate, transcript)
     candidate["requested_filler_drop_spans"] = requested
     candidate["filler_drop_spans"] = normalized
@@ -288,7 +291,16 @@ def build_plan(selected, rejected, candidates_path, candidates_data, transcript_
 
 def run_plan(args):
     out_dir = Path(args.out).resolve()
-    candidates_path = Path(args.candidates).resolve() if args.candidates else out_dir / "shorts_candidates.json"
+    if args.candidates and args.use_default_selection:
+        fail("use either --candidates for explicit user selection or --use-default-selection, not both")
+    if args.candidates:
+        candidates_path = Path(args.candidates).resolve()
+        selection_policy = "explicit_user_selection"
+    elif args.use_default_selection:
+        candidates_path = out_dir / "preview" / "text_visual" / "shorts_candidates.json"
+        selection_policy = "default_text_visual_top_score"
+    else:
+        fail("human confirmation required: provide --candidates for user-selected clips or --use-default-selection after the user approves the default rule")
     transcript_path = Path(args.transcript).resolve() if args.transcript else out_dir / "transcript.json"
     if not candidates_path.exists():
         fail(f"shorts_candidates.json not found: {candidates_path}")
@@ -304,6 +316,7 @@ def run_plan(args):
     candidates = [normalize_candidate(item, index, transcript_data) for index, item in enumerate(raw_candidates, 1)]
     selected, rejected = select_candidates(candidates, transcript_duration(transcript_data), args)
     plan = build_plan(selected, rejected, candidates_path, candidates_data, transcript_path)
+    plan["metadata"]["candidate_selection"] = selection_policy
     out_dir.mkdir(parents=True, exist_ok=True)
     write_json(out_dir / "shorts_plan.json", plan)
     write_plan_preview_md(out_dir / "shorts_plan_preview.md", plan)
@@ -317,6 +330,7 @@ def build_parser():
     parser = argparse.ArgumentParser(description="Build shorts-plan.v2 from validated shorts-candidates.v2.")
     parser.add_argument("--out", required=True)
     parser.add_argument("--candidates")
+    parser.add_argument("--use-default-selection", action="store_true")
     parser.add_argument("--transcript")
     parser.add_argument("--max-shorts", type=int, default=5)
     parser.add_argument("--min-duration", type=float, default=20.0)
