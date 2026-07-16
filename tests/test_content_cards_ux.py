@@ -1,3 +1,4 @@
+import base64
 import copy
 import inspect
 import json
@@ -14,23 +15,25 @@ from tests.test_cards_plan import understanding_fixture
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES = ROOT / "skills/video-add-content-cards/examples"
-OPENER_PATH = ROOT / "skills/video-add-content-cards/scripts/open_gallery.py"
 BUILDER_PATH = ROOT / "skills/video-add-content-cards/scripts/build_cards_plan.py"
 REVIEW_PAGE_PATH = ROOT / "skills/video-add-content-cards/scripts/build_review_page.py"
+REVIEW_TEMPLATE_PATH = ROOT / "skills/video-add-content-cards/assets/content-cards-review.html"
 APPLY_REVIEW_PATH = ROOT / "skills/video-add-content-cards/scripts/apply_cards_review.py"
+PAYLOAD_PATTERN = re.compile(r'const REVIEW_DATA_B64 = "([A-Za-z0-9+/=]+)";')
 
 
 def plan_fixture(copy="200 customers"):
     return {
         "schema_version": 1,
         "target": "overlay",
-        "timeline_id": "source",
+        "timeline_id": "main",
         "brief": {"target_card_count": 1, "theme": "editorial"},
         "cards": [
             {
                 "id": "card-001",
                 "card_type": "stat",
                 "evidence_ref": "moment-001",
+                "source_range": {"start_s": 1.0, "end_s": 1.4},
                 "program_start_s": 1.0,
                 "duration_s": 4.0,
                 "copy": {"status": "draft", "suggested_text": copy},
@@ -66,6 +69,13 @@ def review_fixture(plan=None, selected_ids=("card-001",)):
             for card in plan["cards"]
         ],
     }
+
+
+def review_payload(document):
+    match = PAYLOAD_PATTERN.search(document)
+    if match is None:
+        raise AssertionError("review payload was not injected")
+    return json.loads(base64.b64decode(match.group(1)).decode("utf-8"))
 
 
 class GalleryTests(unittest.TestCase):
@@ -116,26 +126,6 @@ class GalleryTests(unittest.TestCase):
         self.assertIsNotNone(focused_rule)
         self.assertIn("overflow-x: hidden", focused_rule.group(1))
         self.assertIn("width: 100vw; max-width: 100vw", self.document)
-
-
-class GalleryOpenerTests(unittest.TestCase):
-    def load_opener(self):
-        self.assertTrue(OPENER_PATH.is_file(), OPENER_PATH)
-        return load_script(
-            "skills/video-add-content-cards/scripts/open_gallery.py", "open_gallery"
-        )
-
-    def test_resolves_committed_animated_gallery(self):
-        opener = self.load_opener()
-        uri = opener.open_gallery(launch=False)
-        self.assertTrue(uri.startswith("file:"))
-        self.assertTrue(opener.gallery_path().is_file())
-
-    def test_launch_uses_default_browser(self):
-        opener = self.load_opener()
-        with mock.patch.object(opener.webbrowser, "open", return_value=True) as browser:
-            uri = opener.open_gallery()
-        browser.assert_called_once_with(uri)
 
 
 class BriefTests(unittest.TestCase):
@@ -225,42 +215,215 @@ class ReviewPageTests(unittest.TestCase):
             "build_review_page",
         )
 
-    def test_review_page_contains_safe_editable_candidates(self):
-        review_page = self.load_review_page()
-        document = review_page.build_review_page(plan_fixture("</script><b>unsafe</b>"))
-        self.assertIn('type="checkbox"', document)
-        self.assertIn('name="copy"', document)
-        self.assertIn('name="placement"', document)
-        self.assertIn('id="selection-count"', document)
-        self.assertIn("editorial", document)
-        self.assertIn("Target 1", document)
-        self.assertIn("Download review JSON", document)
-        self.assertNotIn("</script><b>unsafe</b>", document)
-        self.assertIn("&lt;/script&gt;&lt;b&gt;unsafe&lt;/b&gt;", document)
+    @staticmethod
+    def fake_ffmpeg(command, **kwargs):
+        Path(command[-1]).write_bytes(b"\xff\xd8\xff\xd9")
+        return subprocess.CompletedProcess(command, 0)
 
-    def test_cli_writes_review_page_without_opening(self):
-        self.assertTrue(REVIEW_PAGE_PATH.is_file(), REVIEW_PAGE_PATH)
-        self.assertIn("--open", REVIEW_PAGE_PATH.read_text(encoding="utf-8"))
+    def test_committed_template_has_live_screenshot_placement_preview(self):
+        self.assertTrue(REVIEW_TEMPLATE_PATH.is_file(), REVIEW_TEMPLATE_PATH)
+        template = REVIEW_TEMPLATE_PATH.read_text(encoding="utf-8")
+        self.assertIn("__CONTENT_CARDS_REVIEW_DATA__", template)
+        self.assertIn('class="frame-preview"', template)
+        self.assertIn('class="placement-proxy"', template)
+        self.assertIn("image.src = card.screenshot", template)
+        for placement in ("top", "bottom", "left", "right", "center"):
+            self.assertIn(f'[data-placement="{placement}"]', template)
+        self.assertIn('placement.addEventListener("change", updatePreview)', template)
+        self.assertIn('copy.addEventListener("input", updatePreview)', template)
+        self.assertIn("font-size: clamp(10px, 1vw, 12px)", template)
+        self.assertIn("-webkit-line-clamp: 2", template)
+        self.assertNotIn("innerHTML", template)
+
+    def test_template_preserves_user_summary_review_ui(self):
+        self.assertTrue(REVIEW_TEMPLATE_PATH.is_file(), REVIEW_TEMPLATE_PATH)
+        template = REVIEW_TEMPLATE_PATH.read_text(encoding="utf-8")
+        self.assertIn('class="summary-box"', template)
+        self.assertIn("Copy the following summary back to the AI agent.", template)
+        self.assertIn('id="copy-summary"', template)
+        self.assertIn('id="summary-output"', template)
+        self.assertIn('document.execCommand("copy")', template)
+        self.assertIn('copyButton.textContent = "Copy failed"', template)
+        self.assertIn("No cards selected yet.", template)
+        self.assertNotIn("Download review JSON", template)
+
+    def test_builder_extracts_retained_source_midpoint_and_safely_injects_payload(self):
+        review_page = self.load_review_page()
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
-            plan_path = tmp / "cards-plan.json"
+            video = tmp / "source.mp4"
+            video.write_bytes(b"video")
             output = tmp / "content-cards-review.html"
-            plan_path.write_text(json.dumps(plan_fixture()), encoding="utf-8")
-            subprocess.run(
-                ["python", str(REVIEW_PAGE_PATH), str(plan_path), str(output)],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            self.assertTrue(output.is_file())
-            self.assertIn("card-001", output.read_text(encoding="utf-8"))
+            plan = plan_fixture("</script><b>unsafe</b>")
+            with mock.patch.object(
+                review_page.subprocess, "run", side_effect=self.fake_ffmpeg
+            ) as ffmpeg:
+                result = review_page.build_review_page(
+                    plan, timeline_fixture(), video, output
+                )
 
-    def test_review_page_stacks_header_and_toolbar_on_narrow_screens(self):
+            self.assertEqual(output.resolve(), result)
+            command = ffmpeg.call_args.args[0]
+            self.assertEqual("1.200000", command[command.index("-ss") + 1])
+            self.assertIn("-frames:v", command)
+            self.assertIn("scale=960:-2", command)
+            document = output.read_text(encoding="utf-8")
+            self.assertNotIn("__CONTENT_CARDS_REVIEW_DATA__", document)
+            self.assertNotIn("</script><b>unsafe</b>", document)
+            payload = review_payload(document)
+            self.assertEqual("</script><b>unsafe</b>", payload["cards"][0]["copy"])
+            self.assertEqual(
+                "content-cards-review-assets/frame-001.jpg",
+                payload["cards"][0]["screenshot"],
+            )
+            self.assertTrue(
+                (tmp / "content-cards-review-assets/frame-001.jpg").is_file()
+            )
+
+    def test_cli_requires_video_and_uses_committed_template(self):
+        script = REVIEW_PAGE_PATH.read_text(encoding="utf-8")
+        self.assertIn('parser.add_argument("--video", required=True)', script)
+        self.assertIn('parser.add_argument("--timeline", required=True)', script)
+        self.assertIn("assets/content-cards-review.html", script)
+
+    def test_missing_video_is_rejected_before_ffmpeg(self):
         review_page = self.load_review_page()
-        document = review_page.build_review_page(plan_fixture())
-        self.assertIn(".header-inner, .toolbar {", document)
-        self.assertIn("flex-direction: column", document)
-        self.assertIn(".toolbar button { width: 100%; }", document)
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            with mock.patch.object(review_page.subprocess, "run") as ffmpeg:
+                with self.assertRaises(FileNotFoundError):
+                    review_page.build_review_page(
+                        plan_fixture(),
+                        timeline_fixture(),
+                        tmp / "missing.mp4",
+                        tmp / "review.html",
+                    )
+            ffmpeg.assert_not_called()
+
+    def test_missing_source_range_is_rejected_before_ffmpeg(self):
+        review_page = self.load_review_page()
+        plan = plan_fixture()
+        del plan["cards"][0]["source_range"]
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            video = tmp / "source.mp4"
+            video.write_bytes(b"video")
+            with mock.patch.object(review_page.subprocess, "run") as ffmpeg:
+                with self.assertRaisesRegex(ValueError, "source_range"):
+                    review_page.build_review_page(
+                        plan, timeline_fixture(), video, tmp / "review.html"
+                    )
+            ffmpeg.assert_not_called()
+
+    def test_mismatched_timeline_id_is_rejected_before_ffmpeg(self):
+        review_page = self.load_review_page()
+        plan = plan_fixture()
+        plan["timeline_id"] = "another-sequence"
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            video = tmp / "source.mp4"
+            video.write_bytes(b"video")
+            with mock.patch.object(review_page.subprocess, "run") as ffmpeg:
+                with self.assertRaisesRegex(ValueError, "timeline_id"):
+                    review_page.build_review_page(
+                        plan, timeline_fixture(), video, tmp / "review.html"
+                    )
+            ffmpeg.assert_not_called()
+
+    def test_failed_frame_batch_does_not_replace_existing_review_assets(self):
+        review_page = self.load_review_page()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            video = tmp / "source.mp4"
+            video.write_bytes(b"video")
+            output = tmp / "review.html"
+            output.write_text("old review", encoding="utf-8")
+            assets = tmp / "review-assets"
+            assets.mkdir()
+            old_frame = assets / "frame-001.jpg"
+            old_frame.write_bytes(b"old frame")
+            calls = 0
+
+            def fail_second_frame(command, **kwargs):
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    raise subprocess.CalledProcessError(1, command)
+                Path(command[-1]).write_bytes(b"new frame")
+                return subprocess.CompletedProcess(command, 0)
+
+            with mock.patch.object(
+                review_page.subprocess, "run", side_effect=fail_second_frame
+            ):
+                with self.assertRaises(subprocess.CalledProcessError):
+                    review_page.build_review_page(
+                        two_card_plan_fixture(), timeline_fixture(), video, output
+                    )
+
+            self.assertEqual(b"old frame", old_frame.read_bytes())
+            self.assertEqual("old review", output.read_text(encoding="utf-8"))
+
+    def test_review_starts_unselected_at_bottom_even_for_previously_approved_cards(self):
+        review_page = self.load_review_page()
+        plan = plan_fixture()
+        plan["cards"][0]["copy"]["status"] = "approved"
+        plan["cards"][0]["placement"] = {"status": "approved", "region": "top"}
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            video = tmp / "source.mp4"
+            video.write_bytes(b"video")
+            output = tmp / "review.html"
+            with mock.patch.object(
+                review_page.subprocess, "run", side_effect=self.fake_ffmpeg
+            ):
+                review_page.build_review_page(plan, timeline_fixture(), video, output)
+            card = review_payload(output.read_text(encoding="utf-8"))["cards"][0]
+            self.assertFalse(card["selected"])
+            self.assertEqual("bottom", card["placement"])
+
+    def test_frame_midpoint_is_clamped_to_the_retained_clip(self):
+        review_page = self.load_review_page()
+        plan = plan_fixture()
+        plan["cards"][0]["source_range"] = {"start_s": 1.8, "end_s": 4.2}
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            video = tmp / "source.mp4"
+            video.write_bytes(b"video")
+            with mock.patch.object(
+                review_page.subprocess, "run", side_effect=self.fake_ffmpeg
+            ) as ffmpeg:
+                review_page.build_review_page(
+                    plan, timeline_fixture(), video, tmp / "review.html"
+                )
+            command = ffmpeg.call_args.args[0]
+            self.assertEqual("1.900000", command[command.index("-ss") + 1])
+
+    def test_varispeed_program_time_is_not_used_to_seek_source_media(self):
+        review_page = self.load_review_page()
+        plan = plan_fixture()
+        card = plan["cards"][0]
+        card["source_range"] = {"start_s": 4.0, "end_s": 4.4}
+        card["program_start_s"] = 2.0
+        card["duration_s"] = 0.2
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            video = tmp / "source.mp4"
+            video.write_bytes(b"video")
+            with mock.patch.object(
+                review_page.subprocess, "run", side_effect=self.fake_ffmpeg
+            ) as ffmpeg:
+                review_page.build_review_page(
+                    plan, timeline_fixture(), video, tmp / "review.html"
+                )
+            command = ffmpeg.call_args.args[0]
+            self.assertEqual("4.200000", command[command.index("-ss") + 1])
+
+    def test_template_stacks_candidate_controls_on_narrow_screens(self):
+        self.assertTrue(REVIEW_TEMPLATE_PATH.is_file(), REVIEW_TEMPLATE_PATH)
+        template = REVIEW_TEMPLATE_PATH.read_text(encoding="utf-8")
+        self.assertIn("@media (max-width: 780px)", template)
+        self.assertIn("flex-direction: column", template)
+        self.assertIn(".frame-preview { grid-column: 1 / -1; }", template)
 
 
 class ApplyReviewTests(unittest.TestCase):

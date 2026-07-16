@@ -26,40 +26,44 @@ review/03-content-cards/card-stills/        # one useful still per card
 review/03-content-cards/content-cards-preview.mp4  # optional short cue windows
 review/03-content-cards/content-cards-summary.md
 review/03-content-cards/content-cards-review.html  # local candidate review board
-review/03-content-cards/content-cards-review.json  # exported human choices
+review/03-content-cards/content-cards-review-assets/  # one source frame per candidate
+review/03-content-cards/content-cards-review.json  # validated human choices
 ```
 
-Keep the plan outside `cache/`. The HTML, overlay, and preview renders are reproducible.
+The reusable review page is committed at
+`skills/video-add-content-cards/assets/content-cards-review.html`. Keep the plan outside
+`cache/`. The populated HTML, screenshots, overlay, and preview renders are reproducible.
 
 ## Workflow
 
 ### 1. Interview before drafting
 
 Read `understanding.json` and the active timeline first. Count eligible graphic moments and
-recommend a target card count:
+calculate the target card count recommendation before interviewing:
 
 ```text
 min(eligible moments, max(1, round(program minutes / 0.75)))
 ```
 
-This is a target, not an automatic truncation rule. Ask one question at a time and give the
-recommendation as the default:
-
-1. What should the cards help this audience do: explain, emphasize, navigate, or convert?
-2. What target card count should this edit use?
-3. Are any `intro`, `key-quote`, `stat`, `list`, or `outro` cards required?
-4. Will captions be present, and which of `top`, `bottom`, `left`, `right`, or `center` must
-   remain clear?
-
-Immediately before asking about theme, open the real animated examples:
+This is a target, not an automatic truncation rule. Before asking any question, open the real
+animated examples yourself with the native command for the current OS. Run exactly one:
 
 ```powershell
-python skills/video-add-content-cards/scripts/open_gallery.py
+# Windows PowerShell
+Start-Process (Resolve-Path 'skills/video-add-content-cards/examples/gallery-animated.html')
 ```
 
-This opens `examples/gallery-animated.html`. If the browser cannot launch, the command prints
-the file URI for the user to open. Ask the user to compare all five themes or focus a column
-with the native picker:
+```bash
+# macOS
+open skills/video-add-content-cards/examples/gallery-animated.html
+
+# Linux desktop
+xdg-open skills/video-add-content-cards/examples/gallery-animated.html
+```
+
+If the command fails, diagnose and retry it. Do not replace this action with a URI or ask the
+user to find and click the file. The gallery compares all five themes and can focus one column
+with its native picker:
 
 | Theme | Starting character |
 |---|---|
@@ -69,9 +73,16 @@ with the native picker:
 | `dotgrid` | pixel-mono, technical |
 | `apex` | high-energy sports, red accent |
 
-**Present + STOP.** Wait for one theme choice. Then summarize the purpose, audience, target
-count, required types, clear regions, theme, and notes; ask for confirmation. If the user
-cancels, retain analysis, leave the operation `draft`, and do not author or render cards.
+Ask exactly one question at a time in this order:
+
+1. Which theme should this edit use?
+2. What target card count should this edit use? Offer the calculated recommendation as default.
+3. Which card types must be included? Offer `intro`, `key-quote`, `stat`, `list`, and `outro`;
+   default to none.
+
+**Present + STOP** after each question. After the third answer, summarize the theme, target
+count, required types, and any user-supplied notes; ask for confirmation. If the user cancels,
+retain analysis, leave the operation `draft`, and do not author or render cards.
 
 ### 2. Draft cards from shared understanding
 
@@ -80,18 +91,16 @@ python skills/video-add-content-cards/scripts/build_cards_plan.py `
   work/understand/understanding.json `
   work/timeline.json `
   work/content-cards/cards-plan.json `
-  --purpose "emphasize" `
-  --audience "existing customers" `
   --target-card-count 6 `
   --theme editorial `
   --must-include-type stat `
-  --avoid-region bottom `
   --notes "Keep product names verbatim"
 ```
 
 The script maps kept semantic moments into program time and omits moments removed by rough cut. It preserves source ranges and evidence references, clamps duration to the containing clip, and marks copy/placement/visual treatment as `draft`.
 The confirmed interview is stored as `brief` in `cards-plan.json`. Repeat
-`--must-include-type` or `--avoid-region` for multiple values; omit flags that do not apply.
+`--must-include-type` for multiple values; omit flags that do not apply. Older optional brief
+fields remain accepted for compatibility but are not part of the normal interview.
 
 ### 3. Make editorial choices
 
@@ -114,22 +123,47 @@ allow a stronger or sparser set when the evidence warrants it.
 
 ### 4. Review and apply candidate choices
 
-Generate a project-specific browser review after the candidate plan exists:
+Generate a project-specific browser review after the candidate plan exists. Pass the source
+video aligned to the plan's `source_range` and the active timeline. The script clamps each
+evidence midpoint to its containing retained clip, then populates the committed template with
+one corresponding source frame per candidate:
 
 ```powershell
 python skills/video-add-content-cards/scripts/build_review_page.py `
   work/content-cards/cards-plan.json `
   review/03-content-cards/content-cards-review.html `
-  --open
+  --video input/source.mp4 `
+  --timeline work/timeline.json
 ```
 
-The page shows card IDs, program times, evidence references, draft copy, and placement. The
-user selects cards, edits copy, chooses placement, and downloads
-`content-cards-review.json`. Put that export at
-`review/03-content-cards/content-cards-review.json`.
+Immediately open the populated review yourself with the native command for the current OS.
+Run exactly one:
 
-**Present + STOP.** Wait for the exported review. Do not author HTML from unchecked draft
-candidates. Apply the review only after the file exists:
+```powershell
+# Windows PowerShell
+Start-Process (Resolve-Path 'review/03-content-cards/content-cards-review.html')
+```
+
+```bash
+# macOS
+open review/03-content-cards/content-cards-review.html
+
+# Linux desktop
+xdg-open review/03-content-cards/content-cards-review.html
+```
+
+If the command fails, diagnose and retry it; do not ask the user to locate the file. The page
+shows each source frame, card ID, program time, editable copy, and placement. Every candidate
+starts unselected with placement set to `bottom`. Changing placement moves a gray card proxy
+over the real frame so collision risk is visible before approval. The user selects cards,
+edits copy, chooses placement, clicks **Copy summary**, and pastes the visible summary back
+into the conversation.
+
+**Present + STOP.** Wait for the pasted selection summary. Do not author HTML from unchecked
+draft candidates. Convert the summary into
+`review/03-content-cards/content-cards-review.json`: write one entry for every plan card, mark
+summary IDs selected with their chosen copy and placement, and mark all other IDs unselected
+with their current draft copy and an empty placement. Then apply the validated review:
 
 ```powershell
 python skills/video-add-content-cards/scripts/apply_cards_review.py `

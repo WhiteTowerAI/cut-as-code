@@ -1,232 +1,196 @@
-"""Build a local, editable review page from a content-cards plan."""
+"""Populate the content-card review template and extract one frame per candidate."""
 
 import argparse
-import html
+import base64
 import json
-import webbrowser
+import math
+import shutil
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
 
 
-PLACEMENTS = ("top", "bottom", "left", "right", "center")
+TEMPLATE_RELATIVE = Path("assets/content-cards-review.html")
+TEMPLATE_PATH = Path(__file__).resolve().parents[1] / TEMPLATE_RELATIVE
+PAYLOAD_MARKER = "__CONTENT_CARDS_REVIEW_DATA__"
+PLACEMENTS = {"top", "bottom", "left", "right", "center"}
+UNDERSTAND_SCRIPTS = Path(__file__).resolve().parents[2] / "video-understand" / "scripts"
+sys.path.insert(0, str(UNDERSTAND_SCRIPTS))
+import projectlib  # noqa: E402
+
+
+def _number(value, label):
+    if isinstance(value, bool):
+        raise ValueError(f"{label} must be a finite number")
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"{label} must be a finite number") from error
+    if not math.isfinite(number):
+        raise ValueError(f"{label} must be a finite number")
+    return number
+
+
+def _frame_time(card, timeline):
+    source_range = card.get("source_range")
+    if not isinstance(source_range, dict):
+        raise ValueError("card source_range is required for source-frame review")
+    start = _number(source_range.get("start_s"), "source_range.start_s")
+    end = _number(source_range.get("end_s"), "source_range.end_s")
+    if start < 0 or end <= start:
+        raise ValueError("card source_range must be a positive half-open range")
+    clip = next(
+        (
+            clip
+            for clip in timeline["clips"]
+            if clip["source_range"]["start_s"]
+            <= start
+            < clip["source_range"]["end_s"]
+        ),
+        None,
+    )
+    if clip is None:
+        raise ValueError("card source_range start is not retained by the timeline")
+    retained_end = min(end, float(clip["source_range"]["end_s"]))
+    return (start + retained_end) / 2
 
 
 def _copy_text(card):
     copy = card.get("copy", {})
-    return copy.get("text") or copy.get("suggested_text", "")
+    if not isinstance(copy, dict):
+        raise ValueError("card copy must be an object")
+    value = copy.get("text") or copy.get("suggested_text", "")
+    if not isinstance(value, str):
+        raise ValueError("card copy text must be a string")
+    return value
 
 
-def _placement_options(selected):
-    options = ['<option value="">Unplaced</option>']
-    for value in PLACEMENTS:
-        mark = " selected" if value == selected else ""
-        options.append(f'<option value="{value}"{mark}>{value.title()}</option>')
-    return "".join(options)
+def _extract_frame(video, time_s, output):
+    command = [
+        "ffmpeg",
+        "-y",
+        "-loglevel",
+        "error",
+        "-ss",
+        f"{time_s:.6f}",
+        "-i",
+        str(video),
+        "-frames:v",
+        "1",
+        "-vf",
+        "scale=960:-2",
+        "-q:v",
+        "2",
+        str(output),
+    ]
+    subprocess.run(command, check=True, capture_output=True)
+    if not output.is_file() or output.stat().st_size == 0:
+        raise RuntimeError(f"ffmpeg did not create review frame: {output}")
 
 
-def _candidate(card):
-    card_id = html.escape(str(card["id"]), quote=True)
-    card_type = html.escape(str(card.get("card_type", "unknown")))
-    evidence = html.escape(str(card.get("evidence_ref", "unknown")))
-    copy = html.escape(str(_copy_text(card)), quote=True)
-    start = float(card.get("program_start_s", 0))
-    duration = float(card.get("duration_s", 0))
-    region = card.get("placement", {}).get("region")
-    checked = " checked" if card.get("copy", {}).get("status") == "approved" else ""
-    return f"""
-      <article class="candidate" data-card-id="{card_id}">
-        <label class="pick">
-          <input type="checkbox" name="selected" aria-label="Select {card_id}"{checked}>
-        </label>
-        <div class="identity">
-          <strong>{card_id}</strong>
-          <span>{card_type}</span>
-          <span>{start:.3f}s / {duration:.3f}s</span>
-          <span>{evidence}</span>
-        </div>
-        <label class="field copy-field">
-          <span>Copy</span>
-          <input type="text" name="copy" value="{copy}">
-        </label>
-        <label class="field placement-field">
-          <span>Placement</span>
-          <select name="placement">{_placement_options(region)}</select>
-        </label>
-      </article>"""
-
-
-def build_review_page(plan):
+def _payload(plan, timeline, output):
+    errors = projectlib.validate_timeline(timeline)
+    if errors:
+        raise ValueError("invalid timeline: " + "; ".join(errors))
+    if plan.get("timeline_id") != timeline["timeline_id"]:
+        raise ValueError("plan timeline_id does not match the active timeline")
+    cards = plan.get("cards")
+    if not isinstance(cards, list):
+        raise ValueError("plan cards must be a list")
     brief = plan.get("brief", {})
-    cards = plan.get("cards", [])
-    theme = html.escape(str(brief.get("theme", "unselected")))
+    if not isinstance(brief, dict):
+        raise ValueError("plan brief must be an object")
     target = brief.get("target_card_count", len(cards))
-    rows = "".join(_candidate(card) for card in cards)
-    prefix = """<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Content cards review</title>
-  <style>
-    :root {
-      color-scheme: dark;
-      --bg: #151719;
-      --band: #1d2023;
-      --surface: #24282b;
-      --line: #3b4145;
-      --text: #f2eee5;
-      --muted: #aeb4b7;
-      --accent: #4fc3b4;
-      --warning: #f3bd5b;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      font: 14px/1.45 system-ui, sans-serif;
-      letter-spacing: 0;
-    }
-    header { border-bottom: 1px solid var(--line); background: var(--band); }
-    .header-inner, main { width: min(1180px, calc(100% - 32px)); margin: 0 auto; }
-    .header-inner { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; padding: 20px 0; }
-    h1 { margin: 0; font-size: 22px; letter-spacing: 0; }
-    .summary { display: flex; gap: 18px; color: var(--muted); white-space: nowrap; }
-    .summary strong { color: var(--text); }
-    main { padding: 20px 0 40px; }
-    .toolbar {
-      position: sticky;
-      top: 0;
-      z-index: 2;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      min-height: 58px;
-      padding: 8px 0;
-      background: var(--bg);
-      border-bottom: 1px solid var(--line);
-    }
-    #selection-count { color: var(--warning); }
-    #selection-count.on-target { color: var(--accent); }
-    button {
-      min-height: 38px;
-      padding: 8px 12px;
-      border: 1px solid var(--accent);
-      border-radius: 6px;
-      background: transparent;
-      color: var(--text);
-      font: inherit;
-      cursor: pointer;
-    }
-    button:hover, button:focus-visible { background: #253b38; outline: none; }
-    form { display: grid; gap: 10px; padding-top: 14px; }
-    .candidate {
-      display: grid;
-      grid-template-columns: 40px 180px minmax(260px, 1fr) 170px;
-      gap: 14px;
-      align-items: center;
-      min-height: 104px;
-      padding: 14px;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      background: var(--surface);
-    }
-    .pick { display: grid; place-items: center; align-self: stretch; cursor: pointer; }
-    .pick input { width: 20px; height: 20px; accent-color: var(--accent); }
-    .identity { display: grid; gap: 2px; min-width: 0; color: var(--muted); }
-    .identity strong { color: var(--text); font-size: 15px; }
-    .identity span { overflow-wrap: anywhere; }
-    .field { display: grid; gap: 6px; min-width: 0; color: var(--muted); }
-    input[type="text"], select {
-      width: 100%;
-      min-height: 40px;
-      border: 1px solid #50575c;
-      border-radius: 4px;
-      background: #171a1c;
-      color: var(--text);
-      font: inherit;
-      padding: 8px 10px;
-    }
-    input[type="text"]:focus, select:focus { border-color: var(--accent); outline: 2px solid #265950; }
-    @media (max-width: 780px) {
-      .header-inner, .toolbar { align-items: stretch; flex-direction: column; gap: 10px; }
-      .toolbar { position: static; }
-      .toolbar button { width: 100%; }
-      .summary { display: grid; gap: 2px; white-space: normal; }
-      .candidate { grid-template-columns: 36px 1fr; align-items: start; }
-      .copy-field, .placement-field { grid-column: 2; }
-    }
-  </style>
-</head>"""
-    heading = f"""
-<body data-target="{target}">
-  <header>
-    <div class="header-inner">
-      <h1>Content cards review</h1>
-      <div class="summary"><span>Theme {theme}</span><span>Target {target}</span></div>
-    </div>
-  </header>
-  <main>
-    <div class="toolbar">
-      <strong id="selection-count" aria-live="polite"></strong>
-      <button id="download" type="button">Download review JSON</button>
-    </div>
-    <form id="review-form">{rows}
-    </form>
-  </main>"""
-    suffix = """
-  <script>
-    const candidates = [...document.querySelectorAll(".candidate")];
-    const target = Number(document.body.dataset.target);
-    const count = document.querySelector("#selection-count");
-    function selectedCount() {
-      return candidates.filter((row) => row.querySelector('[name="selected"]').checked).length;
-    }
-    function updateCount() {
-      const selected = selectedCount();
-      count.textContent = `${selected} selected / target ${target}`;
-      count.classList.toggle("on-target", selected === target);
-    }
-    for (const checkbox of document.querySelectorAll('[name="selected"]')) {
-      checkbox.addEventListener("change", updateCount);
-    }
-    document.querySelector("#download").addEventListener("click", () => {
-      const review = {
-        schema_version: 1,
-        cards: candidates.map((row) => ({
-          id: row.dataset.cardId,
-          selected: row.querySelector('[name="selected"]').checked,
-          copy: row.querySelector('[name="copy"]').value,
-          placement: row.querySelector('[name="placement"]').value,
-        })),
-      };
-      const url = URL.createObjectURL(new Blob([JSON.stringify(review, null, 2) + "\\n"], {type: "application/json"}));
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "content-cards-review.json";
-      link.click();
-      URL.revokeObjectURL(url);
-    });
-    updateCount();
-  </script>
-</body>
-</html>
-"""
-    return prefix + heading + suffix
+    if not isinstance(target, int) or isinstance(target, bool) or target < 1:
+        raise ValueError("brief target_card_count must be a positive integer")
+    theme = brief.get("theme", "unselected")
+    if not isinstance(theme, str):
+        raise ValueError("brief theme must be a string")
+
+    assets_dir = output.parent / f"{output.stem}-assets"
+    payload_cards = []
+    frame_specs = []
+    for index, card in enumerate(cards, 1):
+        if not isinstance(card, dict) or not isinstance(card.get("id"), str):
+            raise ValueError("every card must be an object with a string id")
+        frame = assets_dir / f"frame-{index:03d}.jpg"
+        frame_specs.append((_frame_time(card, timeline), frame))
+        placement = card.get("placement", {})
+        if not isinstance(placement, dict):
+            raise ValueError("card placement must be an object")
+        region = placement.get("region") or ""
+        if region and region not in PLACEMENTS:
+            raise ValueError(f"invalid card placement: {region!r}")
+        payload_cards.append(
+            {
+                "id": card["id"],
+                "card_type": str(card.get("card_type", "unknown")),
+                "evidence_ref": str(card.get("evidence_ref", "unknown")),
+                "program_start_s": _number(
+                    card.get("program_start_s"), "program_start_s"
+                ),
+                "duration_s": _number(card.get("duration_s"), "duration_s"),
+                "copy": _copy_text(card),
+                "placement": "bottom",
+                "selected": False,
+                "screenshot": frame.relative_to(output.parent).as_posix(),
+            }
+        )
+    return {"theme": theme, "target": target, "cards": payload_cards}, frame_specs
+
+
+def build_review_page(plan, timeline, video, output):
+    video = Path(video).resolve()
+    if not video.is_file():
+        raise FileNotFoundError(f"review source video not found: {video}")
+    if not TEMPLATE_PATH.is_file():
+        raise FileNotFoundError(f"review template not found: {TEMPLATE_PATH}")
+
+    output = Path(output).resolve()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    template = TEMPLATE_PATH.read_text(encoding="utf-8")
+    if template.count(PAYLOAD_MARKER) != 1:
+        raise ValueError("review template must contain exactly one payload marker")
+    payload, frame_specs = _payload(plan, timeline, output)
+    data = json.dumps(
+        payload, ensure_ascii=False, separators=(",", ":")
+    ).encode("utf-8")
+    document = template.replace(PAYLOAD_MARKER, base64.b64encode(data).decode("ascii"))
+
+    assets_dir = output.parent / f"{output.stem}-assets"
+    with tempfile.TemporaryDirectory(
+        dir=output.parent, prefix=f".{output.stem}-frames-"
+    ) as temporary:
+        temporary = Path(temporary)
+        staged_frames = []
+        for time_s, final_frame in frame_specs:
+            staged_frame = temporary / final_frame.name
+            _extract_frame(video, time_s, staged_frame)
+            staged_frames.append((staged_frame, final_frame))
+        assets_dir.mkdir(parents=True, exist_ok=True)
+        expected_frames = {final.name for _, final in staged_frames}
+        for staged_frame, final_frame in staged_frames:
+            final_frame.unlink(missing_ok=True)
+            shutil.copyfile(staged_frame, final_frame)
+        for stale_frame in assets_dir.glob("frame-*.jpg"):
+            if stale_frame.name not in expected_frames:
+                stale_frame.unlink()
+        output.unlink(missing_ok=True)
+        output.write_text(document, encoding="utf-8")
+    return output
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("plan")
     parser.add_argument("output")
-    parser.add_argument("--open", action="store_true", help="open the generated review page")
+    parser.add_argument("--video", required=True)
+    parser.add_argument("--timeline", required=True)
     args = parser.parse_args(argv)
     plan = json.loads(Path(args.plan).read_text(encoding="utf-8"))
-    output = Path(args.output).resolve()
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(build_review_page(plan), encoding="utf-8")
-    print(output)
-    if args.open:
-        webbrowser.open(output.as_uri())
+    timeline = json.loads(Path(args.timeline).read_text(encoding="utf-8"))
+    print(build_review_page(plan, timeline, args.video, args.output))
 
 
 if __name__ == "__main__":
