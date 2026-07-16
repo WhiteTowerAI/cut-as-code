@@ -82,6 +82,14 @@ def project_fixture(root):
                 "status": "verified",
                 "plan": None,
                 "outputs": [],
+                "target": {"sequence": "main", "scope": "evidence"},
+                "effects": {
+                    "changes_timeline": False,
+                    "changes_geometry": False,
+                    "changes_video_pixels": False,
+                    "changes_audio": False,
+                    "adds_track": None,
+                },
             },
             {
                 "id": "rough-cut",
@@ -92,6 +100,14 @@ def project_fixture(root):
                 "status": "verified",
                 "plan": "rough-cut/edit-plan.json",
                 "outputs": ["timeline.json"],
+                "target": {"sequence": "main", "scope": "timeline"},
+                "effects": {
+                    "changes_timeline": True,
+                    "changes_geometry": False,
+                    "changes_video_pixels": False,
+                    "changes_audio": True,
+                    "adds_track": None,
+                },
                 "render": {
                     "kind": "timeline-transform",
                     "input": "../input/source.mp4",
@@ -106,6 +122,14 @@ def project_fixture(root):
                 "status": "approved",
                 "plan": "content-cards/cards-plan.json",
                 "outputs": ["cache/content-cards-overlay.mov"],
+                "target": {"sequence": "main", "scope": "graphics"},
+                "effects": {
+                    "changes_timeline": False,
+                    "changes_geometry": False,
+                    "changes_video_pixels": False,
+                    "changes_audio": False,
+                    "adds_track": "graphics",
+                },
                 "render": {
                     "kind": "overlay",
                     "asset": "cache/content-cards-overlay.mov",

@@ -41,16 +41,22 @@ def dangling_exit(z):
     last = kept[-1]["word"]
     nxt = after[0]["word"] if after else ""
     if norm(last) in DANGLERS:
-        return f"⚠ dangling exit: ends on '{last.strip()}' (hanging word)"
+        return f"WARNING: dangling exit: ends on '{last.strip()}' (hanging word)"
     # capitalized X Y proper-noun split: keep "Southern", drop "Cross". A trailing
     # ./!/?/… means the kept word ENDS a sentence (a clean boundary, and the next
     # capital just starts the next sentence) — don't warn on those.
     if (nxt and is_cap(last) and is_cap(nxt) and norm(last) not in ("i",)
             and not last.strip().endswith((".", "!", "?", "…"))):
-        return f"⚠ dangling exit: splits proper noun '{last.strip()} {nxt.strip()}'"
+        return f"WARNING: dangling exit: splits proper noun '{last.strip()} {nxt.strip()}'"
     return ""
 
-for i, b in enumerate(coarse["keep"], 1):
+blocks = coarse.get("keep") or [
+    {"in": decision["start_s"], "out": decision["end_s"]}
+    for decision in coarse.get("decisions", [])
+    if decision.get("action") == "keep"
+]
+
+for i, b in enumerate(blocks, 1):
     a, z = float(b["in"]), float(b["out"])
     print(f"\n### block {i}: in={a} out={z}  ({a/60:.2f}-{z/60:.2f} min)")
     print(f"  ENTER [{a-2.0:.1f}|{a:.1f} -> {a+4.0:.1f}]:")

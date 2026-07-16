@@ -77,6 +77,7 @@ def _grade_filter(contribution, project_root, plan_dir):
             raise ValueError(f"selected LUT is missing: {lut_value}")
         layer = f"lut3d={lut_path.name}"
         cwd = lut_path.parent
+        return layer, cwd
     else:
         layer = (look.get("chain") or "").strip()
     if look.get("prepend_base", True) and base:
@@ -164,7 +165,13 @@ def _build(plan, project_root, plan_dir):
                     raise ValueError("delivery cannot use LUTs from multiple folders")
                 lut_cwd = cwd
         elif kind == "overlay":
-            overlays.append(_resolve(project_root, plan_dir, contribution["asset"]))
+            overlays.append(
+                {
+                    "path": _resolve(project_root, plan_dir, contribution["asset"]),
+                    "start_s": float(contribution.get("start_s", 0)),
+                    "duration_s": contribution.get("duration_s"),
+                }
+            )
         elif kind == "audio-filter":
             chain = contribution.get("filter")
             if not chain and contribution.get("plan"):
@@ -175,7 +182,13 @@ def _build(plan, project_root, plan_dir):
         elif kind == "precomputed-asset":
             if contribution.get("target") != "overlay":
                 raise ValueError("precomputed-asset currently requires target=overlay")
-            overlays.append(_resolve(project_root, plan_dir, contribution["asset"]))
+            overlays.append(
+                {
+                    "path": _resolve(project_root, plan_dir, contribution["asset"]),
+                    "start_s": float(contribution.get("start_s", 0)),
+                    "duration_s": contribution.get("duration_s"),
+                }
+            )
         elif kind == "output-constraint":
             constraints.update({key: value for key, value in contribution.items() if key not in ("kind", "operation")})
         elif kind not in ("timeline-transform",):
@@ -186,15 +199,24 @@ def _build(plan, project_root, plan_dir):
         graph.append(f"[{video_label}]{chain}[{output_label}]")
         video_label = output_label
 
-    for overlay_index, overlay in enumerate(overlays):
+    for overlay_index, overlay_spec in enumerate(overlays):
+        overlay = overlay_spec["path"]
         if not overlay.is_file():
             raise ValueError(f"overlay is missing: {overlay}")
         command += ["-i", str(overlay)]
         overlay_label = f"overlay-{overlay_index}"
         output_label = f"video-{len(graph)}"
-        graph.append(f"[{next_input}:v:0]setpts=PTS-STARTPTS[{overlay_label}]")
+        start_s = overlay_spec["start_s"]
         graph.append(
-            f"[{video_label}][{overlay_label}]overlay=eof_action=pass:shortest=0:format=auto[{output_label}]"
+            f"[{next_input}:v:0]setpts=PTS-STARTPTS+{start_s:.6f}/TB[{overlay_label}]"
+        )
+        enable = ""
+        if overlay_spec["duration_s"] is not None:
+            end_s = start_s + float(overlay_spec["duration_s"])
+            enable = f":enable='between(t,{start_s:.6f},{end_s:.6f})'"
+        graph.append(
+            f"[{video_label}][{overlay_label}]overlay=eof_action=pass:shortest=0:format=auto"
+            f"{enable}[{output_label}]"
         )
         video_label = output_label
         next_input += 1
@@ -220,6 +242,13 @@ def _build(plan, project_root, plan_dir):
         graph.append(f"{source_audio}{','.join(audio_filters)}[filtered-audio]")
         audio_label = "filtered-audio"
 
+    output_label = f"video-{len(graph)}"
+    graph.append(
+        f"[{video_label}]tpad=stop_mode=clone:stop_duration="
+        f"{float(timeline['program_duration_s']):.6f}[{output_label}]"
+    )
+    video_label = output_label
+
     command += ["-filter_complex", ";".join(graph), "-map", f"[{video_label}]"]
     if audio_filtered:
         command += ["-map", f"[{audio_label}]", "-c:a", "aac", "-b:a", "160k", "-ar", "48000"]
@@ -232,7 +261,8 @@ def _build(plan, project_root, plan_dir):
         "-preset", constraints.get("preset", "veryfast"),
         "-crf", str(constraints.get("crf", 20)),
         "-pix_fmt", constraints.get("pix_fmt", "yuv420p"),
-        "-movflags", "+faststart", "-shortest", str(output),
+        "-movflags", "+faststart",
+        "-t", f"{float(timeline['program_duration_s']):.6f}", str(output),
     ]
     return command, lut_cwd, output
 
@@ -247,7 +277,58 @@ def render(plan, project_root, plan_dir=None):
     command, cwd, output = _build(plan, project_root, plan_dir)
     output.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(command, cwd=cwd, check=True)
+    timeline = _load(_resolve(project_root, plan_dir, plan["timeline"]))
+    source = _resolve(project_root, plan_dir, plan["source"])
+    _verify_delivery(output, timeline, source)
     return output
+
+
+def _probe_delivery(path):
+    result = subprocess.run(
+        [
+            "ffprobe", "-v", "error", "-show_entries",
+            "stream=codec_type,width,height,duration:format=duration", "-of", "json",
+            str(path),
+        ],
+        check=True, capture_output=True, text=True,
+    )
+    return json.loads(result.stdout)
+
+
+def _verify_delivery(output, timeline, source=None):
+    info = _probe_delivery(output)
+    fps = timeline["fps"]
+    tolerance = fps["den"] / fps["num"]
+    actual = float(info["format"]["duration"])
+    expected = float(timeline["program_duration_s"])
+    if abs(actual - expected) > tolerance:
+        raise ValueError(
+            f"delivery duration mismatch: expected {expected:.6f}, actual {actual:.6f}"
+        )
+    streams = {stream.get("codec_type"): stream for stream in info.get("streams", [])}
+    if "video" not in streams:
+        raise ValueError("delivery video stream is missing")
+    if source is not None:
+        source_info = _probe_delivery(source)
+        source_streams = {
+            stream.get("codec_type"): stream for stream in source_info.get("streams", [])
+        }
+        source_video = source_streams.get("video", {})
+        output_video = streams["video"]
+        if (
+            output_video.get("width"), output_video.get("height")
+        ) != (
+            source_video.get("width"), source_video.get("height")
+        ):
+            raise ValueError("delivery dimensions do not match source")
+        if "audio" in source_streams and "audio" not in streams:
+            raise ValueError("delivery audio stream is missing")
+    if "audio" in streams:
+        video_duration = float(streams["video"].get("duration") or actual)
+        audio_duration = float(streams["audio"].get("duration") or actual)
+        if abs(video_duration - audio_duration) > tolerance:
+            raise ValueError("delivery audio and video durations differ by more than one frame")
+    return info
 
 
 def _write_delivery_report(output, project_root):

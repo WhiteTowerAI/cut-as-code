@@ -143,8 +143,46 @@ def validate_project(project, project_root, check_files=True, check_media=False)
         seen.add(operation_id)
     nodes = operation_map(project)
 
+    effect_flags = (
+        "changes_timeline",
+        "changes_geometry",
+        "changes_video_pixels",
+        "changes_audio",
+    )
     for operation in operations:
         _validate_node(operation, nodes, errors)
+        operation_id = operation.get("id") or "<missing-id>"
+        target = operation.get("target")
+        if not isinstance(target, dict):
+            errors.append(f"{operation_id} target must be an object")
+        else:
+            if not str(target.get("sequence", "")).strip():
+                errors.append(f"{operation_id} target sequence is required")
+            if not str(target.get("scope", "")).strip():
+                errors.append(f"{operation_id} target scope is required")
+        effects = operation.get("effects")
+        if not isinstance(effects, dict):
+            errors.append(f"{operation_id} effects must be an object")
+        else:
+            for flag in effect_flags:
+                if not isinstance(effects.get(flag), bool):
+                    errors.append(f"{operation_id} effects {flag} must be boolean")
+            adds_track = effects.get("adds_track")
+            if adds_track is not None and (
+                not isinstance(adds_track, str) or not adds_track.strip()
+            ):
+                errors.append(f"{operation_id} effects adds_track must be null or non-empty")
+        check = operation.get("check")
+        if check is not None:
+            if not isinstance(check, dict):
+                errors.append(f"{operation_id} check must be an object")
+            else:
+                if check.get("status") not in ("pending", "pass", "fail"):
+                    errors.append(
+                        f"{operation_id} check status must be pending, pass, or fail"
+                    )
+                if not str(check.get("report", "")).strip():
+                    errors.append(f"{operation_id} check report is required")
 
     graph = {
         operation_id: {
@@ -163,6 +201,13 @@ def validate_project(project, project_root, check_files=True, check_media=False)
 
     active = project.get("active_sequence")
     sequences = project.get("sequences", {})
+    for operation in operations:
+        target = operation.get("target")
+        if isinstance(target, dict) and target.get("sequence") not in sequences:
+            errors.append(
+                f"{operation.get('id') or '<missing-id>'} target sequence does not exist: "
+                f"{target.get('sequence')!r}"
+            )
     if active not in sequences:
         errors.append(f"active_sequence does not exist: {active!r}")
     else:
@@ -185,6 +230,15 @@ def validate_project(project, project_root, check_files=True, check_media=False)
                 else:
                     if not path.is_file():
                         errors.append(f"{node.get('id')} missing file: {plan}")
+            report = node.get("check", {}).get("report")
+            if report:
+                try:
+                    report_path = resolve_project_path(project_root, report)
+                except ValueError as exc:
+                    errors.append(str(exc))
+                else:
+                    if not report_path.is_file():
+                        errors.append(f"{node.get('id')} missing check report: {report}")
 
         if active in sequences:
             timeline_value = sequences[active].get("timeline")
@@ -273,6 +327,16 @@ def start_here_text(project, project_root):
         lines.append(
             f"- {operation_id.replace('-', ' ').title()}: revision {operation['revision']}, "
             f"status {operation['status']}{report_text}"
+        )
+    for review in project.get("reviews", []):
+        output = review.get("output")
+        output_text = (
+            f" - `{output[3:] if output and output.startswith('../') else output}`"
+            if output else ""
+        )
+        lines.append(
+            f"- {review.get('id', 'review')}: revision {review.get('revision', 1)}, "
+            f"status {review.get('status', 'draft')}{output_text}"
         )
     lines += [
         "",
@@ -379,9 +443,13 @@ def _validate_grade_choice(plan, contribution, operation_id, errors):
         errors.append(f"{operation_id} selected_look is required for delivery")
     elif selected not in names:
         errors.append(f"{operation_id} selected look not found: {selected}")
+    if plan.get("selection_mode") not in ("human", "agent"):
+        errors.append(f"{operation_id} selection_mode must be human or agent")
+    if not str(plan.get("selection_rationale", "")).strip():
+        errors.append(f"{operation_id} selection_rationale is required")
 
 
-def _validate_cards_choices(plan, operation_id, errors):
+def _validate_cards_choices(plan, operation_id, errors, project_root=None, expected_fps=None):
     if plan.get("schema_version") != 1 or plan.get("target") != "overlay":
         errors.append(f"{operation_id} cards plan must be schema V1 with overlay target")
         return
@@ -391,6 +459,39 @@ def _validate_cards_choices(plan, operation_id, errors):
             value = card.get(field, {})
             if value.get("status") not in ("approved", "verified"):
                 errors.append(f"{card_id} {field} is not approved for delivery")
+        copy = card.get("copy", {})
+        display = copy.get("display", {})
+        if not isinstance(display, dict) or not str(display.get("title", "")).strip():
+            errors.append(f"{card_id} approved copy.display.title is required")
+        placement = card.get("placement", {})
+        if placement.get("face_clearance") != "verified":
+            errors.append(f"{card_id} face_clearance is not verified")
+        if not placement.get("review_still"):
+            errors.append(f"{card_id} composited review_still is required")
+        elif project_root is not None:
+            try:
+                review_still = resolve_project_path(project_root, placement["review_still"])
+            except ValueError as exc:
+                errors.append(str(exc))
+            else:
+                if not review_still.is_file():
+                    errors.append(f"{card_id} composited review_still is missing")
+        renderer = card.get("renderer", {})
+        if not renderer.get("composition") or not renderer.get("asset"):
+            errors.append(f"{card_id} renderer composition and asset are required")
+        fps = renderer.get("fps", {})
+        if (
+            not isinstance(fps, dict)
+            or not isinstance(fps.get("num"), int)
+            or isinstance(fps.get("num"), bool)
+            or not isinstance(fps.get("den"), int)
+            or isinstance(fps.get("den"), bool)
+            or fps.get("num", 0) <= 0
+            or fps.get("den", 0) <= 0
+        ):
+            errors.append(f"{card_id} renderer fps num and den must be positive integers")
+        elif expected_fps and fps != expected_fps:
+            errors.append(f"{card_id} renderer fps does not match timeline fps")
 
 
 def build_render_plan(project, project_root):
@@ -417,6 +518,7 @@ def build_render_plan(project, project_root):
             errors.append(f"project source is missing: {source_value}")
 
     timeline_value = sequence.get("timeline")
+    timeline = None
     if not timeline_value:
         errors.append(f"sequence {sequence_name} has no timeline")
         timeline_relative = None
@@ -426,6 +528,8 @@ def build_render_plan(project, project_root):
         )
         if not timeline_path.is_file():
             errors.append(f"sequence {sequence_name} missing timeline: {timeline_value}")
+        else:
+            timeline = load_json(timeline_path)
 
     compiled = []
     for operation_id in sequence.get("operations", []):
@@ -437,7 +541,11 @@ def build_render_plan(project, project_root):
             cards_path = resolve_project_path(project_root, operation["plan"])
             if cards_path.is_file():
                 try:
-                    _validate_cards_choices(load_json(cards_path), operation_id, errors)
+                    _validate_cards_choices(
+                        load_json(cards_path), operation_id, errors,
+                        project_root=project_root,
+                        expected_fps=timeline.get("fps") if timeline else None,
+                    )
                 except (OSError, ValueError, json.JSONDecodeError) as exc:
                     errors.append(f"{operation_id} invalid cards plan: {exc}")
         declared = operation.get("render")

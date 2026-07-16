@@ -22,10 +22,12 @@ class RenderPlanTests(unittest.TestCase):
         for directory in (
             "input", "final", "work/rough-cut", "work/color-grade",
             "work/content-cards", "work/cache", "work/render",
+            "review/03-content-cards/card-stills",
         ):
             (self.root / directory).mkdir(parents=True, exist_ok=True)
         (self.root / "input/source.mp4").write_bytes(b"source")
         (self.root / "work/cache/content-cards-overlay.mov").write_bytes(b"overlay")
+        (self.root / "review/03-content-cards/card-stills/card-001.jpg").write_bytes(b"still")
         write_json(self.root / "work/timeline.json", timeline_fixture())
         write_json(self.root / "work/rough-cut/edit-plan.json", {})
         write_json(
@@ -36,6 +38,8 @@ class RenderPlanTests(unittest.TestCase):
                 "base": "eq=contrast=1.1",
                 "looks": [{"name": "clean", "chain": "null"}],
                 "selected_look": "clean",
+                "selection_mode": "agent",
+                "selection_rationale": "Fixture selection.",
             },
         )
         write_json(
@@ -46,9 +50,26 @@ class RenderPlanTests(unittest.TestCase):
                 "cards": [
                     {
                         "id": "card-001",
-                        "copy": {"status": "approved", "text": "Approved"},
-                        "placement": {"status": "approved", "region": "top"},
+                        "copy": {
+                            "status": "approved",
+                            "display": {
+                                "eyebrow": "",
+                                "title": "Approved",
+                                "detail": "",
+                            },
+                        },
+                        "placement": {
+                            "status": "approved",
+                            "region": "top",
+                            "face_clearance": "verified",
+                            "review_still": "../review/03-content-cards/card-stills/card-001.jpg",
+                        },
                         "visual_treatment": {"status": "approved"},
+                        "renderer": {
+                            "composition": "cache/content-cards/index.html",
+                            "asset": "cache/content-cards-overlay.mov",
+                            "fps": {"num": 30, "den": 1},
+                        },
                     }
                 ],
             },
@@ -68,6 +89,14 @@ class RenderPlanTests(unittest.TestCase):
             "status": "approved",
             "plan": "color-grade/grade-plan.json",
             "outputs": [],
+            "target": {"sequence": "main", "scope": "base-video"},
+            "effects": {
+                "changes_timeline": False,
+                "changes_geometry": False,
+                "changes_video_pixels": True,
+                "changes_audio": False,
+                "adds_track": None,
+            },
             "render": {
                 "kind": "video-filter",
                 "target": "base-video",
@@ -138,6 +167,27 @@ class RenderPlanTests(unittest.TestCase):
         del grade["selected_look"]
         write_json(path, grade)
         with self.assertRaisesRegex(ValueError, "selected_look"):
+            self.build()
+
+    def test_delivery_cards_require_renderer_fps(self):
+        path = self.root / "work/content-cards/cards-plan.json"
+        plan = json.loads(path.read_text(encoding="utf-8"))
+        plan["cards"][0]["renderer"].pop("fps", None)
+        write_json(path, plan)
+        with self.assertRaisesRegex(ValueError, "renderer fps"):
+            self.build()
+
+    def test_delivery_cards_require_existing_composited_review_still(self):
+        (self.root / "review/03-content-cards/card-stills/card-001.jpg").unlink()
+        with self.assertRaisesRegex(ValueError, "review_still is missing"):
+            self.build()
+
+    def test_delivery_card_renderer_fps_matches_timeline(self):
+        path = self.root / "work/content-cards/cards-plan.json"
+        plan = json.loads(path.read_text(encoding="utf-8"))
+        plan["cards"][0]["renderer"]["fps"] = {"num": 24, "den": 1}
+        write_json(path, plan)
+        with self.assertRaisesRegex(ValueError, "renderer fps does not match timeline"):
             self.build()
 
     def test_delivery_cards_require_completed_human_choices(self):
@@ -216,6 +266,8 @@ class DeliveryIntegrationTests(unittest.TestCase):
                 "base": "eq=brightness=0.05",
                 "looks": [{"name": "clean", "chain": "null"}],
                 "selected_look": "clean",
+                "selection_mode": "agent",
+                "selection_rationale": "Fixture selection.",
             },
         )
         self.plan = {
@@ -276,11 +328,40 @@ class DeliveryIntegrationTests(unittest.TestCase):
         self.assertLess(graph.index("eq=brightness"), graph.index("overlay="))
         self.assertNotIn("copy", command[command.index("-c:a") + 1])
 
+    def test_delivery_targets_program_duration_without_shortest_truncation(self):
+        command = render_project.build_command(self.plan, self.root)
+        graph = command[command.index("-filter_complex") + 1]
+        self.assertIn("tpad=stop_mode=clone", graph)
+        self.assertNotIn("-shortest", command)
+        final_t = max(index for index, value in enumerate(command) if value == "-t")
+        self.assertEqual("3.000000", command[final_t + 1])
+
+    def test_overlay_contribution_can_start_at_program_time(self):
+        plan = json.loads(json.dumps(self.plan))
+        plan["contributions"][2]["start_s"] = 1.25
+        plan["contributions"][2]["duration_s"] = 0.75
+        command = render_project.build_command(plan, self.root)
+        graph = command[command.index("-filter_complex") + 1]
+        self.assertIn("setpts=PTS-STARTPTS+1.250000/TB", graph)
+        self.assertIn("enable='between(t,1.250000,2.000000)'", graph)
+
     def test_renderer_rejects_invalid_video_filter_target(self):
         plan = json.loads(json.dumps(self.plan))
         plan["contributions"][1]["target"] = "captions"
         with self.assertRaisesRegex(ValueError, "target"):
             render_project.build_command(plan, self.root)
+
+    def test_selected_lut_replaces_base_instead_of_double_applying_it(self):
+        lut = self.root / "work/color-grade/selected.cube"
+        lut.write_text("TITLE \"fixture\"\nLUT_3D_SIZE 2\n", encoding="ascii")
+        grade_path = self.root / "work/color-grade/grade-plan.json"
+        grade = json.loads(grade_path.read_text(encoding="utf-8"))
+        grade["selected_lut"] = "selected.cube"
+        write_json(grade_path, grade)
+        command = render_project.build_command(self.plan, self.root)
+        graph = command[command.index("-filter_complex") + 1]
+        self.assertIn("lut3d=selected.cube", graph)
+        self.assertNotIn("eq=brightness=0.05", graph)
 
     def test_renderer_revalidates_timeline(self):
         timeline = timeline_fixture()
@@ -307,6 +388,26 @@ class DeliveryIntegrationTests(unittest.TestCase):
             float(streams["audio"]["duration"]),
             delta=1 / 30,
         )
+
+    def test_delivery_verifier_rejects_missing_source_audio(self):
+        silent = self.root / "final/silent.mp4"
+        self._run_ffmpeg(
+            "-f", "lavfi", "-i", "color=c=black:size=160x90:rate=30:duration=3",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", str(silent),
+        )
+        with self.assertRaisesRegex(ValueError, "audio stream is missing"):
+            render_project._verify_delivery(silent, timeline_fixture(), self.source)
+
+    def test_delivery_verifier_rejects_dimension_change(self):
+        wrong_size = self.root / "final/wrong-size.mp4"
+        self._run_ffmpeg(
+            "-f", "lavfi", "-i", "color=c=black:size=80x46:rate=30:duration=3",
+            "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=3",
+            "-shortest", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac",
+            str(wrong_size),
+        )
+        with self.assertRaisesRegex(ValueError, "dimensions"):
+            render_project._verify_delivery(wrong_size, timeline_fixture(), self.source)
 
     def test_identity_timeline_copies_audio_when_only_overlay_changes_video(self):
         plan = dict(self.plan)

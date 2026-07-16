@@ -38,7 +38,10 @@ Use these durable project files:
 ```text
 work/rough-cut/edit-plan.json    # hand-authored keep/drop decisions only
 work/timeline.json               # generated precision ranges + source/program mapping
-review/01-rough-cut/             # summary, timeline map, risky-boundary reel
+review/01-rough-cut/cut-summary.md
+review/01-rough-cut/timeline-map.png
+review/01-rough-cut/boundary-review.mp4
+review/01-rough-cut/full-proxy.mp4  # optional whole-program pacing review
 ```
 
 Each canonical decision has a stable `id`, `action` (`keep` or `drop`), `start_s`,
@@ -58,13 +61,26 @@ optionally assign linear varispeed, then generate the shared timeline:
 ```powershell
 python skills/video-rough-cut/scripts/build_edit.py work/rough-cut/edit-plan.json work/understand/transcript.json work/cache/edit-final.json
 python skills/video-rough-cut/scripts/assign_speed.py work/cache/edit-final.json work/understand/transcript.json
-python skills/video-understand/scripts/build_timeline.py work/cache/edit-final.json work/timeline.json --fps-num 30 --fps-den 1
+python skills/video-understand/scripts/build_timeline.py work/cache/edit-final.json work/timeline.json --fps-num SOURCE_FPS_NUM --fps-den SOURCE_FPS_DEN
 ```
 
-Review a timeline map and short risky-boundary reel. A full proxy is optional. Record a
-`timeline-transform` render contribution, update the operation integer `revision`, and set
-`based_on` to the exact understanding revision consumed. The shared delivery renderer
-encodes the active sequence after all revision checks pass.
+Use the exact rational FPS from `work/understand/media.json`; never round `30000/1001` to
+`30/1`. Review `timeline-map.png` and the short `boundary-review.mp4`. Generate
+`full-proxy.mp4` only when whole-program pacing must be reviewed. Write the result to
+`cut-summary.md` and point the operation check report at that file.
+
+Record the timeline contribution with its required source input, update the operation integer
+`revision`, and set `based_on` to the exact understanding revision consumed:
+
+```json
+"render": {
+  "kind": "timeline-transform",
+  "input": "../input/original-video.mp4",
+  "plan": "timeline.json"
+}
+```
+
+The shared delivery renderer encodes the active sequence after all revision checks pass.
 
 ## Standalone compatibility workflow
 
@@ -144,7 +160,8 @@ Aim to roughly halve runtime.
   ```
   python scripts/inspect_bounds.py work/edit_coarse.json work/transcript.json
   ```
-  It prints the words straddling each in/out so you can nudge them onto clean edges.
+  It accepts both legacy `keep[]` and canonical `decisions[]` plans and prints the words
+  straddling each boundary so you can nudge them onto clean edges.
 
 ### 5. Expand → auto-speed → render
 Turn coarse blocks into tight, dead-air-free render segments, normalize the speaking

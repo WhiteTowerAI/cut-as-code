@@ -51,6 +51,9 @@ class SkillContractTests(unittest.TestCase):
         self.assertIn("work/understand/understanding.json", skill)
         self.assertIn("scripts/build_cards_plan.py", skill)
         self.assertIn("work/content-cards/cards-plan.json", skill)
+        self.assertIn("24000/1001", skill)
+        self.assertIn("face_clearance", skill)
+        self.assertIn('"render"', skill)
 
     def test_content_cards_documents_guided_human_choices(self):
         skill = text("skills/video-add-content-cards/SKILL.md")
@@ -103,12 +106,23 @@ class SkillContractTests(unittest.TestCase):
         self.assertIn("selected_look", skill)
         self.assertIn("base-video", skill)
         self.assertIn("looks.json", skill)
+        self.assertIn("selection_mode", skill)
+        self.assertIn("selection_rationale", skill)
+        self.assertIn("selected-color-look.cube", skill)
 
     def test_compare_documents_only_source_time_mode(self):
         skill = text("skills/video-edit-compare/SKILL.md")
         self.assertIn("original-vs-final-source-time", skill)
         self.assertIn("TIMELINE.json SOURCE.mp4 FINAL.mp4 OUT.mp4", skill)
         self.assertNotIn("edit_final.json", skill)
+        self.assertIn("work/edit-compare/compare-plan.json", skill)
+        self.assertIn("comparison-summary.md", skill)
+
+    def test_understanding_documents_protocol_review_names_and_project_cache(self):
+        skill = text("skills/video-understand/SKILL.md")
+        self.assertIn("contact-sheet.jpg", skill)
+        self.assertIn("--cache-dir", skill)
+        self.assertIn("--lang auto", skill)
 
     def test_repository_docs_describe_v1_project_model(self):
         for path in ("README.md", "AGENTS.md", "CLAUDE.md"):

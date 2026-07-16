@@ -115,10 +115,18 @@ def build_cards(understanding, timeline):
                 "copy": {
                     "status": "draft",
                     "suggested_text": moment.get("summary", ""),
+                    "display": {"eyebrow": None, "title": None, "detail": None},
                 },
-                "placement": {"status": "draft", "region": None},
+                "placement": {
+                    "status": "draft", "region": None,
+                    "face_clearance": "pending", "review_still": None,
+                },
                 "visual_treatment": {"status": "draft"},
-                "renderer": {},
+                "renderer": {
+                    "composition": "cache/content-cards/index.html",
+                    "asset": None,
+                    "fps": dict(timeline["fps"]),
+                },
             }
         )
     return cards

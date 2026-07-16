@@ -77,6 +77,14 @@ def initialize(source, project_root, project_id=None):
                     "understand/analysis.json",
                     "understand/understanding.json",
                 ],
+                "target": {"sequence": "main", "scope": "evidence"},
+                "effects": {
+                    "changes_timeline": False,
+                    "changes_geometry": False,
+                    "changes_video_pixels": False,
+                    "changes_audio": False,
+                    "adds_track": None,
+                },
                 "check": {
                     "status": "pending",
                     "report": "../review/00-video-understanding/video-summary.md",

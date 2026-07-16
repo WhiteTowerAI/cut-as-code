@@ -16,6 +16,8 @@ def canonical_plan(**changes):
         "base": "eq=contrast=1.1",
         "looks": [{"name": "clean", "chain": "null"}],
         "selected_look": "clean",
+        "selection_mode": "agent",
+        "selection_rationale": "Neutral skin and stable contrast across representative frames.",
         "evidence_refs": ["media:source"],
     }
     plan.update(changes)
@@ -59,6 +61,15 @@ class GradePlanTests(unittest.TestCase):
         plan = canonical_plan()
         del plan["selected_look"]
         with self.assertRaisesRegex(ValueError, "selected_look"):
+            gradelib.normalize_spec(plan, require_selected=True)
+
+    def test_delivery_requires_selection_mode_and_rationale(self):
+        plan = canonical_plan()
+        del plan["selection_mode"]
+        with self.assertRaisesRegex(ValueError, "selection_mode"):
+            gradelib.normalize_spec(plan, require_selected=True)
+        plan = canonical_plan(selection_rationale="")
+        with self.assertRaisesRegex(ValueError, "selection_rationale"):
             gradelib.normalize_spec(plan, require_selected=True)
 
 

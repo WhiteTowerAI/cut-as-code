@@ -33,10 +33,14 @@ Require `ffmpeg`/`ffprobe`, Python, and `faster-whisper` for transcription. Chec
 
    ```powershell
    ffmpeg -y -i input/original-video.mp4 -ac 1 -ar 16000 work/cache/audio16k.wav
-   python scripts/transcribe.py work/cache/audio16k.wav work/understand/transcript
+   python scripts/transcribe.py work/cache/audio16k.wav work/understand/transcript medium `
+     --lang auto --cache-dir work/cache/faster-whisper
    ```
 
-   For non-English speech, pass a multilingual model and `--lang`, for example `medium --lang zh`.
+   Use `--lang auto` for unknown or mixed-language speech. Never infer the spoken language
+   from the language of the user's prompt. Pass a fixed language such as `--lang zh` only
+   when the audio itself or explicit user metadata establishes it. Keep model downloads in
+   the project-local `work/cache/faster-whisper/` cache.
 
 4. Generate objective metrics and semantic candidates:
 
@@ -52,7 +56,14 @@ Require `ffmpeg`/`ffprobe`, Python, and `faster-whisper` for transcription. Chec
    python scripts/validate.py understanding work/understand/understanding.json work/understand/transcript.json
    ```
 
-7. Create only useful review artifacts under `review/00-video-understanding/`: a short summary, transcript, and representative contact sheet. Verify metadata, timestamps, evidence references, and visible frames.
+7. Create only these useful review artifacts under `review/00-video-understanding/`:
+   `video-summary.md`, `transcript.srt`, and `contact-sheet.jpg`. Verify metadata,
+   timestamps, evidence references, and visible frames. Do not substitute PNG or ad hoc
+   filenames for the protocol names.
+
+8. Mark the understanding operation `check.status` as `pass` only after the review artifacts
+   and semantic evidence validate. Operation lifecycle `status` and check result are separate;
+   never write `verified` into `check.status`.
 
 ## Contracts
 

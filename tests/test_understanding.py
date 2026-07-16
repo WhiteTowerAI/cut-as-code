@@ -187,8 +187,19 @@ class UtilityTests(unittest.TestCase):
 
     def test_transcribe_arguments_support_multilingual_model(self):
         self.assertEqual(
-            ("a.wav", "out", "medium", "zh"),
+            ("a.wav", "out", "medium", "zh", None),
             transcribe.parse_args(["a.wav", "out", "medium", "--lang", "zh"]),
+        )
+
+    def test_transcribe_arguments_support_auto_language_and_project_cache(self):
+        self.assertEqual(
+            ("a.wav", "out", "small", "auto", "work/cache/faster-whisper"),
+            transcribe.parse_args(
+                [
+                    "a.wav", "out", "small", "--lang", "auto",
+                    "--cache-dir", "work/cache/faster-whisper",
+                ]
+            ),
         )
 
     def test_transcribe_preserves_word_json_and_srt_contract(self):
@@ -201,16 +212,20 @@ class UtilityTests(unittest.TestCase):
         )
 
         class FakeModel:
-            def __init__(self, model_name, device, compute_type):
+            def __init__(self, model_name, device, compute_type, download_root=None):
                 self.model_name = model_name
+                self.download_root = download_root
 
             def transcribe(self, audio, **kwargs):
                 self.kwargs = kwargs
                 return iter([segment]), info
 
         with patch.dict(sys.modules, {"faster_whisper": SimpleNamespace(WhisperModel=FakeModel)}):
-            data, srt = transcribe.transcribe("audio.wav", "base.en", "en")
+            data, srt = transcribe.transcribe(
+                "audio.wav", "small", "auto", "work/cache/faster-whisper"
+            )
         self.assertEqual(7, data["segments"][0]["id"])
+        self.assertEqual("en", data["language"])
         self.assertEqual(
             {"start": 0.1, "end": 0.4, "word": " Hello", "prob": 0.988},
             data["segments"][0]["words"][0],

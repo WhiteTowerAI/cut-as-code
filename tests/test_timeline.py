@@ -198,7 +198,10 @@ class TimelineTests(unittest.TestCase):
 
 class TimelineCompatibilityTests(unittest.TestCase):
     def test_rough_cut_transcriber_delegates_canonical_arguments(self):
-        argv = ["audio.wav", "work/transcript", "medium", "--lang", "zh"]
+        argv = [
+            "audio.wav", "work/transcript", "medium", "--lang", "zh",
+            "--cache-dir", "work/cache/faster-whisper",
+        ]
         self.assertEqual(
             (ROOT / "skills/video-understand/scripts/transcribe.py").resolve(),
             rough_cut_transcribe.CANONICAL_SCRIPT,

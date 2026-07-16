@@ -31,8 +31,14 @@ review/03-content-cards/content-cards-review.json  # validated human choices
 ```
 
 The reusable review page is committed at
-`skills/video-add-content-cards/assets/content-cards-review.html`. Keep the plan outside
-`cache/`. The populated HTML, screenshots, overlay, and preview renders are reproducible.
+`skills/video-add-content-cards/assets/content-cards-review.html`. 
+The populated HTML, screenshots, overlay, and preview renders are reproducible.
+Keep the plan outside `cache/`. It must contain every visible string, timing, placement,
+visual-treatment value, renderer composition path, renderer asset path, and source FPS needed
+to regenerate the disposable HTML and alpha assets after deleting `work/cache/`. Record one
+plan-level `renderer_recipe` with the source example/template, composition output path, render
+engine, and every local runtime asset's output path, exact version, origin, and SHA-256. A
+cached HTML file or downloaded script with no durable recipe does not satisfy regeneration.
 
 ## Workflow
 
@@ -105,6 +111,12 @@ fields remain accepted for compatibility but are not part of the normal intervie
 ### 3. Make editorial choices
 
 Read the evidence at each card time. Correct ASR names and numbers, prune weak candidates, write concise copy, choose placement that clears faces and captions, and approve the visual treatment. Never treat analyzer text as final copy.
+
+Store all on-screen copy under `copy.display` (for example `eyebrow`, `title`, and `detail`),
+not only a summary or suggested title. Set `placement.face_clearance` to `verified` only after
+reviewing a composited still, and store that still's protocol-relative path in
+`placement.review_still`. Store the HyperFrames composition, alpha asset, and exact rational
+FPS under `renderer`.
 
 Use these mappings as a starting point:
 
@@ -190,16 +202,29 @@ Start from the closest repository example:
 
 Keep one visual language across all cards. Use edge anchoring, a card or scrim for legibility, source-relative sizing, and enough contrast against the selected grade. Do not cover the speaker or captions.
 
-Validate before rendering:
+Pass the source FPS explicitly; preserve fractional rates such as `24000/1001` rather than
+rounding to 24 or 30. On Windows use `npx.cmd`, a project-local npm cache, and local assets:
 
 ```powershell
-npx hyperframes lint
-npx hyperframes validate
+$env:npm_config_cache = "$PWD/work/cache/npm"
+npx.cmd hyperframes lint
+npx.cmd hyperframes validate
 ```
+
+Do not depend on remote fonts, images, scripts, or styles at render time.
+
+The approved plan must preserve the exact style and motion values used by the composition,
+not prose labels such as `edge-slide` alone. At minimum record panel geometry and padding,
+colors, borders, type sizes/weights/line heights, and the enter/rule/text/exit durations,
+offsets, staggers, and easing. This makes the creative HTML reproducible from the plan rather
+than a hidden decision stored only in disposable cache.
 
 ### 6. Review small artifacts
 
-Capture a still near the middle of every cue. Render short motion windows only for timing or transition decisions. Do not render a full preview by default.
+Capture a still near the middle of every cue by compositing the card over the actual base-video
+frame at that timestamp. Transparent-only HyperFrames screenshots prove alpha, not face
+clearance, and are insufficient for approval. Render short motion windows only for timing or
+transition decisions. Do not render a full preview by default.
 
 Check:
 
@@ -213,20 +238,47 @@ Check:
 **Present + STOP.** Show the card stills and any short motion windows, name the card IDs, and
 wait for approval. Do not render the full overlay while copy, placement, or timing is disputed.
 
+Every approved cue must have a matching composited still in
+`review/03-content-cards/card-stills/`, `face_clearance: "verified"`, and the still path in
+the plan. Record the review result in `review/03-content-cards/content-cards-summary.md`.
+
 ### 7. Render the transparent contribution
 
-```powershell
-npx hyperframes render --format mov -o work/cache/content-cards-overlay.mov
-```
+Prefer one short alpha MOV per cue so a few seconds of graphics do not create a full-program
+transparent video. Render each at the source dimensions and exact source FPS, then declare a
+render contribution with its program-time window. A single full-length sparse overlay remains
+valid only when it is demonstrably smaller or required by the composition.
 
-Render at the source dimensions with alpha. Record this operation contribution in `project.json`:
+Record this operation contribution in `project.json`:
 
 ```json
 {
-  "kind": "overlay",
-  "asset": "cache/content-cards-overlay.mov"
+"target": {"sequence": "main", "scope": "graphics"},
+"effects": {
+  "changes_timeline": false,
+  "changes_geometry": false,
+  "changes_video_pixels": false,
+  "changes_audio": false,
+  "adds_track": "graphics"
+},
+"check": {
+  "status": "pass",
+  "report": "../review/03-content-cards/content-cards-summary.md"
+},
+"render": [
+  {
+    "kind": "overlay",
+    "asset": "cache/content-cards/card-001.mov",
+    "start_s": 12.5,
+    "duration_s": 4.0
+  }
+]
 }
 ```
+
+The shared renderer offsets each short clip to `start_s`, limits it to `duration_s`, and
+composites it after base-video grading. Keep the operation's `outputs` and each card's
+`renderer.asset` consistent with these declared assets.
 
 Set the operation to `approved` or `verified` only after card review and update its integer `revision` when the plan, timing, or selected input changes. The shared renderer performs the final composite after all active operations pass `based_on` checks:
 
