@@ -55,6 +55,44 @@ class SkillContractTests(unittest.TestCase):
         self.assertIn("face_clearance", skill)
         self.assertIn('"render"', skill)
 
+    def test_content_cards_documents_guided_human_choices(self):
+        skill = text("skills/video-add-content-cards/SKILL.md")
+        lower = skill.lower()
+        for required in (
+            "target card count",
+            "gallery-animated.html",
+            "present + stop",
+            "brief",
+            "scripts/build_review_page.py",
+            "--timeline",
+            "assets/content-cards-review.html",
+            "scripts/apply_cards_review.py",
+            "copy summary",
+            "content-cards-review.json",
+        ):
+            self.assertIn(required, lower)
+
+        self.assertNotIn("what should the cards help this audience do", lower)
+        self.assertNotIn("will captions be present", lower)
+        self.assertNotIn("scripts/open_gallery.py", lower)
+        theme_question = lower.index("1. which theme should this edit use?")
+        count_question = lower.index("2. what target card count should this edit use?")
+        required_question = lower.index("3. which card types must be included?")
+        self.assertLess(theme_question, count_question)
+        self.assertLess(count_question, required_question)
+
+        gallery = "skills/video-add-content-cards/examples/gallery-animated.html"
+        review = "review/03-content-cards/content-cards-review.html"
+        for command in (
+            f"Start-Process (Resolve-Path '{gallery}')",
+            f"open {gallery}",
+            f"xdg-open {gallery}",
+            f"Start-Process (Resolve-Path '{review}')",
+            f"open {review}",
+            f"xdg-open {review}",
+        ):
+            self.assertIn(command, skill)
+
     def test_rough_cut_documents_canonical_timeline_and_legacy_adapter(self):
         skill = text("skills/video-rough-cut/SKILL.md")
         self.assertIn("work/rough-cut/edit-plan.json", skill)
