@@ -27,10 +27,10 @@ if ($missing) {
 
 $html = Get-Content -LiteralPath (Join-Path $skillRoot "examples\index.html") -Raw
 $requiredMarkers = @(
-    'data-composition-id="video-add-captions-hyperframes-preview"',
+    'data-composition-id="video-add-captions-preview"',
     'data-duration="9"',
     'data-fps="30"',
-    'window.__timelines["video-add-captions-hyperframes-preview"]'
+    'window.__timelines["video-add-captions-preview"]'
 )
 
 foreach ($marker in $requiredMarkers) {

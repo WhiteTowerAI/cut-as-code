@@ -1,5 +1,5 @@
 ---
-name: video-add-captions-hyperframes
+name: video-add-captions
 description: >
   Add preset-driven, word-timed captions to a finished video with optional
   Karaoke highlighting. Use when an agent must build readable caption cues,
@@ -8,7 +8,7 @@ description: >
   original audio stream.
 ---
 
-# Video Add Captions with HyperFrames
+# Video Add Captions
 
 ## Scope
 
@@ -99,7 +99,7 @@ Build caption cues with this skill's own grouping script:
 ```powershell
 # Run from the repository root.
 $RepoRoot = (Resolve-Path ".").Path
-$SkillRoot = Join-Path $RepoRoot "skills\video-add-captions-hyperframes"
+$SkillRoot = Join-Path $RepoRoot "skills\video-add-captions"
 $JobRoot = Join-Path $RepoRoot "work\video-add-captions"
 $Transcript = Join-Path $JobRoot "transcript.json"
 $CaptionsJson = Join-Path $JobRoot "captions.json"
@@ -332,7 +332,7 @@ Do not ask the user to edit generator code.
 Skill layout:
 
 ```text
-video-add-captions-hyperframes/
+video-add-captions/
 ├── SKILL.md
 ├── assets/
 │   └── style-previews/
@@ -388,7 +388,7 @@ Set job paths:
 ```powershell
 # Run from the repository root.
 $RepoRoot = (Resolve-Path ".").Path
-$SkillRoot = Join-Path $RepoRoot "skills\video-add-captions-hyperframes"
+$SkillRoot = Join-Path $RepoRoot "skills\video-add-captions"
 $JobRoot = Join-Path $RepoRoot "work\video-add-captions"
 $SourceVideo = Join-Path $JobRoot "source.mp4"
 $CaptionsJson = Join-Path $JobRoot "captions.json"

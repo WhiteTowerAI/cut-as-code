@@ -114,6 +114,27 @@
     .selection-summary p { margin: 0; }
     .selection-summary strong { color: #1d4ed8; }
     .selection-hint { color: #5270aa; font-size: 0.88rem; }
+    .selection-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .copy-selection {
+      flex: 0 0 auto;
+      min-width: 82px;
+      padding: 8px 14px;
+      border: 1px solid #93c5fd;
+      border-radius: 10px;
+      background: #ffffff;
+      color: #1d4ed8;
+      font-weight: 800;
+      cursor: pointer;
+      transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+    }
+    .copy-selection:hover { background: #eff6ff; border-color: #60a5fa; }
+    .copy-selection:focus-visible { outline: 3px solid rgba(37, 99, 235, 0.22); outline-offset: 2px; }
+    .copy-selection.is-copied { border-color: #86efac; background: #f0fdf4; color: #15803d; }
+    .copy-selection.is-error { border-color: #fca5a5; background: #fef2f2; color: #b91c1c; }
 
     .gallery-section { margin-top: clamp(48px, 7vw, 78px); }
     .section-heading {
@@ -371,18 +392,12 @@
       overflow-wrap: anywhere;
     }
 
-    footer {
-      margin-top: 38px;
-      color: #7a8597;
-      font-size: 0.82rem;
-      text-align: center;
-    }
-
     @media (max-width: 820px) {
       .page-shell { width: min(100% - 24px, 1480px); padding-top: 12px; }
       .hero { border-radius: 22px; }
       .selection-summary, .section-heading { align-items: start; flex-direction: column; }
       .section-heading p { text-align: left; }
+      .selection-actions { width: 100%; justify-content: space-between; }
       .option-panel { grid-template-columns: 1fr; }
       .style-card--landscape { flex-basis: 270px; }
       .card-grid--core { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -407,6 +422,7 @@
       .metadata-grid { grid-template-columns: 1fr; }
       .metadata-grid div:last-child { grid-column: auto; }
       .selection-hint { display: none; }
+      .selection-actions { justify-content: flex-end; }
     }
   </style>
 </head>
@@ -421,7 +437,10 @@
 
     <div class="selection-summary" aria-live="polite">
       <p>Selected preview: <strong id="selected-preview">clean</strong></p>
-      <span class="selection-hint">Click a card or use Enter / Space to select and enlarge its preview.</span>
+      <div class="selection-actions">
+        <span class="selection-hint">Click a card or use Enter / Space to select and enlarge its preview.</span>
+        <button class="copy-selection" id="copy-selection" type="button" aria-label="Copy selected caption style">Copy</button>
+      </div>
     </div>
 
     <section class="gallery-section" aria-labelledby="core-title">
@@ -1230,7 +1249,6 @@
       </ul>
     </section>
 
-    <footer>Generated locally from preview-manifest.json. No network connection is required.</footer>
   </main>
 
   <dialog class="preview-dialog" id="preview-dialog" aria-labelledby="preview-dialog-title">
@@ -1248,12 +1266,44 @@
     (() => {
       const cards = Array.from(document.querySelectorAll(".style-card"));
       const selectedPreview = document.getElementById("selected-preview");
+      const copySelection = document.getElementById("copy-selection");
       const previewDialog = document.getElementById("preview-dialog");
       const previewDialogTitle = document.getElementById("preview-dialog-title");
       const previewDialogImage = previewDialog.querySelector(".preview-dialog__image");
       const previewDialogClose = previewDialog.querySelector(".preview-dialog__close");
       let lastTrigger = null;
       let pageScrollPosition = 0;
+      let copyResetTimer = null;
+
+      const resetCopySelection = () => {
+        if (copyResetTimer) {
+          window.clearTimeout(copyResetTimer);
+          copyResetTimer = null;
+        }
+        copySelection.textContent = "Copy";
+        copySelection.classList.remove("is-copied", "is-error");
+      };
+
+      const copyTextWithFallback = async (text) => {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+          return;
+        }
+
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.setAttribute("readonly", "");
+        textArea.style.position = "fixed";
+        textArea.style.left = "-9999px";
+        textArea.style.opacity = "0";
+        document.body.appendChild(textArea);
+        textArea.select();
+        const copied = document.execCommand("copy");
+        textArea.remove();
+        if (!copied) {
+          throw new Error("Unable to copy selected style");
+        }
+      };
 
       const selectCard = (card) => {
         for (const candidate of cards) {
@@ -1262,6 +1312,7 @@
           candidate.setAttribute("aria-pressed", selected ? "true" : "false");
         }
         selectedPreview.textContent = card.dataset.previewId;
+        resetCopySelection();
       };
 
       const openPreview = (card) => {
@@ -1294,6 +1345,20 @@
           }
         });
       }
+
+      copySelection.addEventListener("click", async () => {
+        resetCopySelection();
+        const copyText = "Use caption style: " + selectedPreview.textContent.trim();
+        try {
+          await copyTextWithFallback(copyText);
+          copySelection.textContent = "Copied";
+          copySelection.classList.add("is-copied");
+        } catch {
+          copySelection.textContent = "Copy failed";
+          copySelection.classList.add("is-error");
+        }
+        copyResetTimer = window.setTimeout(resetCopySelection, 1800);
+      });
 
       previewDialogClose.addEventListener("click", closePreview);
       previewDialog.addEventListener("click", (event) => {
