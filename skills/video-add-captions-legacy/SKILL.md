@@ -1,5 +1,5 @@
 ---
-name: video-add-captions
+name: video-add-captions-legacy
 description: >
   Add styled, burned-in subtitles to an existing video using Remotion. The skill
   consumes a source video plus word-timed captions, lets the agent map natural
@@ -10,7 +10,7 @@ description: >
   for rough cutting or selective motion graphics.
 ---
 
-# Video Add Captions
+# Video Add Captions — Legacy Remotion
 
 This skill adds subtitles to a video. It does not cut, trim, diagnose, or
 restructure the footage. If the video was already edited by `video-rough-cut` or
