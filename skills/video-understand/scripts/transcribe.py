@@ -15,6 +15,7 @@ def fmt_ts(value):
 
 def parse_args(argv):
     language = "en"
+    cache_dir = None
     positional = []
     index = 0
     while index < len(argv):
@@ -23,21 +24,35 @@ def parse_args(argv):
                 raise ValueError("--lang requires a language code")
             language = argv[index + 1]
             index += 2
+        elif argv[index] == "--cache-dir":
+            if index + 1 >= len(argv):
+                raise ValueError("--cache-dir requires a path")
+            cache_dir = argv[index + 1]
+            index += 2
         else:
             positional.append(argv[index])
             index += 1
     if len(positional) not in (2, 3):
-        raise ValueError("usage: transcribe.py AUDIO OUT_PREFIX [MODEL] [--lang CODE]")
-    return positional[0], positional[1], positional[2] if len(positional) == 3 else "base.en", language
+        raise ValueError(
+            "usage: transcribe.py AUDIO OUT_PREFIX [MODEL] "
+            "[--lang CODE|auto] [--cache-dir PATH]"
+        )
+    return (
+        positional[0], positional[1],
+        positional[2] if len(positional) == 3 else "base.en",
+        language, cache_dir,
+    )
 
 
-def transcribe(audio, model_name, language):
+def transcribe(audio, model_name, language, cache_dir=None):
     from faster_whisper import WhisperModel
 
-    model = WhisperModel(model_name, device="cpu", compute_type="int8")
+    model = WhisperModel(
+        model_name, device="cpu", compute_type="int8", download_root=cache_dir
+    )
     segments, info = model.transcribe(
         audio,
-        language=language,
+        language=None if language == "auto" else language,
         word_timestamps=True,
         vad_filter=True,
         vad_parameters={"min_silence_duration_ms": 500},
@@ -79,8 +94,10 @@ def transcribe(audio, model_name, language):
 
 
 def main(argv=None):
-    audio, out_prefix, model_name, language = parse_args(sys.argv[1:] if argv is None else argv)
-    data, srt = transcribe(audio, model_name, language)
+    audio, out_prefix, model_name, language, cache_dir = parse_args(
+        sys.argv[1:] if argv is None else argv
+    )
+    data, srt = transcribe(audio, model_name, language, cache_dir)
     with open(out_prefix + ".json", "w", encoding="utf-8") as handle:
         json.dump(data, handle, ensure_ascii=False, indent=1)
     with open(out_prefix + ".srt", "w", encoding="utf-8") as handle:

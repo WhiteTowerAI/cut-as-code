@@ -47,6 +47,11 @@ def normalize_spec(spec, require_selected=False):
         raise ValueError("grade plan selected_look is required for delivery")
     if selected and selected not in names:
         raise ValueError(f"selected look not found: {selected}")
+    if require_selected:
+        if spec.get("selection_mode") not in ("human", "agent"):
+            raise ValueError("grade plan selection_mode must be human or agent")
+        if not str(spec.get("selection_rationale", "")).strip():
+            raise ValueError("grade plan selection_rationale is required for delivery")
     return spec
 
 

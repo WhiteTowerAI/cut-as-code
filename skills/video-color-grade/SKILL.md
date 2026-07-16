@@ -1,28 +1,13 @@
 ---
 name: video-color-grade
-description: >
-  Color-grade any video by writing the grade from scratch as code, then letting a human
-  choose the look. First ASSESS the footage (flat LOG/S-Log/HLG vs already-Rec.709, white-
-  balance cast, exposure), build ONE corrective base (log->Rec.709, or WB+exposure+contrast
-  for normal footage), then generate 5-6 DISTINCT NAMED looks on top (clean_neutral /
-  warm_filmic / cool_desat / teal_orange / punchy_vibrant / vintage_faded), rendered on the
-  same representative frame and presented as a labeled side-by-side contact sheet + a zoomed
-  face/skin strip so the user picks one. After the pick: bake the chosen look to a portable
-  .cube LUT and apply it to the full clip (audio copied, duration/fps/dims kept), with verify.
-  Skin tone is the quality bar; no preset packs. Use when asked to "color grade / colour
-  grade / regrade this", "make some looks and let me choose", "fix the white balance / it
-  looks too flat / muted / too warm", "give it a cinematic / teal-orange / film look",
-  "convert S-Log/log to Rec.709", "bake a LUT / .cube", 调色, 校色, 给视频做调色/电影感/青橙调色,
-  把 log 转 Rec.709, 出几个调色风格让我选, 生成 LUT. NOT for cutting footage (video-rough-cut),
-  every-line subtitles (video-add-captions), overlay cards/lower-thirds (video-overlay-cards),
-  or motion graphics (video-to-remotion).
+description: Use when footage needs color correction, white-balance or exposure repair, Log-to-Rec.709 conversion, named creative looks, skin-tone review, or a portable .cube LUT for an Open-Recut delivery.
 ---
 
 # Video Color Grade (assess → correct → looks → choose → LUT + apply)
 
 Write the grade from scratch as code, generate several distinct **named looks** on the real
-footage, present them side-by-side, let the human **pick one**, then bake a portable `.cube`
-LUT and apply it to the full clip. No preset packs.
+footage, select one through explicit human choice or delegated agent judgment, then bake a
+portable `.cube` LUT and apply it to the full clip. No preset packs.
 
 **Core idea — correct, then style.** Every look is `corrective base + creative layer`:
 
@@ -44,8 +29,9 @@ Requirements: `ffmpeg`/`ffprobe` on PATH, Python with `numpy` + `Pillow`.
   labeled, at full resolution.
 - The full apply uses **`-c:a copy`** (audio never re-encoded → A/V sync identical) and keeps
   source **duration, fps, dimensions**.
-- **Two-phase by design:** present the looks and STOP — never render the full video or bake a
-  LUT until the human has chosen.
+- Complete look selection before delivery. Use `human` mode when the user asked to choose;
+  use `agent` mode without pausing when the user delegated the choice or requested an
+  autonomous run. In both modes, preserve the rationale in the durable plan.
 
 ## Project protocol workflow
 
@@ -58,24 +44,54 @@ Store the durable decision in `work/color-grade/grade-plan.json`:
   "base": "eq=contrast=1.05",
   "looks": [{"name": "clean", "chain": "null"}],
   "selected_look": "clean",
+  "selection_mode": "agent",
+  "selection_rationale": "Neutral correction preserves natural skin and source lighting.",
+  "selected_lut": "../../final/selected-color-look.cube",
   "evidence_refs": ["media:source"]
 }
 ```
 
 Use `base-video` by default so content cards and captions are not recolored. `composite`
 is valid only when intentionally grading already-composited pixels. Read shared
-`work/understand/media.json` and visual evidence, generate the existing contact sheet and
-skin strip under `review/02-color-grade/`, then stop for the human selection. Write
-`selected_look` only after that choice.
+`work/understand/media.json` and visual evidence. Generate
+`review/02-color-grade/choose-color-look.jpg` and
+`review/02-color-grade/skin-tone-check.jpg`; optionally generate the short
+`selected-look-preview.mp4`. Record the decision and evidence in
+`review/02-color-grade/selected-look.md`.
+
+Set `selection_mode` to `human` after an explicit user choice. Set it to `agent` when the
+user delegates the decision or requests an uninterrupted workflow, and choose conservatively
+with skin tone, highlight retention, and neutral balance as the priorities. Always write a
+non-empty `selection_rationale`; do not pause in agent mode.
+
+Bake the chosen LUT to `final/selected-color-look.cube`. When that LUT is shipped, set
+`selected_lut` in the grade plan so the shared renderer consumes that exact file. A baked
+full-look LUT already contains the corrective base; the renderer must apply `lut3d` alone,
+not `base + lut3d`.
 
 Record the operation's exact input revisions in `based_on`, increment its integer
-`revision` when the plan or selected input changes, and contribute:
+`revision` when the plan or selected input changes, set the operation check to `pass` only
+after the review files are complete, and contribute the full protocol fields:
 
 ```json
 {
+"target": {"sequence": "main", "scope": "base-video"},
+"effects": {
+  "changes_timeline": false,
+  "changes_geometry": false,
+  "changes_video_pixels": true,
+  "changes_audio": false,
+  "adds_track": null
+},
+"check": {
+  "status": "pass",
+  "report": "../review/02-color-grade/selected-look.md"
+},
+"render": {
   "kind": "video-filter",
   "target": "base-video",
   "plan": "color-grade/grade-plan.json"
+}
 }
 ```
 
@@ -135,6 +151,9 @@ commands remain compatible during migration.
    `face_skin_check.png` (zoomed skin strip). **LOOK at both.** Skin is the bar — retune or
    drop any look that greys/greens skin, then re-render. Off-center subject? add
    `--face-crop W:H:X:Y`.
+   Treat those PNGs as working intermediates; publish the approved review copies as
+   `review/02-color-grade/choose-color-look.jpg` and
+   `review/02-color-grade/skin-tone-check.jpg`.
 
 3. *(optional)* **Motion previews** of the top 2–3 so they're seen moving (audio kept):
    ```
@@ -142,15 +161,16 @@ commands remain compatible during migration.
      --pick clean_neutral,warm_filmic,teal_orange --with-original --ss 148 --t 8
    ```
 
-4. **Present + STOP.** Show the contact sheet (and clips), name each look, ask the human to
-   pick one number. **Do not render the full video yet.**
+4. **Select one look.** Present the contact sheet and wait only when the user asked to choose.
+   Otherwise select it in agent mode and continue without a decision pause. Write
+   `selected_look`, `selection_mode`, and `selection_rationale` before delivery.
 
 5. **After the pick — bake the LUT and apply to the full clip.**
    ```
    python scripts/bake_lut.py looks.json --name CHOSEN \
-     --out out/CHOSEN.cube --verify-frame work/assess/frame.png
+     --out final/selected-color-look.cube --verify-frame work/assess/frame.png
    python scripts/apply_grade.py SOURCE.mp4 --looks looks.json --name CHOSEN --out out/graded.mp4
-   #   or apply the baked LUT instead of the chain:  --lut out/CHOSEN.cube
+   #   or apply the delivered LUT: --lut final/selected-color-look.cube
    ```
    `apply_grade.py` verifies duration/audio are kept, prints the WB shift (U/V toward 128),
    and drops a spot frame to eyeball.
@@ -161,7 +181,8 @@ commands remain compatible during migration.
    - **Match the delivered video to the delivered LUT:** the chain (`--name`) and the baked
      33³ `.cube` (`--lut`) can differ by up to ~5/255 on steep curves (`bake_lut.py` reports
      this `max|d|`). Invisible for most work, but if you're *shipping the `.cube`* and want the
-     rendered video to match it exactly, apply with **`--lut out/CHOSEN.cube`**, not `--name`.
+   rendered video to match it exactly, apply with **`--lut final/selected-color-look.cube`**,
+   not `--name`.
 
 ## Design notes / gotchas
 - **Grade the CLEAN cut, then composite overlays on top of the graded footage.** If you must
@@ -193,5 +214,5 @@ commands remain compatible during migration.
 - **The LUT bake is exact**, because every filter here is a per-pixel point op: `bake_lut.py`
   pushes a 33³ identity grid through the real chain and self-checks against it
   (`mean|d|` should be well under 1/255; a few-level `max|d|` is just interpolation).
-- **Two-phase, always.** Never bake the full render before the human chooses — that's the
-  whole point of "make some examples and let me choose."
+- **Selection before delivery, always.** Human choice and delegated agent choice are both
+  valid, but the plan must record which occurred and why.

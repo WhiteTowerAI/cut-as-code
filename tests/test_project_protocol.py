@@ -66,6 +66,38 @@ class ProjectProtocolTests(unittest.TestCase):
         self.project["operations"][0]["status"] = "done"
         self.assertTrue(any("invalid status" in error for error in self.errors()))
 
+    def test_operation_target_and_effects_are_required(self):
+        del self.project["operations"][0]["target"]
+        del self.project["operations"][1]["effects"]
+        errors = self.errors()
+        self.assertTrue(any("understanding target" in error for error in errors))
+        self.assertTrue(any("rough-cut effects" in error for error in errors))
+
+    def test_operation_effect_flags_must_use_protocol_types(self):
+        self.project["operations"][0]["effects"]["changes_audio"] = "no"
+        self.assertTrue(any("changes_audio must be boolean" in error for error in self.errors()))
+        self.project["operations"][0]["effects"]["changes_audio"] = False
+        self.project["operations"][0]["effects"]["adds_track"] = 1
+        self.assertTrue(any("adds_track" in error for error in self.errors()))
+
+    def test_operation_target_sequence_must_exist(self):
+        self.project["operations"][0]["target"]["sequence"] = "missing"
+        self.assertTrue(any("target sequence does not exist" in error for error in self.errors()))
+
+    def test_check_status_uses_pending_pass_or_fail(self):
+        self.project["operations"][0]["check"] = {
+            "status": "verified",
+            "report": "../review/00-video-understanding/video-summary.md",
+        }
+        self.assertTrue(any("check status" in error for error in self.errors()))
+
+    def test_check_report_must_exist_when_files_are_checked(self):
+        self.project["operations"][0]["check"] = {
+            "status": "pass",
+            "report": "../review/missing.md",
+        }
+        self.assertTrue(any("missing check report" in error for error in self.errors(check_files=True)))
+
     def test_active_sequence_operation_must_exist(self):
         self.project["sequences"]["main"]["operations"].append("missing")
         self.assertTrue(any("unknown operation" in error for error in self.errors()))

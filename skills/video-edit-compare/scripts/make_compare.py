@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -50,6 +51,12 @@ def source_time_parts(timeline):
                 "duration_s": round(duration - cursor, 6),
             }
         )
+    fps = timeline["fps"]
+    for part in parts:
+        source_range = part["source_range"]
+        part["start_frame"] = round(source_range["start_s"] * fps["num"] / fps["den"])
+        part["end_frame"] = round(source_range["end_s"] * fps["num"] / fps["den"])
+        part["frame_count"] = part["end_frame"] - part["start_frame"]
     return parts
 
 
@@ -70,6 +77,131 @@ def _probe(path):
         "height": int(stream["height"]),
         "duration_s": float(data["format"]["duration"]),
     }
+
+
+def _audio_hash(path):
+    result = subprocess.run(
+        [
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", str(path),
+            "-map", "0:a:0", "-c", "copy", "-f", "hash", "-hash", "md5", "-",
+        ],
+        capture_output=True, text=True,
+    )
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def _crop_bytes(path, at_s, x, y, size):
+    sample_size = min(16, size)
+    result = subprocess.run(
+        [
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-ss", f"{at_s:.6f}",
+            "-i", str(path), "-vf",
+            f"crop={size}:{size}:{x}:{y},scale={sample_size}:{sample_size}:flags=area",
+            "-frames:v", "1",
+            "-pix_fmt", "rgb24", "-f", "rawvideo", "-",
+        ],
+        check=True, capture_output=True,
+    )
+    return result.stdout
+
+
+def verify_output(timeline, source, final, output):
+    source_info = _probe(source)
+    output_info = _probe(output)
+    fps = timeline["fps"]
+    tolerance = fps["den"] / fps["num"]
+    expected = float(timeline["source_duration_s"])
+    if abs(output_info["duration_s"] - expected) > tolerance:
+        raise ValueError("comparison duration does not match source timeline")
+    if output_info["width"] != source_info["width"] * 2:
+        raise ValueError("comparison width is not twice the source width")
+    if output_info["height"] != source_info["height"]:
+        raise ValueError("comparison height does not match source height")
+    source_audio = _audio_hash(source)
+    if source_audio and _audio_hash(output) != source_audio:
+        raise ValueError("comparison audio does not match original source audio")
+
+    size = min(48, source_info["width"] // 4, source_info["height"] // 4)
+    x = (source_info["width"] - size) // 2
+    bottom_margin = max(4, source_info["height"] // 20)
+    y = max(0, source_info["height"] - size - bottom_margin)
+    for part in source_time_parts(timeline):
+        source_range = part["source_range"]
+        source_s = (source_range["start_s"] + source_range["end_s"]) / 2
+        projected = _crop_bytes(
+            output, source_s, source_info["width"] + x, y, size
+        )
+        if part["kind"] == "black":
+            if max(projected, default=0) > 20:
+                raise ValueError("comparison dropped range is not black")
+            continue
+        program = part["program_range"]
+        program_s = (program["start_s"] + program["end_s"]) / 2
+        expected_frames = [
+            _crop_bytes(final, max(0.0, program_s + offset), x, y, size)
+            for offset in (-tolerance, 0.0, tolerance)
+        ]
+        if not projected or any(len(projected) != len(frame) for frame in expected_frames):
+            raise ValueError("comparison frame sample is missing")
+        error = min(
+            sum(abs(a - b) for a, b in zip(projected, frame)) / len(projected)
+            for frame in expected_frames
+        )
+        if error > 16:
+            raise ValueError(
+                "comparison kept frame mismatch: "
+                f"source={source_s:.6f}s program={program_s:.6f}s mean error {error:.2f}"
+            )
+
+
+def write_compare_plan(timeline_path, source, final, output):
+    work_dir = Path(timeline_path).resolve().parent
+    plan_path = work_dir / "edit-compare/compare-plan.json"
+    plan_dir = plan_path.parent
+    relative = lambda value: Path(os.path.relpath(Path(value).resolve(), plan_dir)).as_posix()
+    projectlib.write_json(
+        plan_path,
+        {
+            "schema_version": 1,
+            "mode": "original-vs-final-source-time",
+            "source": relative(source),
+            "final": relative(final),
+            "timeline": relative(timeline_path),
+            "output": relative(output),
+        },
+    )
+    return plan_path
+
+
+def register_review(project_root, output):
+    project_path = Path(project_root) / "work/project.json"
+    if not project_path.is_file():
+        return
+    project = projectlib.load_json(project_path)
+    operations = projectlib.operation_map(project)
+    active_ids = project["sequences"][project["active_sequence"]].get("operations", [])
+    review = {
+        "id": "original-vs-final-source-time",
+        "skill": "video-edit-compare",
+        "revision": 1,
+        "depends_on": [*active_ids, "render"],
+        "based_on": {
+            operation_id: operations[operation_id]["revision"] for operation_id in active_ids
+        },
+        "status": "verified",
+        "plan": "edit-compare/compare-plan.json",
+        "output": Path(os.path.relpath(Path(output).resolve(), Path(project_root) / "work")).as_posix(),
+    }
+    reviews = project.setdefault("reviews", [])
+    for index, existing in enumerate(reviews):
+        if existing.get("id") == review["id"]:
+            review["revision"] = existing.get("revision", 1)
+            reviews[index] = review
+            break
+    else:
+        reviews.append(review)
+    projectlib.write_json(project_path, project)
+    projectlib.write_start_here(project, project_root)
 
 
 def _label(path, text, panel_width):
@@ -93,6 +225,7 @@ def build_command(timeline, source, final, output, filtergraph_path, label_dir):
     output = Path(output).resolve()
     fps = timeline["fps"]
     fps_text = f"{fps['num']}/{fps['den']}"
+    frame_pts = f"N*{fps['den']}/({fps['num']}*TB)"
     frame_tolerance = fps["den"] / fps["num"]
     source_info = _probe(source)
     final_info = _probe(final)
@@ -135,14 +268,17 @@ def build_command(timeline, source, final, output, filtergraph_path, label_dir):
     for index, (part, final_index) in enumerate(zip(parts, final_indices)):
         label = f"right-{index}"
         if part["kind"] == "black":
+            color_duration = (part["frame_count"] + 1) * fps["den"] / fps["num"]
             graph.append(
-                f"color=c=black:s={width}x{height}:r={fps_text}:d={part['duration_s']:.6f},"
-                f"format=yuv420p,settb=AVTB[{label}]"
+                f"color=c=black:s={width}x{height}:r={fps_text}:d={color_duration:.9f},"
+                f"format=yuv420p,trim=end_frame={part['frame_count']},"
+                f"settb=AVTB,setpts={frame_pts}[{label}]"
             )
         else:
             graph.append(
                 f"[{final_index}:v:0]setpts=(PTS-STARTPTS)*{part['speed']:.8f},"
-                f"fps={fps_text},scale={width}:{height},setsar=1,format=yuv420p,settb=AVTB[{label}]"
+                f"fps={fps_text},scale={width}:{height},setsar=1,format=yuv420p,"
+                f"trim=end_frame={part['frame_count']},settb=AVTB,setpts={frame_pts}[{label}]"
             )
         right_labels.append(f"[{label}]")
     if len(right_labels) == 1:
@@ -183,7 +319,9 @@ def main(argv=None):
 
     timeline_path = Path(args.timeline).resolve()
     timeline = projectlib.load_json(timeline_path)
+    project_root = timeline_path.parent.parent
     cache = timeline_path.parent / "cache"
+    write_compare_plan(timeline_path, args.source, args.final, args.output)
     command = build_command(
         timeline,
         args.source,
@@ -197,6 +335,7 @@ def main(argv=None):
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(command, check=True)
     output = Path(args.output).resolve()
+    verify_output(timeline, args.source, args.final, output)
     parts = source_time_parts(timeline)
     (output.parent / "comparison-summary.md").write_text(
         "\n".join(
@@ -208,12 +347,14 @@ def main(argv=None):
                 f"- Kept projections: {sum(part['kind'] == 'final' for part in parts)}",
                 f"- Black dropped ranges: {sum(part['kind'] == 'black' for part in parts)}",
                 "- Audio: original source-time track",
+                "- Verification: pass",
                 f"- Video: `{output.name}`",
                 "",
             ]
         ),
         encoding="utf-8",
     )
+    register_review(project_root, output)
     print(f"[compare] DONE -> {output}")
 
 

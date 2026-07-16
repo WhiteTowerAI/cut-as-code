@@ -134,6 +134,8 @@ class ProjectEndToEndTests(unittest.TestCase):
                     "base": "eq=brightness=0.04",
                     "looks": [{"name": "clean", "chain": "null"}],
                     "selected_look": "clean",
+                    "selection_mode": "agent",
+                    "selection_rationale": "Synthetic fixture selection.",
                     "evidence_refs": ["media:source"],
                 },
             )
@@ -146,10 +148,30 @@ class ProjectEndToEndTests(unittest.TestCase):
                 ]
             )
             cards = self.load(work / "content-cards/cards-plan.json")
+            card_stills = project_root / "review/03-content-cards/card-stills"
+            card_stills.mkdir(parents=True)
+            (card_stills / "card-001.jpg").write_bytes(b"fixture still")
             for card in cards["cards"]:
-                card["copy"] = {"status": "approved", "text": card["copy"]["suggested_text"]}
-                card["placement"] = {"status": "approved", "region": "top"}
+                card["copy"] = {
+                    "status": "approved",
+                    "display": {
+                        "eyebrow": "",
+                        "title": card["copy"]["suggested_text"],
+                        "detail": "",
+                    },
+                }
+                card["placement"] = {
+                    "status": "approved",
+                    "region": "top",
+                    "face_clearance": "verified",
+                    "review_still": "../review/03-content-cards/card-stills/card-001.jpg",
+                }
                 card["visual_treatment"] = {"status": "approved"}
+                card["renderer"] = {
+                    "composition": "cache/content-cards/index.html",
+                    "asset": "cache/content-cards-overlay.mov",
+                    "fps": {"num": 30, "den": 1},
+                }
             write_json(work / "content-cards/cards-plan.json", cards)
             timeline = self.load(work / "timeline.json")
             self.run_command(
@@ -168,12 +190,22 @@ class ProjectEndToEndTests(unittest.TestCase):
                     "id": "rough-cut", "skill": "video-rough-cut", "revision": 1,
                     "depends_on": ["understanding"], "based_on": {"understanding": 1},
                     "status": "verified", "plan": "rough-cut/edit-plan.json", "outputs": ["timeline.json"],
+                    "target": {"sequence": "main", "scope": "timeline"},
+                    "effects": {
+                        "changes_timeline": True, "changes_geometry": False,
+                        "changes_video_pixels": False, "changes_audio": True, "adds_track": None,
+                    },
                     "render": {"kind": "timeline-transform", "input": "../input/original-video.mp4"},
                 },
                 {
                     "id": "color-grade", "skill": "video-color-grade", "revision": 1,
                     "depends_on": ["rough-cut"], "based_on": {"rough-cut": 1},
                     "status": "approved", "plan": "color-grade/grade-plan.json", "outputs": [],
+                    "target": {"sequence": "main", "scope": "base-video"},
+                    "effects": {
+                        "changes_timeline": False, "changes_geometry": False,
+                        "changes_video_pixels": True, "changes_audio": False, "adds_track": None,
+                    },
                     "render": {"kind": "video-filter", "target": "base-video", "plan": "color-grade/grade-plan.json"},
                 },
                 {
@@ -182,6 +214,12 @@ class ProjectEndToEndTests(unittest.TestCase):
                     "based_on": {"rough-cut": 1, "color-grade": 1},
                     "status": "verified", "plan": "content-cards/cards-plan.json",
                     "outputs": ["cache/content-cards-overlay.mov"],
+                    "target": {"sequence": "main", "scope": "graphics"},
+                    "effects": {
+                        "changes_timeline": False, "changes_geometry": False,
+                        "changes_video_pixels": False, "changes_audio": False,
+                        "adds_track": "graphics",
+                    },
                     "render": {"kind": "overlay", "asset": "cache/content-cards-overlay.mov"},
                 },
             ]

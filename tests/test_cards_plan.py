@@ -54,6 +54,9 @@ class CardsPlanTests(unittest.TestCase):
         card = self.builder.build_cards(understanding_fixture(), timeline_fixture())[0]
         self.assertEqual("draft", card["copy"]["status"])
         self.assertEqual("200 customers", card["copy"]["suggested_text"])
+        self.assertEqual({"eyebrow": None, "title": None, "detail": None}, card["copy"]["display"])
+        self.assertEqual("pending", card["placement"]["face_clearance"])
+        self.assertIn("composition", card["renderer"])
 
     def test_non_graphic_editorial_candidates_are_skipped(self):
         for kind in ("repetition", "tangent", "risk"):

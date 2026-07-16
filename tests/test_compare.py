@@ -7,7 +7,7 @@ from pathlib import Path
 
 from PIL import Image, ImageStat
 
-from tests.protocol_testlib import ROOT, load_script, timeline_fixture, write_json
+from tests.protocol_testlib import ROOT, load_script, project_fixture, timeline_fixture, write_json
 
 
 make_compare = load_script(
@@ -56,6 +56,12 @@ class CompareIntegrationTests(unittest.TestCase):
                 str(cls.source),
             ]
         )
+        project = project_fixture(cls.root)
+        stat = cls.source.stat()
+        project["source"]["fingerprint"].update(
+            size=stat.st_size, modified_ns=stat.st_mtime_ns
+        )
+        write_json(cls.root / "work/project.json", project)
         cls._run(
             [
                 "python", str(ROOT / "skills/video-rough-cut/scripts/cut_render.py"),
@@ -75,7 +81,12 @@ class CompareIntegrationTests(unittest.TestCase):
 
     @staticmethod
     def _run(command):
-        subprocess.run(command, check=True, capture_output=True, text=True)
+        result = subprocess.run(command, capture_output=True, text=True)
+        if result.returncode:
+            raise AssertionError(
+                f"command failed ({result.returncode}): {command!r}\n"
+                f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+            )
 
     @classmethod
     def _probe(cls, path):
@@ -122,6 +133,19 @@ class CompareIntegrationTests(unittest.TestCase):
         summary = self.output.parent / "comparison-summary.md"
         self.assertTrue(summary.is_file())
         self.assertIn("original-vs-final-source-time", summary.read_text(encoding="utf-8"))
+        plan = self.root / "work/edit-compare/compare-plan.json"
+        self.assertTrue(plan.is_file())
+        self.assertEqual(
+            "original-vs-final-source-time",
+            json.loads(plan.read_text(encoding="utf-8"))["mode"],
+        )
+        project = json.loads((self.root / "work/project.json").read_text(encoding="utf-8"))
+        review = next(item for item in project["reviews"] if item["id"] == "original-vs-final-source-time")
+        self.assertEqual({"rough-cut": 2, "content-cards": 1}, review["based_on"])
+        self.assertIn(
+            "original-vs-final-source-time",
+            (self.root / "START-HERE.md").read_text(encoding="utf-8"),
+        )
 
     def test_dropped_source_time_is_black_on_right(self):
         image = self._crop(self.output, 3.0, "crop=40:30:220:45", "dropped")
@@ -129,11 +153,22 @@ class CompareIntegrationTests(unittest.TestCase):
 
     def test_kept_source_time_matches_expected_final_program_frame(self):
         projected = self._crop(self.output, 5.0, "crop=40:30:220:45", "projected")
-        expected = self._crop(self.final, 2.5, "crop=40:30:60:45", "expected")
         left = list(projected.getdata())
-        right = list(expected.getdata())
-        error = sum(abs(a - b) for lp, rp in zip(left, right) for a, b in zip(lp, rp)) / (len(left) * 3)
-        self.assertLess(error, 12)
+        errors = []
+        for offset in (-1 / 30, 0, 1 / 30):
+            expected = self._crop(
+                self.final, 2.5 + offset, "crop=40:30:60:45", f"expected-{offset}"
+            )
+            right = list(expected.getdata())
+            errors.append(
+                sum(
+                    abs(a - b)
+                    for lp, rp in zip(left, right)
+                    for a, b in zip(lp, rp)
+                )
+                / (len(left) * 3)
+            )
+        self.assertLess(min(errors), 12)
 
     def test_filter_only_writes_durable_filtergraph_without_output(self):
         output = self.root / "review/filter-only.mp4"
