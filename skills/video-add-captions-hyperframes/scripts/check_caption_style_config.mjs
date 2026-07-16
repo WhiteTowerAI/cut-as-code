@@ -9,7 +9,7 @@ import {
 } from "./caption_style_config.mjs";
 
 assert.deepEqual(captionPresetNames, ["clean", "minimal", "social-bold", "pill", "boxed", "stroked", "shorts"]);
-assert.deepEqual(captionHighlightThemeNames, ["bright-green", "orange", "yellow"]);
+assert.deepEqual(captionHighlightThemeNames, ["yellow", "green", "orange", "purple", "blue", "pink"]);
 assert.deepEqual(captionBackgroundThemeNames, ["gray", "yellow", "blue", "pink", "green"]);
 assert.deepEqual(captionStrokeThemeNames, ["black", "yellow", "blue", "pink", "green"]);
 
@@ -17,11 +17,28 @@ const clean = resolveCaptionStyle({ preset: "clean" });
 assert.equal(clean.font.sizeRatio, 0.0416);
 assert.equal(clean.layout.paddingBottomRatio, 0.07);
 
+for (const preset of ["clean", "minimal", "social-bold", "pill", "boxed", "stroked"]) {
+  assert.equal(resolveCaptionStyle({ preset }).font.family, "system-ui, sans-serif");
+}
+for (const preset of captionPresetNames) {
+  assert.equal(resolveCaptionStyle({ preset }).effects.shadow.strength, "none");
+}
+
 const shortsYellow = resolveCaptionStyle({ preset: "shorts", highlightTheme: "yellow" });
 assert.equal(shortsYellow.wordHighlight.activeColor, "#F8F54F");
 assert.equal(shortsYellow.font.family.startsWith("Cal_Sans"), true);
+assert.equal(shortsYellow.font.sizeRatio, 0.035);
 assert.equal(shortsYellow.stroke.enabled, true);
 assert.equal(resolveCaptionStyle({ preset: "shorts" }).wordHighlight.activeColor, "#21D32E");
+
+for (const theme of captionHighlightThemeNames) {
+  const resolved = resolveCaptionStyle({ preset: "shorts", highlightTheme: theme });
+  assert.equal(resolved.font.sizeRatio, 0.035);
+  assert.equal(resolved.wordHighlight.activeColor, resolved.wordHighlight.backgroundColor);
+}
+
+const shortsPurple = resolveCaptionStyle({ preset: "shorts", highlightTheme: "purple" });
+assert.equal(shortsPurple.wordHighlight.activeColor, "#C084FC");
 
 const bluePill = resolveCaptionStyle({ preset: "pill", backgroundTheme: "blue" });
 assert.equal(bluePill.background.enabled, true);

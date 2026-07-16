@@ -5,7 +5,7 @@ $required = @(
     "SKILL.md",
     "examples\index.html",
     "reference\MIGRATION.md",
-    "config\caption-styles.json",
+    "scripts\caption-styles.json",
     "scripts\caption_style_config.mjs",
     "scripts\check_caption_style_config.mjs",
     "scripts\generate_caption_project.mjs",

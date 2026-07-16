@@ -290,11 +290,12 @@ const html = `<!doctype html>
       }
 
       .caption-word {
-        display: inline;
+        display: inline-block;
         color: ${style.font.color};
         opacity: ${initialWordOpacity};
-        overflow-wrap: anywhere;
-        word-break: break-word;
+        white-space: nowrap;
+        overflow-wrap: normal;
+        word-break: normal;
         border-radius: ${Math.round(height * style.wordHighlight.backgroundRadiusRatio)}px;
         padding: ${style.wordHighlight.mode === "background" ? "0 0.08em" : "0"};
       }

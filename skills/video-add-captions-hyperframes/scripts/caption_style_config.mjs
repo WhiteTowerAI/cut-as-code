@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-const configText = readFileSync(new URL("../config/caption-styles.json", import.meta.url), "utf8").replace(/^\uFEFF/, "");
+const configText = readFileSync(new URL("./caption-styles.json", import.meta.url), "utf8").replace(/^\uFEFF/, "");
 const config = JSON.parse(configText);
 
 export const captionPresets = config.presets;
@@ -99,7 +99,7 @@ export const resolveCaptionStyle = ({
   }
 
   if (highlightTheme) {
-    resolved = mergeDeep(resolved, getTheme(captionThemes.highlight, highlightTheme, "bright-green", strict));
+    resolved = mergeDeep(resolved, getTheme(captionThemes.highlight, highlightTheme, "green", strict));
   }
 
   resolved = mergeDeep(resolved, overrides);

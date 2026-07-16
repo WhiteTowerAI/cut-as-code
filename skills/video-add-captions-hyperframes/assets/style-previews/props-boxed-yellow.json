@@ -1,0 +1,79 @@
+﻿{
+    "id":  "boxed-yellow",
+    "preset":  "boxed",
+    "backgroundTheme":  "yellow",
+    "strokeTheme":  null,
+    "highlightTheme":  null,
+    "karaoke":  false,
+    "mode":  "preview",
+    "width":  1280,
+    "height":  720,
+    "fps":  30,
+    "snapshotTime":  1.55,
+    "sourceVideo":  "TEST/videos/video-add-captions-work/phase-4-style-previews/fixtures/preview-landscape.mp4",
+    "captionsFile":  "TEST/videos/video-add-captions-work/phase-4-style-previews/fixtures/preview-captions.json",
+    "resolvedStyle":  {
+                          "preset":  "boxed",
+                          "font":  {
+                                       "family":  "system-ui, sans-serif",
+                                       "sizeRatio":  0.0416,
+                                       "weight":  800,
+                                       "color":  "#1A1A1A",
+                                       "lineHeight":  1.298,
+                                       "letterSpacing":  0
+                                   },
+                          "layout":  {
+                                         "anchor":  "bottom",
+                                         "align":  "center",
+                                         "maxWidth":  0.9,
+                                         "paddingBottomRatio":  0.07
+                                     },
+                          "background":  {
+                                             "enabled":  true,
+                                             "theme":  "yellow",
+                                             "shape":  "rounded",
+                                             "color":  "#FACC15",
+                                             "opacity":  0.82,
+                                             "radiusRatio":  0.008,
+                                             "paddingXRatio":  0.032,
+                                             "paddingYRatio":  0.0112
+                                         },
+                          "effects":  {
+                                          "shadow":  {
+                                                         "strength":  "none",
+                                                         "color":  "#000000",
+                                                         "opacity":  0,
+                                                         "offsetYRatio":  0,
+                                                         "blurRatio":  0
+                                                     },
+                                          "stroke":  {
+                                                         "strength":  "none",
+                                                         "color":  "#000000",
+                                                         "widthRatio":  0
+                                                     }
+                                      },
+                          "stroke":  {
+                                         "enabled":  false,
+                                         "theme":  "black",
+                                         "color":  "#000000",
+                                         "opacity":  0.85,
+                                         "widthRatio":  0
+                                     },
+                          "wordHighlight":  {
+                                                "enabled":  true,
+                                                "mode":  "textColor",
+                                                "activeColor":  "#B45309",
+                                                "activeScale":  1.12,
+                                                "upcomingOpacity":  0.68,
+                                                "backgroundColor":  "#8BE9FD",
+                                                "backgroundOpacity":  0.22,
+                                                "backgroundRadiusRatio":  0.008
+                                            },
+                          "animation":  {
+                                            "type":  "fade",
+                                            "popInFrames":  5,
+                                            "popOutFrames":  4,
+                                            "translateYPx":  0
+                                        }
+                      }
+}
