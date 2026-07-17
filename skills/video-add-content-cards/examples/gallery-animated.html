@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>video-add-content-cards — 5 themes × 13 cards (animated)</title>
+<style>
+  /* --scale is UNITLESS (CSS scale() rejects lengths); cell width derives from it. */
+  :root { --scale: 0.1771; --cw: calc(1920px * var(--scale)); }
+  body { margin: 0; background: #1a1a1e; color: #e8e8ea;
+         font: 14px/1.4 system-ui, sans-serif; }
+  h1 { font-size: 18px; font-weight: 600; padding: 20px 24px 4px; margin: 0;
+       overflow-wrap: anywhere; }
+  p.sub { padding: 0 24px 16px; margin: 0; color: #9a9aa2; overflow-wrap: anywhere; }
+  h1, p.sub { width: 100vw; max-width: 100vw; box-sizing: border-box; }
+  .theme-picker { position: sticky; top: 0; z-index: 6; display: flex; gap: 16px;
+                  align-items: center; min-height: 52px; box-sizing: border-box;
+                  min-width: 0; width: 100vw; max-width: 100vw;
+                  margin: 0; padding: 8px 24px; border: 0; border-bottom: 1px solid #3a3a42;
+                  background: #202027; }
+  .theme-picker legend { padding: 0 12px 0 0; font-weight: 600; }
+  .theme-picker label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  .theme-picker input { accent-color: #65d1c8; }
+  table { border-collapse: collapse; width: max-content; }
+  thead th { position: sticky; top: 52px; background: #26262c; color: #e8e8ea;
+             font-weight: 600; padding: 10px 8px; text-align: center; z-index: 3;
+             border-bottom: 2px solid #3a3a42; }
+  thead th:first-child { text-align: left; padding-left: 24px; }
+  th.card { text-align: left; padding: 8px 8px 8px 24px; white-space: nowrap;
+            vertical-align: middle; color: #e8e8ea; font-weight: 600;
+            background: #202027; position: sticky; left: 0; z-index: 2; }
+  th.card .t { display: block; color: #7a7a82; font-weight: 400; font-size: 12px; }
+  td { padding: 6px; vertical-align: top; }
+  .missing { display: grid; place-items: center; width: var(--cw); aspect-ratio: 16/9;
+             color: #d06060; font-size: 12px; text-align: center;
+             border: 1px dashed #5a3a3a; border-radius: 4px; }
+  img { display: block; width: var(--cw); height: auto; border-radius: 4px;
+        background: repeating-conic-gradient(#3a3a3e 0 25%, #2a2a2e 0 50%) 0 0/24px 24px; }
+  .frame { position: relative; width: var(--cw); aspect-ratio: 16/9; overflow: hidden;
+           border-radius: 4px;
+           background: repeating-conic-gradient(#3a3a3e 0 25%, #2a2a2e 0 50%) 0 0/24px 24px; }
+  .frame iframe { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px;
+                  transform-origin: top left; transform: scale(var(--scale));
+                  border: 0; }
+  body:not([data-theme="all"]) { --scale: 0.42; --cw: calc(1920px * var(--scale)); overflow-x: hidden; }
+  body:not([data-theme="all"]) [data-theme] { display: none; }
+  body[data-theme="almanac"] [data-theme="almanac"] { display: table-cell; }
+  body[data-theme="teal"] [data-theme="teal"] { display: table-cell; }
+  body[data-theme="editorial"] [data-theme="editorial"] { display: table-cell; }
+  body[data-theme="dotgrid"] [data-theme="dotgrid"] { display: table-cell; }
+  body[data-theme="apex"] [data-theme="apex"] { display: table-cell; }
+  @media (max-width: 900px) {
+    :root { --scale: 0.12; }
+    body:not([data-theme="all"]) { --scale: 0.11; }
+    .theme-picker { position: static; flex-wrap: wrap; gap: 10px 14px; }
+    thead th { top: 0; }
+  }
+</style></head>
+<body data-theme="all">
+  <h1>video-add-content-cards — 5 themes × 13 cards (animated)</h1>
+  <p class="sub">Each cell is the live composition looping its 6s cue (entrance → hold → exit). 65 iframes driven by a shared master clock. Same content as the static gallery, just moving.</p>
+
+  <fieldset class="theme-picker">
+    <legend>Theme view</legend>
+    <label><input type="radio" name="theme" value="all" checked> Compare all</label>
+    <label><input type="radio" name="theme" value="almanac"> almanac</label>
+    <label><input type="radio" name="theme" value="teal"> teal</label>
+    <label><input type="radio" name="theme" value="editorial"> editorial</label>
+    <label><input type="radio" name="theme" value="dotgrid"> dotgrid</label>
+    <label><input type="radio" name="theme" value="apex"> apex</label>
+  </fieldset>
+  <table>
+    <thead><tr>
+      <th>Card ↓ / Theme →</th>
+      <th data-theme="almanac">almanac</th><th data-theme="teal">teal</th><th data-theme="editorial">editorial</th><th data-theme="dotgrid">dotgrid</th><th data-theme="apex">apex</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <th class="card">Intro<span class="t">t3s</span></th>
+        <td data-theme="almanac"><div class="frame"><iframe loading="lazy" title="index-almanac.html t3s"
+      src="index-almanac.html#loop=0,6"></iframe></div></td><td data-theme="teal"><div class="frame"><iframe loading="lazy" title="index-teal.html t3s"
+      src="index-teal.html#loop=0,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t3s"
+      src="index-editorial.html#loop=0,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t3s"
+      src="index-dotgrid.html#loop=0,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t3s"
+      src="index-apex.html#loop=0,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">SectionCard<span class="t">t9s</span></th>
+        <td data-theme="almanac"><div class="frame"><iframe loading="lazy" title="index-almanac.html t9s"
+      src="index-almanac.html#loop=6,6"></iframe></div></td><td data-theme="teal"><div class="frame"><iframe loading="lazy" title="index-teal.html t9s"
+      src="index-teal.html#loop=6,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t9s"
+      src="index-editorial.html#loop=6,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t9s"
+      src="index-dotgrid.html#loop=6,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t9s"
+      src="index-apex.html#loop=6,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">LowerThird<span class="t">t15s</span></th>
+        <td data-theme="almanac"><div class="frame"><iframe loading="lazy" title="index-almanac.html t15s"
+      src="index-almanac.html#loop=12,6"></iframe></div></td><td data-theme="teal"><div class="frame"><iframe loading="lazy" title="index-teal.html t15s"
+      src="index-teal.html#loop=12,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t15s"
+      src="index-editorial.html#loop=12,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t15s"
+      src="index-dotgrid.html#loop=12,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t15s"
+      src="index-apex.html#loop=12,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">StatCallout<span class="t">t21s</span></th>
+        <td data-theme="almanac"><div class="frame"><iframe loading="lazy" title="index-almanac.html t21s"
+      src="index-almanac.html#loop=18,6"></iframe></div></td><td data-theme="teal"><div class="frame"><iframe loading="lazy" title="index-teal.html t21s"
+      src="index-teal.html#loop=18,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t21s"
+      src="index-editorial.html#loop=18,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t21s"
+      src="index-dotgrid.html#loop=18,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t21s"
+      src="index-apex.html#loop=18,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">Outro<span class="t">t27s</span></th>
+        <td data-theme="almanac"><div class="frame"><iframe loading="lazy" title="index-almanac.html t27s"
+      src="index-almanac.html#loop=24,6"></iframe></div></td><td data-theme="teal"><div class="frame"><iframe loading="lazy" title="index-teal.html t27s"
+      src="index-teal.html#loop=24,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t27s"
+      src="index-editorial.html#loop=24,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t27s"
+      src="index-dotgrid.html#loop=24,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t27s"
+      src="index-apex.html#loop=24,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">TitleBumper<span class="t">t33s</span></th>
+        <td data-theme="almanac"><div class="frame"><iframe loading="lazy" title="index-almanac.html t33s"
+      src="index-almanac.html#loop=30,6"></iframe></div></td><td data-theme="teal"><div class="frame"><iframe loading="lazy" title="index-teal.html t33s"
+      src="index-teal.html#loop=30,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t33s"
+      src="index-editorial.html#loop=30,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t33s"
+      src="index-dotgrid.html#loop=30,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t33s"
+      src="index-apex.html#loop=30,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">KeypointCallout<span class="t">t39s</span></th>
+        <td data-theme="almanac"><div class="frame"><iframe loading="lazy" title="index-almanac.html t39s"
+      src="index-almanac.html#loop=36,6"></iframe></div></td><td data-theme="teal"><div class="frame"><iframe loading="lazy" title="index-teal.html t39s"
+      src="index-teal.html#loop=36,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t39s"
+      src="index-editorial.html#loop=36,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t39s"
+      src="index-dotgrid.html#loop=36,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t39s"
+      src="index-apex.html#loop=36,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">ReframeCard<span class="t">t45s</span></th>
+        <td data-theme="almanac"><div class="frame"><iframe loading="lazy" title="index-almanac.html t45s"
+      src="index-almanac.html#loop=42,6"></iframe></div></td><td data-theme="teal"><div class="frame"><iframe loading="lazy" title="index-teal.html t45s"
+      src="index-teal.html#loop=42,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t45s"
+      src="index-editorial.html#loop=42,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t45s"
+      src="index-dotgrid.html#loop=42,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t45s"
+      src="index-apex.html#loop=42,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">PromptCard<span class="t">t51s</span></th>
+        <td data-theme="almanac"><div class="frame"><iframe loading="lazy" title="index-almanac.html t51s"
+      src="index-almanac.html#loop=48,6"></iframe></div></td><td data-theme="teal"><div class="frame"><iframe loading="lazy" title="index-teal.html t51s"
+      src="index-teal.html#loop=48,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t51s"
+      src="index-editorial.html#loop=48,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t51s"
+      src="index-dotgrid.html#loop=48,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t51s"
+      src="index-apex.html#loop=48,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">BeforeAfter<span class="t">t57s</span></th>
+        <td data-theme="almanac"><div class="frame"><iframe loading="lazy" title="index-almanac.html t57s"
+      src="index-almanac.html#loop=54,6"></iframe></div></td><td data-theme="teal"><div class="frame"><iframe loading="lazy" title="index-teal.html t57s"
+      src="index-teal.html#loop=54,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t57s"
+      src="index-editorial.html#loop=54,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t57s"
+      src="index-dotgrid.html#loop=54,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t57s"
+      src="index-apex.html#loop=54,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">Checklist<span class="t">t63s</span></th>
+        <td data-theme="almanac"><div class="frame"><iframe loading="lazy" title="index-almanac.html t63s"
+      src="index-almanac.html#loop=60,6"></iframe></div></td><td data-theme="teal"><div class="frame"><iframe loading="lazy" title="index-teal.html t63s"
+      src="index-teal.html#loop=60,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t63s"
+      src="index-editorial.html#loop=60,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t63s"
+      src="index-dotgrid.html#loop=60,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t63s"
+      src="index-apex.html#loop=60,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">CommandChips<span class="t">t69s</span></th>
+        <td data-theme="almanac"><div class="frame"><iframe loading="lazy" title="index-almanac.html t69s"
+      src="index-almanac.html#loop=66,6"></iframe></div></td><td data-theme="teal"><div class="frame"><iframe loading="lazy" title="index-teal.html t69s"
+      src="index-teal.html#loop=66,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t69s"
+      src="index-editorial.html#loop=66,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t69s"
+      src="index-dotgrid.html#loop=66,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t69s"
+      src="index-apex.html#loop=66,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">ListReveal<span class="t">t75s</span></th>
+        <td data-theme="almanac"><div class="frame"><iframe loading="lazy" title="index-almanac.html t75s"
+      src="index-almanac.html#loop=72,6"></iframe></div></td><td data-theme="teal"><div class="frame"><iframe loading="lazy" title="index-teal.html t75s"
+      src="index-teal.html#loop=72,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t75s"
+      src="index-editorial.html#loop=72,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t75s"
+      src="index-dotgrid.html#loop=72,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t75s"
+      src="index-apex.html#loop=72,6"></iframe></div></td>
+      </tr>
+    </tbody>
+  </table>
+  <script>
+    const themeInputs = [...document.querySelectorAll('input[name="theme"]')];
+    const requestedTheme = new URLSearchParams(location.hash.slice(1)).get("theme");
+    const initialTheme = themeInputs.some((input) => input.value === requestedTheme)
+      ? requestedTheme : "all";
+    function selectTheme(theme) {
+      document.body.dataset.theme = theme;
+      themeInputs.find((input) => input.value === theme).checked = true;
+      history.replaceState(null, "", "#theme=" + theme);
+    }
+    for (const input of themeInputs) input.addEventListener("change", () => selectTheme(input.value));
+    selectTheme(initialTheme);
+  </script>
+  <script>
+    const frames = () => [...document.querySelectorAll("iframe")];
+    const t0 = performance.now();
+    function beat() {
+      const t = (performance.now() - t0) / 1000;
+      for (const f of frames()) { try { f.contentWindow.postMessage({ hfClock: t }, "*"); } catch (e) {} }
+      requestAnimationFrame(beat);
+    }
+    requestAnimationFrame(beat);
+  </script>
+</body></html>

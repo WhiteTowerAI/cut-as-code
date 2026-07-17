@@ -31,7 +31,64 @@ Activate any environment that has these (do NOT assume a specific conda env name
 - Python with `faster-whisper` (CPU works: `device=cpu, compute_type=int8`)
 Check first: `yt-dlp --version`, `ffmpeg -version`, `python -c "import faster_whisper"`.
 
-## Working layout
+## Project protocol workflow
+
+Use these durable project files:
+
+```text
+work/rough-cut/edit-plan.json    # hand-authored keep/drop decisions only
+work/timeline.json               # generated precision ranges + source/program mapping
+review/01-rough-cut/cut-summary.md
+review/01-rough-cut/timeline-map.png
+review/01-rough-cut/boundary-review.mp4
+review/01-rough-cut/full-proxy.mp4  # optional whole-program pacing review
+```
+
+Each canonical decision has a stable `id`, `action` (`keep` or `drop`), `start_s`,
+`end_s`, `reason`, and semantic/transcript `evidence_refs`. Keep decisions chronological;
+V1 does not support reordered or duplicated source clips.
+
+Reuse the shared evidence layer rather than transcribing or diagnosing again:
+
+```powershell
+python skills/video-understand/scripts/transcribe.py work/cache/audio16k.wav work/understand/transcript
+python skills/video-understand/scripts/analyze.py work/understand/transcript.json work/understand/analysis.json
+```
+
+The existing precision scripts accept the canonical plan. Expand word-safe boundaries,
+optionally assign linear varispeed, then generate the shared timeline:
+
+```powershell
+python skills/video-rough-cut/scripts/build_edit.py work/rough-cut/edit-plan.json work/understand/transcript.json work/cache/edit-final.json
+python skills/video-rough-cut/scripts/assign_speed.py work/cache/edit-final.json work/understand/transcript.json
+python skills/video-understand/scripts/build_timeline.py work/cache/edit-final.json work/timeline.json --fps-num SOURCE_FPS_NUM --fps-den SOURCE_FPS_DEN
+```
+
+Use the exact rational FPS from `work/understand/media.json`; never round `30000/1001` to
+`30/1`. Review `timeline-map.png` and the short `boundary-review.mp4`. Generate
+`full-proxy.mp4` only when whole-program pacing must be reviewed. Write the result to
+`cut-summary.md` and point the operation check report at that file.
+
+Record the timeline contribution with its required source input, update the operation integer
+`revision`, and set `based_on` to the exact understanding revision consumed:
+
+```json
+"render": {
+  "kind": "timeline-transform",
+  "input": "../input/original-video.mp4",
+  "plan": "timeline.json"
+}
+```
+
+The shared delivery renderer encodes the active sequence after all revision checks pass.
+
+## Standalone compatibility workflow
+
+The legacy files and commands below remain supported during migration. `build_edit.py`
+accepts both `edit_coarse.json` and canonical `decisions[]`; `cut_render.py` accepts both
+`edit_final.json` and `timeline.json`; this skill's `transcribe.py` is a compatibility
+wrapper around `../video-understand/scripts/transcribe.py`.
+
 Keep all intermediates under `work/`, deliver to project root:
 ```
 work/source.mp4            # downloaded original
@@ -95,7 +152,7 @@ This is the editorial core. Read the transcript + analysis, then write a coarse 
 of **keep-blocks and drop-spans that tile the entire timeline with no gaps/overlaps**,
 each with `in`, `out`, and a one-line `reason`. Compress slow preamble to a few
 high-value nuggets; keep substance as large blocks; drop clear tangents/rambles.
-Preserve chronological order unless reordering clearly helps (monologues back-reference).
+Preserve chronological order; the canonical V1 timeline rejects reordering.
 Aim to roughly halve runtime.
 - Format spec + a real worked example: `reference/edit_coarse.schema.md`.
 - Align every block boundary to a **sentence/clause end** — never start/stop
@@ -103,7 +160,8 @@ Aim to roughly halve runtime.
   ```
   python scripts/inspect_bounds.py work/edit_coarse.json work/transcript.json
   ```
-  It prints the words straddling each in/out so you can nudge them onto clean edges.
+  It accepts both legacy `keep[]` and canonical `decisions[]` plans and prints the words
+  straddling each boundary so you can nudge them onto clean edges.
 
 ### 5. Expand → auto-speed → render
 Turn coarse blocks into tight, dead-air-free render segments, normalize the speaking
@@ -147,11 +205,9 @@ python scripts/cut_render.py    work/edit_final.json   work/source.mp4 first_cut
   When segments carry a `speed`, it re-times each input (`setpts` video / `atempo` audio)
   and normalizes fps/timebase/sample-rate per input before concat so A/V stays locked;
   with no speed it falls back to the exact original graph.
-- **Pairs-with caveat (`video-edit-compare`):** that sibling visualizes keep/drop on the
-  ORIGINAL timeline (it reads `source.mp4` + the keep spans, not `first_cut.mp4`), so it
-  still works — it just ignores `speed` and shows kept content at original pace. Its right
-  panel will NOT reflect the varispeed; it answers "what content was kept", not "at what
-  pace it plays". That's expected, not a desync.
+- **Final comparison:** `video-edit-compare` reads the canonical timeline plus the actual
+  final delivery. It projects final pixels back to source time, stretches varispeed clips
+  to their source duration, and shows dropped ranges as black.
 
 ### 6. Self-check — do not declare done until this passes
 ```

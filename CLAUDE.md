@@ -28,27 +28,57 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Open-Recut is **a stack of agentic video-editing skills**, not an application. Each
 directory under `skills/<name>/` is a self-contained skill: a `SKILL.md` (the agent
 playbook — read it first), plus `scripts/`, `examples/`, and `reference/`. There is no
-root build, no package manifest, no test suite, and no lint config — the scripts are run
-ad hoc by an agent following the skill's pipeline. When you change a skill, the SKILL.md
-*is* the spec; keep it and the scripts in sync.
+root build, package manifest, or lint config. Protocol and ffmpeg integration checks live
+under `tests/` and use Python `unittest`. When you change a skill, the SKILL.md *is* the
+spec; keep it, scripts, and tests in sync.
 
-## The seven skills
+## Skills
 
 | Skill | Job | Stack |
 |---|---|---|
+| `video-understand` | Shared media probe, word-level transcript, objective analysis, and evidence-backed semantic understanding | Python · ffprobe · faster-whisper |
 | `video-rough-cut` | Raw long video → compact first cut (download, transcribe, diagnose, hand-written JSON cut plan, varispeed, render, self-check) | Python · yt-dlp · ffmpeg · faster-whisper |
-| `video-edit-compare` | Split-screen diff (original vs cut on one timeline) to review an edit plan | Python · ffmpeg |
+| `video-edit-compare` | Original versus actual final pixels projected onto the source clock | Python · ffmpeg · Pillow |
 | `video-color-grade` | Assess footage → corrective base + named looks → human picks → bake `.cube` LUT + apply | Python · ffmpeg · numpy · Pillow |
-| `video-overlay-cards` | Composite intro/chapter/lower-third/outro cards onto a video (no re-cut) | Python · ffmpeg · Pillow |
-| `video-add-captions` | Every-line styled subtitles, optional karaoke | Remotion (React/TS) · ffmpeg · faster-whisper |
-| `video-to-remotion` | Watch content → auto-generate *selective* motion graphics (lower-thirds, stats, chapter cards) | Remotion (React/TS) · ffmpeg · faster-whisper |
-| `design-frames-to-motion` | Rebuild designer PNG frames as parametric Remotion components, transcript-synced | Remotion (React/TS) · ffmpeg |
+| `video-overlay-cards(legacy)` | Composite intro/chapter/lower-third/outro cards onto a video (no re-cut) | Python · ffmpeg · Pillow |
+| `video-add-captions` | Preset-driven, word-timed captions with optional karaoke | HyperFrames · ffmpeg |
+| `video-add-captions-legacy` | Legacy styled captions and karaoke | Remotion (React/TS) · ffmpeg |
+| `video-to-remotion(legacy)` | Watch content → auto-generate *selective* motion graphics (lower-thirds, stats, chapter cards) | Remotion (React/TS) · ffmpeg · faster-whisper |
+| `video-add-content-cards` | Same as video-to-remotion, authored as HTML + GSAP instead of React (agents iterate HTML faster; no bundler) | HyperFrames (HTML/GSAP) · ffmpeg · faster-whisper |
+| `design-frames-to-motion(legacy)` | Rebuild designer PNG frames as parametric Remotion components, transcript-synced | Remotion (React/TS) · ffmpeg |
+
+## Shared project protocol V1
+
+- Skills are optional and composable; there is no fixed global pipeline. A project can run
+  cards directly or rough cut → color grade → cards.
+- `work/project.json` is the only shared manifest. It records operation dependencies,
+  statuses, render contributions, integer `revision` values, and `based_on` checks.
+- `work/timeline.json` is the custom one-source, chronological source-to-program mapping.
+  V1 does not use OpenTimelineIO or support reordered/duplicated clips or nonlinear speed.
+- Canonical time values are seconds. All ranges are half-open `[start_s, end_s)` and use
+  explicit `source_range` and `program_range` objects.
+- Each operation declares a `target` (`sequence` and scope) and `effects` such as timeline,
+  pixel, geometry, audio, or added-track changes.
+- Render contribution kinds are `timeline-transform`, `video-filter`, `audio-filter`,
+  `overlay`, `precomputed-asset`, and `output-constraint`.
+- Domain decisions remain in `work/rough-cut/edit-plan.json`,
+  `work/color-grade/grade-plan.json`, and `work/content-cards/cards-plan.json`.
+- User-facing files live in `input/`, `review/`, and `final/`; `work/cache/` is disposable.
+- Compile approved active operations with `build_render_plan.py`, then render delivery once
+  with `render_project.py`. Timeline changes require audio filtering/encoding; `-c:a copy`
+  is valid only when no active operation cuts, concatenates, retimes, or filters audio.
+- `video-edit-compare` runs after final delivery and supports only
+  `original-vs-final-source-time`.
+- Default review uses stills, contact sheets, boundary reels, and short previews. Render a
+  full-length intermediate only when a whole-program pacing decision requires it.
+- Preserve compatibility adapters for current edit, looks, and cue formats until every
+  documented consumer has migrated.
 
 ## Architecture that spans skills
 
 These conventions are shared and load-bearing — match them in any new skill:
 
-- **The transcript is the shared interchange format.** `skills/video-rough-cut/scripts/transcribe.py`
+- **The transcript is the shared interchange format.** `skills/video-understand/scripts/transcribe.py`
   is the canonical transcriber (faster-whisper, CPU/int8, VAD, word-level). It emits
   `transcript.json` = `segments[] → words[]` with per-word `start`/`end`. The Remotion
   skills (`video-add-captions`, `video-to-remotion`) deliberately reuse it via a relative
@@ -73,9 +103,9 @@ These conventions are shared and load-bearing — match them in any new skill:
   done. Don't skip it.
 
 - **Two render families:**
-  - *ffmpeg/Python* (`rough-cut`, `color-grade`, `overlay-cards`, `edit-compare`): one
-    re-encode pass, **audio always `-c:a copy`** so A/V sync is preserved, source
-    duration/fps/dims kept.
+  - *ffmpeg/Python* standalone operations copy audio when they do not change time. The
+    shared delivery renderer encodes audio after cuts, concatenation, varispeed, or an
+    audio filter; otherwise it uses `-c:a copy`.
   - *Remotion/React* (`captions`, `to-remotion`, `design-frames-to-motion`): default to
     rendering a **transparent overlay** (ProRes 4444) at the **source's own resolution**,
     then ffmpeg-composite onto the source (`-c:a copy`). The full-frame `<OffthreadVideo>`
@@ -106,7 +136,7 @@ There is no aggregate runner; commands live inside each `SKILL.md` pipeline. Can
 ```bash
 # transcribe (the shared step) — produces transcript.json + .srt
 ffmpeg -y -i work/source.mp4 -ac 1 -ar 16000 work/audio16k.wav
-python skills/video-rough-cut/scripts/transcribe.py work/audio16k.wav work/transcript
+python skills/video-understand/scripts/transcribe.py work/audio16k.wav work/transcript
 
 # Remotion render (overlay path) — run from inside the scaffolded project
 npx remotion still src/index.ts <Comp> work/stills/f295.png --frame=295

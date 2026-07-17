@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Content cards review</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #151719;
+      --band: #1d2023;
+      --surface: #24282b;
+      --line: #3b4145;
+      --text: #f2eee5;
+      --muted: #aeb4b7;
+      --accent: #4fc3b4;
+      --warning: #f3bd5b;
+      --proxy: rgba(86, 91, 94, 0.88);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.45 system-ui, sans-serif;
+      letter-spacing: 0;
+    }
+    header { border-bottom: 1px solid var(--line); background: var(--band); }
+    .header-inner, main { width: min(1180px, calc(100% - 32px)); margin: 0 auto; }
+    .header-inner { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; padding: 20px 0; }
+    h1 { margin: 0; font-size: 22px; letter-spacing: 0; }
+    .summary { display: flex; gap: 18px; color: var(--muted); white-space: nowrap; }
+    .summary strong { color: var(--text); }
+    main { padding: 20px 0 40px; }
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 58px;
+      padding: 8px 0;
+      background: var(--bg);
+      border-bottom: 1px solid var(--line);
+    }
+    #selection-count { color: var(--warning); }
+    #selection-count.on-target { color: var(--accent); }
+    button {
+      min-height: 38px;
+      padding: 8px 12px;
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      cursor: pointer;
+    }
+    button:hover, button:focus-visible { background: #253b38; outline: none; }
+    form { display: grid; gap: 10px; padding-top: 14px; }
+    .candidate {
+      display: grid;
+      grid-template-columns: 40px 150px minmax(220px, 1fr) 140px minmax(280px, 360px);
+      gap: 14px;
+      align-items: center;
+      min-height: 104px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface);
+    }
+    .pick { display: grid; place-items: center; align-self: stretch; cursor: pointer; }
+    .pick input { width: 20px; height: 20px; accent-color: var(--accent); }
+    .identity { display: grid; gap: 2px; min-width: 0; color: var(--muted); }
+    .identity strong { color: var(--text); font-size: 15px; }
+    .identity span { overflow-wrap: anywhere; }
+    .field { display: grid; gap: 6px; min-width: 0; color: var(--muted); }
+    input[type="text"], select {
+      width: 100%;
+      min-height: 40px;
+      border: 1px solid #50575c;
+      border-radius: 4px;
+      background: #171a1c;
+      color: var(--text);
+      font: inherit;
+      padding: 8px 10px;
+    }
+    input[type="text"]:focus, select:focus { border-color: var(--accent); outline: 2px solid #265950; }
+    .frame-preview {
+      position: relative;
+      width: 100%;
+      overflow: hidden;
+      border: 1px solid #50575c;
+      border-radius: 4px;
+      background: #090a0b;
+      aspect-ratio: 16 / 9;
+    }
+    .frame-preview img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #090a0b;
+    }
+    .placement-proxy {
+      position: absolute;
+      display: grid;
+      place-items: center;
+      padding: 6px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.82);
+      border-radius: 3px;
+      background: var(--proxy);
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+      font-size: clamp(10px, 1vw, 12px);
+      font-weight: 650;
+      line-height: 1.15;
+      text-align: center;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .placement-proxy[data-placement="top"] {
+      top: 6%; left: 22%; width: 56%; height: 22%; opacity: 1;
+    }
+    .placement-proxy[data-placement="bottom"] {
+      bottom: 6%; left: 22%; width: 56%; height: 22%; opacity: 1;
+    }
+    .placement-proxy[data-placement="left"] {
+      top: 22%; left: 4%; width: 34%; height: 56%; opacity: 1;
+    }
+    .placement-proxy[data-placement="right"] {
+      top: 22%; right: 4%; width: 34%; height: 56%; opacity: 1;
+    }
+    .placement-proxy[data-placement="center"] {
+      top: 35%; left: 21%; width: 58%; height: 30%; opacity: 1;
+    }
+    .placement-proxy span {
+      display: -webkit-box;
+      overflow: hidden;
+      overflow-wrap: anywhere;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+    }
+    .summary-box {
+      margin-top: 20px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface);
+      padding: 14px;
+    }
+    .summary-box-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .summary-box-header h2 { margin: 0; font-size: 16px; }
+    #copy-summary { position: relative; }
+    #copy-summary.copied { border-color: var(--accent); background: #253b38; }
+    #summary-output {
+      width: 100%;
+      min-height: 120px;
+      margin: 0;
+      padding: 10px;
+      border: 1px solid #50575c;
+      border-radius: 4px;
+      background: #171a1c;
+      color: var(--text);
+      font: 13px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    @media (max-width: 1100px) {
+      .candidate { grid-template-columns: 40px 150px minmax(220px, 1fr) 140px; }
+      .frame-preview { grid-column: 2 / -1; width: min(520px, 100%); }
+    }
+    @media (max-width: 780px) {
+      .header-inner, .toolbar { align-items: stretch; flex-direction: column; gap: 10px; }
+      .toolbar { position: static; }
+      .toolbar button { width: 100%; }
+      .summary { display: grid; gap: 2px; white-space: normal; }
+      .candidate { grid-template-columns: 36px 1fr; align-items: start; }
+      .copy-field, .placement-field { grid-column: 2; }
+      .frame-preview { grid-column: 1 / -1; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <h1>Content cards review</h1>
+    </div>
+  </header>
+  <main>
+    <div class="toolbar">
+      <strong id="selection-count" aria-live="polite"></strong>
+    </div>
+    <form id="review-form"></form>
+    <section class="summary-box">
+      <div class="summary-box-header">
+        <h2>Copy the following summary back to the AI agent.</h2>
+        <button id="copy-summary" type="button">Copy summary</button>
+      </div>
+      <pre id="summary-output">No cards selected yet.</pre>
+    </section>
+  </main>
+
+  <template id="candidate-template">
+    <article class="candidate">
+      <label class="pick">
+        <input type="checkbox" name="selected">
+      </label>
+      <div class="identity">
+        <strong data-id></strong>
+        <span data-type></span>
+        <span data-time></span>
+      </div>
+      <label class="field copy-field">
+        <span>Text</span>
+        <input type="text" name="copy">
+      </label>
+      <label class="field placement-field">
+        <span>Placement</span>
+        <select name="placement">
+          <option value="">Unplaced</option>
+          <option value="top">Top</option>
+          <option value="bottom">Bottom</option>
+          <option value="left">Left</option>
+          <option value="right">Right</option>
+          <option value="center">Center</option>
+        </select>
+      </label>
+      <div class="frame-preview">
+        <img alt="">
+        <div class="placement-proxy" data-placement="">
+          <span data-proxy-copy></span>
+        </div>
+      </div>
+    </article>
+  </template>
+
+  <script>
+    const REVIEW_DATA_B64 = "__CONTENT_CARDS_REVIEW_DATA__";
+    const binary = atob(REVIEW_DATA_B64);
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    const reviewData = JSON.parse(new TextDecoder().decode(bytes));
+    const form = document.querySelector("#review-form");
+    const candidateTemplate = document.querySelector("#candidate-template");
+    const count = document.querySelector("#selection-count");
+    const summaryOutput = document.querySelector("#summary-output");
+    const copyButton = document.querySelector("#copy-summary");
+    const placements = new Set(["", "top", "bottom", "left", "right", "center"]);
+    const target = reviewData.target;
+
+    function displayId(id) {
+      return id.replace(/^card-0+/, "card-");
+    }
+
+    function makeCandidate(card) {
+      const fragment = candidateTemplate.content.cloneNode(true);
+      const row = fragment.querySelector(".candidate");
+      const selected = row.querySelector('[name="selected"]');
+      const copy = row.querySelector('[name="copy"]');
+      const placement = row.querySelector('[name="placement"]');
+      const image = row.querySelector("img");
+      const preview = row.querySelector(".placement-proxy");
+      const proxyCopy = row.querySelector("[data-proxy-copy]");
+
+      row.dataset.cardId = card.id;
+      row.querySelector("[data-id]").textContent = displayId(card.id);
+      row.querySelector("[data-type]").textContent = card.card_type;
+      row.querySelector("[data-time]").textContent = `${card.program_start_s.toFixed(3)}s ~ ${card.duration_s.toFixed(3)}s`;
+      selected.checked = card.selected;
+      selected.setAttribute("aria-label", `Select ${card.id}`);
+      copy.value = card.copy;
+      placement.value = placements.has(card.placement) ? card.placement : "";
+      image.src = card.screenshot;
+      image.alt = `Video frame for ${card.id}`;
+
+      function updatePreview() {
+        preview.dataset.placement = placement.value;
+        proxyCopy.textContent = copy.value.trim() || card.card_type;
+      }
+
+      placement.addEventListener("change", updatePreview);
+      copy.addEventListener("input", updatePreview);
+      updatePreview();
+      form.append(fragment);
+      return row;
+    }
+
+    const candidates = reviewData.cards.map(makeCandidate);
+
+    function selectedCount() {
+      return candidates.filter((row) => row.querySelector('[name="selected"]').checked).length;
+    }
+    function updateCount() {
+      const selected = selectedCount();
+      count.textContent = `${selected} selected / target ${target}`;
+      count.classList.toggle("on-target", selected === target);
+    }
+    function buildSummary() {
+      const selectedRows = candidates.filter((row) => row.querySelector('[name="selected"]').checked);
+      if (selectedRows.length === 0) return "No cards selected yet.";
+      return selectedRows
+        .map((row) => {
+          const id = row.dataset.cardId;
+          const copy = row.querySelector('[name="copy"]').value;
+          const placement = row.querySelector('[name="placement"]').value || "Unplaced";
+          return `${id} | ${placement} | ${copy}`;
+        })
+        .join("\n");
+    }
+    function updateSummary() {
+      summaryOutput.textContent = buildSummary();
+    }
+    function updateAll() {
+      updateCount();
+      updateSummary();
+    }
+    for (const input of form.querySelectorAll('[name="selected"], [name="copy"], [name="placement"]')) {
+      input.addEventListener("change", updateAll);
+      input.addEventListener("input", updateAll);
+    }
+    function legacyCopy(text) {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.append(textarea);
+      textarea.select();
+      const copied = document.execCommand("copy");
+      textarea.remove();
+      return copied;
+    }
+    async function copySummary(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+          await navigator.clipboard.writeText(text);
+          return true;
+        } catch (error) {
+          // Local file clipboard permissions vary by browser; use the native fallback below.
+        }
+      }
+      return legacyCopy(text);
+    }
+    copyButton.addEventListener("click", async () => {
+      const copied = await copySummary(summaryOutput.textContent);
+      if (!copied) {
+        copyButton.textContent = "Copy failed";
+        setTimeout(() => { copyButton.textContent = "Copy summary"; }, 1500);
+        return;
+      }
+      copyButton.textContent = "Copied!";
+      copyButton.classList.add("copied");
+      setTimeout(() => {
+        copyButton.textContent = "Copy summary";
+        copyButton.classList.remove("copied");
+      }, 1500);
+    });
+    updateAll();
+  </script>
+</body>
+</html>

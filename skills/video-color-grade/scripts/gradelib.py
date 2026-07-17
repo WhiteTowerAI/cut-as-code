@@ -26,9 +26,38 @@ def run(cmd, cwd=None):
     return r
 
 
-def load_spec(path):
+def normalize_spec(spec, require_selected=False):
+    """Validate canonical grade plans while leaving legacy looks specs intact."""
+    if "schema_version" not in spec:
+        return spec
+    if spec.get("schema_version") != 1:
+        raise ValueError("grade plan schema_version must be 1")
+    if spec.get("target") not in ("base-video", "composite"):
+        raise ValueError("grade plan target must be base-video or composite")
+
+    looks = spec.get("looks")
+    if not isinstance(looks, list) or not looks:
+        raise ValueError("grade plan looks must be a non-empty list")
+    names = [look.get("name") for look in looks]
+    if any(not name for name in names) or len(names) != len(set(names)):
+        raise ValueError("grade plan look names must be unique and non-empty")
+
+    selected = spec.get("selected_look")
+    if require_selected and not selected:
+        raise ValueError("grade plan selected_look is required for delivery")
+    if selected and selected not in names:
+        raise ValueError(f"selected look not found: {selected}")
+    if require_selected:
+        if spec.get("selection_mode") not in ("human", "agent"):
+            raise ValueError("grade plan selection_mode must be human or agent")
+        if not str(spec.get("selection_rationale", "")).strip():
+            raise ValueError("grade plan selection_rationale is required for delivery")
+    return spec
+
+
+def load_spec(path, require_selected=False):
     with open(path, encoding="utf-8") as f:
-        return json.load(f)
+        return normalize_spec(json.load(f), require_selected=require_selected)
 
 
 def get_look(spec, name):
