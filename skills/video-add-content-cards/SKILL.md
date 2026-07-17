@@ -31,7 +31,7 @@ review/03-content-cards/content-cards-review.json  # validated human choices
 ```
 
 The reusable review page is committed at
-`skills/video-add-content-cards/assets/content-cards-review.html`. 
+`skills/video-add-content-cards/assets/content-cards-review.html`.
 The populated HTML, screenshots, overlay, and preview renders are reproducible.
 Keep the plan outside `cache/`. It must contain every visible string, timing, placement,
 visual-treatment value, renderer composition path, renderer asset path, and source FPS needed

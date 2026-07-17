@@ -1,0 +1,30 @@
+{
+  "schema_version": "shorts-candidates.v2",
+  "video": {"source": "work/source.mp4", "duration_s": 96.0},
+  "transcript": {"path": "work/shorts/transcript.json", "timebase": "input_video_relative"},
+  "selection": {"target_count": 1, "evidence_mode": "text_only"},
+  "candidates": [
+    {
+      "candidate_id": "cand-001",
+      "title": "Growth Driver and Qualified Platform",
+      "scene_type": "product_demo",
+      "start_time": 0.0,
+      "end_time": 23.5,
+      "transcript_excerpt": "This is um going to be our new major growth driver. Every company that works with NVIDIA on AI has already qualified this platform.",
+      "evidence_mode": "text_only",
+      "score_breakdown": {
+        "hook": {"score": 18, "reason": "The growth-driver promise establishes importance immediately."},
+        "completeness": {"score": 18, "reason": "The claim is followed by concrete adoption evidence."},
+        "audience_value": {"score": 17, "reason": "The platform qualification statement is understandable business evidence."},
+        "emotion_tension": {"score": 8, "reason": "The claim carries clear business stakes."},
+        "quotability": {"score": 12, "reason": "The growth-driver line can stand alone."},
+        "pace_editability": {"score": 8, "reason": "The two concise statements require no internal restructuring."}
+      },
+      "metadata": {"editorial_reason": "The growth claim and qualification evidence form a complete business short."},
+      "warnings": [],
+      "filler_drop_spans": [
+        {"type": "filler", "start_time": 0.8, "end_time": 1.1, "reason": "Independent filler word.", "review_status": "approved"}
+      ]
+    }
+  ]
+}

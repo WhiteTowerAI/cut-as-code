@@ -3,15 +3,15 @@
 Reads a word-level transcript (the work/transcript.json produced by the
 video-rough-cut skill's transcribe.py) and groups words into caption cues —
 broken on sentence punctuation, a max line budget, a max duration, and speech
-gaps — while keeping per-word timings so the Remotion component can highlight
-the current word (karaoke).
+gaps — while keeping per-word timings so any renderer can highlight the current
+word (karaoke).
 
 Outputs:
-  src/captions.json   list of { index, start, end, text, lines[], words[] }
-  out/captions.srt    standard SubRip subtitles (portable + a quick sanity read)
+  captions.json   list of { index, start, end, text, lines[], words[] }
+  captions.srt    standard SubRip subtitles (portable + a quick sanity read)
 
 Usage:
-  python build_captions.py <transcript.json> [src/captions.json] [out/captions.srt] \
+  python build_captions.py <transcript.json> [captions.json] [captions.srt] \
          [--max-chars 42] [--max-lines 2] [--max-dur 6] [--gap 0.6]
 """
 import sys, json
@@ -126,8 +126,8 @@ def main():
         sys.exit(__doc__)
     transcript = a[0]
     pos = [x for x in a[1:] if not x.startswith("--")]
-    out_json = pos[0] if len(pos) > 0 else "src/captions.json"
-    out_srt = pos[1] if len(pos) > 1 else "out/captions.srt"
+    out_json = pos[0] if len(pos) > 0 else "captions.json"
+    out_srt = pos[1] if len(pos) > 1 else "captions.srt"
 
     def opt(name, default, cast):
         return cast(a[a.index(name) + 1]) if name in a else default

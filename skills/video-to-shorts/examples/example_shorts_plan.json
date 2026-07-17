@@ -1,0 +1,60 @@
+{
+  "schema_version": "shorts-plan.v2",
+  "producer": {"skill": "video-to-shorts", "planner": "deterministic"},
+  "source_candidates": {
+    "path": "work/shorts/shorts_candidates.json",
+    "schema_version": "shorts-candidates.v2"
+  },
+  "transcript": {"path": "work/shorts/transcript.json", "timebase": "input_video_relative"},
+  "shorts": [
+    {
+      "id": "short_01",
+      "short_id": "short_01",
+      "candidate_id": "cand-001",
+      "source_candidate_index": 1,
+      "order": 1,
+      "title": "Growth Driver and Qualified Platform",
+      "scene_type": "product_demo",
+      "evidence_mode": "text_only",
+      "start_time": 0.0,
+      "end_time": 23.5,
+      "duration": 23.5,
+      "score_breakdown": {
+        "hook": {"score": 18, "reason": "The growth-driver promise establishes importance immediately."},
+        "completeness": {"score": 18, "reason": "The claim is followed by concrete adoption evidence."},
+        "audience_value": {"score": 17, "reason": "The platform qualification statement is understandable business evidence."},
+        "emotion_tension": {"score": 8, "reason": "The claim carries clear business stakes."},
+        "quotability": {"score": 12, "reason": "The growth-driver line can stand alone."},
+        "pace_editability": {"score": 8, "reason": "The two concise statements require no internal restructuring."}
+      },
+      "score": 81,
+      "hook_sentence": "",
+      "editorial_reason": "The growth claim and qualification evidence form a complete business short.",
+      "transcript_excerpt": "This is um going to be our new major growth driver. Every company that works with NVIDIA on AI has already qualified this platform.",
+      "requested_filler_drop_spans": [
+        {"type": "filler", "start_time": 0.8, "end_time": 1.1, "reason": "Independent filler word.", "review_status": "approved"}
+      ],
+      "filler_drop_spans": [
+        {"type": "filler", "start_time": 0.8, "end_time": 1.1, "reason": "Independent filler word.", "review_status": "approved", "words": ["um"]}
+      ],
+      "rejected_filler_drop_spans": [],
+      "keep_spans": [
+        {"start_time": 0.0, "end_time": 0.8},
+        {"start_time": 1.1, "end_time": 23.5}
+      ],
+      "source_duration": 23.5,
+      "filler_removed_duration": 0.3,
+      "estimated_output_duration": 23.2,
+      "validation": {"passed": true, "errors": [], "warnings": []},
+      "outputs": {
+        "directory": "work/shorts/short_01",
+        "source_video": "work/shorts/short_01/source.mp4",
+        "transcript": "work/shorts/short_01/transcript.json",
+        "extraction_report": "work/shorts/short_01/extraction_report.json"
+      },
+      "status": "planned"
+    }
+  ],
+  "rejected_candidates": [],
+  "metadata": {"notes": "The approved filler_drop_span is normalized and converted to keep_spans before extraction."}
+}

@@ -1,0 +1,86 @@
+{
+  "duration": 96.0,
+  "language": "en",
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 8.4,
+      "text": "This is um going to be our new major growth driver.",
+      "words": [
+        { "start": 0.0, "end": 0.4, "word": "This" },
+        { "start": 0.4, "end": 0.7, "word": "is" },
+        { "start": 0.8, "end": 1.1, "word": "um" },
+        { "start": 1.2, "end": 1.6, "word": "going" },
+        { "start": 1.6, "end": 1.8, "word": "to" },
+        { "start": 1.8, "end": 2.0, "word": "be" },
+        { "start": 2.0, "end": 2.4, "word": "our" },
+        { "start": 2.4, "end": 2.8, "word": "new" },
+        { "start": 2.8, "end": 3.3, "word": "major" },
+        { "start": 3.3, "end": 3.9, "word": "growth" },
+        { "start": 3.9, "end": 4.4, "word": "driver." }
+      ]
+    },
+    {
+      "start": 18.0,
+      "end": 34.0,
+      "text": "Every company that works with NVIDIA on AI has already qualified this platform.",
+      "words": [
+        { "start": 18.0, "end": 18.4, "word": "Every" },
+        { "start": 18.4, "end": 18.9, "word": "company" },
+        { "start": 18.9, "end": 19.2, "word": "that" },
+        { "start": 19.2, "end": 19.6, "word": "works" },
+        { "start": 19.6, "end": 19.9, "word": "with" },
+        { "start": 19.9, "end": 20.5, "word": "NVIDIA" },
+        { "start": 20.5, "end": 20.7, "word": "on" },
+        { "start": 20.7, "end": 21.0, "word": "AI" },
+        { "start": 21.0, "end": 21.3, "word": "has" },
+        { "start": 21.3, "end": 21.8, "word": "already" },
+        { "start": 21.8, "end": 22.5, "word": "qualified" },
+        { "start": 22.5, "end": 22.8, "word": "this" },
+        { "start": 22.8, "end": 23.5, "word": "platform." }
+      ]
+    },
+    {
+      "start": 52.0,
+      "end": 74.0,
+      "text": "This is SQL running three times faster, not ten percent faster, three times faster.",
+      "words": [
+        { "start": 52.0, "end": 52.3, "word": "This" },
+        { "start": 52.3, "end": 52.5, "word": "is" },
+        { "start": 52.5, "end": 52.9, "word": "SQL" },
+        { "start": 52.9, "end": 53.3, "word": "running" },
+        { "start": 53.3, "end": 53.8, "word": "three" },
+        { "start": 53.8, "end": 54.2, "word": "times" },
+        { "start": 54.2, "end": 54.8, "word": "faster," },
+        { "start": 54.8, "end": 55.1, "word": "not" },
+        { "start": 55.1, "end": 55.5, "word": "ten" },
+        { "start": 55.5, "end": 56.0, "word": "percent" },
+        { "start": 56.0, "end": 56.6, "word": "faster," },
+        { "start": 56.6, "end": 57.0, "word": "three" },
+        { "start": 57.0, "end": 57.4, "word": "times" },
+        { "start": 57.4, "end": 58.0, "word": "faster." }
+      ]
+    },
+    {
+      "start": 78.0,
+      "end": 94.0,
+      "text": "Real time stream processing is where AI systems start making decisions as events happen.",
+      "words": [
+        { "start": 78.0, "end": 78.4, "word": "Real" },
+        { "start": 78.4, "end": 78.8, "word": "time" },
+        { "start": 78.8, "end": 79.4, "word": "stream" },
+        { "start": 79.4, "end": 80.0, "word": "processing" },
+        { "start": 80.0, "end": 80.2, "word": "is" },
+        { "start": 80.2, "end": 80.5, "word": "where" },
+        { "start": 80.5, "end": 80.8, "word": "AI" },
+        { "start": 80.8, "end": 81.4, "word": "systems" },
+        { "start": 81.4, "end": 81.8, "word": "start" },
+        { "start": 81.8, "end": 82.4, "word": "making" },
+        { "start": 82.4, "end": 83.0, "word": "decisions" },
+        { "start": 83.0, "end": 83.3, "word": "as" },
+        { "start": 83.3, "end": 83.8, "word": "events" },
+        { "start": 83.8, "end": 84.4, "word": "happen." }
+      ]
+    }
+  ]
+}

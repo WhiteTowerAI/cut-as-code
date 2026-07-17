@@ -32,7 +32,7 @@ root build, package manifest, or lint config. Protocol and ffmpeg integration ch
 under `tests/` and use Python `unittest`. When you change a skill, the SKILL.md *is* the
 spec; keep it, scripts, and tests in sync.
 
-## The nine skills
+## Skills
 
 | Skill | Job | Stack |
 |---|---|---|
@@ -41,7 +41,8 @@ spec; keep it, scripts, and tests in sync.
 | `video-edit-compare` | Original versus actual final pixels projected onto the source clock | Python · ffmpeg · Pillow |
 | `video-color-grade` | Assess footage → corrective base + named looks → human picks → bake `.cube` LUT + apply | Python · ffmpeg · numpy · Pillow |
 | `video-overlay-cards(legacy)` | Composite intro/chapter/lower-third/outro cards onto a video (no re-cut) | Python · ffmpeg · Pillow |
-| `video-add-captions` | Every-line styled subtitles, optional karaoke | Remotion (React/TS) · ffmpeg · faster-whisper |
+| `video-add-captions` | Preset-driven, word-timed captions with optional karaoke | HyperFrames · ffmpeg |
+| `video-add-captions-legacy` | Legacy styled captions and karaoke | Remotion (React/TS) · ffmpeg |
 | `video-to-remotion(legacy)` | Watch content → auto-generate *selective* motion graphics (lower-thirds, stats, chapter cards) | Remotion (React/TS) · ffmpeg · faster-whisper |
 | `video-add-content-cards` | Same as video-to-remotion, authored as HTML + GSAP instead of React (agents iterate HTML faster; no bundler) | HyperFrames (HTML/GSAP) · ffmpeg · faster-whisper |
 | `design-frames-to-motion(legacy)` | Rebuild designer PNG frames as parametric Remotion components, transcript-synced | Remotion (React/TS) · ffmpeg |
