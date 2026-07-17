@@ -2,12 +2,18 @@
 """Build shorts_plan.v2 from validated shorts-candidates.v2 data."""
 
 import argparse
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 from preview import write_plan_preview_html, write_plan_preview_md
 from review_gate import candidate_review_paths, sha256_file, validate_candidate_review
 from transcript_utils import load_json, overlap_ratio, transcript_duration, write_json
+
+
+UNDERSTAND_SCRIPTS = Path(__file__).resolve().parents[2] / "video-understand" / "scripts"
+sys.path.insert(0, str(UNDERSTAND_SCRIPTS))
+import projectlib  # noqa: E402
 
 
 SCORE_DIMENSIONS = {
@@ -292,6 +298,109 @@ def build_plan(selected, rejected, candidates_path, candidates_data, transcript_
     }
 
 
+def source_ranges_for_program(timeline, start, end):
+    ranges = []
+    for clip in timeline["clips"]:
+        program = clip["program_range"]
+        overlap_start = max(float(start), float(program["start_s"]))
+        overlap_end = min(float(end), float(program["end_s"]))
+        if overlap_end <= overlap_start:
+            continue
+        source = clip["source_range"]
+        speed = float(clip["speed"])
+        ranges.append({
+            "start_s": round(float(source["start_s"]) + (overlap_start - float(program["start_s"])) * speed, 6),
+            "end_s": round(float(source["start_s"]) + (overlap_end - float(program["start_s"])) * speed, 6),
+        })
+    return ranges
+
+
+def canonical_project_plan(legacy, project_root, out_dir, transcript, review):
+    root = Path(project_root).resolve()
+    project = projectlib.load_json(root / "work/project.json")
+    if project.get("render", {}).get("status") != "verified":
+        fail("project mode requires a verified main delivery render")
+    sequence = project.get("sequences", {}).get(project.get("active_sequence"), {})
+    timeline = projectlib.load_json(
+        projectlib.resolve_project_path(root, sequence.get("timeline", ""))
+    )
+    errors = projectlib.validate_timeline(timeline)
+    if errors:
+        fail("invalid project timeline: " + "; ".join(errors))
+    if transcript.get("timebase") != "program" or transcript.get("timeline_id") != timeline["timeline_id"]:
+        fail("project shorts transcript must use the active program timeline")
+    source_render_value = project.get("render", {}).get("output")
+    source_render = projectlib.resolve_project_path(root, source_render_value)
+    if not source_render.is_file():
+        fail(f"verified main render is missing: {source_render}")
+    if Path(review["artifacts"]["source_video"]["path"]).resolve() != source_render:
+        fail("candidate review is not bound to the verified main render")
+    operations = projectlib.operation_map(project)
+    depends_on = list(sequence.get("operations", []))
+    based_on = {operation_id: operations[operation_id]["revision"] for operation_id in depends_on}
+    delivery_mode = review["decision"]["delivery_mode"]
+    canonical_shorts = []
+    for index, item in enumerate(legacy["shorts"], 1):
+        short_id = f"short-{index:03d}"
+        program_range = {
+            "start_s": round(float(item["start_time"]), 6),
+            "end_s": round(float(item["end_time"]), 6),
+        }
+        work_directory = f"shorts/{short_id}"
+        canonical_shorts.append({
+            **item,
+            "id": short_id,
+            "short_id": short_id,
+            "program_range": program_range,
+            "source_ranges": source_ranges_for_program(
+                timeline, program_range["start_s"], program_range["end_s"]
+            ),
+            "outputs": {
+                "work_directory": work_directory,
+                "transcript": f"{work_directory}/transcript.json",
+                "extraction_report": f"{work_directory}/extraction-report.json",
+                "horizontal_video": f"../final/shorts/{short_id}-horizontal.mp4",
+                "vertical_video": (
+                    f"../final/shorts/{short_id}-vertical.mp4"
+                    if delivery_mode == "horizontal_and_vertical" else None
+                ),
+            },
+        })
+    stat = source_render.stat()
+    decision = review["decision"]
+    return {
+        "schema_version": 1,
+        "target": "derived",
+        "timebase": "program",
+        "timeline_id": timeline["timeline_id"],
+        "source_render": {
+            "path": source_render_value,
+            "sha256": sha256_file(source_render),
+            "size": stat.st_size,
+            "modified_ns": stat.st_mtime_ns,
+        },
+        "source_transcript": "understand/transcript.json",
+        "source_candidates": legacy["source_candidates"],
+        "transcript": {"path": "shorts/transcript.json", "timebase": "program"},
+        "depends_on": depends_on,
+        "based_on": based_on,
+        "selection": {
+            "mode": review.get("decision_mode", "human"),
+            "rationale": decision.get("selection_rationale", "Human selection recorded by review receipt."),
+            "delivery_mode": delivery_mode,
+            "review_id": review["review_id"],
+        },
+        "shorts": canonical_shorts,
+        "rejected_candidates": legacy["rejected_candidates"],
+        "metadata": {
+            **legacy["metadata"],
+            "candidate_review_path": str(candidate_review_paths(out_dir)["review"]),
+            "candidate_review_sha256": sha256_file(candidate_review_paths(out_dir)["review"]),
+            "approved_candidates_path": legacy["source_candidates"]["path"],
+        },
+    }
+
+
 def run_plan(args):
     out_dir = Path(args.out).resolve()
     review, candidates_path = validate_candidate_review(out_dir)
@@ -313,7 +422,7 @@ def run_plan(args):
         candidates,
         transcript_duration(transcript_data),
         args,
-        preserve_input_order=selection_policy == "explicit_user_selection",
+        preserve_input_order=selection_policy in ("explicit_user_selection", "explicit_agent_selection"),
     )
     plan = build_plan(selected, rejected, candidates_path, candidates_data, transcript_path)
     plan["metadata"]["candidate_selection"] = selection_policy
@@ -325,10 +434,15 @@ def run_plan(args):
         "candidate_review_sha256": sha256_file(review_path),
     }
     out_dir.mkdir(parents=True, exist_ok=True)
-    write_json(out_dir / "shorts_plan.json", plan)
+    if args.project_root:
+        plan = canonical_project_plan(plan, args.project_root, out_dir, transcript_data, review)
+        plan_path = out_dir / "shorts-plan.json"
+    else:
+        plan_path = out_dir / "shorts_plan.json"
+    write_json(plan_path, plan)
     write_plan_preview_md(out_dir / "shorts_plan_preview.md", plan)
     write_plan_preview_html(out_dir / "shorts_plan_preview.html", plan)
-    print(f"[video-to-shorts] plan: {out_dir / 'shorts_plan.json'}")
+    print(f"[video-to-shorts] plan: {plan_path}")
     print(f"[video-to-shorts] selected: {len(selected)}")
     print(f"[video-to-shorts] rejected: {len(rejected)}")
 
@@ -337,6 +451,7 @@ def build_parser():
     parser = argparse.ArgumentParser(description="Build shorts-plan.v2 from validated shorts-candidates.v2.")
     parser.add_argument("--out", required=True)
     parser.add_argument("--transcript")
+    parser.add_argument("--project-root", help="Emit canonical Project Protocol V1 shorts-plan.json.")
     parser.add_argument("--max-shorts", type=int, default=5)
     parser.add_argument("--min-duration", type=float, default=20.0)
     parser.add_argument("--max-duration", type=float, default=90.0)

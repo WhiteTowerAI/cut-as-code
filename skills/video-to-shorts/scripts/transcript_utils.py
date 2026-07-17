@@ -36,9 +36,24 @@ def transcript_text(transcript):
 def excerpt_for_range(transcript, start, end, max_chars=420):
     parts = []
     for seg in transcript.get("segments", []):
-        s = float(seg.get("start", 0.0))
-        e = float(seg.get("end", s))
-        if s < end and e > start:
+        words = seg.get("words")
+        if isinstance(words, list):
+            selected = [
+                str(word.get("word", ""))
+                for word in words
+                if float(word.get("start", 0.0)) < end
+                and float(word.get("end", word.get("start", 0.0))) > start
+                and str(word.get("word", "")).strip()
+            ]
+            if selected:
+                text = "".join(selected).strip()
+                if len(selected) > 1 and not any(word[:1].isspace() for word in selected[1:]):
+                    text = " ".join(word.strip() for word in selected)
+                parts.append(text)
+            continue
+        segment_start = float(seg.get("start", 0.0))
+        segment_end = float(seg.get("end", segment_start))
+        if segment_start < end and segment_end > start:
             text = str(seg.get("text", "")).strip()
             if text:
                 parts.append(text)

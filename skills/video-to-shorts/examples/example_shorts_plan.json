@@ -1,60 +1,65 @@
 {
-  "schema_version": "shorts-plan.v2",
-  "producer": {"skill": "video-to-shorts", "planner": "deterministic"},
-  "source_candidates": {
-    "path": "work/shorts/shorts_candidates.json",
-    "schema_version": "shorts-candidates.v2"
+  "schema_version": 1,
+  "target": "derived",
+  "timebase": "program",
+  "timeline_id": "main",
+  "source_render": {
+    "path": "../final/final-video.mp4",
+    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "size": 12345678,
+    "modified_ns": 1784250000000000000
   },
-  "transcript": {"path": "work/shorts/transcript.json", "timebase": "input_video_relative"},
+  "source_transcript": "understand/transcript.json",
+  "transcript": {"path": "shorts/transcript.json", "timebase": "program"},
+  "depends_on": ["understanding", "captions"],
+  "based_on": {"understanding": 1, "captions": 1},
+  "selection": {
+    "mode": "agent",
+    "rationale": "The selected range has a self-contained hook and measurable payoff.",
+    "delivery_mode": "horizontal_and_vertical",
+    "review_id": "example-review"
+  },
   "shorts": [
     {
-      "id": "short_01",
-      "short_id": "short_01",
+      "id": "short-001",
+      "short_id": "short-001",
       "candidate_id": "cand-001",
-      "source_candidate_index": 1,
       "order": 1,
-      "title": "Growth Driver and Qualified Platform",
-      "scene_type": "product_demo",
+      "title": "A Claim With a Measurable Payoff",
+      "scene_type": "solo_talk",
       "evidence_mode": "text_visual",
-      "start_time": 0.0,
-      "end_time": 23.5,
-      "duration": 23.5,
+      "start_time": 2.0,
+      "end_time": 27.0,
+      "duration": 25.0,
+      "program_range": {"start_s": 2.0, "end_s": 27.0},
+      "source_ranges": [
+        {"start_s": 5.0, "end_s": 7.0},
+        {"start_s": 10.0, "end_s": 38.0}
+      ],
+      "score": 82,
       "score_breakdown": {
-        "hook": {"score": 18, "reason": "The growth-driver promise establishes importance immediately."},
-        "completeness": {"score": 18, "reason": "The claim is followed by concrete adoption evidence."},
-        "audience_value": {"score": 17, "reason": "The platform qualification statement is understandable business evidence."},
-        "emotion_tension": {"score": 8, "reason": "The claim carries clear business stakes."},
-        "quotability": {"score": 12, "reason": "The growth-driver line can stand alone."},
-        "pace_editability": {"score": 8, "reason": "The two concise statements require no internal restructuring."}
+        "hook": {"score": 18, "reason": "The opening claim creates immediate curiosity."},
+        "completeness": {"score": 19, "reason": "The claim resolves with a concrete result."},
+        "audience_value": {"score": 17, "reason": "The measured improvement is understandable."},
+        "emotion_tension": {"score": 8, "reason": "The contrast creates moderate stakes."},
+        "quotability": {"score": 12, "reason": "The payoff is concise and repeatable."},
+        "pace_editability": {"score": 8, "reason": "The range contains no required internal restructuring."}
       },
-      "score": 81,
-      "hook_sentence": "",
-      "editorial_reason": "The growth claim and qualification evidence form a complete business short.",
-      "transcript_excerpt": "This is um going to be our new major growth driver. Every company that works with NVIDIA on AI has already qualified this platform.",
-      "requested_filler_drop_spans": [
-        {"type": "filler", "start_time": 0.8, "end_time": 1.1, "reason": "Independent filler word.", "review_status": "approved"}
-      ],
-      "filler_drop_spans": [
-        {"type": "filler", "start_time": 0.8, "end_time": 1.1, "reason": "Independent filler word.", "review_status": "approved", "words": ["um"]}
-      ],
-      "rejected_filler_drop_spans": [],
-      "keep_spans": [
-        {"start_time": 0.0, "end_time": 0.8},
-        {"start_time": 1.1, "end_time": 23.5}
-      ],
-      "source_duration": 23.5,
-      "filler_removed_duration": 0.3,
-      "estimated_output_duration": 23.2,
+      "editorial_reason": "The bold opening and measured payoff form a complete short.",
+      "transcript_excerpt": "This changes everything. The result is three times faster.",
+      "filler_drop_spans": [],
+      "keep_spans": [{"start_time": 2.0, "end_time": 27.0}],
+      "estimated_output_duration": 25.0,
       "validation": {"passed": true, "errors": [], "warnings": []},
       "outputs": {
-        "directory": "work/shorts/short_01",
-        "source_video": "work/shorts/short_01/source.mp4",
-        "transcript": "work/shorts/short_01/transcript.json",
-        "extraction_report": "work/shorts/short_01/extraction_report.json"
+        "work_directory": "shorts/short-001",
+        "transcript": "shorts/short-001/transcript.json",
+        "extraction_report": "shorts/short-001/extraction-report.json",
+        "horizontal_video": "../final/shorts/short-001-horizontal.mp4",
+        "vertical_video": "../final/shorts/short-001-vertical.mp4"
       },
       "status": "planned"
     }
   ],
-  "rejected_candidates": [],
-  "metadata": {"notes": "The approved filler_drop_span is normalized and converted to keep_spans before extraction."}
+  "rejected_candidates": []
 }

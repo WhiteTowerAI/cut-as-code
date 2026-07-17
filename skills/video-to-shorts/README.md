@@ -1,123 +1,43 @@
 # Video To Shorts
 
-`video-to-shorts` selects complete horizontal short-source moments through one required Agent-first `text_visual` pass using the transcript plus visual context. `candidates.py` validates `shorts_candidates.json`, computes score totals, deduplicates overlaps within that file, and generates its review preview. Approved horizontal shorts can optionally continue through an Agent-planned deterministic vertical delivery workflow.
+`video-to-shorts` turns a verified Open Recut main delivery into reviewed
+horizontal and optional vertical derivatives. Project mode consumes the shared
+source transcript and `timeline.json`, so every candidate uses the same program
+clock as `final/final-video.mp4` and retains source traceability.
 
-Candidate evidence mode (`text_visual`) is independent from delivery mode (`horizontal_only` or `horizontal_and_vertical`). Vertical delivery always regenerates dense visual evidence from each extracted short, validates an Agent-authored plan, renders a low-resolution preview for review, and only then permits a formal render.
+The canonical workflow is:
 
-Current vertical strategies are `STATIC_CROP`, `SCENE_CROP`, `LETTERBOX`, and `REVIEW_REQUIRED`. Planning is scene-first: stable presenter scenes should use fixed crops that keep the head and torso large and complete, while `LETTERBOX` is reserved for specific scenes that require full horizontal information. The validator reports strategy-duration percentages and non-blocking warnings for complete-short LETTERBOX and presenter scenes classified as LETTERBOX. `LETTERBOX` preserves the complete sharp foreground frame over a blurred, darkened background rather than a plain black background. Stable pure-black borders are removed only from the background layer after multi-frame confirmation; uncertain detection falls back to complete-frame blur, and the sharp foreground is never cropped. The workflow does not provide continuous dynamic subject tracking.
+1. Map `work/understand/transcript.json` through `work/timeline.json`.
+2. Inspect transcript and visual context; author complete candidate moments.
+3. Validate word-exact excerpts and six-dimension scores.
+4. Record a hash-bound human or explicitly delegated agent selection.
+5. Write `work/shorts/shorts-plan.json` with dependency revisions and ranges.
+6. Extract seeked keep ranges into `final/shorts/*-horizontal.mp4`.
+7. Optionally author, preview, approve, and render a deterministic 9:16 plan.
 
-## Transcript Input
+Shorts are recorded as a derived `project.json` operation but are not added to
+the main sequence. They never modify or re-render the main delivery.
 
-The recommended entry is an explicitly provided standard transcript:
+Project outputs are separated by purpose:
 
-```powershell
-python skills/video-to-shorts/scripts/prepare_transcript.py VIDEO.mp4 `
-  --transcript C:\absolute\path\transcript.json `
-  --out WORK\shorts
-```
+- durable decisions and transcripts: `work/shorts/`
+- disposable frames and intermediate media: `work/cache/shorts/`
+- review artifacts: `review/06-shorts/`
+- delivered media: `final/shorts/`
 
-If `--transcript` is omitted, the current compatibility fallback extracts audio and invokes `video-rough-cut/scripts/transcribe.py`. The fallback is not the skill's long-term transcription architecture. No transcript files are auto-discovered.
+Vertical strategies are `STATIC_CROP`, `SCENE_CROP`, `LETTERBOX`, and
+`REVIEW_REQUIRED`. Plans preserve FPS as `{num, den}`. Python validates an
+agent-authored crop; it does not invent coordinates or claim continuous tracking.
 
-Outputs include `transcript.json`, `transcript_metadata.json`, `transcript_preview.md`, and `transcript_preview.html`. The previews contain objective transcript statistics only and do not recommend candidate ranges.
+See [SKILL.md](SKILL.md) for the complete protocol, commands, candidate contract,
+review modes, vertical rules, compatibility behavior, and self-check.
 
-## Visual Context
-
-```powershell
-python skills/video-to-shorts/scripts/prepare_visual_context.py VIDEO.mp4 `
-  --out WORK\shorts\visual_context
-```
-
-This creates timestamped frames, paged contact sheets, and `visual_manifest.json` for the required `text_visual` candidate pass. Visual evidence never affects candidate scoring.
-
-## Candidate Step
-
-1. Prepare or provide `WORK/shorts/transcript.json`.
-2. Inspect the prepared visual context and author `WORK/shorts/preview/text_visual/shorts_candidates.json`. Set `selection.evidence_mode` and every candidate `evidence_mode` to `text_visual`.
-3. Provide a non-empty `metadata.editorial_reason` for every candidate. Do not write candidate total `score`; provide all six `score_breakdown` entries and reasons.
-4. Validate the candidate file in its preview folder:
+Run the executable protocol check from the repository root:
 
 ```powershell
-python skills/video-to-shorts/scripts/candidates.py `
-  --out WORK\shorts\preview\text_visual `
-  --candidates WORK\shorts\preview\text_visual\shorts_candidates.json `
-  --transcript WORK\shorts\transcript.json
+python skills/video-to-shorts/scripts/check_project_protocol.py
 ```
 
-5. Review the normalized JSON and HTML. On Windows, prefer ASCII punctuation in Agent-authored metadata and avoid piping Unicode-rich generated source through PowerShell with an unknown pipeline encoding.
-
-Explicit paths are supported:
-
-```powershell
-python skills/video-to-shorts/scripts/candidates.py `
-  --out WORK\shorts `
-  --candidates WORK\drafts\shorts_candidates.json `
-  --transcript WORK\shorts\transcript.json
-```
-
-Outputs:
-
-- `shorts_candidates.json`: normalized v2 candidates with script-computed totals.
-- `shorts_candidates_preview.md`: human-readable contract review.
-- `shorts_candidates_preview.html`: visual review including duration, dimensions and reasons, script-generated score, warnings, filler spans, separately labeled visual observations/risks/keyframes, and local keyframe thumbnails when the files exist.
-
-The validator does not call external model services, repair JSON through a provider, or reinterpret the Agent's scores. Each invocation accepts exactly one evidence mode, requires every candidate to match `selection.evidence_mode`, deduplicates only inside that file, and displays visual evidence without changing scoring.
-
-## Mandatory Candidate Interview
-
-After the `text_visual` preview exists, open the machine-enforced interview:
-
-```powershell
-python skills/video-to-shorts/scripts/interaction.py candidate-open `
-  --out WORK\shorts
-```
-
-Show `WORK/shorts/review/candidate_review_question.md` to the user and end the current turn. In a later turn, save the user's verbatim reply and record it:
-
-```powershell
-python skills/video-to-shorts/scripts/interaction.py candidate-answer `
-  --out WORK\shorts `
-  --response-file WORK\shorts\review\user_response.txt
-```
-
-The user must choose `horizontal_only` or `horizontal_and_vertical`. Explicit qualified candidate references preserve user order. If the later user response omits candidate IDs or says default/skip, the gate selects the five highest-scoring `text_visual` candidates. Silence, an ambiguous answer, or a modification request cannot advance the workflow.
-
-## Plan Generation
-
-After the candidate review reports `approved`:
-
-```powershell
-python skills/video-to-shorts/scripts/plan.py `
-  --out WORK\shorts
-```
-
-`plan.py` has no candidate-selection bypass. It verifies the current review, the source candidate hash, the approved candidate file, and the user-selected delivery mode. The planner consumes validated `shorts-candidates.v2`, applies deterministic score, completeness, duration, timeline, excerpt, overlap, and maximum-count filters, then writes:
-
-- `shorts_plan.json`
-- `shorts_plan_preview.md`
-- `shorts_plan_preview.html`
-
-The planner preserves editorial scores, validates approved word-level `filler_drop_spans`, and derives `keep_spans` plus estimated output duration. It does not infer filler words or use visual fields for ranking.
-
-Extraction applies the existing outer boundary refinement first, then concatenates the derived keep spans in one final ffmpeg encode and remaps the short transcript onto a continuous timeline:
-
-```powershell
-python skills/video-to-shorts/scripts/extract_shorts.py `
-  --video VIDEO.mp4 `
-  --out WORK\shorts
-```
-
-Rejected or unsafe filler_drop_spans are reported and are not executed.
-
-## Contract
-
-The complete candidate v2 required fields, types, enums, score ranges, timeline rules, boundary guidance, four scene strategies, and JSON template live in `SKILL.md`. Executable checks live in `scripts/candidates.py`, while the human/Agent contract lives in `SKILL.md`.
-
-## Pipeline Boundary
-
-Planning, short-relative transcript generation, extraction, boundary refinement, vertical reframing, captions, and publishing are later steps or downstream skills. A future independent transcript skill is not implemented or assumed here; it only needs to hand off the standard transcript through `--transcript`.
-
-## Examples
-
-- `examples/example_transcript.json`: compact word-level transcript.
-- `examples/example_shorts_candidates_text_visual.json`: `text_visual` candidate v2 input without total scores.
-- `examples/example_shorts_plan.json`: deterministic `shorts-plan.v2` output example.
+Standalone `shorts-candidates.v2`, `shorts-plan.v2`, legacy human reviews, and
+`short_XX/source.mp4` vertical inputs remain supported when project options are
+absent.

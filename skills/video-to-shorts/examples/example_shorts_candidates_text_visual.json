@@ -1,31 +1,29 @@
 {
   "schema_version": "shorts-candidates.v2",
-  "video": {"source": "work/source.mp4", "duration_s": 96.0},
-  "transcript": {"path": "work/shorts/transcript.json", "timebase": "input_video_relative"},
+  "video": {"source": "final/final-video.mp4", "duration_s": 30.0},
+  "transcript": {"path": "work/shorts/transcript.json", "timebase": "program"},
   "selection": {"target_count": 1, "evidence_mode": "text_visual"},
   "candidates": [
     {
-      "candidate_id": "cand-visual-001",
-      "title": "Qualified Platform With Visible Product Evidence",
-      "scene_type": "product_demo",
-      "start_time": 0.0,
-      "end_time": 23.5,
-      "transcript_excerpt": "This is um going to be our new major growth driver. Every company that works with NVIDIA on AI has already qualified this platform.",
+      "candidate_id": "cand-001",
+      "title": "A Claim With a Measurable Payoff",
+      "scene_type": "solo_talk",
+      "start_time": 2.0,
+      "end_time": 27.0,
+      "transcript_excerpt": "This changes everything. The result is three times faster.",
       "evidence_mode": "text_visual",
       "score_breakdown": {
-        "hook": {"score": 18, "reason": "The growth-driver promise establishes importance immediately."},
-        "completeness": {"score": 18, "reason": "The claim is followed by concrete adoption evidence."},
-        "audience_value": {"score": 17, "reason": "The platform qualification statement is understandable business evidence."},
-        "emotion_tension": {"score": 8, "reason": "The claim carries clear business stakes."},
-        "quotability": {"score": 12, "reason": "The growth-driver line can stand alone."},
-        "pace_editability": {"score": 8, "reason": "The two concise statements require no internal restructuring."}
+        "hook": {"score": 18, "reason": "The opening claim creates immediate curiosity."},
+        "completeness": {"score": 19, "reason": "The claim resolves with a concrete result."},
+        "audience_value": {"score": 17, "reason": "The measured improvement is understandable."},
+        "emotion_tension": {"score": 8, "reason": "The contrast creates moderate stakes."},
+        "quotability": {"score": 12, "reason": "The payoff is concise and repeatable."},
+        "pace_editability": {"score": 8, "reason": "The range contains no required internal restructuring."}
       },
-      "metadata": {"editorial_reason": "The adoption claim is complete and the visible product evidence helps the moment stand alone."},
+      "metadata": {"editorial_reason": "The bold opening and measured payoff form a complete short."},
       "warnings": [],
-      "filler_drop_spans": [
-        {"type": "filler", "start_time": 0.8, "end_time": 1.1, "reason": "Independent filler word.", "review_status": "approved"}
-      ],
-      "visual_observations": ["The product remains visible while the adoption claim is spoken."],
+      "filler_drop_spans": [],
+      "visual_observations": ["The presenter remains visible throughout the claim and payoff."],
       "visual_risks": [],
       "visual_keyframes": []
     }

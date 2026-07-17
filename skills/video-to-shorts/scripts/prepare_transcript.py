@@ -2,12 +2,19 @@
 """Prepare the standard word-level transcript consumed by video-to-shorts."""
 
 import argparse
+import hashlib
 import html
 import json
 import math
 import shutil
 import subprocess
+import sys
 from pathlib import Path
+
+
+UNDERSTAND_SCRIPTS = Path(__file__).resolve().parents[2] / "video-understand" / "scripts"
+sys.path.insert(0, str(UNDERSTAND_SCRIPTS))
+import projectlib  # noqa: E402
 
 
 def fail(message):
@@ -95,14 +102,38 @@ def write_json(path, data):
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def file_binding(path):
+    path = Path(path).resolve()
+    stat = path.stat()
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return {
+        "path": str(path),
+        "sha256": digest.hexdigest(),
+        "size": stat.st_size,
+        "modified_ns": stat.st_mtime_ns,
+    }
+
+
 def generate_fallback(video_path, out_dir, ffmpeg, python_exe, model, lang):
-    transcribe = repo_root() / "skills" / "video-rough-cut" / "scripts" / "transcribe.py"
+    transcribe = repo_root() / "skills" / "video-understand" / "scripts" / "transcribe.py"
     if not transcribe.exists():
         fail(f"fallback transcriber not found: {transcribe}")
     audio_path = out_dir / "audio16k.wav"
     run([ffmpeg, "-y", "-i", str(video_path), "-ac", "1", "-ar", "16000", str(audio_path)])
-    run([python_exe, str(transcribe), str(audio_path), str(out_dir / "transcript"), model, "--lang", lang])
-    return out_dir / "transcript.json"
+    model_cache = out_dir.parent / "cache" / "shorts" / "whisper"
+    model_cache.mkdir(parents=True, exist_ok=True)
+    run([
+        python_exe, str(transcribe), str(audio_path), str(out_dir / "generated-transcript"), model,
+        "--lang", lang, "--cache-dir", str(model_cache),
+    ])
+    return out_dir / "generated-transcript.json"
+
+
+def prepare_transcript_data(transcript, timeline=None):
+    return projectlib.map_transcript_to_timeline(transcript, timeline) if timeline else transcript
 
 
 def probe_video_duration(video_path, ffprobe):
@@ -180,10 +211,11 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Prepare the standard transcript input consumed by video-to-shorts.")
     parser.add_argument("video")
     parser.add_argument("--transcript", help="Explicit standard transcript JSON. Recommended; disables fallback transcription.")
+    parser.add_argument("--timeline", help="Project timeline.json; maps a source transcript onto program time.")
     parser.add_argument("--out", required=True)
     parser.add_argument("--ffmpeg", help="ffmpeg path used only by the temporary fallback.")
     parser.add_argument("--ffprobe", help="Optional ffprobe path for video duration metadata.")
-    parser.add_argument("--python", default="python", help="Python used by the temporary video-rough-cut transcribe.py fallback.")
+    parser.add_argument("--python", default="python", help="Python used by the temporary video-understand transcribe.py fallback.")
     parser.add_argument("--model", default="base.en", help="Temporary fallback Whisper model.")
     parser.add_argument("--lang", default="en", help="Temporary fallback language.")
     return parser.parse_args()
@@ -191,6 +223,8 @@ def parse_args():
 
 def main():
     args = parse_args()
+    if args.timeline and not args.transcript:
+        fail("project timeline mode requires the canonical source transcript via --transcript")
     video_path = Path(args.video).resolve()
     if not video_path.exists():
         fail(f"video not found: {video_path}")
@@ -205,11 +239,40 @@ def main():
         metadata = {"acquisition_mode": "provided", "source_transcript": str(source), "generator": ""}
     else:
         generated = generate_fallback(video_path, out_dir, resolve_tool("ffmpeg", args.ffmpeg), args.python, args.model, args.lang)
+        source = generated
         transcript = load_and_validate_transcript(generated)
-        metadata = {"acquisition_mode": "generated_fallback", "source_transcript": "", "generator": "video-rough-cut/transcribe.py"}
+        metadata = {"acquisition_mode": "generated_fallback", "source_transcript": "", "generator": "video-understand/transcribe.py"}
+    if args.timeline:
+        timeline_path = Path(args.timeline).resolve()
+        if not timeline_path.exists():
+            fail(f"timeline not found: {timeline_path}")
+        try:
+            timeline = json.loads(timeline_path.read_text(encoding="utf-8-sig"))
+        except (OSError, json.JSONDecodeError) as error:
+            fail(f"invalid timeline JSON: {timeline_path}: {error}")
+        transcript = prepare_transcript_data(transcript, timeline)
+        metadata.update({
+            "acquisition_mode": "project",
+            "timeline": str(timeline_path),
+            "timeline_id": timeline["timeline_id"],
+            "timebase": "program",
+            "bindings": {
+                "video": file_binding(video_path),
+                "source_transcript": file_binding(source),
+                "timeline": file_binding(timeline_path),
+            },
+        })
+    else:
+        metadata["timebase"] = transcript.get("timebase", "input_video_relative")
     write_json(target, transcript)
     ffprobe = resolve_tool("ffprobe", args.ffprobe) if args.ffprobe else shutil.which("ffprobe")
-    duration = transcript_duration(transcript, probe_video_duration(video_path, ffprobe))
+    video_duration = probe_video_duration(video_path, ffprobe)
+    duration = transcript_duration(transcript, video_duration)
+    if args.timeline and video_duration is not None and abs(video_duration - duration) > 0.1:
+        fail(
+            f"program transcript duration {duration:.3f}s does not match final video "
+            f"duration {video_duration:.3f}s"
+        )
     metadata.update({"video": str(video_path), "duration_s": round(duration, 3)})
     stats = minute_stats(transcript, duration)
     write_preview_md(out_dir / "transcript_preview.md", metadata, transcript, stats)

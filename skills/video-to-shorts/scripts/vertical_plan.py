@@ -7,6 +7,7 @@ import json
 import math
 import shutil
 import subprocess
+from fractions import Fraction
 from pathlib import Path
 
 from review_gate import validate_vertical_delivery_allowed
@@ -54,8 +55,10 @@ def write_json(path, payload):
 
 
 def parse_rate(value):
-    numerator, denominator = value.split("/", 1)
-    return float(numerator) / float(denominator) if float(denominator) else 0.0
+    rate = Fraction(value)
+    if rate <= 0:
+        fail(f"invalid frame rate: {value}")
+    return {"num": rate.numerator, "den": rate.denominator}
 
 
 def probe_video(ffprobe, video):
@@ -74,7 +77,7 @@ def probe_video(ffprobe, video):
     return {
         "width": int(video_stream["width"]),
         "height": int(video_stream["height"]),
-        "fps": round(parse_rate(rate), 6),
+        "fps": parse_rate(rate),
         "duration_s": round(duration, 6),
     }
 
@@ -262,11 +265,13 @@ def validate_plan(raw, video, source):
 
 
 def write_markdown(path, plan):
+    fps = plan["source_fps"]
+    fps_value = fps["num"] / fps["den"]
     lines = [
         "# Vertical Plan Preview",
         "",
         f"- Source: `{plan['source_video']}`",
-        f"- Source media: {plan['source_width']}x{plan['source_height']} at {plan['source_fps']:.3f} fps",
+        f"- Source media: {plan['source_width']}x{plan['source_height']} at {fps_value:.3f} fps (`{fps['num']}/{fps['den']}`)",
         f"- Duration: {plan['source_duration_s']:.3f}s",
         f"- Output: {plan['output_width']}x{plan['output_height']} (`{plan['target_aspect_ratio']}`)",
         f"- Strategy: `{plan['strategy']}`",
@@ -332,6 +337,8 @@ def write_html(path, plan):
         for strategy in STRATEGY_ORDER
     )
     review_note = "<p class='notice'>REVIEW_REQUIRED is a valid review outcome. Formal rendering is intentionally blocked.</p>" if plan["strategy"] == "REVIEW_REQUIRED" else ""
+    fps = plan["source_fps"]
+    fps_value = fps["num"] / fps["den"]
     document = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Vertical Plan Preview</title><style>
@@ -339,7 +346,7 @@ body{{font-family:Segoe UI,Arial,sans-serif;margin:0;background:#f3f4f6;color:#1
 h1,h2{{margin-top:0}}.meta{{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin:20px 0}}.card{{background:#f8fafc;padding:12px;border-radius:8px}}
 table{{width:100%;border-collapse:collapse}}th,td{{text-align:left;vertical-align:top;border-bottom:1px solid #e5e7eb;padding:10px}}code{{background:#eef2ff;padding:2px 5px;border-radius:4px}}.notice{{background:#fff7ed;border-left:4px solid #f97316;padding:12px}}
 </style></head><body><main><h1>Vertical Plan Preview</h1>
-<div class="meta"><div class="card"><strong>Source</strong><br>{esc(plan['source_video'])}</div><div class="card"><strong>Media</strong><br>{plan['source_width']}x{plan['source_height']} / {plan['source_fps']:.3f} fps / {plan['source_duration_s']:.3f}s</div><div class="card"><strong>Output</strong><br>{plan['output_width']}x{plan['output_height']} / 9:16</div><div class="card"><strong>Strategy</strong><br><code>{esc(plan['strategy'])}</code></div></div>
+<div class="meta"><div class="card"><strong>Source</strong><br>{esc(plan['source_video'])}</div><div class="card"><strong>Media</strong><br>{plan['source_width']}x{plan['source_height']} / {fps_value:.3f} fps ({fps['num']}/{fps['den']}) / {plan['source_duration_s']:.3f}s</div><div class="card"><strong>Output</strong><br>{plan['output_width']}x{plan['output_height']} / 9:16</div><div class="card"><strong>Strategy</strong><br><code>{esc(plan['strategy'])}</code></div></div>
 {review_note}<h2>Strategy Duration</h2><ul>{strategy_summary}</ul><h2>Segments</h2><table><thead><tr><th>Time</th><th>Strategy</th><th>Content</th><th>Crop</th><th>Reason</th></tr></thead><tbody>{''.join(rows)}</tbody></table>
 <h2>Visual Evidence</h2><ul>{evidence}</ul><h2>Warnings</h2><ul>{warnings}</ul><h2>Validator Warnings</h2><ul>{validator_warnings}</ul></main></body></html>"""
     path.write_text(document, encoding="utf-8")
@@ -364,6 +371,12 @@ def main():
     ffprobe = resolve_tool("ffprobe", args.ffprobe)
     source = probe_video(ffprobe, video)
     plan = validate_plan(load_json(input_path), video, source)
+    if video.name.lower().endswith("-horizontal.mp4") and video.parent.name == "shorts":
+        plan["output_video"] = str(
+            video.with_name(video.name[:-len("-horizontal.mp4")] + "-vertical.mp4")
+        )
+    else:
+        plan["output_video"] = str(out / "out" / "vertical.mp4")
     plan_path = out / "vertical_plan.json"
     markdown_path = out / "vertical_plan_preview.md"
     html_path = out / "vertical_plan_preview.html"

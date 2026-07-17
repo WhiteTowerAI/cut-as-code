@@ -7,6 +7,7 @@ import math
 import statistics
 import shutil
 import subprocess
+from fractions import Fraction
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont, ImageStat
@@ -59,6 +60,21 @@ def probe_media(ffprobe, video):
     ]))
     payload["path"] = str(video.resolve())
     return payload
+
+
+def rational_fps(value):
+    if isinstance(value, dict):
+        numerator, denominator = value.get("num"), value.get("den")
+        if (
+            not isinstance(numerator, int) or isinstance(numerator, bool)
+            or not isinstance(denominator, int) or isinstance(denominator, bool)
+            or numerator <= 0 or denominator <= 0
+        ):
+            fail("source_fps must use positive integer num and den")
+        rate = Fraction(numerator, denominator)
+    else:
+        rate = Fraction(str(value)).limit_denominator(100000)
+    return {"num": rate.numerator, "den": rate.denominator}
 
 
 def dimensions_for_mode(plan, mode, preview_height):
@@ -210,12 +226,32 @@ def render(ffmpeg, source_probe, video, plan, output, output_width, output_heigh
     command = [
         ffmpeg, "-y", "-i", str(video), "-filter_complex", ";".join(filters),
         "-map", "[vout]", "-c:v", "libx264", "-preset", "medium", "-crf", "20",
-        "-r", f"{fps:.6f}", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+        "-r", f"{fps['num']}/{fps['den']}", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
     ]
     if has_audio:
         command.extend(["-map", "[aout]", "-c:a", "aac", "-b:a", "192k"])
     command.append(str(output))
     run(command)
+
+
+def validate_rendered_media(probe, width, height, duration, fps, require_audio):
+    video = next(
+        (stream for stream in probe.get("streams", []) if stream.get("codec_type") == "video"),
+        None,
+    )
+    if not video or int(video.get("width", 0)) != width or int(video.get("height", 0)) != height:
+        fail("vertical render dimensions do not match the plan")
+    actual_rate = Fraction(video.get("avg_frame_rate") or "0/1")
+    expected_rate = Fraction(fps["num"], fps["den"])
+    if actual_rate != expected_rate:
+        fail("vertical render frame rate does not match the rational source FPS")
+    actual_duration = float(probe.get("format", {}).get("duration") or 0.0)
+    if abs(actual_duration - float(duration)) > max(0.1, 2 / float(expected_rate)):
+        fail("vertical render duration does not match the source short")
+    if require_audio and not any(
+        stream.get("codec_type") == "audio" for stream in probe.get("streams", [])
+    ):
+        fail("vertical render lost the source audio stream")
 
 
 def make_contact_sheet(ffmpeg, video, output, duration, label):
@@ -286,6 +322,8 @@ def main():
     parser.add_argument("--out", required=True)
     parser.add_argument("--mode", required=True, choices=("preview", "final"))
     parser.add_argument("--preview-height", type=int, default=640)
+    parser.add_argument("--review-out", help="User-facing preview/contact-sheet directory.")
+    parser.add_argument("--final-output", help="Override the validated formal output path.")
     parser.add_argument("--ffmpeg")
     parser.add_argument("--ffprobe")
     args = parser.parse_args()
@@ -310,10 +348,49 @@ def main():
         fail("source has no video stream")
     if int(source_video_stream.get("width", 0)) != int(plan.get("source_width", -1)) or int(source_video_stream.get("height", 0)) != int(plan.get("source_height", -1)):
         fail("source dimensions no longer match validated plan")
-    destination = root / ("preview" if args.mode == "preview" else "out")
+    fps = rational_fps(plan.get("source_fps") or 30.0)
+    if Fraction(source_video_stream.get("avg_frame_rate") or "0/1") != Fraction(fps["num"], fps["den"]):
+        fail("source FPS no longer matches the validated vertical plan")
+    source_duration = float(source_probe.get("format", {}).get("duration") or 0.0)
+    if abs(source_duration - float(plan.get("source_duration_s", 0.0))) > max(
+        0.1, 2 / float(Fraction(fps["num"], fps["den"]))
+    ):
+        fail("source duration no longer matches the validated vertical plan")
+    slug = video.stem[:-len("-horizontal")] if video.stem.endswith("-horizontal") else video.stem
+    review_destination = Path(args.review_out).resolve() if args.review_out else None
+    if args.mode == "preview":
+        destination = review_destination or root / "preview"
+        output_path = destination / (
+            f"{slug}-vertical-preview.mp4" if review_destination else "vertical_preview.mp4"
+        )
+        contact_path = destination / (
+            f"{slug}-vertical-contact-sheet.jpg" if review_destination else "preview_contact_sheet.jpg"
+        )
+        summary_path = destination / (
+            f"{slug}-vertical-preview-summary.md" if review_destination else "preview_summary.md"
+        )
+        probe_path = destination / (
+            f"{slug}-vertical-preview-probe.json" if review_destination else "media_probe.json"
+        )
+    else:
+        output_value = args.final_output or plan.get("output_video")
+        if not output_value:
+            fail("formal vertical output is missing from the plan")
+        output_path = Path(output_value).resolve()
+        if output_path == video:
+            fail("formal vertical output must exist in the plan and not overwrite its input")
+        destination = review_destination or output_path.parent
+        contact_path = destination / (
+            f"{slug}-vertical-final-contact-sheet.jpg" if review_destination else "final_contact_sheet.jpg"
+        )
+        summary_path = destination / (
+            f"{slug}-vertical-final-summary.md" if review_destination else "final_summary.md"
+        )
+        probe_path = destination / (
+            f"{slug}-vertical-final-probe.json" if review_destination else "media_probe.json"
+        )
     destination.mkdir(parents=True, exist_ok=True)
-    summary_path = destination / ("preview_summary.md" if args.mode == "preview" else "final_summary.md")
-    probe_path = destination / "media_probe.json"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     if plan.get("strategy") == "REVIEW_REQUIRED":
         write_json(probe_path, {"source": source_probe, "output": None, "status": "REVIEW_REQUIRED"})
         note = "`REVIEW_REQUIRED` is a valid review outcome. No media was rendered because the evidence does not support a safe deterministic crop."
@@ -333,9 +410,6 @@ def main():
     if args.mode == "final":
         validate_vertical_review(root, video, plan_path)
     output_width, output_height = dimensions_for_mode(plan, args.mode, args.preview_height)
-    output_path = destination / ("vertical_preview.mp4" if args.mode == "preview" else "vertical.mp4")
-    contact_path = destination / ("preview_contact_sheet.jpg" if args.mode == "preview" else "final_contact_sheet.jpg")
-    fps = float(plan.get("source_fps") or 30.0)
     if any(segment["strategy"] == "LETTERBOX" for segment in plan["segments"]):
         background_analysis = detect_stable_black_bars(
             ffmpeg, video, destination, float(plan["source_duration_s"]),
@@ -350,6 +424,10 @@ def main():
         }
     render(ffmpeg, source_probe, video, plan, output_path, output_width, output_height, fps, background_analysis)
     output_probe = probe_media(ffprobe, output_path)
+    validate_rendered_media(
+        output_probe, output_width, output_height, plan["source_duration_s"], fps,
+        any(stream.get("codec_type") == "audio" for stream in source_probe.get("streams", [])),
+    )
     duration = float(output_probe.get("format", {}).get("duration") or 0.0)
     make_contact_sheet(ffmpeg, output_path, contact_path, duration, args.mode)
     write_json(probe_path, {"source": source_probe, "output": output_probe, "plan": str(plan_path), "letterbox_background": background_analysis})

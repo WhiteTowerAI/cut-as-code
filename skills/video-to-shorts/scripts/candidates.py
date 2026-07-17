@@ -2,11 +2,18 @@
 """Validate agent-authored short candidates and generate review previews."""
 
 import argparse
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 from preview import write_candidates_preview_html, write_candidates_preview_md
+from review_gate import sha256_file
 from transcript_utils import excerpt_for_range, load_json, overlap_ratio, transcript_duration, write_json
+
+
+UNDERSTAND_SCRIPTS = Path(__file__).resolve().parents[2] / "video-understand" / "scripts"
+sys.path.insert(0, str(UNDERSTAND_SCRIPTS))
+import projectlib  # noqa: E402
 
 
 SCORE_LIMITS = {
@@ -169,6 +176,46 @@ def validate_selection(value):
     return {**value, "evidence_mode": evidence_mode}
 
 
+def verify_binding(binding, expected_path, label):
+    if not isinstance(binding, dict):
+        fail(f"project transcript metadata is missing {label} binding")
+    path = Path(binding.get("path", "")).resolve()
+    expected = Path(expected_path).resolve()
+    if path != expected or not path.is_file():
+        fail(f"project {label} binding path is stale")
+    stat = path.stat()
+    if (
+        binding.get("sha256") != sha256_file(path)
+        or binding.get("size") != stat.st_size
+        or binding.get("modified_ns") != stat.st_mtime_ns
+    ):
+        fail(f"project {label} changed after transcript preparation")
+
+
+def validate_project_bindings(project_root, transcript_path, transcript):
+    root = Path(project_root).resolve()
+    project = projectlib.load_json(root / "work/project.json")
+    if project.get("render", {}).get("status") != "verified":
+        fail("project candidates require a verified main render")
+    sequence = project["sequences"][project["active_sequence"]]
+    final_video = projectlib.resolve_project_path(root, project["render"]["output"])
+    timeline_path = projectlib.resolve_project_path(root, sequence["timeline"])
+    source_transcript = root / "work" / "understand" / "transcript.json"
+    metadata_path = transcript_path.parent / "transcript_metadata.json"
+    if not metadata_path.is_file():
+        fail("project transcript_metadata.json is required")
+    metadata = load_json(metadata_path)
+    if metadata.get("timebase") != "program" or transcript.get("timebase") != "program":
+        fail("project candidates require a program-time transcript")
+    if metadata.get("timeline_id") != transcript.get("timeline_id"):
+        fail("project transcript timeline binding is stale")
+    bindings = metadata.get("bindings", {})
+    verify_binding(bindings.get("video"), final_video, "video")
+    verify_binding(bindings.get("timeline"), timeline_path, "timeline")
+    verify_binding(bindings.get("source_transcript"), source_transcript, "source transcript")
+    return metadata
+
+
 def run_candidates(args):
     out_dir = Path(args.out).resolve()
     input_path = Path(args.candidates).resolve() if args.candidates else out_dir / "shorts_candidates.json"
@@ -185,6 +232,10 @@ def run_candidates(args):
     require_type(raw.get("candidates"), list, "candidates")
     selection = validate_selection(raw.get("selection"))
     transcript = load_json(transcript_path)
+    project_metadata = (
+        validate_project_bindings(args.project_root, transcript_path, transcript)
+        if args.project_root else None
+    )
     duration = transcript_duration(transcript)
     normalized = [normalize_candidate(item, index, transcript, duration) for index, item in enumerate(raw["candidates"])]
     present_modes = {candidate["evidence_mode"] for candidate in normalized}
@@ -198,7 +249,24 @@ def run_candidates(args):
         "evidence_mode": selection["evidence_mode"],
         "validated_at": datetime.now(timezone.utc).isoformat(),
     }
-    result["transcript"] = {**raw.get("transcript", {}), "path": str(transcript_path), "timebase": "input_video_relative"}
+    if project_metadata:
+        video_binding = project_metadata["bindings"]["video"]
+        result["video"] = {
+            "source": video_binding["path"],
+            "sha256": video_binding["sha256"],
+            "duration_s": project_metadata.get("duration_s", duration),
+        }
+        result["transcript"] = {
+            "path": str(transcript_path),
+            "timebase": "program",
+            "timeline_id": transcript["timeline_id"],
+        }
+    else:
+        result["transcript"] = {
+            **raw.get("transcript", {}),
+            "path": str(transcript_path),
+            "timebase": transcript.get("timebase", "input_video_relative"),
+        }
     result["selection"] = selection
     result["candidates"] = dedupe_candidates(normalized)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -206,6 +274,13 @@ def run_candidates(args):
     write_json(output_path, result)
     write_candidates_preview_md(out_dir / "shorts_candidates_preview.md", result)
     write_candidates_preview_html(out_dir / "shorts_candidates_preview.html", result)
+    if args.project_root:
+        workflow_root = transcript_path.parent
+        review_dir = Path(args.project_root).resolve() / "review" / "06-shorts"
+        write_json(workflow_root / "candidates.json", result)
+        review_dir.mkdir(parents=True, exist_ok=True)
+        write_candidates_preview_md(review_dir / "candidates-summary.md", result)
+        write_candidates_preview_html(review_dir / "candidates.html", result)
     print(f"[video-to-shorts] validated candidates: {output_path}")
     print(f"[video-to-shorts] evidence mode: {selection['evidence_mode']}")
     print(f"[video-to-shorts] kept after overlap dedupe: {len(result['candidates'])}")
@@ -216,6 +291,7 @@ def build_parser():
     parser.add_argument("--out", required=True, help="Output directory containing transcript.json by default.")
     parser.add_argument("--candidates", help="Agent-authored candidate JSON. Defaults to OUT/shorts_candidates.json.")
     parser.add_argument("--transcript", help="Transcript JSON. Defaults to OUT/transcript.json.")
+    parser.add_argument("--project-root")
     return parser
 
 

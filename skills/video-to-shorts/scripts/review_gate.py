@@ -108,6 +108,19 @@ def candidate_options(loaded):
 
 
 def candidate_question(review):
+    if review.get("decision_mode") == "agent":
+        lines = [
+            "# Delegated Candidate Review", "",
+            "Inspect the candidate JSON and HTML preview, then record explicit candidates, delivery mode, and rationale.",
+            "", "| Reference | Score | Duration | Title |", "|---|---:|---:|---|",
+        ]
+        for option in review["candidate_options"]:
+            lines.append(
+                f"| `{option['reference']}` | {option['score']} | "
+                f"{float(option['duration']):.3f}s | {option['title'].replace('|', '/')} |"
+            )
+        lines.extend(["", f"Review ID: `{review['review_id']}`", ""])
+        return "\n".join(lines)
     lines = [
         "# Candidate Review Required / 候选审核",
         "",
@@ -155,8 +168,13 @@ def candidate_question(review):
     return "\n".join(lines) + "\n"
 
 
-def open_candidate_review(out_dir):
+def open_candidate_review(out_dir, decision_mode="human", delegation_note=None):
     root = Path(out_dir).resolve()
+    if decision_mode not in ("human", "agent"):
+        fail("decision_mode must be human or agent")
+    delegation_note = str(delegation_note or "").strip()
+    if decision_mode == "agent" and not delegation_note:
+        fail("agent decision mode requires a delegation note")
     paths = candidate_review_paths(root)
     loaded = load_candidate_sources(root)
     transcript_path = root / "transcript.json"
@@ -168,6 +186,8 @@ def open_candidate_review(out_dir):
         "schema_version": CANDIDATE_REVIEW_SCHEMA,
         "review_id": secrets.token_hex(16),
         "workflow_root": str(root),
+        "decision_mode": decision_mode,
+        "delegation_note": delegation_note or None,
         "status": "pending",
         "opened_at": utc_now(),
         "artifacts": {
@@ -197,6 +217,13 @@ def ensure_review_root(review, out_dir, schema):
     actual = Path(review.get("workflow_root", "")).resolve()
     if actual != expected:
         fail(f"review workflow_root does not match --out: {actual} != {expected}")
+
+
+def require_decision_mode(review, expected):
+    actual = review.get("decision_mode", "human")
+    if actual != expected:
+        command = "agent approval" if actual == "agent" else "human answer"
+        fail(f"{actual} decision mode requires {command}")
 
 
 def verify_candidate_artifacts(review):
@@ -277,7 +304,7 @@ def approved_candidate_payload(loaded, review, selection_mode, selected_referenc
         "transcript": source.get("transcript", {}),
         "producer": {
             "skill": "video-to-shorts",
-            "mode": "human_review_gate",
+            "mode": f"{review.get('decision_mode', 'human')}_review_gate",
             "review_id": review["review_id"],
             "created_at": utc_now(),
         },
@@ -299,6 +326,7 @@ def answer_candidate_review(out_dir, response):
         fail(f"candidate review is not open; run interaction.py candidate-open first: {paths['review']}")
     review = load_json(paths["review"])
     ensure_review_root(review, root, CANDIDATE_REVIEW_SCHEMA)
+    require_decision_mode(review, "human")
     if review.get("status") != "pending":
         fail(f"candidate review is not pending: {review.get('status')}")
     verify_candidate_artifacts(review)
@@ -328,6 +356,46 @@ def answer_candidate_review(out_dir, response):
     return review
 
 
+def answer_candidate_review_agent(out_dir, selected_references, delivery_mode, rationale):
+    root = Path(out_dir).resolve()
+    paths = candidate_review_paths(root)
+    if not paths["review"].exists():
+        fail("candidate review is not open")
+    review = load_json(paths["review"])
+    ensure_review_root(review, root, CANDIDATE_REVIEW_SCHEMA)
+    require_decision_mode(review, "agent")
+    if review.get("status") != "pending":
+        fail(f"candidate review is not pending: {review.get('status')}")
+    verify_candidate_artifacts(review)
+    rationale = str(rationale or "").strip()
+    if not rationale:
+        fail("agent candidate approval requires a rationale")
+    if delivery_mode not in DELIVERY_MODES:
+        fail("agent candidate approval requires an explicit delivery mode")
+    if not isinstance(selected_references, list) or not selected_references:
+        fail("agent candidate approval requires explicit candidate references")
+    valid = {option["reference"] for option in review["candidate_options"]}
+    if any(reference not in valid for reference in selected_references):
+        fail("agent candidate approval contains an unknown candidate reference")
+    loaded = load_candidate_sources(root)
+    approved = approved_candidate_payload(
+        loaded, review, "explicit_agent_selection", selected_references, delivery_mode
+    )
+    write_json(paths["approved"], approved)
+    review["status"] = "approved"
+    review["answered_at"] = utc_now()
+    review["decision"] = {
+        "actor": "agent",
+        "selection_mode": "explicit_agent_selection",
+        "selection_rationale": rationale,
+        "delivery_mode": delivery_mode,
+        "selected_references": selected_references,
+    }
+    review["approved_candidates"] = artifact(paths["approved"])
+    write_json(paths["review"], review)
+    return review
+
+
 def validate_candidate_review(out_dir):
     root = Path(out_dir).resolve()
     paths = candidate_review_paths(root)
@@ -351,13 +419,21 @@ def validate_candidate_review(out_dir):
 def validate_plan_review(out_dir, plan, video_path=None):
     review, approved_path = validate_candidate_review(out_dir)
     metadata = plan.get("metadata") if isinstance(plan.get("metadata"), dict) else {}
-    gate = metadata.get("human_review") if isinstance(metadata.get("human_review"), dict) else {}
     review_path = candidate_review_paths(out_dir)["review"]
-    if gate.get("candidate_review_id") != review.get("review_id"):
+    if plan.get("schema_version") == 1:
+        review_id = plan.get("selection", {}).get("review_id")
+        review_sha256 = metadata.get("candidate_review_sha256")
+        approved_value = metadata.get("approved_candidates_path")
+    else:
+        gate = metadata.get("human_review") if isinstance(metadata.get("human_review"), dict) else {}
+        review_id = gate.get("candidate_review_id")
+        review_sha256 = gate.get("candidate_review_sha256")
+        approved_value = plan.get("source_candidates", {}).get("path")
+    if review_id != review.get("review_id"):
         fail("shorts_plan.json is not bound to the current candidate review")
-    if gate.get("candidate_review_sha256") != sha256_file(review_path):
+    if review_sha256 != sha256_file(review_path):
         fail("candidate review changed after shorts_plan.json was generated")
-    if Path(plan.get("source_candidates", {}).get("path", "")).resolve() != approved_path:
+    if Path(approved_value or "").resolve() != approved_path:
         fail("shorts_plan.json does not use the approved candidate file")
     if video_path is not None:
         approved_video = Path(review["artifacts"]["source_video"]["path"]).resolve()
@@ -377,9 +453,15 @@ def validate_plan_review(out_dir, plan, video_path=None):
 
 def candidate_workflow_root_for_short(video):
     video = Path(video).resolve()
-    if video.name.lower() != "source.mp4" or not video.parent.name.startswith("short_"):
-        fail("vertical delivery requires an extracted WORK/shorts/short_XX/source.mp4")
-    return video.parent.parent
+    if video.name.lower() == "source.mp4" and video.parent.name.startswith("short_"):
+        return video.parent.parent
+    if (
+        re.fullmatch(r"short-[0-9]+-horizontal\.mp4", video.name.lower())
+        and video.parent.name == "shorts"
+        and video.parent.parent.name == "final"
+    ):
+        return video.parent.parent.parent / "work" / "shorts"
+    fail("vertical delivery requires a legacy short source or project final/shorts horizontal output")
 
 
 def validate_vertical_delivery_allowed(video):
@@ -400,6 +482,17 @@ def vertical_review_paths(out_dir):
 
 
 def vertical_question(review):
+    if review.get("decision_mode") == "agent":
+        lines = [
+            "# Delegated Vertical Preview Review", "",
+            "Inspect every preview artifact and validator warning, then record approval with a rationale.",
+            "",
+        ]
+        lines.extend(
+            f"- {label}: `{entry['path']}`" for label, entry in review["artifacts"].items()
+        )
+        lines.extend(["", f"Review ID: `{review['review_id']}`", ""])
+        return "\n".join(lines)
     renderable = review["strategy"] != "REVIEW_REQUIRED"
     choices = [
         "- `决定: revise` and optionally `修改: <request>` — request a new plan or preview.",
@@ -455,6 +548,8 @@ def open_vertical_review(out_dir, video, plan_path, summary_path, probe_path=Non
         "workflow_root": str(root),
         "candidate_workflow_root": str(workflow_root),
         "candidate_review_id": candidate_review["review_id"],
+        "decision_mode": candidate_review.get("decision_mode", "human"),
+        "delegation_note": candidate_review.get("delegation_note"),
         "status": "pending",
         "strategy": plan.get("strategy"),
         "opened_at": utc_now(),
@@ -490,6 +585,7 @@ def answer_vertical_review(out_dir, response):
         fail("vertical review is not open; render preview mode first")
     review = load_json(paths["review"])
     ensure_review_root(review, root, VERTICAL_REVIEW_SCHEMA)
+    require_decision_mode(review, "human")
     if review.get("status") != "pending":
         fail(f"vertical review is not pending: {review.get('status')}")
     for label, entry in review.get("artifacts", {}).items():
@@ -504,6 +600,32 @@ def answer_vertical_review(out_dir, response):
     requested_change = change_request(response)
     if requested_change:
         review["change_request"] = requested_change
+    write_json(paths["review"], review)
+    return review
+
+
+def answer_vertical_review_agent(out_dir, rationale):
+    root = Path(out_dir).resolve()
+    paths = vertical_review_paths(root)
+    if not paths["review"].exists():
+        fail("vertical review is not open; render preview mode first")
+    review = load_json(paths["review"])
+    ensure_review_root(review, root, VERTICAL_REVIEW_SCHEMA)
+    require_decision_mode(review, "agent")
+    if review.get("status") != "pending":
+        fail(f"vertical review is not pending: {review.get('status')}")
+    for label, entry in review.get("artifacts", {}).items():
+        verify_artifact(entry, label)
+    if review.get("strategy") == "REVIEW_REQUIRED":
+        fail("REVIEW_REQUIRED cannot be approved for final rendering")
+    rationale = str(rationale or "").strip()
+    if not rationale:
+        fail("agent vertical approval requires a rationale")
+    review["status"] = "approved"
+    review["answered_at"] = utc_now()
+    review["decision"] = "approve"
+    review["decision_actor"] = "agent"
+    review["decision_rationale"] = rationale
     write_json(paths["review"], review)
     return review
 
