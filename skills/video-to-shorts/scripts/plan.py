@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from preview import write_plan_preview_html, write_plan_preview_md
+from review_gate import candidate_review_paths, sha256_file, validate_candidate_review
 from transcript_utils import load_json, overlap_ratio, transcript_duration, write_json
 
 
@@ -211,11 +212,13 @@ def validation_for(candidate, transcript_duration_s, args):
     return {"passed": not errors, "errors": errors, "warnings": warnings}
 
 
-def select_candidates(candidates, transcript_duration_s, args):
+def select_candidates(candidates, transcript_duration_s, args, preserve_input_order=False):
     evaluated = []
     for candidate in candidates:
         evaluated.append((candidate, validation_for(candidate, transcript_duration_s, args)))
-    eligible = sorted((item for item in evaluated if item[1]["passed"]), key=lambda item: item[0]["score"], reverse=True)
+    eligible = [item for item in evaluated if item[1]["passed"]]
+    if not preserve_input_order:
+        eligible.sort(key=lambda item: item[0]["score"], reverse=True)
     selected = []
     rejected = [(candidate, validation) for candidate, validation in evaluated if not validation["passed"]]
     for candidate, validation in eligible:
@@ -291,16 +294,8 @@ def build_plan(selected, rejected, candidates_path, candidates_data, transcript_
 
 def run_plan(args):
     out_dir = Path(args.out).resolve()
-    if args.candidates and args.use_default_selection:
-        fail("use either --candidates for explicit user selection or --use-default-selection, not both")
-    if args.candidates:
-        candidates_path = Path(args.candidates).resolve()
-        selection_policy = "explicit_user_selection"
-    elif args.use_default_selection:
-        candidates_path = out_dir / "preview" / "text_visual" / "shorts_candidates.json"
-        selection_policy = "default_text_visual_top_score"
-    else:
-        fail("human confirmation required: provide --candidates for user-selected clips or --use-default-selection after the user approves the default rule")
+    review, candidates_path = validate_candidate_review(out_dir)
+    selection_policy = review["decision"]["selection_mode"]
     transcript_path = Path(args.transcript).resolve() if args.transcript else out_dir / "transcript.json"
     if not candidates_path.exists():
         fail(f"shorts_candidates.json not found: {candidates_path}")
@@ -314,9 +309,21 @@ def run_plan(args):
         fail("shorts_candidates.json must contain a candidates array")
     transcript_data = load_json(transcript_path)
     candidates = [normalize_candidate(item, index, transcript_data) for index, item in enumerate(raw_candidates, 1)]
-    selected, rejected = select_candidates(candidates, transcript_duration(transcript_data), args)
+    selected, rejected = select_candidates(
+        candidates,
+        transcript_duration(transcript_data),
+        args,
+        preserve_input_order=selection_policy == "explicit_user_selection",
+    )
     plan = build_plan(selected, rejected, candidates_path, candidates_data, transcript_path)
     plan["metadata"]["candidate_selection"] = selection_policy
+    plan["metadata"]["delivery_mode"] = review["decision"]["delivery_mode"]
+    review_path = candidate_review_paths(out_dir)["review"]
+    plan["metadata"]["human_review"] = {
+        "candidate_review_id": review["review_id"],
+        "candidate_review_path": str(review_path),
+        "candidate_review_sha256": sha256_file(review_path),
+    }
     out_dir.mkdir(parents=True, exist_ok=True)
     write_json(out_dir / "shorts_plan.json", plan)
     write_plan_preview_md(out_dir / "shorts_plan_preview.md", plan)
@@ -329,8 +336,6 @@ def run_plan(args):
 def build_parser():
     parser = argparse.ArgumentParser(description="Build shorts-plan.v2 from validated shorts-candidates.v2.")
     parser.add_argument("--out", required=True)
-    parser.add_argument("--candidates")
-    parser.add_argument("--use-default-selection", action="store_true")
     parser.add_argument("--transcript")
     parser.add_argument("--max-shorts", type=int, default=5)
     parser.add_argument("--min-duration", type=float, default=20.0)

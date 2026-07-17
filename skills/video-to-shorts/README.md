@@ -69,27 +69,35 @@ Outputs:
 
 The validator does not call external model services, repair JSON through a provider, or reinterpret the Agent's scores. Each invocation accepts exactly one evidence mode, requires every candidate to match `selection.evidence_mode`, deduplicates only inside that file, and displays visual evidence without changing scoring.
 
+## Mandatory Candidate Interview
+
+After both isolated previews exist, open the machine-enforced interview:
+
+```powershell
+python skills/video-to-shorts/scripts/interaction.py candidate-open `
+  --out WORK\shorts
+```
+
+Show `WORK/shorts/review/candidate_review_question.md` to the user and end the current turn. In a later turn, save the user's verbatim reply and record it:
+
+```powershell
+python skills/video-to-shorts/scripts/interaction.py candidate-answer `
+  --out WORK\shorts `
+  --response-file WORK\shorts\review\user_response.txt
+```
+
+The user must choose `horizontal_only` or `horizontal_and_vertical`. Explicit qualified candidate references preserve user order. If the later user response omits candidate IDs or says default/skip, the gate selects the five highest-scoring `text_visual` candidates. Silence, an ambiguous answer, or a modification request cannot advance the workflow.
+
 ## Plan Generation
 
-Always stop for human review after both isolated candidate previews exist. If the human specifies candidate IDs, create an explicit reviewed `WORK/shorts/shorts_candidates.json` containing only those candidates and pass it with `--candidates`. If the human confirms continuation without specifying IDs, explicitly authorize the default rule with `--use-default-selection`; this selects the five highest-scoring eligible candidates from `preview/text_visual/shorts_candidates.json`.
-
-Explicit user selection:
+After the candidate review reports `approved`:
 
 ```powershell
 python skills/video-to-shorts/scripts/plan.py `
-  --out WORK\shorts `
-  --candidates WORK\shorts\shorts_candidates.json
+  --out WORK\shorts
 ```
 
-Human-approved default selection:
-
-```powershell
-python skills/video-to-shorts/scripts/plan.py `
-  --out WORK\shorts `
-  --use-default-selection
-```
-
-Calling `plan.py` without either selection option fails. The planner consumes validated `shorts-candidates.v2`, applies deterministic score, completeness, duration, timeline, excerpt, overlap, and maximum-count filters, then writes:
+`plan.py` has no candidate-selection bypass. It verifies the current review, both source candidate hashes, the approved candidate file, and the user-selected delivery mode. The planner consumes validated `shorts-candidates.v2`, applies deterministic score, completeness, duration, timeline, excerpt, overlap, and maximum-count filters, then writes:
 
 - `shorts_plan.json`
 - `shorts_plan_preview.md`

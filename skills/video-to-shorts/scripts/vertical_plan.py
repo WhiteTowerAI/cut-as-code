@@ -9,6 +9,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from review_gate import validate_vertical_delivery_allowed
+
 
 ALLOWED_STRATEGIES = {"STATIC_CROP", "SCENE_CROP", "LETTERBOX", "REVIEW_REQUIRED"}
 ALLOWED_CONTENT_TYPES = {"PRESENTER", "WIDE_INFORMATION", "PRODUCT", "MULTI_SUBJECT", "OTHER", "UNSPECIFIED"}
@@ -357,6 +359,7 @@ def main():
         fail(f"video not found: {video}")
     if not input_path.exists():
         fail(f"plan input not found: {input_path}")
+    validate_vertical_delivery_allowed(video)
     out.mkdir(parents=True, exist_ok=True)
     ffprobe = resolve_tool("ffprobe", args.ffprobe)
     source = probe_video(ffprobe, video)

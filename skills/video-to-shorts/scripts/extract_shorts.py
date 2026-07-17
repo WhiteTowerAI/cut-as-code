@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 
 from boundary_refine import refine_short_boundary
+from review_gate import validate_plan_review
 from transcript_utils import load_json, write_json
 
 
@@ -188,6 +189,7 @@ def run_extract(args):
     ffmpeg = resolve_tool("ffmpeg", args.ffmpeg)
     ffprobe = resolve_tool("ffprobe", args.ffprobe or Path(ffmpeg).with_name("ffprobe.exe"))
     plan = load_json(plan_path)
+    validate_plan_review(out_dir, plan, video_path)
     transcript = load_json(transcript_path)
     shorts = plan.get("shorts") or []
     if not shorts:

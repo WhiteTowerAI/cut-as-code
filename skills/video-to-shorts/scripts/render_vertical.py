@@ -11,6 +11,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont, ImageStat
 
+from review_gate import open_vertical_review, validate_vertical_delivery_allowed, validate_vertical_review
+
 
 RENDERABLE_STRATEGIES = {"STATIC_CROP", "SCENE_CROP", "LETTERBOX"}
 
@@ -294,6 +296,7 @@ def main():
         fail(f"video not found: {video}")
     if not plan_path.exists():
         fail(f"plan not found: {plan_path}")
+    validate_vertical_delivery_allowed(video)
     ffmpeg = resolve_tool("ffmpeg", args.ffmpeg)
     ffprobe = resolve_tool("ffprobe", args.ffprobe)
     plan = load_json(plan_path)
@@ -317,12 +320,18 @@ def main():
         write_summary(summary_path, args.mode, plan, video, note=note)
         if args.mode == "final":
             fail(f"REVIEW_REQUIRED plans cannot be rendered; summary: {summary_path}")
+        review_path, question_path = open_vertical_review(root, video, plan_path, summary_path, probe_path)
         print(f"[video-to-shorts] review summary: {summary_path}")
+        print(f"[video-to-shorts] vertical review: {review_path}")
+        print(f"[video-to-shorts] fixed question: {question_path}")
+        print("[video-to-shorts] STOP: show the question to the user and end the current turn")
         return
     if plan.get("strategy") not in RENDERABLE_STRATEGIES:
         fail(f"unsupported plan strategy: {plan.get('strategy')}")
     if args.mode == "final" and plan.get("render_allowed") is not True:
         fail("formal render is not allowed by the validated plan")
+    if args.mode == "final":
+        validate_vertical_review(root, video, plan_path)
     output_width, output_height = dimensions_for_mode(plan, args.mode, args.preview_height)
     output_path = destination / ("vertical_preview.mp4" if args.mode == "preview" else "vertical.mp4")
     contact_path = destination / ("preview_contact_sheet.jpg" if args.mode == "preview" else "final_contact_sheet.jpg")
@@ -345,10 +354,16 @@ def main():
     make_contact_sheet(ffmpeg, output_path, contact_path, duration, args.mode)
     write_json(probe_path, {"source": source_probe, "output": output_probe, "plan": str(plan_path), "letterbox_background": background_analysis})
     write_summary(summary_path, args.mode, plan, video, output_path, output_probe, contact_path)
+    if args.mode == "preview":
+        review_path, question_path = open_vertical_review(root, video, plan_path, summary_path, probe_path, output_path, contact_path)
     print(f"[video-to-shorts] vertical {args.mode}: {output_path}")
     print(f"[video-to-shorts] contact sheet: {contact_path}")
     print(f"[video-to-shorts] media probe: {probe_path}")
     print(f"[video-to-shorts] summary: {summary_path}")
+    if args.mode == "preview":
+        print(f"[video-to-shorts] vertical review: {review_path}")
+        print(f"[video-to-shorts] fixed question: {question_path}")
+        print("[video-to-shorts] STOP: show the question to the user and end the current turn")
 
 
 if __name__ == "__main__":

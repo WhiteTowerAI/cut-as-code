@@ -1,15 +1,29 @@
 ---
 name: video-to-shorts
-description: Select complete horizontal short-form moments, extract approved shorts, and optionally deliver deterministic Agent-planned vertical versions.
+description: Select complete horizontal short-form moments, extract human-approved shorts, and optionally deliver deterministic Agent-planned vertical versions through mandatory, machine-enforced user interviews that cannot be replaced by Agent decisions.
 ---
 
 # Video To Shorts
+
+## Mandatory Human Interaction Contract
+
+The candidate decision and every vertical-preview decision are mandatory user interviews. They are not optional recommendations. At each review gate, the Agent must:
+
+1. Generate the review JSON and fixed Markdown question with `interaction.py` or `render_vertical.py --mode preview`.
+2. Show the generated question and review artifact paths to the user.
+3. End the current turn immediately. Do not call the next-stage script in the same turn.
+4. In a later turn, record the user's verbatim response with `interaction.py`.
+5. Continue only when the gate reports `approved`.
+
+The Agent must not invent, infer, or silently substitute a user response. A user who replies without a candidate selection receives the defined default `text_visual` top-five selection, but that later user response is still required. Complete silence cannot advance an asynchronous Agent turn.
+
+The scripts bind approvals to artifact hashes. Regenerating or editing reviewed candidates, plans, source media, or previews invalidates the approval. `plan.py`, `extract_shorts.py`, `vertical_plan.py`, and final vertical rendering reject missing, stale, skipped, or change-requested reviews.
 
 ## Transcript Input Boundary
 
 The long-term responsibility of `video-to-shorts` is to consume a prepared standard word-level transcript. Candidate selection, planning, and extraction depend only on this data contract; they do not depend on a transcription model, device, or provider.
 
-An independent transcript skill may be implemented in the future, but it does not exist today. Do not create or assume its directory, command name, provider framework, or output location. Any future transcription capability should produce the same standard `transcript.json`, and the caller should pass that file explicitly with `--transcript`.
+If an independent transcription skill is discovered, use it directly. If none is found, do not create or assume its directory, command name, provider framework, or output location. Any future transcription capability should produce the same standard `transcript.json`, and the caller should pass that file explicitly with `--transcript`.
 
 ### Recommended Provided Transcript Path
 
@@ -121,8 +135,9 @@ Do not plan all vertical crops directly from the original long video. Each appro
 6. Run `vertical_plan.py` to probe the real media, validate the Agent's choices, and write normalized plan and preview documents.
 7. Run `render_vertical.py --mode preview` before any formal render.
 8. Inspect `preview/vertical_preview.mp4`, `preview/preview_contact_sheet.jpg`, and `preview/preview_summary.md`.
-9. Stop for human review. Do not render `out/vertical.mp4` yet.
-10. Only after the plan and preview are approved, run `render_vertical.py --mode final`.
+9. `render_vertical.py --mode preview` writes `review/vertical_review.json` and `review/vertical_review_question.md`. Show the fixed question and end the current turn.
+10. In a later turn, record the verbatim user response with `interaction.py vertical-answer`.
+11. Run `render_vertical.py --mode final` only when the review status is `approved`. `revise`, `skip`, silence, and ambiguous answers remain blocked.
 
 ```powershell
 python skills/video-to-shorts/scripts/prepare_visual_context.py SHORT\source.mp4 `
@@ -247,6 +262,12 @@ python skills/video-to-shorts/scripts/render_vertical.py `
   --out SHORT\vertical-agent `
   --mode preview
 
+# STOP HERE. Show review/vertical_review_question.md and end the turn.
+
+python skills/video-to-shorts/scripts/interaction.py vertical-answer `
+  --out SHORT\vertical-agent `
+  --response-file SHORT\vertical-agent\review\user_response.txt
+
 python skills/video-to-shorts/scripts/render_vertical.py `
   --video SHORT\source.mp4 `
   --plan SHORT\vertical-agent\vertical_plan.json `
@@ -297,7 +318,7 @@ short_XX/
 8. Validate the text-visual file and write `preview/text_visual/shorts_candidates_preview.html`.
 9. Complete Candidate Artifact Text QA for the text-visual JSON and HTML.
 10. Only after both folders are finalized may the Agent or human open both outputs for side-by-side review.
-11. Stop for human review before creating a promoted candidate file or running plan generation.
+11. Run `interaction.py candidate-open`, show the generated fixed question, and end the current turn before plan generation.
 
 ```powershell
 python skills/video-to-shorts/scripts/candidates.py `
@@ -362,13 +383,13 @@ Use these signals together with the scene strategy and six scoring dimensions. D
 - Common bad boundaries start after the premise or end on a transition into the actual point.
 - Reject generic motivation, throat-clearing, repeated restatements, and claims whose support lies outside the range.
 
-### Tutorial or Story
+### World Cup Scenario
 
-- Select actionable steps, mistakes and fixes, turning points, compact case studies, and stories with a clear result.
-- Keep the goal, initial condition, or problem needed to interpret the steps or story.
-- Preserve the usable method or narrative payoff, including the final result or lesson.
-- Common bad boundaries begin midway through instructions or end before the final step, twist, result, or lesson.
-- Reject incomplete procedures, anecdotes without payoff, and setup-only passages.
+- Select decisive goals, critical saves, costly mistakes and recoveries, momentum shifts, turning points, compact match narratives, and moments with a clear outcome.
+- Keep the teams, scoreline, match stage, prior event, or stakes needed to interpret the moment.
+- Preserve the competitive payoff, including the decisive play, reversal, final result, or consequence.
+- Common bad boundaries begin after the necessary match setup or end before the decisive action, reversal, result, or consequence.
+- Reject incomplete sequences, context-free highlights, match setup without payoff, and passages that end before the outcome is clear.
 
 ## Boundary Rules
 
@@ -463,7 +484,7 @@ Each candidate requires:
 
 - `candidate_id`: non-empty string.
 - `title`: non-empty string.
-- `scene_type`: `product_demo`, `conversation_interview`, `solo_talk`, or `tutorial_story`.
+- `scene_type`: `product_demo`, `conversation_interview`, `solo_talk`, or `world_cup`.
 - `start_time`, `end_time`: numbers on the input-video-relative timeline; `0 <= start_time < end_time <= transcript duration`.
 - `transcript_excerpt`: non-empty exact excerpt for that time range.
 - `evidence_mode`: `text_only` or `text_visual`.
@@ -515,35 +536,48 @@ Apply the template independently in each preview folder. For the visual file, se
 
 Review `preview/text_only/shorts_candidates.json` with `preview/text_only/shorts_candidates_preview.html`, and separately review `preview/text_visual/shorts_candidates.json` with `preview/text_visual/shorts_candidates_preview.html`. Only after both isolated passes are finalized may they be compared side by side.
 
-Always stop here and wait for explicit human confirmation. The existence of both previews, the original request for short videos, or a requested target count is not permission to select or cut candidates.
+Open the mandatory interview:
 
-- If the human names candidate IDs or exact clips, promote only those instructed candidates into an explicit reviewed `WORK/shorts/shorts_candidates.json`, preserving the human's requested order, then run `plan.py --candidates WORK/shorts/shorts_candidates.json`.
-- If the human confirms continuation but does not name candidate IDs, use the default selection rule: select the five highest-scoring eligible candidates from `preview/text_visual/shorts_candidates.json`. Run `plan.py --use-default-selection`; do not use `text_only` candidates in default mode.
-- Never apply the default merely because the human is silent or ambiguous. Ask for confirmation and remain stopped.
+```powershell
+python skills/video-to-shorts/scripts/interaction.py candidate-open `
+  --out WORK\shorts
+```
 
-Continue to plan generation or clip extraction only after one of these two human-approved paths is explicit. This workflow does not implement a future transcript skill, short-transcript remapping, filler extraction, boundary refinement changes, or clip extraction changes.
+This writes `review/candidate_review.json` and `review/candidate_review_question.md`. Show the generated question verbatim and end the current turn. Do not create a plan, extract media, or record an answer in the same turn.
+
+The fixed interview asks for:
+
+- Optional `候选:` selection using the qualified references listed in the question.
+- Required `交付:` selection: `horizontal_only` or `horizontal_and_vertical`.
+- Optional `修改:` request, which keeps the workflow blocked.
+
+Candidate behavior is deterministic:
+
+- Explicit candidate references select only those candidates and preserve the user's order.
+- An omitted `候选:` line, `候选: 默认`, or `候选: 跳过` selects the five highest-scoring `text_visual` candidates.
+- The default is allowed only after a later user response. User silence cannot be recorded and cannot advance the workflow.
+- A missing delivery mode, an unknown candidate, an ambiguous duplicate ID, or a change request keeps plan generation blocked.
+
+In the later user-response turn, preserve the response verbatim and record it:
+
+```powershell
+python skills/video-to-shorts/scripts/interaction.py candidate-answer `
+  --out WORK\shorts `
+  --response-file WORK\shorts\review\user_response.txt
+```
+
+Continue only when the command reports `candidate review status: approved`. The approval is bound to both candidate files and the generated `review/approved_candidates.json` by SHA-256.
 
 ## Shorts Plan v2
 
-After human review, generate a deterministic plan using exactly one approved selection path.
-
-For explicit user-selected candidates:
+After the mandatory candidate interview is approved, generate a deterministic plan:
 
 ```powershell
 python skills/video-to-shorts/scripts/plan.py `
-  --out WORK\shorts `
-  --candidates WORK\shorts\shorts_candidates.json
+  --out WORK\shorts
 ```
 
-For human-approved default selection, which means the five highest-scoring eligible `text_visual` candidates:
-
-```powershell
-python skills/video-to-shorts/scripts/plan.py `
-  --out WORK\shorts `
-  --use-default-selection
-```
-
-Without `--candidates` or `--use-default-selection`, `plan.py` must fail instead of inferring permission. `plan.py` requires `shorts-candidates.v2`. It uses the script-generated candidate `score` and existing `score_breakdown`; it never recalculates editorial dimensions, changes their reasons, reads visual observations for scoring, or calls a model.
+`plan.py` has no `--candidates` or `--use-default-selection` bypass. It reads only the current approved review gate, verifies candidate hashes, and consumes `review/approved_candidates.json`. `extract_shorts.py` revalidates the same gate and rejects a plan containing an unapproved candidate. The planner requires `shorts-candidates.v2`, uses the script-generated candidate `score` and existing `score_breakdown`, and never recalculates editorial dimensions, changes their reasons, reads visual observations for scoring, or calls a model.
 
 ### Selection Rules
 

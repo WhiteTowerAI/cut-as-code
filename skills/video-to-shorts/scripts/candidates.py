@@ -18,7 +18,7 @@ SCORE_LIMITS = {
     "pace_editability": 10,
 }
 EVIDENCE_MODES = {"text_only", "text_visual"}
-SCENE_TYPES = {"product_demo", "conversation_interview", "solo_talk", "tutorial_story"}
+SCENE_TYPES = {"product_demo", "conversation_interview", "solo_talk", "world_cup"}
 ALLOWED_TOP_LEVEL = {"schema_version", "video", "transcript", "producer", "selection", "candidates"}
 ALLOWED_CANDIDATE = {
     "candidate_id", "title", "scene_type", "start_time", "end_time", "transcript_excerpt",
