@@ -7,6 +7,10 @@ import {
   resolveCaptionStyle,
   resolveKaraoke,
 } from "./caption_style_config.mjs";
+import {
+  resolveGallerySelection,
+  validSelectionIds,
+} from "./caption_interaction_state.mjs";
 
 assert.deepEqual(captionPresetNames, ["clean", "minimal", "social-bold", "pill", "boxed", "stroked", "shorts"]);
 assert.deepEqual(captionHighlightThemeNames, ["yellow", "green", "orange", "purple", "blue", "pink"]);
@@ -54,8 +58,33 @@ assert.equal(resolveKaraoke("true", clean), true);
 assert.equal(resolveCaptionStyle({ preset: "unknown", strict: false }).preset, "clean");
 assert.throws(() => resolveCaptionStyle({ preset: "unknown" }), /unknown caption style preset/);
 
+assert.equal(validSelectionIds.length, 25);
+assert.equal(new Set(validSelectionIds).size, 25);
+assert.deepEqual(resolveGallerySelection("shorts-purple"), {
+  response: "shorts-purple",
+  choiceId: "shorts-purple",
+  skipped: false,
+  preset: "shorts",
+  highlightTheme: "purple",
+  backgroundTheme: null,
+  strokeTheme: null,
+  karaoke: true,
+});
+assert.deepEqual(resolveGallerySelection("跳过"), {
+  response: "跳过",
+  choiceId: "clean",
+  skipped: true,
+  preset: "clean",
+  highlightTheme: null,
+  backgroundTheme: null,
+  strokeTheme: null,
+  karaoke: false,
+});
+assert.throws(() => resolveGallerySelection("随便"), /must be one exact gallery combination ID/);
+
 console.log(`[caption-styles] ${captionPresetNames.length} presets`);
 console.log(`[caption-styles] ${captionHighlightThemeNames.length} highlight themes`);
 console.log(`[caption-styles] ${captionBackgroundThemeNames.length} background themes`);
 console.log(`[caption-styles] ${captionStrokeThemeNames.length} stroke themes`);
+console.log(`[caption-styles] ${validSelectionIds.length} interview choices`);
 console.log("[caption-styles] config check passed");

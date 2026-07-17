@@ -1,19 +1,22 @@
 # Caption Feedback Mapping
 
-This skill is agent-facing. Users describe caption style in natural language; the
-agent maps that request to an official preset, theme flags, and optional JSON
-overrides accepted by `scripts/generate_caption_project.mjs`.
+This skill is agent-facing. Users first choose an exact gallery combination ID or
+explicitly reply `跳过`; after seeing source-backed preview evidence, they may
+describe adjustments in natural language. The agent maps only that recorded user
+feedback to optional JSON overrides accepted by `scripts/generate_caption_project.mjs`.
 
 ## Safe Edit Points
 
 - Use `scripts/caption-styles.json` as the source of official preset and theme names.
-- Pass the final preset and themes with `--preset`, `--highlight-theme`,
-  `--background-theme`, and `--stroke-theme`.
+- Record the exact gallery response with `scripts/caption_interaction.mjs select`.
+- Pass `--interaction-state` to the generator. The generator reads the selected
+  preset, themes, and Karaoke value from that state and rejects conflicting flags.
 - Put only requested property overrides in a JSON file passed with `--overrides`.
 - Edit caption cue JSON only when correcting subtitle text or timing data.
 
-Write the final style only after the user confirms a preview, unless the user
-explicitly asks to skip preview.
+The user may skip gallery selection, which explicitly chooses `clean`. The
+source-backed preview confirmation cannot be skipped. Full rendering requires the
+exact recorded response `确认渲染`.
 
 ## Official Style Vocabulary
 

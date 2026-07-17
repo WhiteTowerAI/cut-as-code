@@ -16,6 +16,7 @@
       --line-strong: #c8d0dc;
       --accent: #2563eb;
       --accent-soft: #eaf1ff;
+      --success: #15803d;
       --navy: #111827;
       --radius-lg: 24px;
       --radius-md: 17px;
@@ -34,6 +35,7 @@
       line-height: 1.5;
     }
     button, input, select, textarea { font: inherit; }
+    code { font-family: inherit; }
     img { max-width: 100%; }
 
     .page-shell {
@@ -111,30 +113,40 @@
       background: var(--accent-soft);
       color: #1e3a8a;
     }
-    .selection-summary p { margin: 0; }
-    .selection-summary strong { color: #1d4ed8; }
-    .selection-hint { color: #5270aa; font-size: 0.88rem; }
-    .selection-actions {
-      display: flex;
-      align-items: center;
-      gap: 12px;
+    .selection-copy { min-width: 0; }
+    .selection-copy p { margin: 0; }
+    .selection-label {
+      color: #5270aa;
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
     }
+    .selected-value {
+      margin-top: 2px !important;
+      color: #5270aa;
+      font-size: 1rem;
+      font-weight: 800;
+    }
+    .selected-value.has-selection { color: #1d4ed8; }
+    .selection-help {
+      margin-top: 3px !important;
+      color: var(--muted);
+      font-size: 0.79rem;
+    }
+    .selection-help code { color: #344054; }
     .copy-selection {
       flex: 0 0 auto;
-      min-width: 82px;
-      padding: 8px 14px;
+      padding: 9px 14px;
       border: 1px solid #93c5fd;
       border-radius: 10px;
       background: #ffffff;
       color: #1d4ed8;
       font-weight: 800;
       cursor: pointer;
-      transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
     }
-    .copy-selection:hover { background: #eff6ff; border-color: #60a5fa; }
-    .copy-selection:focus-visible { outline: 3px solid rgba(37, 99, 235, 0.22); outline-offset: 2px; }
-    .copy-selection.is-copied { border-color: #86efac; background: #f0fdf4; color: #15803d; }
-    .copy-selection.is-error { border-color: #fca5a5; background: #fef2f2; color: #b91c1c; }
+    .copy-selection:disabled { color: #98a2b3; border-color: var(--line); background: #f2f4f7; cursor: not-allowed; }
+    .copy-selection.is-copied { color: var(--success); border-color: #a9d8b8; background: #f2fbf5; }
 
     .gallery-section { margin-top: clamp(48px, 7vw, 78px); }
     .section-heading {
@@ -146,35 +158,12 @@
       padding-bottom: 14px;
       border-bottom: 1px solid var(--line);
     }
-    .section-heading h2 {
-      margin: 0;
-      font-size: clamp(1.55rem, 3vw, 2.25rem);
-      line-height: 1.15;
-      letter-spacing: -0.025em;
-    }
-    .section-heading p {
-      max-width: 620px;
-      margin: 0;
-      color: var(--muted);
-      text-align: right;
-    }
-
+    .section-heading h2 { margin: 0; font-size: clamp(1.55rem, 3vw, 2.25rem); line-height: 1.15; letter-spacing: -0.025em; }
+    .section-heading p { max-width: 620px; margin: 0; color: var(--muted); text-align: right; }
     .subgroup + .subgroup { margin-top: 38px; }
-    .subgroup-heading {
-      display: flex;
-      align-items: center;
-      gap: 11px;
-      margin: 0 0 16px;
-    }
+    .subgroup-heading { display: flex; align-items: center; gap: 11px; margin: 0 0 16px; }
     .subgroup-heading h3 { margin: 0; font-size: 1.18rem; }
-    .count-badge {
-      padding: 3px 9px;
-      border-radius: 999px;
-      background: #e8edf4;
-      color: #596579;
-      font-size: 0.76rem;
-      font-weight: 800;
-    }
+    .count-badge { padding: 3px 9px; border-radius: 999px; background: #e8edf4; color: #596579; font-size: 0.76rem; font-weight: 800; }
 
     .card-grid {
       display: flex;
@@ -219,25 +208,6 @@
       border-color: var(--accent);
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16), var(--shadow-selected);
     }
-    .selection-mark {
-      position: absolute;
-      z-index: 2;
-      top: 20px;
-      right: 20px;
-      display: grid;
-      width: 28px;
-      height: 28px;
-      place-items: center;
-      border-radius: 50%;
-      background: var(--accent);
-      color: #ffffff;
-      font-size: 0.85rem;
-      font-weight: 900;
-      opacity: 0;
-      transform: scale(0.7);
-      transition: opacity 160ms ease, transform 160ms ease;
-    }
-    .style-card.is-selected .selection-mark { opacity: 1; transform: scale(1); }
 
     .preview-frame {
       display: grid;
@@ -250,32 +220,13 @@
     .preview-frame--landscape { width: 100%; aspect-ratio: 16 / 9; }
     .preview-frame--shorts { width: min(100%, 168px); aspect-ratio: 9 / 16; margin: 0 auto; }
     .card-grid--shorts .preview-frame--shorts { width: min(100%, 184px); }
-    .preview-frame img { width: 100%; height: 100%; display: block; object-fit: contain; }
+    .preview-frame img { width: 100%; height: 100%; object-fit: contain; }
 
     .card-copy { display: grid; gap: 12px; padding: 13px 4px 3px; }
-    .card-heading { display: flex; align-items: start; justify-content: space-between; gap: 10px; }
-    .card-heading h4 {
-      min-width: 0;
-      margin: 0;
-      font-size: 1rem;
-      line-height: 1.28;
-      overflow-wrap: anywhere;
-    }
-    .aspect-badge {
-      flex: 0 0 auto;
-      padding: 3px 8px;
-      border-radius: 999px;
-      background: #eef2f7;
-      color: #526074;
-      font-size: 0.72rem;
-      font-weight: 800;
-    }
-    .metadata-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 9px 12px;
-      margin: 0;
-    }
+    .card-heading { display: flex; align-items: start; justify-content: space-between; gap: 10px; margin: 0; }
+    .card-heading h4 { min-width: 0; margin: 0; color: var(--ink); font-size: 1rem; line-height: 1.28; overflow-wrap: anywhere; }
+    .aspect-badge { flex: 0 0 auto; padding: 3px 8px; border-radius: 999px; background: #eef2f7; color: #526074; font-size: 0.72rem; font-weight: 800; }
+    .metadata-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 12px; margin: 0; }
     .metadata-grid div:last-child { grid-column: 1 / -1; }
     .metadata-grid dt {
       color: #8a94a5;
@@ -291,8 +242,26 @@
       font-weight: 700;
       overflow-wrap: anywhere;
     }
-    .metadata-grid dd.status-on { color: #15803d; }
+    .metadata-grid dd.status-on { color: var(--success); }
     .metadata-grid dd.status-off { color: #667085; }
+    .selection-mark {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      display: grid;
+      width: 28px;
+      height: 28px;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #ffffff;
+      font-size: 0.85rem;
+      font-weight: 900;
+      opacity: 0;
+      transform: scale(0.75);
+      transition: opacity 150ms ease, transform 150ms ease;
+    }
+    .style-card.is-selected .selection-mark { opacity: 1; transform: scale(1); }
 
     .option-panel {
       display: grid;
@@ -307,24 +276,8 @@
     }
     .option-panel h2 { margin: 0 0 10px; font-size: clamp(1.5rem, 3vw, 2.1rem); }
     .option-panel p { margin: 0; color: var(--muted); }
-    .option-list {
-      display: grid;
-      gap: 10px;
-      margin: 0;
-      padding: 0;
-      list-style: none;
-    }
-    .option-list li {
-      padding: 10px 13px;
-      border-radius: 12px;
-      background: var(--surface-soft);
-      color: #475467;
-      font-size: 0.9rem;
-    }
-    .option-list strong { color: var(--ink); }
+    .option-code { padding: 14px 16px; border-radius: 12px; background: var(--surface-soft); color: #475467; font-size: 0.9rem; font-weight: 700; text-align: center; }
 
-    html.modal-open { scroll-behavior: auto; }
-    body.modal-open { overflow: hidden; }
     .preview-dialog {
       position: fixed;
       inset: 0;
@@ -392,21 +345,24 @@
       overflow-wrap: anywhere;
     }
 
+    html.modal-open { scroll-behavior: auto; }
+    body.modal-open { overflow: hidden; }
+
     @media (max-width: 820px) {
       .page-shell { width: min(100% - 24px, 1480px); padding-top: 12px; }
       .hero { border-radius: 22px; }
-      .selection-summary, .section-heading { align-items: start; flex-direction: column; }
+      .selection-summary, .section-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
       .section-heading p { text-align: left; }
-      .selection-actions { width: 100%; justify-content: space-between; }
       .option-panel { grid-template-columns: 1fr; }
       .style-card--landscape { flex-basis: 270px; }
       .card-grid--core { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .card-grid--shorts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     }
-
     @media (max-width: 540px) {
       .hero { padding: 26px 22px; }
       .gallery-section { margin-top: 44px; }
+      .selection-summary, .option-panel { align-items: stretch; flex-direction: column; }
+      .copy-selection { width: 100%; }
       .card-grid { gap: 14px; }
       .style-card--landscape { flex-basis: 100%; max-width: 420px; }
       .style-card--shorts { flex-basis: 168px; width: 168px; }
@@ -417,12 +373,12 @@
       .preview-frame--shorts { width: 138px; }
       .preview-dialog { width: calc(100vw - 20px); max-height: calc(100vh - 20px); padding: 40px 8px 0; border-radius: 14px; }
       .preview-dialog__close { top: 6px; right: 8px; }
-      .preview-dialog__media,
-      .preview-dialog__image { max-height: calc(100vh - 100px); }
+      .preview-dialog__media, .preview-dialog__image { max-height: calc(100vh - 100px); }
       .metadata-grid { grid-template-columns: 1fr; }
       .metadata-grid div:last-child { grid-column: auto; }
-      .selection-hint { display: none; }
-      .selection-actions { justify-content: flex-end; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
     }
   </style>
 </head>
@@ -431,39 +387,38 @@
     <header class="hero">
       <p class="eyebrow">25 offline preview styles</p>
       <h1>Caption Style Gallery</h1>
-      <p class="hero-copy">Choose a visual direction by preview ID, then request that preset, theme, and Karaoke option when adding captions.</p>
-      <div class="default-note">Default behavior: clean is used when no style is selected.</div>
+      <p class="hero-copy">Compare the maintained caption combinations, select one card, copy its exact combination ID, and return that ID to the Agent.</p>
+      <div class="default-note">Reply <strong>skip</strong> to the Agent only when you explicitly want the default <strong>clean</strong> style.</div>
     </header>
 
     <div class="selection-summary" aria-live="polite">
-      <p>Selected preview: <strong id="selected-preview">clean</strong></p>
-      <div class="selection-actions">
-        <span class="selection-hint">Click a card or use Enter / Space to select and enlarge its preview.</span>
-        <button class="copy-selection" id="copy-selection" type="button" aria-label="Copy selected caption style">Copy</button>
+      <div class="selection-copy">
+        <p class="selection-label">Selected combination ID</p>
+        <p class="selected-value" id="selected-preview">No style selected</p>
+        <p class="selection-help">To use the default <code>clean</code> style without browsing, return to the Agent and explicitly reply <code>skip</code>.</p>
       </div>
+      <button class="copy-selection" id="copy-selection" type="button" disabled>Copy ID</button>
     </div>
 
     <section class="gallery-section" aria-labelledby="core-title">
       <div class="section-heading">
         <h2 id="core-title">Core Presets</h2>
-        <p>The primary starting points, including one explicit Karaoke combination.</p>
+        <p>The four primary starting points, including one explicit Karaoke combination.</p>
       </div>
       <div class="card-grid card-grid--core">
     <article
-      class="style-card style-card--landscape is-selected"
+      class="style-card style-card--landscape"
       data-preview-id="clean"
       data-preview-image="preview-clean.png"
-      data-preset="clean"
-      data-theme="default"
-      data-karaoke="off"
+      data-preview-label="Clean"
       role="button"
       tabindex="0"
-      aria-pressed="true"
+      aria-pressed="false"
       aria-haspopup="dialog"
       aria-controls="preview-dialog"
       aria-label="Select and enlarge Clean caption style"
     >
-      <span class="selection-mark" aria-hidden="true">✓</span>
+      <span class="selection-mark" aria-hidden="true">&#10003;</span>
       <div class="preview-frame preview-frame--landscape">
         <img src="./preview-clean.png" alt="Clean caption preview" loading="lazy" draggable="false">
       </div>
@@ -483,9 +438,7 @@
       class="style-card style-card--landscape"
       data-preview-id="minimal"
       data-preview-image="preview-minimal.png"
-      data-preset="minimal"
-      data-theme="default"
-      data-karaoke="off"
+      data-preview-label="Minimal"
       role="button"
       tabindex="0"
       aria-pressed="false"
@@ -493,7 +446,7 @@
       aria-controls="preview-dialog"
       aria-label="Select and enlarge Minimal caption style"
     >
-      <span class="selection-mark" aria-hidden="true">✓</span>
+      <span class="selection-mark" aria-hidden="true">&#10003;</span>
       <div class="preview-frame preview-frame--landscape">
         <img src="./preview-minimal.png" alt="Minimal caption preview" loading="lazy" draggable="false">
       </div>
@@ -513,9 +466,7 @@
       class="style-card style-card--landscape"
       data-preview-id="social-bold"
       data-preview-image="preview-social-bold.png"
-      data-preset="social-bold"
-      data-theme="default"
-      data-karaoke="off"
+      data-preview-label="Social Bold"
       role="button"
       tabindex="0"
       aria-pressed="false"
@@ -523,7 +474,7 @@
       aria-controls="preview-dialog"
       aria-label="Select and enlarge Social Bold caption style"
     >
-      <span class="selection-mark" aria-hidden="true">✓</span>
+      <span class="selection-mark" aria-hidden="true">&#10003;</span>
       <div class="preview-frame preview-frame--landscape">
         <img src="./preview-social-bold.png" alt="Social Bold caption preview" loading="lazy" draggable="false">
       </div>
@@ -543,9 +494,7 @@
       class="style-card style-card--landscape"
       data-preview-id="social-bold-karaoke"
       data-preview-image="preview-social-bold-karaoke.png"
-      data-preset="social-bold"
-      data-theme="default"
-      data-karaoke="on"
+      data-preview-label="Social Bold Karaoke"
       role="button"
       tabindex="0"
       aria-pressed="false"
@@ -553,7 +502,7 @@
       aria-controls="preview-dialog"
       aria-label="Select and enlarge Social Bold Karaoke caption style"
     >
-      <span class="selection-mark" aria-hidden="true">✓</span>
+      <span class="selection-mark" aria-hidden="true">&#10003;</span>
       <div class="preview-frame preview-frame--landscape">
         <img src="./preview-social-bold-karaoke.png" alt="Social Bold Karaoke caption preview" loading="lazy" draggable="false">
       </div>
@@ -568,8 +517,7 @@
           <div><dt>Karaoke</dt><dd class="status-on">On</dd></div>
         </dl>
       </div>
-    </article>
-</div>
+    </article></div>
     </section>
 
     <section class="gallery-section" aria-labelledby="background-title">
@@ -584,9 +532,7 @@
       class="style-card style-card--landscape"
       data-preview-id="pill-gray"
       data-preview-image="preview-pill-gray.png"
-      data-preset="pill"
-      data-theme="gray"
-      data-karaoke="off"
+      data-preview-label="Pill Gray"
       role="button"
       tabindex="0"
       aria-pressed="false"
@@ -594,7 +540,7 @@
       aria-controls="preview-dialog"
       aria-label="Select and enlarge Pill Gray caption style"
     >
-      <span class="selection-mark" aria-hidden="true">✓</span>
+      <span class="selection-mark" aria-hidden="true">&#10003;</span>
       <div class="preview-frame preview-frame--landscape">
         <img src="./preview-pill-gray.png" alt="Pill Gray caption preview" loading="lazy" draggable="false">
       </div>
@@ -614,9 +560,7 @@
       class="style-card style-card--landscape"
       data-preview-id="pill-yellow"
       data-preview-image="preview-pill-yellow.png"
-      data-preset="pill"
-      data-theme="yellow"
-      data-karaoke="off"
+      data-preview-label="Pill Yellow"
       role="button"
       tabindex="0"
       aria-pressed="false"
@@ -624,7 +568,7 @@
       aria-controls="preview-dialog"
       aria-label="Select and enlarge Pill Yellow caption style"
     >
-      <span class="selection-mark" aria-hidden="true">✓</span>
+      <span class="selection-mark" aria-hidden="true">&#10003;</span>
       <div class="preview-frame preview-frame--landscape">
         <img src="./preview-pill-yellow.png" alt="Pill Yellow caption preview" loading="lazy" draggable="false">
       </div>
@@ -644,9 +588,7 @@
       class="style-card style-card--landscape"
       data-preview-id="pill-blue"
       data-preview-image="preview-pill-blue.png"
-      data-preset="pill"
-      data-theme="blue"
-      data-karaoke="off"
+      data-preview-label="Pill Blue"
       role="button"
       tabindex="0"
       aria-pressed="false"
@@ -654,7 +596,7 @@
       aria-controls="preview-dialog"
       aria-label="Select and enlarge Pill Blue caption style"
     >
-      <span class="selection-mark" aria-hidden="true">✓</span>
+      <span class="selection-mark" aria-hidden="true">&#10003;</span>
       <div class="preview-frame preview-frame--landscape">
         <img src="./preview-pill-blue.png" alt="Pill Blue caption preview" loading="lazy" draggable="false">
       </div>
@@ -674,9 +616,7 @@
       class="style-card style-card--landscape"
       data-preview-id="pill-pink"
       data-preview-image="preview-pill-pink.png"
-      data-preset="pill"
-      data-theme="pink"
-      data-karaoke="off"
+      data-preview-label="Pill Pink"
       role="button"
       tabindex="0"
       aria-pressed="false"
@@ -684,7 +624,7 @@
       aria-controls="preview-dialog"
       aria-label="Select and enlarge Pill Pink caption style"
     >
-      <span class="selection-mark" aria-hidden="true">✓</span>
+      <span class="selection-mark" aria-hidden="true">&#10003;</span>
       <div class="preview-frame preview-frame--landscape">
         <img src="./preview-pill-pink.png" alt="Pill Pink caption preview" loading="lazy" draggable="false">
       </div>
@@ -704,9 +644,7 @@
       class="style-card style-card--landscape"
       data-preview-id="pill-green"
       data-preview-image="preview-pill-green.png"
-      data-preset="pill"
-      data-theme="green"
-      data-karaoke="off"
+      data-preview-label="Pill Green"
       role="button"
       tabindex="0"
       aria-pressed="false"
@@ -714,7 +652,7 @@
       aria-controls="preview-dialog"
       aria-label="Select and enlarge Pill Green caption style"
     >
-      <span class="selection-mark" aria-hidden="true">✓</span>
+      <span class="selection-mark" aria-hidden="true">&#10003;</span>
       <div class="preview-frame preview-frame--landscape">
         <img src="./preview-pill-green.png" alt="Pill Green caption preview" loading="lazy" draggable="false">
       </div>
@@ -729,8 +667,7 @@
           <div><dt>Karaoke</dt><dd class="status-off">Off</dd></div>
         </dl>
       </div>
-    </article>
-</div>
+    </article></div>
       </div>
       <div class="subgroup">
         <div class="subgroup-heading"><h3>Boxed</h3><span class="count-badge">5 themes</span></div>
@@ -739,9 +676,7 @@
       class="style-card style-card--landscape"
       data-preview-id="boxed-gray"
       data-preview-image="preview-boxed-gray.png"
-      data-preset="boxed"
-      data-theme="gray"
-      data-karaoke="off"
+      data-preview-label="Boxed Gray"
       role="button"
       tabindex="0"
       aria-pressed="false"
@@ -749,7 +684,7 @@
       aria-controls="preview-dialog"
       aria-label="Select and enlarge Boxed Gray caption style"
     >
-      <span class="selection-mark" aria-hidden="true">✓</span>
+      <span class="selection-mark" aria-hidden="true">&#10003;</span>
       <div class="preview-frame preview-frame--landscape">
         <img src="./preview-boxed-gray.png" alt="Boxed Gray caption preview" loading="lazy" draggable="false">
       </div>
@@ -769,9 +704,7 @@
       class="style-card style-card--landscape"
       data-preview-id="boxed-yellow"
       data-preview-image="preview-boxed-yellow.png"
-      data-preset="boxed"
-      data-theme="yellow"
-      data-karaoke="off"
+      data-preview-label="Boxed Yellow"
       role="button"
       tabindex="0"
       aria-pressed="false"
@@ -779,7 +712,7 @@
       aria-controls="preview-dialog"
       aria-label="Select and enlarge Boxed Yellow caption style"
     >
-      <span class="selection-mark" aria-hidden="true">✓</span>
+      <span class="selection-mark" aria-hidden="true">&#10003;</span>
       <div class="preview-frame preview-frame--landscape">
         <img src="./preview-boxed-yellow.png" alt="Boxed Yellow caption preview" loading="lazy" draggable="false">
       </div>
@@ -799,9 +732,7 @@
       class="style-card style-card--landscape"
       data-preview-id="boxed-blue"
       data-preview-image="preview-boxed-blue.png"
-      data-preset="boxed"
-      data-theme="blue"
-      data-karaoke="off"
+      data-preview-label="Boxed Blue"
       role="button"
       tabindex="0"
       aria-pressed="false"
@@ -809,7 +740,7 @@
       aria-controls="preview-dialog"
       aria-label="Select and enlarge Boxed Blue caption style"
     >
-      <span class="selection-mark" aria-hidden="true">✓</span>
+      <span class="selection-mark" aria-hidden="true">&#10003;</span>
       <div class="preview-frame preview-frame--landscape">
         <img src="./preview-boxed-blue.png" alt="Boxed Blue caption preview" loading="lazy" draggable="false">
       </div>
@@ -829,9 +760,7 @@
       class="style-card style-card--landscape"
       data-preview-id="boxed-pink"
       data-preview-image="preview-boxed-pink.png"
-      data-preset="boxed"
-      data-theme="pink"
-      data-karaoke="off"
+      data-preview-label="Boxed Pink"
       role="button"
       tabindex="0"
       aria-pressed="false"
@@ -839,7 +768,7 @@
       aria-controls="preview-dialog"
       aria-label="Select and enlarge Boxed Pink caption style"
     >
-      <span class="selection-mark" aria-hidden="true">✓</span>
+      <span class="selection-mark" aria-hidden="true">&#10003;</span>
       <div class="preview-frame preview-frame--landscape">
         <img src="./preview-boxed-pink.png" alt="Boxed Pink caption preview" loading="lazy" draggable="false">
       </div>
@@ -859,9 +788,7 @@
       class="style-card style-card--landscape"
       data-preview-id="boxed-green"
       data-preview-image="preview-boxed-green.png"
-      data-preset="boxed"
-      data-theme="green"
-      data-karaoke="off"
+      data-preview-label="Boxed Green"
       role="button"
       tabindex="0"
       aria-pressed="false"
@@ -869,7 +796,7 @@
       aria-controls="preview-dialog"
       aria-label="Select and enlarge Boxed Green caption style"
     >
-      <span class="selection-mark" aria-hidden="true">✓</span>
+      <span class="selection-mark" aria-hidden="true">&#10003;</span>
       <div class="preview-frame preview-frame--landscape">
         <img src="./preview-boxed-green.png" alt="Boxed Green caption preview" loading="lazy" draggable="false">
       </div>
@@ -884,24 +811,21 @@
           <div><dt>Karaoke</dt><dd class="status-off">Off</dd></div>
         </dl>
       </div>
-    </article>
-</div>
+    </article></div>
       </div>
     </section>
 
-    <section class="gallery-section" aria-labelledby="stroke-title">
+    <section class="gallery-section" aria-labelledby="stroked-title">
       <div class="section-heading">
-        <h2 id="stroke-title">Stroke Styles</h2>
-        <p>Background-free captions with five stroke colors.</p>
+        <h2 id="stroked-title">Stroked Styles</h2>
+        <p>Five background-free options arranged on the same five-column alignment as the background styles.</p>
       </div>
       <div class="card-grid ">
     <article
       class="style-card style-card--landscape"
       data-preview-id="stroked-black"
       data-preview-image="preview-stroked-black.png"
-      data-preset="stroked"
-      data-theme="black"
-      data-karaoke="off"
+      data-preview-label="Stroked Black"
       role="button"
       tabindex="0"
       aria-pressed="false"
@@ -909,7 +833,7 @@
       aria-controls="preview-dialog"
       aria-label="Select and enlarge Stroked Black caption style"
     >
-      <span class="selection-mark" aria-hidden="true">✓</span>
+      <span class="selection-mark" aria-hidden="true">&#10003;</span>
       <div class="preview-frame preview-frame--landscape">
         <img src="./preview-stroked-black.png" alt="Stroked Black caption preview" loading="lazy" draggable="false">
       </div>
@@ -929,9 +853,7 @@
       class="style-card style-card--landscape"
       data-preview-id="stroked-yellow"
       data-preview-image="preview-stroked-yellow.png"
-      data-preset="stroked"
-      data-theme="yellow"
-      data-karaoke="off"
+      data-preview-label="Stroked Yellow"
       role="button"
       tabindex="0"
       aria-pressed="false"
@@ -939,7 +861,7 @@
       aria-controls="preview-dialog"
       aria-label="Select and enlarge Stroked Yellow caption style"
     >
-      <span class="selection-mark" aria-hidden="true">✓</span>
+      <span class="selection-mark" aria-hidden="true">&#10003;</span>
       <div class="preview-frame preview-frame--landscape">
         <img src="./preview-stroked-yellow.png" alt="Stroked Yellow caption preview" loading="lazy" draggable="false">
       </div>
@@ -959,9 +881,7 @@
       class="style-card style-card--landscape"
       data-preview-id="stroked-blue"
       data-preview-image="preview-stroked-blue.png"
-      data-preset="stroked"
-      data-theme="blue"
-      data-karaoke="off"
+      data-preview-label="Stroked Blue"
       role="button"
       tabindex="0"
       aria-pressed="false"
@@ -969,7 +889,7 @@
       aria-controls="preview-dialog"
       aria-label="Select and enlarge Stroked Blue caption style"
     >
-      <span class="selection-mark" aria-hidden="true">✓</span>
+      <span class="selection-mark" aria-hidden="true">&#10003;</span>
       <div class="preview-frame preview-frame--landscape">
         <img src="./preview-stroked-blue.png" alt="Stroked Blue caption preview" loading="lazy" draggable="false">
       </div>
@@ -989,9 +909,7 @@
       class="style-card style-card--landscape"
       data-preview-id="stroked-pink"
       data-preview-image="preview-stroked-pink.png"
-      data-preset="stroked"
-      data-theme="pink"
-      data-karaoke="off"
+      data-preview-label="Stroked Pink"
       role="button"
       tabindex="0"
       aria-pressed="false"
@@ -999,7 +917,7 @@
       aria-controls="preview-dialog"
       aria-label="Select and enlarge Stroked Pink caption style"
     >
-      <span class="selection-mark" aria-hidden="true">✓</span>
+      <span class="selection-mark" aria-hidden="true">&#10003;</span>
       <div class="preview-frame preview-frame--landscape">
         <img src="./preview-stroked-pink.png" alt="Stroked Pink caption preview" loading="lazy" draggable="false">
       </div>
@@ -1019,9 +937,7 @@
       class="style-card style-card--landscape"
       data-preview-id="stroked-green"
       data-preview-image="preview-stroked-green.png"
-      data-preset="stroked"
-      data-theme="green"
-      data-karaoke="off"
+      data-preview-label="Stroked Green"
       role="button"
       tabindex="0"
       aria-pressed="false"
@@ -1029,7 +945,7 @@
       aria-controls="preview-dialog"
       aria-label="Select and enlarge Stroked Green caption style"
     >
-      <span class="selection-mark" aria-hidden="true">✓</span>
+      <span class="selection-mark" aria-hidden="true">&#10003;</span>
       <div class="preview-frame preview-frame--landscape">
         <img src="./preview-stroked-green.png" alt="Stroked Green caption preview" loading="lazy" draggable="false">
       </div>
@@ -1044,23 +960,20 @@
           <div><dt>Karaoke</dt><dd class="status-off">Off</dd></div>
         </dl>
       </div>
-    </article>
-</div>
+    </article></div>
     </section>
 
-    <section class="gallery-section" id="shorts-styles" aria-labelledby="shorts-title">
+    <section class="gallery-section" aria-labelledby="shorts-title">
       <div class="section-heading">
         <h2 id="shorts-title">Shorts Styles</h2>
-        <p>Compact 9:16 cards preserve the vertical preview ratio without letting each image dominate the page.</p>
+        <p>Six vertical-video treatments in one evenly aligned row on wide screens.</p>
       </div>
       <div class="card-grid card-grid--shorts">
     <article
       class="style-card style-card--shorts"
       data-preview-id="shorts-yellow"
       data-preview-image="preview-shorts-yellow.png"
-      data-preset="shorts"
-      data-theme="yellow"
-      data-karaoke="on"
+      data-preview-label="Shorts Yellow"
       role="button"
       tabindex="0"
       aria-pressed="false"
@@ -1068,7 +981,7 @@
       aria-controls="preview-dialog"
       aria-label="Select and enlarge Shorts Yellow caption style"
     >
-      <span class="selection-mark" aria-hidden="true">✓</span>
+      <span class="selection-mark" aria-hidden="true">&#10003;</span>
       <div class="preview-frame preview-frame--shorts">
         <img src="./preview-shorts-yellow.png" alt="Shorts Yellow caption preview" loading="lazy" draggable="false">
       </div>
@@ -1088,9 +1001,7 @@
       class="style-card style-card--shorts"
       data-preview-id="shorts-green"
       data-preview-image="preview-shorts-green.png"
-      data-preset="shorts"
-      data-theme="green"
-      data-karaoke="on"
+      data-preview-label="Shorts Green"
       role="button"
       tabindex="0"
       aria-pressed="false"
@@ -1098,7 +1009,7 @@
       aria-controls="preview-dialog"
       aria-label="Select and enlarge Shorts Green caption style"
     >
-      <span class="selection-mark" aria-hidden="true">✓</span>
+      <span class="selection-mark" aria-hidden="true">&#10003;</span>
       <div class="preview-frame preview-frame--shorts">
         <img src="./preview-shorts-green.png" alt="Shorts Green caption preview" loading="lazy" draggable="false">
       </div>
@@ -1118,9 +1029,7 @@
       class="style-card style-card--shorts"
       data-preview-id="shorts-orange"
       data-preview-image="preview-shorts-orange.png"
-      data-preset="shorts"
-      data-theme="orange"
-      data-karaoke="on"
+      data-preview-label="Shorts Orange"
       role="button"
       tabindex="0"
       aria-pressed="false"
@@ -1128,7 +1037,7 @@
       aria-controls="preview-dialog"
       aria-label="Select and enlarge Shorts Orange caption style"
     >
-      <span class="selection-mark" aria-hidden="true">✓</span>
+      <span class="selection-mark" aria-hidden="true">&#10003;</span>
       <div class="preview-frame preview-frame--shorts">
         <img src="./preview-shorts-orange.png" alt="Shorts Orange caption preview" loading="lazy" draggable="false">
       </div>
@@ -1148,9 +1057,7 @@
       class="style-card style-card--shorts"
       data-preview-id="shorts-purple"
       data-preview-image="preview-shorts-purple.png"
-      data-preset="shorts"
-      data-theme="purple"
-      data-karaoke="on"
+      data-preview-label="Shorts Purple"
       role="button"
       tabindex="0"
       aria-pressed="false"
@@ -1158,7 +1065,7 @@
       aria-controls="preview-dialog"
       aria-label="Select and enlarge Shorts Purple caption style"
     >
-      <span class="selection-mark" aria-hidden="true">✓</span>
+      <span class="selection-mark" aria-hidden="true">&#10003;</span>
       <div class="preview-frame preview-frame--shorts">
         <img src="./preview-shorts-purple.png" alt="Shorts Purple caption preview" loading="lazy" draggable="false">
       </div>
@@ -1178,9 +1085,7 @@
       class="style-card style-card--shorts"
       data-preview-id="shorts-blue"
       data-preview-image="preview-shorts-blue.png"
-      data-preset="shorts"
-      data-theme="blue"
-      data-karaoke="on"
+      data-preview-label="Shorts Blue"
       role="button"
       tabindex="0"
       aria-pressed="false"
@@ -1188,7 +1093,7 @@
       aria-controls="preview-dialog"
       aria-label="Select and enlarge Shorts Blue caption style"
     >
-      <span class="selection-mark" aria-hidden="true">✓</span>
+      <span class="selection-mark" aria-hidden="true">&#10003;</span>
       <div class="preview-frame preview-frame--shorts">
         <img src="./preview-shorts-blue.png" alt="Shorts Blue caption preview" loading="lazy" draggable="false">
       </div>
@@ -1208,9 +1113,7 @@
       class="style-card style-card--shorts"
       data-preview-id="shorts-pink"
       data-preview-image="preview-shorts-pink.png"
-      data-preset="shorts"
-      data-theme="pink"
-      data-karaoke="on"
+      data-preview-label="Shorts Pink"
       role="button"
       tabindex="0"
       aria-pressed="false"
@@ -1218,7 +1121,7 @@
       aria-controls="preview-dialog"
       aria-label="Select and enlarge Shorts Pink caption style"
     >
-      <span class="selection-mark" aria-hidden="true">✓</span>
+      <span class="selection-mark" aria-hidden="true">&#10003;</span>
       <div class="preview-frame preview-frame--shorts">
         <img src="./preview-shorts-pink.png" alt="Shorts Pink caption preview" loading="lazy" draggable="false">
       </div>
@@ -1233,30 +1136,22 @@
           <div><dt>Karaoke</dt><dd class="status-on">On</dd></div>
         </dl>
       </div>
-    </article>
-</div>
+    </article></div>
     </section>
 
     <section class="gallery-section option-panel" aria-labelledby="karaoke-title">
       <div>
-        <h2 id="karaoke-title">Karaoke Option</h2>
-        <p>Karaoke controls word-level highlighting independently from the official preset. It can be enabled or disabled for other presets on request.</p>
+        <h2 id="karaoke-title">Karaoke is an option, not a preset</h2>
+        <p>The gallery includes explicit combinations where Karaoke changes the visual result. Later preview adjustments can still turn it on or off.</p>
       </div>
-      <ul class="option-list">
-        <li><strong>Karaoke is an option</strong>, not an official preset.</li>
-        <li><strong>social-bold-karaoke</strong> is a combination ID.</li>
-        <li>Ask for any preset with Karaoke <strong>on</strong> or <strong>off</strong>.</li>
-      </ul>
+      <span class="option-code">auto · true · false</span>
     </section>
-
   </main>
 
   <dialog class="preview-dialog" id="preview-dialog" aria-labelledby="preview-dialog-title">
-    <button class="preview-dialog__close" type="button" aria-label="Close enlarged preview">&#10005;</button>
+    <button class="preview-dialog__close" type="button" aria-label="Close enlarged preview">✕</button>
     <figure class="preview-dialog__figure">
-      <div class="preview-dialog__media">
-        <img class="preview-dialog__image" alt="">
-      </div>
+      <div class="preview-dialog__media"><img class="preview-dialog__image" alt=""></div>
       <figcaption class="preview-dialog__caption" id="preview-dialog-title">Caption preview</figcaption>
     </figure>
   </dialog>
@@ -1264,64 +1159,53 @@
   <script id="embedded-preview-manifest" type="application/json">{"schemaVersion":1,"generatedAt":"2026-07-16T03:50:50.1057047Z","generator":"scripts/render_style_previews.ps1","total":25,"groups":[{"id":"core","items":[{"id":"clean","label":"Clean","preset":"clean","themeType":"none","theme":null,"karaoke":false,"orientation":"landscape","aspectRatio":"16:9","width":1280,"height":720,"image":"preview-clean.png","props":"props-clean.json"},{"id":"minimal","label":"Minimal","preset":"minimal","themeType":"none","theme":null,"karaoke":false,"orientation":"landscape","aspectRatio":"16:9","width":1280,"height":720,"image":"preview-minimal.png","props":"props-minimal.json"},{"id":"social-bold","label":"Social Bold","preset":"social-bold","themeType":"none","theme":null,"karaoke":false,"orientation":"landscape","aspectRatio":"16:9","width":1280,"height":720,"image":"preview-social-bold.png","props":"props-social-bold.json"},{"id":"social-bold-karaoke","label":"Social Bold Karaoke","preset":"social-bold","themeType":"none","theme":null,"karaoke":true,"orientation":"landscape","aspectRatio":"16:9","width":1280,"height":720,"image":"preview-social-bold-karaoke.png","props":"props-social-bold-karaoke.json"}]},{"id":"pill","items":[{"id":"pill-gray","label":"Pill Gray","preset":"pill","themeType":"background","theme":"gray","karaoke":false,"orientation":"landscape","aspectRatio":"16:9","width":1280,"height":720,"image":"preview-pill-gray.png","props":"props-pill-gray.json"},{"id":"pill-yellow","label":"Pill Yellow","preset":"pill","themeType":"background","theme":"yellow","karaoke":false,"orientation":"landscape","aspectRatio":"16:9","width":1280,"height":720,"image":"preview-pill-yellow.png","props":"props-pill-yellow.json"},{"id":"pill-blue","label":"Pill Blue","preset":"pill","themeType":"background","theme":"blue","karaoke":false,"orientation":"landscape","aspectRatio":"16:9","width":1280,"height":720,"image":"preview-pill-blue.png","props":"props-pill-blue.json"},{"id":"pill-pink","label":"Pill Pink","preset":"pill","themeType":"background","theme":"pink","karaoke":false,"orientation":"landscape","aspectRatio":"16:9","width":1280,"height":720,"image":"preview-pill-pink.png","props":"props-pill-pink.json"},{"id":"pill-green","label":"Pill Green","preset":"pill","themeType":"background","theme":"green","karaoke":false,"orientation":"landscape","aspectRatio":"16:9","width":1280,"height":720,"image":"preview-pill-green.png","props":"props-pill-green.json"}]},{"id":"boxed","items":[{"id":"boxed-gray","label":"Boxed Gray","preset":"boxed","themeType":"background","theme":"gray","karaoke":false,"orientation":"landscape","aspectRatio":"16:9","width":1280,"height":720,"image":"preview-boxed-gray.png","props":"props-boxed-gray.json"},{"id":"boxed-yellow","label":"Boxed Yellow","preset":"boxed","themeType":"background","theme":"yellow","karaoke":false,"orientation":"landscape","aspectRatio":"16:9","width":1280,"height":720,"image":"preview-boxed-yellow.png","props":"props-boxed-yellow.json"},{"id":"boxed-blue","label":"Boxed Blue","preset":"boxed","themeType":"background","theme":"blue","karaoke":false,"orientation":"landscape","aspectRatio":"16:9","width":1280,"height":720,"image":"preview-boxed-blue.png","props":"props-boxed-blue.json"},{"id":"boxed-pink","label":"Boxed Pink","preset":"boxed","themeType":"background","theme":"pink","karaoke":false,"orientation":"landscape","aspectRatio":"16:9","width":1280,"height":720,"image":"preview-boxed-pink.png","props":"props-boxed-pink.json"},{"id":"boxed-green","label":"Boxed Green","preset":"boxed","themeType":"background","theme":"green","karaoke":false,"orientation":"landscape","aspectRatio":"16:9","width":1280,"height":720,"image":"preview-boxed-green.png","props":"props-boxed-green.json"}]},{"id":"stroked","items":[{"id":"stroked-black","label":"Stroked Black","preset":"stroked","themeType":"stroke","theme":"black","karaoke":false,"orientation":"landscape","aspectRatio":"16:9","width":1280,"height":720,"image":"preview-stroked-black.png","props":"props-stroked-black.json"},{"id":"stroked-yellow","label":"Stroked Yellow","preset":"stroked","themeType":"stroke","theme":"yellow","karaoke":false,"orientation":"landscape","aspectRatio":"16:9","width":1280,"height":720,"image":"preview-stroked-yellow.png","props":"props-stroked-yellow.json"},{"id":"stroked-blue","label":"Stroked Blue","preset":"stroked","themeType":"stroke","theme":"blue","karaoke":false,"orientation":"landscape","aspectRatio":"16:9","width":1280,"height":720,"image":"preview-stroked-blue.png","props":"props-stroked-blue.json"},{"id":"stroked-pink","label":"Stroked Pink","preset":"stroked","themeType":"stroke","theme":"pink","karaoke":false,"orientation":"landscape","aspectRatio":"16:9","width":1280,"height":720,"image":"preview-stroked-pink.png","props":"props-stroked-pink.json"},{"id":"stroked-green","label":"Stroked Green","preset":"stroked","themeType":"stroke","theme":"green","karaoke":false,"orientation":"landscape","aspectRatio":"16:9","width":1280,"height":720,"image":"preview-stroked-green.png","props":"props-stroked-green.json"}]},{"id":"shorts","items":[{"id":"shorts-yellow","label":"Shorts Yellow","preset":"shorts","themeType":"highlight","theme":"yellow","karaoke":true,"orientation":"shorts","aspectRatio":"9:16","width":1080,"height":1920,"image":"preview-shorts-yellow.png","props":"props-shorts-yellow.json"},{"id":"shorts-green","label":"Shorts Green","preset":"shorts","themeType":"highlight","theme":"green","karaoke":true,"orientation":"shorts","aspectRatio":"9:16","width":1080,"height":1920,"image":"preview-shorts-green.png","props":"props-shorts-green.json"},{"id":"shorts-orange","label":"Shorts Orange","preset":"shorts","themeType":"highlight","theme":"orange","karaoke":true,"orientation":"shorts","aspectRatio":"9:16","width":1080,"height":1920,"image":"preview-shorts-orange.png","props":"props-shorts-orange.json"},{"id":"shorts-purple","label":"Shorts Purple","preset":"shorts","themeType":"highlight","theme":"purple","karaoke":true,"orientation":"shorts","aspectRatio":"9:16","width":1080,"height":1920,"image":"preview-shorts-purple.png","props":"props-shorts-purple.json"},{"id":"shorts-blue","label":"Shorts Blue","preset":"shorts","themeType":"highlight","theme":"blue","karaoke":true,"orientation":"shorts","aspectRatio":"9:16","width":1080,"height":1920,"image":"preview-shorts-blue.png","props":"props-shorts-blue.json"},{"id":"shorts-pink","label":"Shorts Pink","preset":"shorts","themeType":"highlight","theme":"pink","karaoke":true,"orientation":"shorts","aspectRatio":"9:16","width":1080,"height":1920,"image":"preview-shorts-pink.png","props":"props-shorts-pink.json"}]}]}</script>
   <script>
     (() => {
-      const cards = Array.from(document.querySelectorAll(".style-card"));
+      const cards = [...document.querySelectorAll(".style-card")];
       const selectedPreview = document.getElementById("selected-preview");
       const copySelection = document.getElementById("copy-selection");
       const previewDialog = document.getElementById("preview-dialog");
-      const previewDialogTitle = document.getElementById("preview-dialog-title");
       const previewDialogImage = previewDialog.querySelector(".preview-dialog__image");
+      const previewDialogTitle = document.getElementById("preview-dialog-title");
       const previewDialogClose = previewDialog.querySelector(".preview-dialog__close");
+      let selectedId = null;
       let lastTrigger = null;
       let pageScrollPosition = 0;
-      let copyResetTimer = null;
 
-      const resetCopySelection = () => {
-        if (copyResetTimer) {
-          window.clearTimeout(copyResetTimer);
-          copyResetTimer = null;
-        }
-        copySelection.textContent = "Copy";
-        copySelection.classList.remove("is-copied", "is-error");
-      };
-
-      const copyTextWithFallback = async (text) => {
+      const copyText = async (text) => {
         if (navigator.clipboard && window.isSecureContext) {
           await navigator.clipboard.writeText(text);
           return;
         }
-
-        const textArea = document.createElement("textarea");
-        textArea.value = text;
-        textArea.setAttribute("readonly", "");
-        textArea.style.position = "fixed";
-        textArea.style.left = "-9999px";
-        textArea.style.opacity = "0";
-        document.body.appendChild(textArea);
-        textArea.select();
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
         const copied = document.execCommand("copy");
-        textArea.remove();
-        if (!copied) {
-          throw new Error("Unable to copy selected style");
-        }
+        textarea.remove();
+        if (!copied) throw new Error("Unable to copy selected style");
       };
 
       const selectCard = (card) => {
-        for (const candidate of cards) {
+        cards.forEach((candidate) => {
           const selected = candidate === card;
           candidate.classList.toggle("is-selected", selected);
           candidate.setAttribute("aria-pressed", selected ? "true" : "false");
-        }
-        selectedPreview.textContent = card.dataset.previewId;
-        resetCopySelection();
+        });
+        selectedId = card.dataset.previewId;
+        selectedPreview.textContent = selectedId;
+        selectedPreview.classList.add("has-selection");
+        copySelection.disabled = false;
+        copySelection.textContent = "Copy ID";
+        copySelection.classList.remove("is-copied");
       };
 
       const openPreview = (card) => {
         pageScrollPosition = window.scrollY;
-        selectCard(card);
         lastTrigger = card;
-        previewDialogTitle.textContent = card.dataset.previewId;
         previewDialogImage.src = "./" + card.dataset.previewImage;
-        previewDialogImage.alt = card.dataset.previewId + " caption preview";
+        previewDialogImage.alt = card.dataset.previewLabel + " caption preview";
+        previewDialogTitle.textContent = card.dataset.previewId;
         previewDialog.classList.toggle("is-shorts", card.classList.contains("style-card--shorts"));
         document.documentElement.classList.add("modal-open");
         document.body.classList.add("modal-open");
@@ -1330,47 +1214,38 @@
         window.scrollTo(0, pageScrollPosition);
       };
 
-      const closePreview = () => {
-        if (previewDialog.open) {
-          previewDialog.close();
-        }
-      };
-
-      for (const card of cards) {
-        card.addEventListener("click", () => openPreview(card));
+      cards.forEach((card) => {
+        card.addEventListener("click", () => {
+          selectCard(card);
+          openPreview(card);
+        });
         card.addEventListener("keydown", (event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
+            selectCard(card);
             openPreview(card);
           }
         });
-      }
+      });
 
       copySelection.addEventListener("click", async () => {
-        resetCopySelection();
-        const copyText = "Use caption style: " + selectedPreview.textContent.trim();
+        if (!selectedId) return;
         try {
-          await copyTextWithFallback(copyText);
+          await copyText(selectedId);
           copySelection.textContent = "Copied";
           copySelection.classList.add("is-copied");
         } catch {
           copySelection.textContent = "Copy failed";
-          copySelection.classList.add("is-error");
         }
-        copyResetTimer = window.setTimeout(resetCopySelection, 1800);
       });
 
-      previewDialogClose.addEventListener("click", closePreview);
+      previewDialogClose.addEventListener("click", () => previewDialog.close());
       previewDialog.addEventListener("click", (event) => {
-        if (event.target === previewDialog) {
-          closePreview();
-        }
+        if (event.target === previewDialog) previewDialog.close();
       });
       previewDialog.addEventListener("close", () => {
         document.body.classList.remove("modal-open");
-        if (lastTrigger) {
-          lastTrigger.focus({ preventScroll: true });
-        }
+        if (lastTrigger) lastTrigger.focus({ preventScroll: true });
         window.scrollTo(0, pageScrollPosition);
         document.documentElement.classList.remove("modal-open");
       });

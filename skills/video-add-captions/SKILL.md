@@ -68,7 +68,9 @@ Required inputs:
 
 - A finished source video.
 - A working output directory that does not overwrite the source.
-- The user's confirmed style selection, or `clean` when the user explicitly skips selection.
+- An interaction state created by `scripts/caption_interaction.mjs`.
+- The user's exact gallery combination ID, or the exact response `跳过` to choose `clean`.
+- The user's exact response `确认渲染` after reviewing source-backed preview evidence.
 
 Optional inputs:
 
@@ -254,23 +256,44 @@ Read `reference/caption-style-themes.md` for the configuration vocabulary and `r
 
 ## Style Selection Workflow
 
-Full rendering requires explicit human confirmation. Follow this sequence:
+Full rendering requires two recorded human decisions. These gates are mandatory, and `scripts/generate_caption_project.mjs` rejects attempts to bypass them.
+
+### Gate 1: interview the user about style
 
 1. Prepare the source video, caption cues, and source metadata.
-2. If the user already expressed a preference, map it to `preset`, theme, Karaoke, and optional overrides.
-3. Provide the offline style gallery:
+2. Start the interaction state with `scripts/caption_interaction.mjs start`. By default this opens `assets/style-previews/index.html` in the Windows system browser with `Start-Process`; do not substitute a Codex in-app `file://` link for the external browser window.
+3. Ask exactly this question, preserving the decision rules:
 
-   `assets/style-previews/index.html`
+   > 字幕样式库已在系统浏览器中打开。
+   > 请浏览全部 25 种样式，然后只回复一个组合 ID，例如 `pill-yellow`。
+   > 如果不想选择样式，请明确回复：`跳过`。此时采用默认 `clean`。
+   > 收到有效组合 ID 或明确的“跳过”之前，流程不会继续。
 
-4. Explain that the user may reply with a combination ID such as `pill-yellow`, `stroked-blue`, `shorts-purple`, or `social-bold-karaoke`.
-5. Stop and wait for the user's selection. Do not render the complete overlay or final video yet.
-6. If the user explicitly declines selection or says to skip it, use `clean`.
-7. If no explicit selection is received, do not infer approval of another style; fall back only to `clean`.
-8. If the user dislikes the result, map the feedback to selection parameters or overrides and generate representative preview snapshots.
-9. Show the updated preview evidence and stop again for confirmation.
-10. Render the complete overlay and final video only after the user explicitly confirms the selected result.
+4. Stop and wait. Do not call the `select` command on the user's behalf.
+5. Record the user's response verbatim with `caption_interaction.mjs select --response`.
+6. A response is valid only when it is one exact gallery combination ID or exactly `跳过`/`skip`. Silence, "随便", inferred preference, or an Agent-selected value is invalid.
+7. `跳过` records an explicit user decision and resolves to `clean`; it is not an automatic fallback.
+8. Until Gate 1 is recorded, preview generation and full overlay generation must fail.
 
-The absence of a reply is not approval. Do not continue a long render while waiting for a style decision.
+### Gate 2: interview the user about the real-video preview
+
+1. Generate a source-backed preview project using the recorded selection.
+2. Capture at least four representative preview images: early caption, middle caption, late caption, and no-caption. When Karaoke is enabled, also include a frame inside an active word.
+3. Record the actual image paths with `caption_interaction.mjs preview-ready`.
+4. Show the images to the user and ask exactly this question:
+
+   > 请检查真实视频上的字幕预览。
+   > 满意时请明确回复：`确认渲染`。
+   > 不满意时请说明需要调整的字号、位置、颜色、背景、描边或 Karaoke。
+   > 收到明确的“确认渲染”之前，不会生成完整字幕层和最终视频。
+
+5. Stop and wait. Do not call the `confirm` command on the user's behalf.
+6. If the user requests a change, record the response with `caption_interaction.mjs adjust`, apply the selection or overrides change, regenerate preview evidence, and return to Gate 2.
+7. Only the exact response `确认渲染` creates final render approval.
+8. Any changed source video, captions JSON, selection, overrides file, or preview cycle invalidates the previous approval.
+9. Render the complete overlay and final video only while the interaction state is `render_approved`.
+
+The absence of a reply is never approval. An Agent must not simulate either user response during a real skill invocation.
 
 ## Natural Language Mapping Examples
 
@@ -350,6 +373,8 @@ video-add-captions/
 └── scripts/
     ├── build_captions.py
     ├── caption-styles.json
+    ├── caption_interaction.mjs
+    ├── caption_interaction_state.mjs
     ├── caption_style_config.mjs
     ├── check_caption_style_config.mjs
     ├── composite_caption_overlay.ps1
@@ -365,6 +390,7 @@ current-job/
 ├── transcript.json
 ├── captions.json
 ├── captions.srt
+├── caption-interaction.json
 ├── caption-overrides.json
 ├── preview-project/
 │   ├── index.html
@@ -392,15 +418,29 @@ $SkillRoot = Join-Path $RepoRoot "skills\video-add-captions"
 $JobRoot = Join-Path $RepoRoot "work\video-add-captions"
 $SourceVideo = Join-Path $JobRoot "source.mp4"
 $CaptionsJson = Join-Path $JobRoot "captions.json"
+$InteractionState = Join-Path $JobRoot "caption-interaction.json"
 $PreviewProject = Join-Path $JobRoot "preview-project"
 $PreviewSnapshots = Join-Path $JobRoot "preview-snapshots"
 ```
 
-Open the offline gallery:
+Start Gate 1 and open the offline gallery in the Windows system browser:
 
 ```powershell
-Start-Process "$SkillRoot\assets\style-previews\index.html"
+node "$SkillRoot\scripts\caption_interaction.mjs" start `
+  --state $InteractionState `
+  --source $SourceVideo `
+  --captions $CaptionsJson
 ```
+
+Print the command output as the user interview, then stop. After the user replies, record the response verbatim:
+
+```powershell
+node "$SkillRoot\scripts\caption_interaction.mjs" select `
+  --state $InteractionState `
+  --response "pill-yellow"
+```
+
+Use `--response "跳过"` only when that was the user's explicit reply.
 
 Run the style configuration guardrail:
 
@@ -415,12 +455,11 @@ node "$SkillRoot\scripts\generate_caption_project.mjs" `
   --video $SourceVideo `
   --captions $CaptionsJson `
   --out $PreviewProject `
-  --preset clean `
-  --karaoke false `
+  --interaction-state $InteractionState `
   --mode preview
 ```
 
-Replace the selection flags with the user's confirmed candidate. Add `--overrides` only for job-specific adjustments.
+The generator reads the selected preset, theme, and Karaoke value from the interaction state. Passing conflicting selection flags fails. Add `--overrides` only for job-specific adjustments.
 
 Check the generated project:
 
@@ -435,7 +474,7 @@ Capture representative frames:
 
 ```powershell
 npx.cmd hyperframes snapshot $PreviewProject `
-  --at 1,4,7 `
+  --at 0,1,4,7 `
   --no-end `
   --timeout 60000 `
   --describe false `
@@ -443,6 +482,38 @@ npx.cmd hyperframes snapshot $PreviewProject `
 ```
 
 Choose timestamps that include an early cue, a middle cue, a late cue, an active Karaoke word when enabled, and a frame with no visible caption. Adjust the example timestamps to the actual source duration.
+
+Record the exact preview evidence paths and enter Gate 2:
+
+```powershell
+$Evidence = @(
+  "$PreviewSnapshots\frame-01-at-0s.png",
+  "$PreviewSnapshots\frame-02-at-1s.png",
+  "$PreviewSnapshots\frame-03-at-4s.png",
+  "$PreviewSnapshots\frame-04-at-7s.png"
+) -join ","
+
+node "$SkillRoot\scripts\caption_interaction.mjs" preview-ready `
+  --state $InteractionState `
+  --project-meta "$PreviewProject\project-meta.json" `
+  --evidence $Evidence
+```
+
+Print the command output as the second user interview, show the preview images, and stop. If the user requests changes:
+
+```powershell
+node "$SkillRoot\scripts\caption_interaction.mjs" adjust `
+  --state $InteractionState `
+  --response "字幕再大一点"
+```
+
+After applying the change, regenerate and re-record preview evidence. If the user replies exactly `确认渲染`:
+
+```powershell
+node "$SkillRoot\scripts\caption_interaction.mjs" confirm `
+  --state $InteractionState `
+  --response "确认渲染"
+```
 
 For explicit gallery-asset maintenance, provide deterministic landscape and vertical fixtures plus `preview-captions.json`, then run:
 
@@ -473,8 +544,7 @@ node "$SkillRoot\scripts\generate_caption_project.mjs" `
   --video $SourceVideo `
   --captions $CaptionsJson `
   --out $OverlayProject `
-  --preset clean `
-  --karaoke false `
+  --interaction-state $InteractionState `
   --mode overlay
 ```
 
@@ -555,18 +625,24 @@ Complete all checks before reporting success.
    node "$SkillRoot\scripts\check_caption_style_config.mjs"
    ```
 
-2. Run the generated project's HyperFrames check:
+2. Inspect the interaction status and require `render_approved`:
+
+   ```powershell
+   node "$SkillRoot\scripts\caption_interaction.mjs" status --state $InteractionState
+   ```
+
+3. Run the generated project's HyperFrames check:
 
    ```powershell
    npx.cmd hyperframes check $OverlayProject --at 1.55 --timeout 10000 --no-contrast
    ```
 
-3. View at least three representative caption timestamps and one no-caption timestamp.
-4. Check that wrapping occurs between words and never inside a normal English word.
-5. Check caption safe-area placement and frame-edge clipping.
-6. Check Karaoke timing against `words[].start` and `words[].end` when enabled.
-7. Check that the no-caption frame is visually empty in the overlay.
-8. Inspect overlay codec and alpha metadata:
+4. View at least three representative caption timestamps and one no-caption timestamp.
+5. Check that wrapping occurs between words and never inside a normal English word.
+6. Check caption safe-area placement and frame-edge clipping.
+7. Check Karaoke timing against `words[].start` and `words[].end` when enabled.
+8. Check that the no-caption frame is visually empty in the overlay.
+9. Inspect overlay codec and alpha metadata:
 
    ```powershell
    ffprobe -v error `
@@ -576,14 +652,14 @@ Complete all checks before reporting success.
      $OverlayVideo
    ```
 
-9. Confirm source and final audio packet hashes match:
+10. Confirm source and final audio packet hashes match:
 
    ```powershell
    ffmpeg -v error -i $SourceVideo -map "0:a:0?" -c copy -f hash -hash sha256 -
    ffmpeg -v error -i $FinalVideo -map "0:a:0?" -c copy -f hash -hash sha256 -
    ```
 
-10. Check that black levels or average brightness are not abnormally raised. Run path-taking filters from the report directory and use basename output files:
+11. Check that black levels or average brightness are not abnormally raised. Run path-taking filters from the report directory and use basename output files:
 
     ```powershell
     Push-Location $JobRoot
@@ -603,5 +679,5 @@ Complete all checks before reporting success.
 
     Compare `YAVG` values at no-caption timestamps and visually compare the matching source and final frames. Small encoding differences are acceptable; a systematic brightness lift or dark overlay is not.
 
-11. Confirm the final output exists, is non-zero, is not either input path, and plays with synchronized source audio.
-12. Report the selected preset, themes, Karaoke value, overrides path, preview evidence, overlay path, final video path, and every validation result.
+12. Confirm the final output exists, is non-zero, is not either input path, and plays with synchronized source audio.
+13. Report both recorded user responses, the selected preset, themes, Karaoke value, overrides path, preview evidence, overlay path, final video path, and every validation result.

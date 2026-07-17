@@ -7,35 +7,24 @@ const skillRoot = resolve(scriptDirectory, "..");
 const assetsDirectory = join(skillRoot, "assets", "style-previews");
 const manifestPath = join(assetsDirectory, "preview-manifest.json");
 const outputPath = join(assetsDirectory, "index.html");
-
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8").replace(/^\uFEFF/, ""));
 const expectedGroups = ["core", "pill", "boxed", "stroked", "shorts"];
 const actualGroups = manifest.groups.map((group) => group.id);
 
-if (manifest.total !== 25) {
-  throw new Error(`Expected manifest.total to be 25, received ${manifest.total}.`);
-}
 if (JSON.stringify(actualGroups) !== JSON.stringify(expectedGroups)) {
-  throw new Error(`Unexpected manifest group order: ${actualGroups.join(", ")}.`);
+  throw new Error(`Unexpected preview groups: ${actualGroups.join(", ")}`);
 }
 
 const groupMap = Object.fromEntries(manifest.groups.map((group) => [group.id, group.items]));
 const allItems = manifest.groups.flatMap((group) => group.items);
-const uniqueIds = new Set(allItems.map((item) => item.id));
-if (uniqueIds.size !== manifest.total) {
-  throw new Error("Preview IDs must be unique.");
+if (manifest.total !== 25 || allItems.length !== 25) {
+  throw new Error(`Expected 25 preview items, found manifest.total=${manifest.total}, items=${allItems.length}`);
 }
 
 for (const item of allItems) {
-  for (const relativePath of [item.image, item.props]) {
-    if (!relativePath || relativePath !== relativePath.split(/[\\/]/).pop()) {
-      throw new Error(`Manifest path must be a local filename: ${relativePath}.`);
-    }
-    if (relativePath.includes("video-add-captions-legacy")) {
-      throw new Error(`Legacy path is not allowed: ${relativePath}.`);
-    }
-    if (!existsSync(join(assetsDirectory, relativePath))) {
-      throw new Error(`Missing gallery asset: ${relativePath}.`);
+  for (const fileName of [item.image, item.props]) {
+    if (!existsSync(join(assetsDirectory, fileName))) {
+      throw new Error(`Missing preview asset: ${fileName}`);
     }
   }
 }
@@ -44,8 +33,7 @@ const escapeHtml = (value) => String(value)
   .replaceAll("&", "&amp;")
   .replaceAll("<", "&lt;")
   .replaceAll(">", "&gt;")
-  .replaceAll('"', "&quot;")
-  .replaceAll("'", "&#039;");
+  .replaceAll('"', "&quot;");
 
 const titleCase = (value) => String(value)
   .split("-")
@@ -53,25 +41,22 @@ const titleCase = (value) => String(value)
   .join(" ");
 
 const renderCard = (item) => {
+  const theme = item.theme ?? "Default";
   const isShorts = item.orientation === "shorts";
-  const isSelected = item.id === "clean";
-  const themeLabel = item.theme ? titleCase(item.theme) : "Default";
   return `
     <article
-      class="style-card ${isShorts ? "style-card--shorts" : "style-card--landscape"}${isSelected ? " is-selected" : ""}"
+      class="style-card ${isShorts ? "style-card--shorts" : "style-card--landscape"}"
       data-preview-id="${escapeHtml(item.id)}"
       data-preview-image="${escapeHtml(item.image)}"
-      data-preset="${escapeHtml(item.preset)}"
-      data-theme="${escapeHtml(item.theme ?? "default")}"
-      data-karaoke="${item.karaoke ? "on" : "off"}"
+      data-preview-label="${escapeHtml(item.label)}"
       role="button"
       tabindex="0"
-      aria-pressed="${isSelected ? "true" : "false"}"
+      aria-pressed="false"
       aria-haspopup="dialog"
       aria-controls="preview-dialog"
       aria-label="Select and enlarge ${escapeHtml(item.label)} caption style"
     >
-      <span class="selection-mark" aria-hidden="true">✓</span>
+      <span class="selection-mark" aria-hidden="true">&#10003;</span>
       <div class="preview-frame ${isShorts ? "preview-frame--shorts" : "preview-frame--landscape"}">
         <img src="./${escapeHtml(item.image)}" alt="${escapeHtml(item.label)} caption preview" loading="lazy" draggable="false">
       </div>
@@ -82,14 +67,14 @@ const renderCard = (item) => {
         </div>
         <dl class="metadata-grid">
           <div><dt>Official preset</dt><dd>${escapeHtml(item.preset)}</dd></div>
-          <div><dt>Theme</dt><dd>${escapeHtml(themeLabel)}</dd></div>
+          <div><dt>Theme</dt><dd>${escapeHtml(titleCase(theme))}</dd></div>
           <div><dt>Karaoke</dt><dd class="${item.karaoke ? "status-on" : "status-off"}">${item.karaoke ? "On" : "Off"}</dd></div>
         </dl>
       </div>
     </article>`;
 };
 
-const renderGrid = (items, className = "") => `<div class="card-grid ${className}">${items.map(renderCard).join("")}\n</div>`;
+const renderGrid = (items, className) => `<div class="card-grid ${className}">${items.map(renderCard).join("")}</div>`;
 const manifestJson = JSON.stringify(manifest).replaceAll("<", "\\u003c");
 
 const html = `<!doctype html>
@@ -110,6 +95,7 @@ const html = `<!doctype html>
       --line-strong: #c8d0dc;
       --accent: #2563eb;
       --accent-soft: #eaf1ff;
+      --success: #15803d;
       --navy: #111827;
       --radius-lg: 24px;
       --radius-md: 17px;
@@ -128,6 +114,7 @@ const html = `<!doctype html>
       line-height: 1.5;
     }
     button, input, select, textarea { font: inherit; }
+    code { font-family: inherit; }
     img { max-width: 100%; }
 
     .page-shell {
@@ -205,30 +192,40 @@ const html = `<!doctype html>
       background: var(--accent-soft);
       color: #1e3a8a;
     }
-    .selection-summary p { margin: 0; }
-    .selection-summary strong { color: #1d4ed8; }
-    .selection-hint { color: #5270aa; font-size: 0.88rem; }
-    .selection-actions {
-      display: flex;
-      align-items: center;
-      gap: 12px;
+    .selection-copy { min-width: 0; }
+    .selection-copy p { margin: 0; }
+    .selection-label {
+      color: #5270aa;
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
     }
+    .selected-value {
+      margin-top: 2px !important;
+      color: #5270aa;
+      font-size: 1rem;
+      font-weight: 800;
+    }
+    .selected-value.has-selection { color: #1d4ed8; }
+    .selection-help {
+      margin-top: 3px !important;
+      color: var(--muted);
+      font-size: 0.79rem;
+    }
+    .selection-help code { color: #344054; }
     .copy-selection {
       flex: 0 0 auto;
-      min-width: 82px;
-      padding: 8px 14px;
+      padding: 9px 14px;
       border: 1px solid #93c5fd;
       border-radius: 10px;
       background: #ffffff;
       color: #1d4ed8;
       font-weight: 800;
       cursor: pointer;
-      transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
     }
-    .copy-selection:hover { background: #eff6ff; border-color: #60a5fa; }
-    .copy-selection:focus-visible { outline: 3px solid rgba(37, 99, 235, 0.22); outline-offset: 2px; }
-    .copy-selection.is-copied { border-color: #86efac; background: #f0fdf4; color: #15803d; }
-    .copy-selection.is-error { border-color: #fca5a5; background: #fef2f2; color: #b91c1c; }
+    .copy-selection:disabled { color: #98a2b3; border-color: var(--line); background: #f2f4f7; cursor: not-allowed; }
+    .copy-selection.is-copied { color: var(--success); border-color: #a9d8b8; background: #f2fbf5; }
 
     .gallery-section { margin-top: clamp(48px, 7vw, 78px); }
     .section-heading {
@@ -240,35 +237,12 @@ const html = `<!doctype html>
       padding-bottom: 14px;
       border-bottom: 1px solid var(--line);
     }
-    .section-heading h2 {
-      margin: 0;
-      font-size: clamp(1.55rem, 3vw, 2.25rem);
-      line-height: 1.15;
-      letter-spacing: -0.025em;
-    }
-    .section-heading p {
-      max-width: 620px;
-      margin: 0;
-      color: var(--muted);
-      text-align: right;
-    }
-
+    .section-heading h2 { margin: 0; font-size: clamp(1.55rem, 3vw, 2.25rem); line-height: 1.15; letter-spacing: -0.025em; }
+    .section-heading p { max-width: 620px; margin: 0; color: var(--muted); text-align: right; }
     .subgroup + .subgroup { margin-top: 38px; }
-    .subgroup-heading {
-      display: flex;
-      align-items: center;
-      gap: 11px;
-      margin: 0 0 16px;
-    }
+    .subgroup-heading { display: flex; align-items: center; gap: 11px; margin: 0 0 16px; }
     .subgroup-heading h3 { margin: 0; font-size: 1.18rem; }
-    .count-badge {
-      padding: 3px 9px;
-      border-radius: 999px;
-      background: #e8edf4;
-      color: #596579;
-      font-size: 0.76rem;
-      font-weight: 800;
-    }
+    .count-badge { padding: 3px 9px; border-radius: 999px; background: #e8edf4; color: #596579; font-size: 0.76rem; font-weight: 800; }
 
     .card-grid {
       display: flex;
@@ -313,25 +287,6 @@ const html = `<!doctype html>
       border-color: var(--accent);
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16), var(--shadow-selected);
     }
-    .selection-mark {
-      position: absolute;
-      z-index: 2;
-      top: 20px;
-      right: 20px;
-      display: grid;
-      width: 28px;
-      height: 28px;
-      place-items: center;
-      border-radius: 50%;
-      background: var(--accent);
-      color: #ffffff;
-      font-size: 0.85rem;
-      font-weight: 900;
-      opacity: 0;
-      transform: scale(0.7);
-      transition: opacity 160ms ease, transform 160ms ease;
-    }
-    .style-card.is-selected .selection-mark { opacity: 1; transform: scale(1); }
 
     .preview-frame {
       display: grid;
@@ -344,32 +299,13 @@ const html = `<!doctype html>
     .preview-frame--landscape { width: 100%; aspect-ratio: 16 / 9; }
     .preview-frame--shorts { width: min(100%, 168px); aspect-ratio: 9 / 16; margin: 0 auto; }
     .card-grid--shorts .preview-frame--shorts { width: min(100%, 184px); }
-    .preview-frame img { width: 100%; height: 100%; display: block; object-fit: contain; }
+    .preview-frame img { width: 100%; height: 100%; object-fit: contain; }
 
     .card-copy { display: grid; gap: 12px; padding: 13px 4px 3px; }
-    .card-heading { display: flex; align-items: start; justify-content: space-between; gap: 10px; }
-    .card-heading h4 {
-      min-width: 0;
-      margin: 0;
-      font-size: 1rem;
-      line-height: 1.28;
-      overflow-wrap: anywhere;
-    }
-    .aspect-badge {
-      flex: 0 0 auto;
-      padding: 3px 8px;
-      border-radius: 999px;
-      background: #eef2f7;
-      color: #526074;
-      font-size: 0.72rem;
-      font-weight: 800;
-    }
-    .metadata-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 9px 12px;
-      margin: 0;
-    }
+    .card-heading { display: flex; align-items: start; justify-content: space-between; gap: 10px; margin: 0; }
+    .card-heading h4 { min-width: 0; margin: 0; color: var(--ink); font-size: 1rem; line-height: 1.28; overflow-wrap: anywhere; }
+    .aspect-badge { flex: 0 0 auto; padding: 3px 8px; border-radius: 999px; background: #eef2f7; color: #526074; font-size: 0.72rem; font-weight: 800; }
+    .metadata-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 12px; margin: 0; }
     .metadata-grid div:last-child { grid-column: 1 / -1; }
     .metadata-grid dt {
       color: #8a94a5;
@@ -385,8 +321,26 @@ const html = `<!doctype html>
       font-weight: 700;
       overflow-wrap: anywhere;
     }
-    .metadata-grid dd.status-on { color: #15803d; }
+    .metadata-grid dd.status-on { color: var(--success); }
     .metadata-grid dd.status-off { color: #667085; }
+    .selection-mark {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      display: grid;
+      width: 28px;
+      height: 28px;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #ffffff;
+      font-size: 0.85rem;
+      font-weight: 900;
+      opacity: 0;
+      transform: scale(0.75);
+      transition: opacity 150ms ease, transform 150ms ease;
+    }
+    .style-card.is-selected .selection-mark { opacity: 1; transform: scale(1); }
 
     .option-panel {
       display: grid;
@@ -401,24 +355,8 @@ const html = `<!doctype html>
     }
     .option-panel h2 { margin: 0 0 10px; font-size: clamp(1.5rem, 3vw, 2.1rem); }
     .option-panel p { margin: 0; color: var(--muted); }
-    .option-list {
-      display: grid;
-      gap: 10px;
-      margin: 0;
-      padding: 0;
-      list-style: none;
-    }
-    .option-list li {
-      padding: 10px 13px;
-      border-radius: 12px;
-      background: var(--surface-soft);
-      color: #475467;
-      font-size: 0.9rem;
-    }
-    .option-list strong { color: var(--ink); }
+    .option-code { padding: 14px 16px; border-radius: 12px; background: var(--surface-soft); color: #475467; font-size: 0.9rem; font-weight: 700; text-align: center; }
 
-    html.modal-open { scroll-behavior: auto; }
-    body.modal-open { overflow: hidden; }
     .preview-dialog {
       position: fixed;
       inset: 0;
@@ -486,21 +424,24 @@ const html = `<!doctype html>
       overflow-wrap: anywhere;
     }
 
+    html.modal-open { scroll-behavior: auto; }
+    body.modal-open { overflow: hidden; }
+
     @media (max-width: 820px) {
       .page-shell { width: min(100% - 24px, 1480px); padding-top: 12px; }
       .hero { border-radius: 22px; }
-      .selection-summary, .section-heading { align-items: start; flex-direction: column; }
+      .selection-summary, .section-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
       .section-heading p { text-align: left; }
-      .selection-actions { width: 100%; justify-content: space-between; }
       .option-panel { grid-template-columns: 1fr; }
       .style-card--landscape { flex-basis: 270px; }
       .card-grid--core { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .card-grid--shorts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     }
-
     @media (max-width: 540px) {
       .hero { padding: 26px 22px; }
       .gallery-section { margin-top: 44px; }
+      .selection-summary, .option-panel { align-items: stretch; flex-direction: column; }
+      .copy-selection { width: 100%; }
       .card-grid { gap: 14px; }
       .style-card--landscape { flex-basis: 100%; max-width: 420px; }
       .style-card--shorts { flex-basis: 168px; width: 168px; }
@@ -511,12 +452,12 @@ const html = `<!doctype html>
       .preview-frame--shorts { width: 138px; }
       .preview-dialog { width: calc(100vw - 20px); max-height: calc(100vh - 20px); padding: 40px 8px 0; border-radius: 14px; }
       .preview-dialog__close { top: 6px; right: 8px; }
-      .preview-dialog__media,
-      .preview-dialog__image { max-height: calc(100vh - 100px); }
+      .preview-dialog__media, .preview-dialog__image { max-height: calc(100vh - 100px); }
       .metadata-grid { grid-template-columns: 1fr; }
       .metadata-grid div:last-child { grid-column: auto; }
-      .selection-hint { display: none; }
-      .selection-actions { justify-content: flex-end; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
     }
   </style>
 </head>
@@ -525,22 +466,23 @@ const html = `<!doctype html>
     <header class="hero">
       <p class="eyebrow">25 offline preview styles</p>
       <h1>Caption Style Gallery</h1>
-      <p class="hero-copy">Choose a visual direction by preview ID, then request that preset, theme, and Karaoke option when adding captions.</p>
-      <div class="default-note">Default behavior: clean is used when no style is selected.</div>
+      <p class="hero-copy">Compare the maintained caption combinations, select one card, copy its exact combination ID, and return that ID to the Agent.</p>
+      <div class="default-note">Reply <strong>skip</strong> to the Agent only when you explicitly want the default <strong>clean</strong> style.</div>
     </header>
 
     <div class="selection-summary" aria-live="polite">
-      <p>Selected preview: <strong id="selected-preview">clean</strong></p>
-      <div class="selection-actions">
-        <span class="selection-hint">Click a card or use Enter / Space to select and enlarge its preview.</span>
-        <button class="copy-selection" id="copy-selection" type="button" aria-label="Copy selected caption style">Copy</button>
+      <div class="selection-copy">
+        <p class="selection-label">Selected combination ID</p>
+        <p class="selected-value" id="selected-preview">No style selected</p>
+        <p class="selection-help">To use the default <code>clean</code> style without browsing, return to the Agent and explicitly reply <code>skip</code>.</p>
       </div>
+      <button class="copy-selection" id="copy-selection" type="button" disabled>Copy ID</button>
     </div>
 
     <section class="gallery-section" aria-labelledby="core-title">
       <div class="section-heading">
         <h2 id="core-title">Core Presets</h2>
-        <p>The primary starting points, including one explicit Karaoke combination.</p>
+        <p>The four primary starting points, including one explicit Karaoke combination.</p>
       </div>
       ${renderGrid(groupMap.core, "card-grid--core")}
     </section>
@@ -552,50 +494,43 @@ const html = `<!doctype html>
       </div>
       <div class="subgroup">
         <div class="subgroup-heading"><h3>Pill</h3><span class="count-badge">5 themes</span></div>
-        ${renderGrid(groupMap.pill)}
+        ${renderGrid(groupMap.pill, "")}
       </div>
       <div class="subgroup">
         <div class="subgroup-heading"><h3>Boxed</h3><span class="count-badge">5 themes</span></div>
-        ${renderGrid(groupMap.boxed)}
+        ${renderGrid(groupMap.boxed, "")}
       </div>
     </section>
 
-    <section class="gallery-section" aria-labelledby="stroke-title">
+    <section class="gallery-section" aria-labelledby="stroked-title">
       <div class="section-heading">
-        <h2 id="stroke-title">Stroke Styles</h2>
-        <p>Background-free captions with five stroke colors.</p>
+        <h2 id="stroked-title">Stroked Styles</h2>
+        <p>Five background-free options arranged on the same five-column alignment as the background styles.</p>
       </div>
-      ${renderGrid(groupMap.stroked)}
+      ${renderGrid(groupMap.stroked, "")}
     </section>
 
-    <section class="gallery-section" id="shorts-styles" aria-labelledby="shorts-title">
+    <section class="gallery-section" aria-labelledby="shorts-title">
       <div class="section-heading">
         <h2 id="shorts-title">Shorts Styles</h2>
-        <p>Compact 9:16 cards preserve the vertical preview ratio without letting each image dominate the page.</p>
+        <p>Six vertical-video treatments in one evenly aligned row on wide screens.</p>
       </div>
       ${renderGrid(groupMap.shorts, "card-grid--shorts")}
     </section>
 
     <section class="gallery-section option-panel" aria-labelledby="karaoke-title">
       <div>
-        <h2 id="karaoke-title">Karaoke Option</h2>
-        <p>Karaoke controls word-level highlighting independently from the official preset. It can be enabled or disabled for other presets on request.</p>
+        <h2 id="karaoke-title">Karaoke is an option, not a preset</h2>
+        <p>The gallery includes explicit combinations where Karaoke changes the visual result. Later preview adjustments can still turn it on or off.</p>
       </div>
-      <ul class="option-list">
-        <li><strong>Karaoke is an option</strong>, not an official preset.</li>
-        <li><strong>social-bold-karaoke</strong> is a combination ID.</li>
-        <li>Ask for any preset with Karaoke <strong>on</strong> or <strong>off</strong>.</li>
-      </ul>
+      <span class="option-code">auto · true · false</span>
     </section>
-
   </main>
 
   <dialog class="preview-dialog" id="preview-dialog" aria-labelledby="preview-dialog-title">
-    <button class="preview-dialog__close" type="button" aria-label="Close enlarged preview">&#10005;</button>
+    <button class="preview-dialog__close" type="button" aria-label="Close enlarged preview">✕</button>
     <figure class="preview-dialog__figure">
-      <div class="preview-dialog__media">
-        <img class="preview-dialog__image" alt="">
-      </div>
+      <div class="preview-dialog__media"><img class="preview-dialog__image" alt=""></div>
       <figcaption class="preview-dialog__caption" id="preview-dialog-title">Caption preview</figcaption>
     </figure>
   </dialog>
@@ -603,64 +538,53 @@ const html = `<!doctype html>
   <script id="embedded-preview-manifest" type="application/json">${manifestJson}</script>
   <script>
     (() => {
-      const cards = Array.from(document.querySelectorAll(".style-card"));
+      const cards = [...document.querySelectorAll(".style-card")];
       const selectedPreview = document.getElementById("selected-preview");
       const copySelection = document.getElementById("copy-selection");
       const previewDialog = document.getElementById("preview-dialog");
-      const previewDialogTitle = document.getElementById("preview-dialog-title");
       const previewDialogImage = previewDialog.querySelector(".preview-dialog__image");
+      const previewDialogTitle = document.getElementById("preview-dialog-title");
       const previewDialogClose = previewDialog.querySelector(".preview-dialog__close");
+      let selectedId = null;
       let lastTrigger = null;
       let pageScrollPosition = 0;
-      let copyResetTimer = null;
 
-      const resetCopySelection = () => {
-        if (copyResetTimer) {
-          window.clearTimeout(copyResetTimer);
-          copyResetTimer = null;
-        }
-        copySelection.textContent = "Copy";
-        copySelection.classList.remove("is-copied", "is-error");
-      };
-
-      const copyTextWithFallback = async (text) => {
+      const copyText = async (text) => {
         if (navigator.clipboard && window.isSecureContext) {
           await navigator.clipboard.writeText(text);
           return;
         }
-
-        const textArea = document.createElement("textarea");
-        textArea.value = text;
-        textArea.setAttribute("readonly", "");
-        textArea.style.position = "fixed";
-        textArea.style.left = "-9999px";
-        textArea.style.opacity = "0";
-        document.body.appendChild(textArea);
-        textArea.select();
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
         const copied = document.execCommand("copy");
-        textArea.remove();
-        if (!copied) {
-          throw new Error("Unable to copy selected style");
-        }
+        textarea.remove();
+        if (!copied) throw new Error("Unable to copy selected style");
       };
 
       const selectCard = (card) => {
-        for (const candidate of cards) {
+        cards.forEach((candidate) => {
           const selected = candidate === card;
           candidate.classList.toggle("is-selected", selected);
           candidate.setAttribute("aria-pressed", selected ? "true" : "false");
-        }
-        selectedPreview.textContent = card.dataset.previewId;
-        resetCopySelection();
+        });
+        selectedId = card.dataset.previewId;
+        selectedPreview.textContent = selectedId;
+        selectedPreview.classList.add("has-selection");
+        copySelection.disabled = false;
+        copySelection.textContent = "Copy ID";
+        copySelection.classList.remove("is-copied");
       };
 
       const openPreview = (card) => {
         pageScrollPosition = window.scrollY;
-        selectCard(card);
         lastTrigger = card;
-        previewDialogTitle.textContent = card.dataset.previewId;
         previewDialogImage.src = "./" + card.dataset.previewImage;
-        previewDialogImage.alt = card.dataset.previewId + " caption preview";
+        previewDialogImage.alt = card.dataset.previewLabel + " caption preview";
+        previewDialogTitle.textContent = card.dataset.previewId;
         previewDialog.classList.toggle("is-shorts", card.classList.contains("style-card--shorts"));
         document.documentElement.classList.add("modal-open");
         document.body.classList.add("modal-open");
@@ -669,47 +593,38 @@ const html = `<!doctype html>
         window.scrollTo(0, pageScrollPosition);
       };
 
-      const closePreview = () => {
-        if (previewDialog.open) {
-          previewDialog.close();
-        }
-      };
-
-      for (const card of cards) {
-        card.addEventListener("click", () => openPreview(card));
+      cards.forEach((card) => {
+        card.addEventListener("click", () => {
+          selectCard(card);
+          openPreview(card);
+        });
         card.addEventListener("keydown", (event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
+            selectCard(card);
             openPreview(card);
           }
         });
-      }
+      });
 
       copySelection.addEventListener("click", async () => {
-        resetCopySelection();
-        const copyText = "Use caption style: " + selectedPreview.textContent.trim();
+        if (!selectedId) return;
         try {
-          await copyTextWithFallback(copyText);
+          await copyText(selectedId);
           copySelection.textContent = "Copied";
           copySelection.classList.add("is-copied");
         } catch {
           copySelection.textContent = "Copy failed";
-          copySelection.classList.add("is-error");
         }
-        copyResetTimer = window.setTimeout(resetCopySelection, 1800);
       });
 
-      previewDialogClose.addEventListener("click", closePreview);
+      previewDialogClose.addEventListener("click", () => previewDialog.close());
       previewDialog.addEventListener("click", (event) => {
-        if (event.target === previewDialog) {
-          closePreview();
-        }
+        if (event.target === previewDialog) previewDialog.close();
       });
       previewDialog.addEventListener("close", () => {
         document.body.classList.remove("modal-open");
-        if (lastTrigger) {
-          lastTrigger.focus({ preventScroll: true });
-        }
+        if (lastTrigger) lastTrigger.focus({ preventScroll: true });
         window.scrollTo(0, pageScrollPosition);
         document.documentElement.classList.remove("modal-open");
       });
@@ -719,6 +634,6 @@ const html = `<!doctype html>
 </html>
 `;
 
-writeFileSync(outputPath, html, "utf8");
-console.log(`[caption-gallery] wrote ${outputPath}`);
-console.log(`[caption-gallery] ${allItems.length} cards embedded from preview-manifest.json`);
+writeFileSync(outputPath, html.replaceAll(/[ \t]+$/gm, ""), "utf8");
+console.log(`[caption-gallery] generated ${allItems.length} previews`);
+console.log(`[caption-gallery] ${outputPath}`);

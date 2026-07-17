@@ -10,16 +10,20 @@ import {
   resolveCaptionStyle,
   resolveKaraoke,
 } from "./caption_style_config.mjs";
+import {
+  readInteractionState,
+  selectionOptionsFromState,
+  validateGenerationInteraction,
+} from "./caption_interaction_state.mjs";
 
 const rawArgs = process.argv.slice(2);
 
 const usage = `Usage:
-  node generate_caption_project.mjs <source-video> <captions-json> <project-dir>
-
   node generate_caption_project.mjs \\
     --video <source-video> \\
     --captions <captions-json> \\
     --out <project-dir> \\
+    --interaction-state <json-file> \\
     [--preset ${captionPresetNames.join("|")}] \\
     [--highlight-theme ${captionHighlightThemeNames.join("|")}] \\
     [--background-theme ${captionBackgroundThemeNames.join("|")}] \\
@@ -29,18 +33,7 @@ const usage = `Usage:
     [--overrides <json-file>]`;
 
 const parseArgs = (args) => {
-  if (args.length === 3 && args.every((arg) => !arg.startsWith("--"))) {
-    return {
-      video: args[0],
-      captions: args[1],
-      out: args[2],
-      preset: "shorts",
-      highlightTheme: "yellow",
-      karaoke: "true",
-    };
-  }
-
-  const parsed = { preset: "clean", karaoke: "auto", mode: "preview" };
+  const parsed = { mode: "preview" };
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (!arg.startsWith("--")) {
@@ -66,7 +59,7 @@ try {
   process.exit(1);
 }
 
-if (!options.video || !options.captions || !options.out) {
+if (!options.video || !options.captions || !options.out || !options.interactionState) {
   console.error(usage);
   process.exit(1);
 }
@@ -78,21 +71,40 @@ const assetsDir = join(projectDir, "assets");
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const skillRoot = resolve(scriptDir, "..");
 const fontSource = join(skillRoot, "public", "fonts", "CalSans-Regular.ttf");
-const overrides = options.overrides
-  ? JSON.parse(readFileSync(resolve(options.overrides), "utf8"))
+const overridesPath = options.overrides ? resolve(options.overrides) : null;
+const overrides = overridesPath
+  ? JSON.parse(readFileSync(overridesPath, "utf8").replace(/^\uFEFF/, ""))
   : undefined;
-const style = resolveCaptionStyle({
-  preset: options.preset,
-  highlightTheme: options.highlightTheme,
-  backgroundTheme: options.backgroundTheme,
-  strokeTheme: options.strokeTheme,
-  overrides,
-});
-const karaoke = resolveKaraoke(options.karaoke, style);
 const mode = options.mode ?? "preview";
 if (!new Set(["preview", "overlay"]).has(mode)) {
   throw new Error(`[captions] invalid render mode: ${mode}`);
 }
+
+const interactionState = readInteractionState(options.interactionState);
+const recordedSelection = selectionOptionsFromState(interactionState.state.selection ?? {});
+const requestedSelection = {
+  preset: options.preset ?? recordedSelection.preset,
+  highlightTheme: options.highlightTheme ?? recordedSelection.highlightTheme,
+  backgroundTheme: options.backgroundTheme ?? recordedSelection.backgroundTheme,
+  strokeTheme: options.strokeTheme ?? recordedSelection.strokeTheme,
+  karaoke: options.karaoke ?? recordedSelection.karaoke,
+};
+const interaction = validateGenerationInteraction({
+  statePath: options.interactionState,
+  mode,
+  sourceVideo,
+  captionsPath,
+  requestedSelection,
+  overridesPath,
+});
+const style = resolveCaptionStyle({
+  preset: requestedSelection.preset,
+  highlightTheme: requestedSelection.highlightTheme,
+  backgroundTheme: requestedSelection.backgroundTheme,
+  strokeTheme: requestedSelection.strokeTheme,
+  overrides,
+});
+const karaoke = resolveKaraoke(requestedSelection.karaoke, style);
 
 const probe = JSON.parse(execFileSync("ffprobe", [
   "-v", "error",
@@ -216,7 +228,12 @@ const horizontalPosition = style.layout.align === "left"
 const staticTranslateX = style.layout.align === "center" ? "-50%" : "0";
 const staticTranslateY = style.layout.anchor === "center" ? "-50%" : "0";
 const initialWordOpacity = karaokeEnabled ? style.wordHighlight.upcomingOpacity : 1;
-const compositionSuffix = [style.preset, options.highlightTheme, options.backgroundTheme, options.strokeTheme]
+const compositionSuffix = [
+  style.preset,
+  requestedSelection.highlightTheme,
+  requestedSelection.backgroundTheme,
+  requestedSelection.strokeTheme,
+]
   .filter(Boolean)
   .join("-")
   .replaceAll(/[^a-zA-Z0-9-]/g, "-");
@@ -338,17 +355,29 @@ writeFileSync(join(projectDir, "project-meta.json"), JSON.stringify({
   duration,
   cueCount: captions.length,
   selection: {
+    choiceId: interaction.state.selection.choiceId,
+    skipped: interaction.state.selection.skipped,
     preset: style.preset,
-    highlightTheme: options.highlightTheme ?? null,
-    backgroundTheme: options.backgroundTheme ?? null,
-    strokeTheme: options.strokeTheme ?? null,
+    highlightTheme: requestedSelection.highlightTheme ?? null,
+    backgroundTheme: requestedSelection.backgroundTheme ?? null,
+    strokeTheme: requestedSelection.strokeTheme ?? null,
     karaoke,
     mode,
+  },
+  interaction: {
+    statePath: interaction.statePath,
+    phase: interaction.state.phase,
+    selectionId: interaction.state.selection.choiceId,
+    selectionResponse: interaction.state.selection.response,
+    sourceSha256: interaction.state.sourceVideo.sha256,
+    captionsSha256: interaction.state.captions.sha256,
+    overridesPath,
+    overridesSha256: interaction.currentOverridesHash,
   },
   resolvedStyle: style,
 }, null, 2), "utf8");
 
 console.log(`[hyperframes-captions] generated ${captions.length} cues`);
-console.log(`[hyperframes-captions] style=${style.preset} karaoke=${karaoke} mode=${mode}`);
+console.log(`[hyperframes-captions] selection=${interaction.state.selection.choiceId} style=${style.preset} karaoke=${karaoke} mode=${mode}`);
 console.log(`[hyperframes-captions] ${width}x${height} @ ${fps}fps, ${duration.toFixed(3)}s`);
 console.log(`[hyperframes-captions] ${join(projectDir, "index.html")}`);

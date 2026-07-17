@@ -31,11 +31,13 @@ $ShortsVideo = [System.IO.Path]::GetFullPath($ShortsVideo)
 
 $captionsFile = Join-Path $ReviewDirectory "fixtures\preview-captions.json"
 $projectsDirectory = Join-Path $ReviewDirectory "generated-projects"
+$interactionStatesDirectory = Join-Path $ReviewDirectory "interaction-states"
 $logsDirectory = Join-Path $ReviewDirectory "logs"
 $snapshotsDirectory = Join-Path $ReviewDirectory "review\snapshots"
 $generationLog = Join-Path $ReviewDirectory "generation-log.txt"
 $hyperframesLog = Join-Path $logsDirectory "hyperframes-checks.txt"
 $generator = Join-Path $PSScriptRoot "generate_caption_project.mjs"
+$interactionScript = Join-Path $PSScriptRoot "caption_interaction.mjs"
 $snapshotTime = 1.55
 
 $candidates = @(
@@ -153,7 +155,7 @@ if ($Force) {
     }
 }
 
-New-Item -ItemType Directory -Force -Path $projectsDirectory, $snapshotsDirectory | Out-Null
+New-Item -ItemType Directory -Force -Path $projectsDirectory, $interactionStatesDirectory, $snapshotsDirectory | Out-Null
 Set-Content -LiteralPath $generationLog -Value "Phase 4 style preview generation" -Encoding UTF8
 Set-Content -LiteralPath $hyperframesLog -Value "HyperFrames checks for all 25 preview candidates" -Encoding UTF8
 
@@ -165,28 +167,34 @@ $manifestItems = @()
 foreach ($candidate in $candidates) {
     $video = if ($candidate.orientation -eq "shorts") { $ShortsVideo } else { $LandscapeVideo }
     $projectDirectory = Join-Path $projectsDirectory $candidate.id
+    $interactionState = Join-Path $interactionStatesDirectory "$($candidate.id).json"
     $snapshotDirectory = Join-Path $snapshotsDirectory $candidate.id
     $candidateLog = Join-Path $logsDirectory "$($candidate.id).txt"
 
     Write-GenerationLog "[$($candidate.id)] generate project"
+    Invoke-LoggedCommand -FilePath "node" -Arguments @(
+        $interactionScript,
+        "start",
+        "--state", $interactionState,
+        "--source", $video,
+        "--captions", $captionsFile,
+        "--no-open", "true",
+        "--force", "true"
+    ) -LogPath $candidateLog
+    Invoke-LoggedCommand -FilePath "node" -Arguments @(
+        $interactionScript,
+        "select",
+        "--state", $interactionState,
+        "--response", $candidate.id
+    ) -LogPath $candidateLog
     $generateArgs = @(
         $generator,
         "--video", $video,
         "--captions", $captionsFile,
         "--out", $projectDirectory,
-        "--preset", $candidate.preset,
-        "--karaoke", $candidate.karaoke.ToString().ToLowerInvariant(),
+        "--interaction-state", $interactionState,
         "--mode", "preview"
     )
-    if ($candidate.backgroundTheme) {
-        $generateArgs += @("--background-theme", $candidate.backgroundTheme)
-    }
-    if ($candidate.strokeTheme) {
-        $generateArgs += @("--stroke-theme", $candidate.strokeTheme)
-    }
-    if ($candidate.highlightTheme) {
-        $generateArgs += @("--highlight-theme", $candidate.highlightTheme)
-    }
     Set-Content -LiteralPath $candidateLog -Value "Preview candidate: $($candidate.id)" -Encoding UTF8
     Invoke-LoggedCommand -FilePath "node" -Arguments $generateArgs -LogPath $candidateLog
 

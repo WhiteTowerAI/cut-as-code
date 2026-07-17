@@ -7,6 +7,8 @@ $required = @(
     "reference\MIGRATION.md",
     "scripts\caption-styles.json",
     "scripts\caption_style_config.mjs",
+    "scripts\caption_interaction_state.mjs",
+    "scripts\caption_interaction.mjs",
     "scripts\check_caption_style_config.mjs",
     "scripts\generate_caption_project.mjs",
     "scripts\composite_caption_overlay.ps1",
