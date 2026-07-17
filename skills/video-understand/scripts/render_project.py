@@ -168,6 +168,10 @@ def _build(plan, project_root, plan_dir):
             overlays.append(
                 {
                     "path": _resolve(project_root, plan_dir, contribution["asset"]),
+                    "asset_type": contribution.get("asset_type", "file"),
+                    "pattern": contribution.get("pattern"),
+                    "start_number": contribution.get("start_number", 1),
+                    "fps": contribution.get("fps"),
                     "start_s": float(contribution.get("start_s", 0)),
                     "duration_s": contribution.get("duration_s"),
                 }
@@ -201,9 +205,31 @@ def _build(plan, project_root, plan_dir):
 
     for overlay_index, overlay_spec in enumerate(overlays):
         overlay = overlay_spec["path"]
-        if not overlay.is_file():
-            raise ValueError(f"overlay is missing: {overlay}")
-        command += ["-i", str(overlay)]
+        if overlay_spec["asset_type"] == "image-sequence":
+            pattern = overlay_spec["pattern"]
+            if not overlay.is_dir() or not pattern or Path(pattern).name != pattern:
+                raise ValueError(f"image-sequence overlay is invalid: {overlay}")
+            pattern_path = (overlay / pattern).resolve()
+            if pattern_path.parent != overlay.resolve():
+                raise ValueError(f"image-sequence pattern escapes overlay directory: {pattern}")
+            start_number = overlay_spec["start_number"]
+            try:
+                first_frame = overlay / (pattern % start_number)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"image-sequence pattern is invalid: {pattern}") from exc
+            if not first_frame.is_file():
+                raise ValueError(f"image-sequence first frame is missing: {first_frame}")
+            fps_value = overlay_spec["fps"]
+            if not isinstance(fps_value, dict) or fps_value != timeline["fps"]:
+                raise ValueError("image-sequence overlay fps must match timeline fps")
+            command += [
+                "-framerate", f"{fps_value['num']}/{fps_value['den']}",
+                "-start_number", str(start_number), "-i", str(pattern_path),
+            ]
+        else:
+            if not overlay.is_file():
+                raise ValueError(f"overlay is missing: {overlay}")
+            command += ["-i", str(overlay)]
         overlay_label = f"overlay-{overlay_index}"
         output_label = f"video-{len(graph)}"
         start_s = overlay_spec["start_s"]

@@ -1,7 +1,9 @@
 """Shared Open Recut project protocol helpers."""
 
 import json
+import math
 import os
+import re
 import subprocess
 from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
@@ -494,6 +496,45 @@ def _validate_cards_choices(plan, operation_id, errors, project_root=None, expec
             errors.append(f"{card_id} renderer fps does not match timeline fps")
 
 
+def _validate_image_sequence(contribution, asset_path, expected_fps, operation_id, errors):
+    pattern = contribution.get("pattern")
+    start_number = contribution.get("start_number", 1)
+    fps = contribution.get("fps")
+    if not asset_path.is_dir():
+        errors.append(f"{operation_id} image-sequence asset must be a directory")
+        return
+    if (
+        not isinstance(pattern, str)
+        or Path(pattern).name != pattern
+        or not re.fullmatch(r"[A-Za-z0-9._-]*%0?[1-9][0-9]*d[A-Za-z0-9._-]*", pattern)
+    ):
+        errors.append(f"{operation_id} image-sequence pattern is invalid")
+        return
+    if not isinstance(start_number, int) or isinstance(start_number, bool) or start_number < 0:
+        errors.append(f"{operation_id} image-sequence start_number must be a non-negative integer")
+        return
+    if (
+        not isinstance(fps, dict)
+        or not isinstance(fps.get("num"), int)
+        or isinstance(fps.get("num"), bool)
+        or not isinstance(fps.get("den"), int)
+        or isinstance(fps.get("den"), bool)
+        or fps.get("num", 0) <= 0
+        or fps.get("den", 0) <= 0
+    ):
+        errors.append(f"{operation_id} image-sequence fps must use positive integer num and den")
+        return
+    if expected_fps and fps != expected_fps:
+        errors.append(f"{operation_id} image-sequence fps does not match timeline fps")
+    try:
+        first_frame = asset_path / (pattern % start_number)
+    except (TypeError, ValueError):
+        errors.append(f"{operation_id} image-sequence pattern is invalid")
+    else:
+        if not first_frame.is_file():
+            errors.append(f"{operation_id} image-sequence first frame is missing")
+
+
 def build_render_plan(project, project_root):
     """Compile approved active operations into a render-relative delivery plan."""
     errors = validate_project(project, project_root, check_files=True)
@@ -581,10 +622,20 @@ def build_render_plan(project, project_root):
                     errors.append(str(exc))
             if required_path and required_path not in item:
                 errors.append(f"{operation_id} {kind} requires {required_path}")
-            elif required_path and not resolved_paths[required_path].is_file():
-                errors.append(
-                    f"{operation_id} missing {required_path}: {contribution[required_path]}"
-                )
+            elif required_path:
+                required = resolved_paths[required_path]
+                if kind == "overlay" and contribution.get("asset_type") == "image-sequence":
+                    _validate_image_sequence(
+                        contribution,
+                        required,
+                        timeline.get("fps") if timeline else None,
+                        operation_id,
+                        errors,
+                    )
+                elif not required.is_file():
+                    errors.append(
+                        f"{operation_id} missing {required_path}: {contribution[required_path]}"
+                    )
 
             if kind == "video-filter":
                 if contribution.get("target") not in ("base-video", "composite"):
@@ -834,3 +885,124 @@ def program_to_source(timeline, program_s):
                 + (program_s - program_range["start_s"]) * clip["speed"]
             )
     return None
+
+
+def map_transcript_to_timeline(transcript, timeline):
+    """Map canonical source-time words onto a validated program timeline."""
+    errors = validate_timeline(timeline)
+    if errors:
+        raise ValueError("invalid timeline: " + "; ".join(errors))
+    segments = transcript.get("segments")
+    if not isinstance(segments, list):
+        raise ValueError("transcript segments must be a list")
+
+    mapped_segments = []
+    previous_source_start = -1.0
+    for segment_index, segment in enumerate(segments):
+        words = segment.get("words", [])
+        if not isinstance(words, list):
+            raise ValueError(f"segment {segment_index} words must be a list")
+        groups = []
+        for word_index, word in enumerate(words):
+            try:
+                source_start = float(word["start"])
+                source_end = float(word["end"])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"segment {segment_index} word {word_index} has invalid timing"
+                ) from exc
+            if (
+                not math.isfinite(source_start)
+                or not math.isfinite(source_end)
+                or source_start < 0
+                or source_end <= source_start
+            ):
+                raise ValueError(
+                    f"segment {segment_index} word {word_index} has invalid timing"
+                )
+            if source_start < previous_source_start - 1e-6:
+                raise ValueError("transcript words must stay chronological")
+            previous_source_start = source_start
+
+            midpoint = (source_start + source_end) / 2
+            clip = next(
+                (
+                    item
+                    for item in timeline["clips"]
+                    if item["source_range"]["start_s"]
+                    <= midpoint
+                    < item["source_range"]["end_s"]
+                ),
+                None,
+            )
+            if clip is None:
+                continue
+
+            source_range = clip["source_range"]
+            clipped_start = max(source_start, float(source_range["start_s"]))
+            clipped_end = min(source_end, float(source_range["end_s"]))
+            if clipped_end <= clipped_start:
+                continue
+            program_start = (
+                float(clip["program_range"]["start_s"])
+                + (clipped_start - float(source_range["start_s"])) / float(clip["speed"])
+            )
+            program_end = (
+                float(clip["program_range"]["start_s"])
+                + (clipped_end - float(source_range["start_s"])) / float(clip["speed"])
+            )
+            mapped_word = {
+                **word,
+                "start": _rounded_time(program_start),
+                "end": _rounded_time(program_end),
+                "source_range": {
+                    "start_s": _rounded_time(clipped_start),
+                    "end_s": _rounded_time(clipped_end),
+                },
+                "program_range": {
+                    "start_s": _rounded_time(program_start),
+                    "end_s": _rounded_time(program_end),
+                },
+                "clip_id": clip["id"],
+            }
+            if not groups or groups[-1]["clip_id"] != clip["id"]:
+                groups.append({"clip_id": clip["id"], "words": []})
+            groups[-1]["words"].append(mapped_word)
+
+        source_segment_id = segment.get("id", segment_index)
+        for group_index, group in enumerate(groups, 1):
+            group_words = group["words"]
+            raw_words = [str(word.get("word", "")) for word in group_words]
+            text = "".join(raw_words).strip()
+            if len(raw_words) > 1 and not any(
+                value[:1].isspace() for value in raw_words[1:]
+            ) and any(character.isascii() and character.isalnum() for character in text):
+                text = " ".join(value.strip() for value in raw_words).strip()
+            mapped_segments.append(
+                {
+                    "id": f"{source_segment_id}.{group['clip_id']}.{group_index}",
+                    "source_segment_id": source_segment_id,
+                    "clip_id": group["clip_id"],
+                    "start": group_words[0]["start"],
+                    "end": group_words[-1]["end"],
+                    "text": text,
+                    "source_range": {
+                        "start_s": group_words[0]["source_range"]["start_s"],
+                        "end_s": group_words[-1]["source_range"]["end_s"],
+                    },
+                    "program_range": {
+                        "start_s": group_words[0]["program_range"]["start_s"],
+                        "end_s": group_words[-1]["program_range"]["end_s"],
+                    },
+                    "words": group_words,
+                }
+            )
+
+    return {
+        **transcript,
+        "duration": _rounded_time(timeline["program_duration_s"]),
+        "timebase": "program",
+        "timeline_id": timeline["timeline_id"],
+        "source_duration": transcript.get("duration", timeline["source_duration_s"]),
+        "segments": mapped_segments,
+    }
