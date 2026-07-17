@@ -17,7 +17,7 @@ SCORE_LIMITS = {
     "quotability": 15,
     "pace_editability": 10,
 }
-EVIDENCE_MODES = {"text_only", "text_visual"}
+EVIDENCE_MODES = {"text_visual"}
 SCENE_TYPES = {"product_demo", "conversation_interview", "solo_talk", "world_cup"}
 ALLOWED_TOP_LEVEL = {"schema_version", "video", "transcript", "producer", "selection", "candidates"}
 ALLOWED_CANDIDATE = {
@@ -121,7 +121,7 @@ def normalize_candidate(item, index, transcript, transcript_duration_s):
     if item["scene_type"] not in SCENE_TYPES:
         fail(f"{path}.scene_type must be one of: {', '.join(sorted(SCENE_TYPES))}")
     if item["evidence_mode"] not in EVIDENCE_MODES:
-        fail(f"{path}.evidence_mode must be text_only or text_visual")
+        fail(f"{path}.evidence_mode must be text_visual")
     start = item["start_time"]
     end = item["end_time"]
     if any(isinstance(number, bool) or not isinstance(number, (int, float)) for number in (start, end)):
@@ -139,8 +139,6 @@ def normalize_candidate(item, index, transcript, transcript_duration_s):
     visual_risks = validate_string_list(item.get("visual_risks", []), f"{path}.visual_risks")
     visual_keyframes = validate_string_list(item.get("visual_keyframes", []), f"{path}.visual_keyframes")
     metadata = validate_metadata(item["metadata"], f"{path}.metadata")
-    if item["evidence_mode"] == "text_only" and (visual_observations or visual_risks or visual_keyframes):
-        fail(f"{path} text_only candidates must not contain visual evidence")
     return {
         "candidate_id": item["candidate_id"].strip(), "title": item["title"].strip(),
         "scene_type": item["scene_type"], "start_time": start, "end_time": end,
@@ -167,7 +165,7 @@ def validate_selection(value):
     evidence_mode = value.get("evidence_mode")
     require_type(evidence_mode, str, "selection.evidence_mode")
     if evidence_mode not in EVIDENCE_MODES:
-        fail("selection.evidence_mode must be text_only or text_visual")
+        fail("selection.evidence_mode must be text_visual")
     return {**value, "evidence_mode": evidence_mode}
 
 

@@ -25,26 +25,37 @@ if (-not (Test-Path -LiteralPath $outputDir)) {
   New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 }
 
-$overlayIsWebm = [System.IO.Path]::GetExtension($overlay).Equals(".webm", [System.StringComparison]::OrdinalIgnoreCase)
-$overlayFormat = if ($overlayIsWebm) { "yuv420" } else { "auto" }
+$overlayIsDirectory = Test-Path -LiteralPath $overlay -PathType Container
+$overlayIsWebm = -not $overlayIsDirectory -and [System.IO.Path]::GetExtension($overlay).Equals(".webm", [System.StringComparison]::OrdinalIgnoreCase)
+$overlayFormat = if ($overlayIsWebm) { "yuv420" } else { "rgb" }
 
 $ffmpegArgs = @("-y", "-i", $source)
-if ($overlayIsWebm) {
+if ($overlayIsDirectory) {
+  $firstFrame = Get-ChildItem -LiteralPath $overlay -Filter "frame_*.png" -File | Sort-Object Name | Select-Object -First 1
+  if (-not $firstFrame) {
+    throw "Overlay frame directory contains no frame_*.png files: $overlay"
+  }
+  $frameRate = (& ffprobe -v error -select_streams v:0 -show_entries stream=r_frame_rate -of default=noprint_wrappers=1:nokey=1 $source).Trim()
+  if ($LASTEXITCODE -ne 0 -or -not $frameRate) {
+    throw "Could not read source frame rate"
+  }
+  $ffmpegArgs += @("-framerate", $frameRate, "-start_number", "1", "-i", (Join-Path $overlay "frame_%06d.png"))
+}
+elseif ($overlayIsWebm) {
   $ffmpegArgs += @("-c:v", "libvpx-vp9")
+  $ffmpegArgs += @("-i", $overlay)
+}
+else {
+  $ffmpegArgs += @("-i", $overlay)
 }
 $ffmpegArgs += @(
-  "-i", $overlay,
   "-filter_complex", "[0:v][1:v]overlay=0:0:format=${overlayFormat}:eof_action=pass[v]",
   "-map", "[v]",
   "-map", "0:a?",
-  "-c:v", "libx264",
+  "-c:v", "libx264rgb",
   "-preset", "medium",
-  "-crf", "18",
-  "-pix_fmt", "yuv420p",
-  "-color_range", "tv",
-  "-colorspace", "bt709",
-  "-color_trc", "bt709",
-  "-color_primaries", "bt709",
+  "-crf", "0",
+  "-pix_fmt", "rgb24",
   "-c:a", "copy",
   $output
 )

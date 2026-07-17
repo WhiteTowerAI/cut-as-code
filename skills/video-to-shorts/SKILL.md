@@ -83,37 +83,27 @@ python skills/video-to-shorts/scripts/prepare_visual_context.py VIDEO.mp4 `
 
 This writes timestamped source frames, paged `contact_sheets/contact_sheet_XX.jpg`, and `visual_manifest.json`. The Agent may inspect global sheets and then individual first/middle/last frames around a potential candidate. These artifacts are review context only and never add to or subtract from candidate scores.
 
-## Required Dual Candidate Evidence
+## Required Candidate Evidence
 
-Candidate evidence mode and delivery mode remain independent. Candidate selection must run both evidence modes every time so the human reviewer can compare transcript-only judgment against transcript-plus-visual judgment before plan generation.
+Candidate evidence mode and delivery mode remain independent. Candidate selection uses the transcript plus visual review context through the single required `text_visual` evidence mode.
 
-**Required candidate evidence passes:**
-
-- `text_only`: select candidate moments from transcript evidence only.
-- `text_visual`: separately select candidate moments from transcript evidence plus visual review context.
-
-The two passes are isolated experiments and must not reference, reuse, copy, refine, or react to each other's candidate IDs, titles, boundaries, excerpts, scores, score reasons, editorial reasons, warnings, or conclusions. Complete and freeze the `text_only` pass before opening visual evidence or any `text_visual` working files. During the `text_visual` pass, do not read the completed `text_only` JSON or preview. Similar or identical results are acceptable only when they were reached independently from the allowed evidence.
-
-Do not combine the two modes in one candidate file or one preview. Store the required review artifacts separately:
+Store the required review artifacts here:
 
 ```text
 WORK/shorts/preview/
-  text_only/
-    shorts_candidates.json
-    shorts_candidates_preview.html
   text_visual/
     shorts_candidates.json
     shorts_candidates_preview.html
 ```
 
-Each `shorts_candidates.json` contains candidates from exactly one evidence mode. The two folders are not drafts of one another and neither folder is the source for generating the other.
+The `shorts_candidates.json` file contains only `text_visual` candidates.
 
 **Delivery mode:**
 
 - `horizontal_only`: stop after approved horizontal shorts are extracted.
 - `horizontal_and_vertical`: continue each approved horizontal short through Optional Vertical Delivery.
 
-`text_only` and `text_visual` only determine how the Agent selects content worth cutting. They do not determine vertical crop decisions. For every requested vertical delivery, the Agent must generate and inspect new dense visual evidence from that extracted short. Do not reuse sparse long-video candidate contact sheets as the basis for vertical cropping.
+`text_visual` determines how the Agent selects content worth cutting. It does not determine vertical crop decisions. For every requested vertical delivery, the Agent must generate and inspect new dense visual evidence from that extracted short. Do not reuse sparse long-video candidate contact sheets as the basis for vertical cropping.
 
 ## Boundary
 
@@ -308,37 +298,27 @@ short_XX/
 
 ## Agent-First Candidate Workflow
 
-1. Create `WORK/shorts/preview/text_only/`.
-2. Read only `transcript.json`. Do not open contact sheets, visual frames, `visual_manifest.json`, or any prior `text_visual` artifact.
-3. Independently author `preview/text_only/shorts_candidates.json` using `shorts-candidates.v2`; every candidate must use `evidence_mode=text_only`. Do not write `score`.
-4. Validate the text-only file and write `preview/text_only/shorts_candidates_preview.html`.
-5. Complete Candidate Artifact Text QA for the text-only JSON and HTML, then freeze that folder. Do not reopen it while authoring the visual pass.
-6. Create `WORK/shorts/preview/text_visual/` and begin a separate selection pass from the prepared transcript plus visual context. Do not read, copy, or revise from `preview/text_only/`.
-7. Independently author `preview/text_visual/shorts_candidates.json`; every candidate must use `evidence_mode=text_visual`. Do not write `score`.
-8. Validate the text-visual file and write `preview/text_visual/shorts_candidates_preview.html`.
-9. Complete Candidate Artifact Text QA for the text-visual JSON and HTML.
-10. Only after both folders are finalized may the Agent or human open both outputs for side-by-side review.
-11. Run `interaction.py candidate-open`, show the generated fixed question, and end the current turn before plan generation.
+1. Create `WORK/shorts/preview/text_visual/`.
+2. Read the prepared transcript and inspect the visual context.
+3. Author `preview/text_visual/shorts_candidates.json`; every candidate must use `evidence_mode=text_visual`. Do not write `score`.
+4. Validate the text-visual file and write `preview/text_visual/shorts_candidates_preview.html`.
+5. Complete Candidate Artifact Text QA for the JSON and HTML.
+6. Run `interaction.py candidate-open`, show the generated fixed question, and end the current turn before plan generation.
 
 ```powershell
-python skills/video-to-shorts/scripts/candidates.py `
-  --out WORK\shorts\preview\text_only `
-  --candidates WORK\shorts\preview\text_only\shorts_candidates.json `
-  --transcript WORK\shorts\transcript.json
-
 python skills/video-to-shorts/scripts/candidates.py `
   --out WORK\shorts\preview\text_visual `
   --candidates WORK\shorts\preview\text_visual\shorts_candidates.json `
   --transcript WORK\shorts\transcript.json
 ```
 
-Use explicit `--candidates` and `--transcript` paths for both passes. The script never calls a model API and never revises an Agent's dimension scores based on transcript content.
+Use explicit `--candidates` and `--transcript` paths. The script never calls a model API and never revises an Agent's dimension scores based on transcript content.
 
 ### Candidate Artifact Text QA
 
 Before review, inspect every candidate title, all six score reasons, editorial reason, warnings, and visual observations/risks as standalone text. `metadata.editorial_reason` is required and must explain why the exact moment is worth promoting as a short; it must not repeat only the title or a generic phrase such as `good candidate`. Correct grammar, missing quotation boundaries, repeated words, incomplete phrases, and unclear references. Deterministic validation does not prove that Agent-authored prose is natural or grammatically correct.
 
-Inspect each mode's JSON and HTML inside its own folder and confirm that candidate IDs, titles, duration, transcript excerpt, score reasons, script-generated score, warnings, and `filler_drop_spans` render correctly. For `text_visual`, also inspect the three visual fields. Do not use QA findings from one mode to rewrite candidate judgment in the other mode. Suspicious `?` or the Unicode `U+FFFD` replacement character in Agent-authored metadata may indicate encoding damage, but do not remove legitimate question marks from transcript excerpts or intentional questions.
+Inspect the `text_visual` JSON and HTML and confirm that candidate IDs, titles, duration, transcript excerpt, score reasons, script-generated score, warnings, `filler_drop_spans`, and the three visual fields render correctly. Suspicious `?` or the Unicode `U+FFFD` replacement character in Agent-authored metadata may indicate encoding damage, but do not remove legitimate question marks from transcript excerpts or intentional questions.
 
 On Windows, prefer ASCII straight quotes, apostrophes, and hyphens in Agent-authored metadata. Do not pipe Unicode-rich generated source through Windows PowerShell when the pipeline encoding is unknown. Save generated scripts as UTF-8 files, use ASCII Unicode escapes in source, or use HTML entities for typographic separators. `preview.py` uses ASCII structural separators and writes UTF-8 Markdown/HTML directly.
 
@@ -473,12 +453,11 @@ The Agent supplies each dimension's numeric `score` and a short `reason`. The Ag
 
 ## Evidence Mode
 
-- `text_only`: judge only from transcript; visual arrays must be absent or empty.
 - `text_visual`: judge from transcript plus optional `visual_observations`, `visual_risks`, and `visual_keyframes`. These fields are review evidence only and never affect scoring.
 
 ## Candidate v2 Contract
 
-Top-level fields: `schema_version`, optional `video`, optional `transcript`, optional `producer`, required `selection`, and required `candidates` array. Each mode-specific file must set `selection.evidence_mode` to the folder's single mode: `text_only` or `text_visual`. Output `schema_version` is `shorts-candidates.v2`.
+Top-level fields: `schema_version`, optional `video`, optional `transcript`, optional `producer`, required `selection`, and required `candidates` array. The candidate file must set `selection.evidence_mode` to `text_visual`. Output `schema_version` is `shorts-candidates.v2`.
 
 Each candidate requires:
 
@@ -487,7 +466,7 @@ Each candidate requires:
 - `scene_type`: `product_demo`, `conversation_interview`, `solo_talk`, or `world_cup`.
 - `start_time`, `end_time`: numbers on the input-video-relative timeline; `0 <= start_time < end_time <= transcript duration`.
 - `transcript_excerpt`: non-empty exact excerpt for that time range.
-- `evidence_mode`: `text_only` or `text_visual`.
+- `evidence_mode`: `text_visual`.
 - `score_breakdown`: exactly the six dimensions; each contains only numeric `score` and non-empty string `reason`.
 - `metadata`: object containing non-empty string `editorial_reason`.
 
@@ -499,14 +478,14 @@ Optional candidate fields:
 - `review_status`: string, default `candidate`.
 - Additional `metadata` fields such as `boundary_risk` or comparison notes.
 
-The validator adds `duration` and computed `score`. Candidates overlapping more than 50% of the shorter candidate are deduplicated only within the current mode-specific file. Cross-mode deduplication, merging, promotion, or ranking is forbidden before human review.
+The validator adds `duration` and computed `score`. Candidates overlapping more than 50% of the shorter candidate are deduplicated within the `text_visual` candidate file before human review.
 
 ### Template
 
 ```json
 {
   "schema_version": "shorts-candidates.v2",
-  "selection": {"evidence_mode": "text_only"},
+  "selection": {"evidence_mode": "text_visual"},
   "candidates": [{
     "candidate_id": "cand-001",
     "title": "A complete standalone moment",
@@ -514,7 +493,7 @@ The validator adds `duration` and computed `score`. Candidates overlapping more 
     "start_time": 12.0,
     "end_time": 42.0,
     "transcript_excerpt": "Exact transcript words in the selected range.",
-    "evidence_mode": "text_only",
+    "evidence_mode": "text_visual",
     "score_breakdown": {
       "hook": {"score": 16, "reason": "Immediate clear promise."},
       "completeness": {"score": 19, "reason": "Premise and payoff are complete."},
@@ -530,11 +509,11 @@ The validator adds `duration` and computed `score`. Candidates overlapping more 
 }
 ```
 
-Apply the template independently in each preview folder. For the visual file, set `selection.evidence_mode` and every candidate `evidence_mode` to `text_visual`, then include the optional visual evidence fields. Never create the visual file by copying or transforming the text-only file.
+Set `selection.evidence_mode` and every candidate `evidence_mode` to `text_visual`, then include the optional visual evidence fields.
 
 ## Review Stop
 
-Review `preview/text_only/shorts_candidates.json` with `preview/text_only/shorts_candidates_preview.html`, and separately review `preview/text_visual/shorts_candidates.json` with `preview/text_visual/shorts_candidates_preview.html`. Only after both isolated passes are finalized may they be compared side by side.
+Review `preview/text_visual/shorts_candidates.json` with `preview/text_visual/shorts_candidates_preview.html`.
 
 Open the mandatory interview:
 
@@ -566,7 +545,7 @@ python skills/video-to-shorts/scripts/interaction.py candidate-answer `
   --response-file WORK\shorts\review\user_response.txt
 ```
 
-Continue only when the command reports `candidate review status: approved`. The approval is bound to both candidate files and the generated `review/approved_candidates.json` by SHA-256.
+Continue only when the command reports `candidate review status: approved`. The approval is bound to the `text_visual` candidate file and the generated `review/approved_candidates.json` by SHA-256.
 
 ## Shorts Plan v2
 
@@ -649,7 +628,7 @@ Plan generation does not create these media outputs.
     "order": 1,
     "title": "Example",
     "scene_type": "solo_talk",
-    "evidence_mode": "text_only",
+    "evidence_mode": "text_visual",
     "start_time": 10.0,
     "end_time": 35.0,
     "duration": 25.0,

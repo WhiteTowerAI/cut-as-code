@@ -401,7 +401,7 @@ current-job/
 │   ├── index.html
 │   ├── project-meta.json
 │   └── assets/
-├── caption-overlay.webm
+├── caption-overlay-frames/
 └── captioned.mp4
 ```
 
@@ -537,7 +537,7 @@ Generate a transparent overlay project with the confirmed selection:
 
 ```powershell
 $OverlayProject = Join-Path $JobRoot "overlay-project"
-$OverlayVideo = Join-Path $JobRoot "caption-overlay.webm"
+$OverlayFrames = Join-Path $JobRoot "caption-overlay-frames"
 $FinalVideo = Join-Path $JobRoot "captioned.mp4"
 
 node "$SkillRoot\scripts\generate_caption_project.mjs" `
@@ -557,14 +557,14 @@ npx.cmd hyperframes check $OverlayProject `
   --no-contrast
 ```
 
-Render the caption-only WebM:
+Render the caption-only RGBA PNG sequence. This preserves the exact browser-rendered font pixels and alpha values used by the approved preview:
 
 ```powershell
 Push-Location $OverlayProject
 try {
   npx.cmd hyperframes render `
-    --format webm `
-    --output $OverlayVideo
+    --format png-sequence `
+    --output $OverlayFrames
 }
 finally {
   Pop-Location
@@ -577,11 +577,11 @@ Composite the overlay onto the source and copy the original audio:
 powershell.exe -ExecutionPolicy Bypass `
   -File "$SkillRoot\scripts\composite_caption_overlay.ps1" `
   -SourceVideo $SourceVideo `
-  -OverlayVideo $OverlayVideo `
+  -OverlayVideo $OverlayFrames `
   -OutputVideo $FinalVideo
 ```
 
-The compositing script refuses to overwrite either input, encodes the final video as H.264, and uses `-c:a copy` for source audio.
+The compositing script refuses to overwrite either input, accepts the RGBA PNG frame directory, encodes lossless RGB H.264, and uses `-c:a copy` for source audio.
 
 ## Testing Guidance
 
@@ -642,14 +642,13 @@ Complete all checks before reporting success.
 6. Check caption safe-area placement and frame-edge clipping.
 7. Check Karaoke timing against `words[].start` and `words[].end` when enabled.
 8. Check that the no-caption frame is visually empty in the overlay.
-9. Inspect overlay codec and alpha metadata:
+9. Inspect a representative overlay frame and require RGBA pixels:
 
    ```powershell
-   ffprobe -v error `
-     -select_streams v:0 `
-     -show_entries stream=codec_name,pix_fmt,width,height,r_frame_rate:stream_tags=alpha_mode `
-     -of json `
-     $OverlayVideo
+     ffprobe -v error `
+       -show_entries stream=codec_name,pix_fmt,width,height `
+       -of json `
+       "$OverlayFrames\frame_000001.png"
    ```
 
 10. Confirm source and final audio packet hashes match:

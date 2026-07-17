@@ -65,7 +65,6 @@ def candidate_review_paths(out_dir):
 def candidate_sources(out_dir):
     root = Path(out_dir).resolve()
     return {
-        "text_only": root / "preview" / "text_only" / "shorts_candidates.json",
         "text_visual": root / "preview" / "text_visual" / "shorts_candidates.json",
     }
 
@@ -92,7 +91,7 @@ def load_candidate_sources(out_dir):
 
 def candidate_options(loaded):
     options = []
-    for mode in ("text_only", "text_visual"):
+    for mode in ("text_visual",):
         for candidate in loaded[mode]["data"]["candidates"]:
             candidate_id = str(candidate.get("candidate_id", "")).strip()
             if not candidate_id:
@@ -121,7 +120,7 @@ def candidate_question(review):
         "请回复一行交付模式，并可选择回复一行候选：",
         "",
         "```text",
-        "候选: text_visual/cand-001, text_only/cand-002",
+        "候选: text_visual/cand-001, text_visual/cand-002",
         "交付: horizontal_only",
         "```",
         "",
@@ -163,7 +162,7 @@ def open_candidate_review(out_dir):
     transcript_path = root / "transcript.json"
     source_values = {str(entry["data"].get("video", {}).get("source", "")).strip() for entry in loaded.values()}
     if len(source_values) != 1 or not next(iter(source_values)):
-        fail("both candidate files must reference the same source video")
+        fail("the text_visual candidate file must reference a source video")
     source_video = Path(next(iter(source_values))).resolve()
     review = {
         "schema_version": CANDIDATE_REVIEW_SCHEMA,
@@ -205,8 +204,7 @@ def verify_candidate_artifacts(review):
     if not isinstance(artifacts, dict):
         fail("candidate review artifacts are missing")
     for label in (
-        "source_video", "transcript", "text_only_candidates", "text_only_preview",
-        "text_visual_candidates", "text_visual_preview", "fixed_question",
+        "source_video", "transcript", "text_visual_candidates", "text_visual_preview", "fixed_question",
     ):
         verify_artifact(artifacts.get(label), label)
 
