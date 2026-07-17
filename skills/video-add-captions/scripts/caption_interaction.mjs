@@ -13,11 +13,13 @@ const rawArgs = process.argv.slice(2);
 const command = rawArgs.shift();
 
 const usage = `Usage:
-  node caption_interaction.mjs start --state <json> --source <video> --captions <json> [--no-open true] [--force true]
+  node caption_interaction.mjs start --state <json> --source <video> --captions <json> [--decision-mode human|agent] [--delegation-note <text>] [--no-open true] [--force true]
   node caption_interaction.mjs select --state <json> --response <combination-id|跳过>
+  node caption_interaction.mjs agent-select --state <json> --choice <combination-id> --rationale <text>
   node caption_interaction.mjs preview-ready --state <json> --project-meta <json> --evidence <png1,png2,png3,png4,...>
   node caption_interaction.mjs adjust --state <json> --response <user-feedback>
   node caption_interaction.mjs confirm --state <json> --response 确认渲染
+  node caption_interaction.mjs agent-confirm --state <json> --rationale <text>
   node caption_interaction.mjs status --state <json>`;
 
 const parseArgs = (args) => {
@@ -45,6 +47,9 @@ const writeState = (statePath, state) => {
 
 const nextQuestion = (state) => {
   if (state.phase === "awaiting_style_selection") {
+    if (state.decisionMode === "agent") {
+      return "Agent decision mode is active. Inspect the maintained gallery and record one choice with agent-select.";
+    }
     return [
       "字幕样式库已在系统浏览器中打开。",
       "请浏览全部 25 种样式，然后只回复一个组合 ID，例如 pill-yellow。",
@@ -56,6 +61,9 @@ const nextQuestion = (state) => {
     return `已记录样式 ${state.selection.choiceId}。现在只能生成真实视频预览，不能生成完整成片。`;
   }
   if (state.phase === "awaiting_preview_confirmation") {
+    if (state.decisionMode === "agent") {
+      return "Agent decision mode is active. Inspect every source-backed preview and record the rationale with agent-confirm.";
+    }
     return [
       "请检查真实视频上的字幕预览。",
       "满意时请明确回复：确认渲染。",
@@ -63,7 +71,9 @@ const nextQuestion = (state) => {
       "收到明确的“确认渲染”之前，不会生成完整字幕层和最终视频。",
     ].join("\n");
   }
-  return "用户已经明确确认渲染，可以生成完整字幕层和最终视频。";
+  return state.decisionMode === "agent"
+    ? "Delegated Agent approval is recorded; the complete caption overlay may be rendered."
+    : "用户已经明确确认渲染，可以生成完整字幕层和最终视频。";
 };
 
 const appendHistory = (state, event, details = {}) => {
@@ -86,6 +96,21 @@ const requireOption = (options, key) => {
   return options[key];
 };
 
+const requireDecisionMode = (state, expected, commandName) => {
+  if ((state.decisionMode ?? "human") !== expected) {
+    const required = state.decisionMode === "agent" ? `agent-${commandName}` : commandName;
+    throw new Error(`${state.decisionMode ?? "human"} decision mode cannot use this command. Use ${required}.`);
+  }
+};
+
+const requireRationale = (options) => {
+  const rationale = requireOption(options, "rationale").trim();
+  if (!rationale) {
+    throw new Error("Agent decisions require a non-empty rationale.");
+  }
+  return rationale;
+};
+
 try {
   const options = parseArgs(rawArgs);
   if (command === "start") {
@@ -98,10 +123,20 @@ try {
     if (existsSync(statePath) && options.force !== "true") {
       throw new Error(`Interaction state already exists: ${statePath}. Use --force true to restart deliberately.`);
     }
+    const decisionMode = options.decisionMode ?? "human";
+    if (!new Set(["human", "agent"]).has(decisionMode)) {
+      throw new Error("--decision-mode must be human or agent.");
+    }
+    const delegationNote = String(options.delegationNote ?? "").trim();
+    if (decisionMode === "agent" && !delegationNote) {
+      throw new Error("Agent decision mode requires --delegation-note.");
+    }
 
     const state = {
       schemaVersion: 1,
       skill: "video-add-captions",
+      decisionMode,
+      delegationNote: delegationNote || null,
       phase: "awaiting_style_selection",
       createdAt: now(),
       updatedAt: now(),
@@ -113,7 +148,7 @@ try {
       approval: null,
       history: [],
     };
-    appendHistory(state, "interaction_started");
+    appendHistory(state, "interaction_started", { decisionMode });
     writeState(statePath, state);
     if (options.noOpen !== "true") {
       openGallery();
@@ -123,19 +158,41 @@ try {
   } else if (command === "select") {
     const statePath = requireOption(options, "state");
     const { state } = readInteractionState(statePath);
+    requireDecisionMode(state, "human", "select");
     if (!new Set(["awaiting_style_selection", "style_selected"]).has(state.phase)) {
       throw new Error(`Style selection is not allowed during phase ${state.phase}.`);
     }
     const selection = resolveGallerySelection(requireOption(options, "response"));
     state.phase = "style_selected";
     state.updatedAt = now();
-    state.selection = { ...selection, recordedAt: now() };
+    state.selection = { ...selection, actor: "human", recordedAt: now() };
     state.preview = null;
     state.approval = null;
     appendHistory(state, "style_selected", {
       response: selection.response,
       choiceId: selection.choiceId,
       skipped: selection.skipped,
+    });
+    writeState(statePath, state);
+    console.log(nextQuestion(state));
+  } else if (command === "agent-select") {
+    const statePath = requireOption(options, "state");
+    const { state } = readInteractionState(statePath);
+    requireDecisionMode(state, "agent", "select");
+    if (!new Set(["awaiting_style_selection", "style_selected"]).has(state.phase)) {
+      throw new Error(`Agent style selection is not allowed during phase ${state.phase}.`);
+    }
+    const rationale = requireRationale(options);
+    const { response: _response, ...selection } = resolveGallerySelection(requireOption(options, "choice"));
+    state.phase = "style_selected";
+    state.updatedAt = now();
+    state.selection = { ...selection, actor: "agent", rationale, recordedAt: now() };
+    state.preview = null;
+    state.approval = null;
+    appendHistory(state, "style_selected", {
+      actor: "agent",
+      choiceId: selection.choiceId,
+      rationale,
     });
     writeState(statePath, state);
     console.log(nextQuestion(state));
@@ -200,6 +257,7 @@ try {
   } else if (command === "confirm") {
     const statePath = requireOption(options, "state");
     const { state } = readInteractionState(statePath);
+    requireDecisionMode(state, "human", "confirm");
     if (state.phase !== "awaiting_preview_confirmation") {
       throw new Error(`Render confirmation is only accepted after preview evidence. Current phase: ${state.phase}`);
     }
@@ -211,6 +269,7 @@ try {
     state.updatedAt = now();
     state.approval = {
       response,
+      actor: "human",
       recordedAt: now(),
       selectionId: state.selection.choiceId,
       previewEvidenceSignature: state.preview.evidenceSignature,
@@ -218,10 +277,31 @@ try {
     appendHistory(state, "render_approved", { response });
     writeState(statePath, state);
     console.log(nextQuestion(state));
+  } else if (command === "agent-confirm") {
+    const statePath = requireOption(options, "state");
+    const { state } = readInteractionState(statePath);
+    requireDecisionMode(state, "agent", "confirm");
+    if (state.phase !== "awaiting_preview_confirmation") {
+      throw new Error(`Agent render approval requires preview evidence. Current phase: ${state.phase}`);
+    }
+    const rationale = requireRationale(options);
+    state.phase = "render_approved";
+    state.updatedAt = now();
+    state.approval = {
+      actor: "agent",
+      rationale,
+      recordedAt: now(),
+      selectionId: state.selection.choiceId,
+      previewEvidenceSignature: state.preview.evidenceSignature,
+    };
+    appendHistory(state, "render_approved", { actor: "agent", rationale });
+    writeState(statePath, state);
+    console.log(nextQuestion(state));
   } else if (command === "status") {
     const { state, statePath } = readInteractionState(requireOption(options, "state"));
     console.log(JSON.stringify({
       statePath,
+      decisionMode: state.decisionMode,
       phase: state.phase,
       selection: state.selection,
       previewEvidenceCount: state.preview?.evidence.length ?? 0,

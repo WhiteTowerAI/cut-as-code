@@ -496,6 +496,115 @@ def _validate_cards_choices(plan, operation_id, errors, project_root=None, expec
             errors.append(f"{card_id} renderer fps does not match timeline fps")
 
 
+def _validate_caption_plan(plan, contribution, operation_id, errors, project_root, timeline):
+    if (
+        plan.get("schema_version") != 1
+        or plan.get("target") != "overlay"
+        or plan.get("timebase") != "program"
+    ):
+        errors.append(f"{operation_id} caption plan must be schema V1 program-time overlay")
+        return
+    if plan.get("timeline_id") != timeline.get("timeline_id"):
+        errors.append(f"{operation_id} caption plan timeline_id does not match timeline")
+    if not str(plan.get("source_transcript", "")).strip():
+        errors.append(f"{operation_id} caption plan source_transcript is required")
+    tolerance = timeline["fps"]["den"] / timeline["fps"]["num"]
+    try:
+        duration = float(plan["program_duration_s"])
+    except (KeyError, TypeError, ValueError):
+        errors.append(f"{operation_id} caption plan program_duration_s is required")
+        duration = 0.0
+    if not math.isfinite(duration) or duration <= 0:
+        errors.append(f"{operation_id} caption plan duration must be positive and finite")
+    elif abs(duration - float(timeline["program_duration_s"])) > tolerance:
+        errors.append(f"{operation_id} caption plan duration does not match timeline")
+
+    style = plan.get("style", {})
+    if style.get("status") != "approved":
+        errors.append(f"{operation_id} caption style is not approved")
+    if style.get("selection_mode") not in ("human", "agent"):
+        errors.append(f"{operation_id} caption selection_mode must be human or agent")
+    for field in ("selection_rationale", "choice_id", "preset"):
+        if not str(style.get(field, "")).strip():
+            errors.append(f"{operation_id} caption style {field} is required")
+    if not isinstance(style.get("resolved"), dict) or not style["resolved"]:
+        errors.append(f"{operation_id} caption resolved style is required")
+
+    review = plan.get("review", {})
+    if review.get("status") != "approved":
+        errors.append(f"{operation_id} caption review is not approved")
+    evidence = review.get("evidence")
+    if not isinstance(evidence, list) or len(evidence) < 4:
+        errors.append(f"{operation_id} caption review requires four evidence images")
+    else:
+        for value in evidence:
+            try:
+                path = resolve_project_path(project_root, value)
+            except (TypeError, ValueError) as exc:
+                errors.append(str(exc))
+            else:
+                if not path.is_file():
+                    errors.append(f"{operation_id} caption review evidence is missing: {value}")
+
+    cues = plan.get("cues")
+    if not isinstance(cues, list) or not cues:
+        errors.append(f"{operation_id} caption cues must be a non-empty list")
+    else:
+        previous_end = 0.0
+        for index, cue in enumerate(cues, 1):
+            label = f"{operation_id} cue {index}"
+            try:
+                start, end = float(cue["start"]), float(cue["end"])
+                program_range = cue["program_range"]
+                program_start = float(program_range["start_s"])
+                program_end = float(program_range["end_s"])
+            except (KeyError, TypeError, ValueError):
+                errors.append(f"{label} timing is invalid")
+                continue
+            if (
+                not math.isfinite(start) or not math.isfinite(end)
+                or start < previous_end - tolerance or end <= start or end > duration + tolerance
+            ):
+                errors.append(f"{label} is outside ordered program time")
+            if abs(start - program_start) > tolerance or abs(end - program_end) > tolerance:
+                errors.append(f"{label} program_range does not match compatibility timing")
+            words = cue.get("words")
+            if not isinstance(words, list) or not words:
+                errors.append(f"{label} words must resolve to one timeline clip")
+            else:
+                clip_ids = {
+                    word.get("clip_id") if isinstance(word, dict) else None
+                    for word in words
+                }
+                if None in clip_ids or len(clip_ids) != 1:
+                    errors.append(f"{label} words must resolve to one timeline clip")
+                elif any(
+                    not isinstance(word.get("source_range"), dict)
+                    or not isinstance(word.get("program_range"), dict)
+                    for word in words
+                ):
+                    errors.append(f"{label} words require source and program ranges")
+            previous_end = end
+
+    renderer = plan.get("renderer_recipe", {})
+    if renderer.get("engine") != "hyperframes" or renderer.get("asset_type") != "image-sequence":
+        errors.append(f"{operation_id} caption renderer must be a HyperFrames image sequence")
+    if renderer.get("fps") != timeline.get("fps"):
+        errors.append(f"{operation_id} caption renderer fps does not match timeline fps")
+    if renderer.get("asset") != contribution.get("asset"):
+        errors.append(f"{operation_id} caption plan asset does not match render contribution")
+    runtime_assets = renderer.get("runtime_assets")
+    if not isinstance(runtime_assets, list) or not runtime_assets:
+        errors.append(f"{operation_id} caption runtime_assets are required")
+    elif any(
+        not isinstance(asset, dict)
+        or not str(asset.get("path", "")).strip()
+        or not re.fullmatch(r"[0-9a-f]{64}", str(asset.get("sha256", "")))
+        for asset in runtime_assets
+    ):
+        errors.append(f"{operation_id} caption runtime asset hashes are invalid")
+
+
 def _validate_image_sequence(contribution, asset_path, expected_fps, operation_id, errors):
     pattern = contribution.get("pattern")
     start_number = contribution.get("start_number", 1)
@@ -602,6 +711,21 @@ def build_render_plan(project, project_root):
             if kind not in CONTRIBUTION_KINDS:
                 errors.append(f"{operation_id} unsupported contribution: {kind!r}")
                 continue
+            if (
+                kind == "overlay"
+                and timeline
+                and operation.get("skill") == "video-add-captions"
+                and operation.get("plan")
+            ):
+                captions_path = resolve_project_path(project_root, operation["plan"])
+                if captions_path.is_file():
+                    try:
+                        _validate_caption_plan(
+                            load_json(captions_path), contribution, operation_id,
+                            errors, project_root, timeline,
+                        )
+                    except (OSError, ValueError, json.JSONDecodeError) as exc:
+                        errors.append(f"{operation_id} invalid caption plan: {exc}")
             item = {"operation": operation_id, **contribution}
 
             required_path = {

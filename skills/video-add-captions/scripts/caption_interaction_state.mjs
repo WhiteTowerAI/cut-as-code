@@ -71,6 +71,10 @@ export const readInteractionState = (statePath) => {
   if (state.schemaVersion !== 1 || state.skill !== "video-add-captions") {
     throw new Error(`Invalid video-add-captions interaction state: ${resolvedStatePath}`);
   }
+  state.decisionMode ??= "human";
+  if (!new Set(["human", "agent"]).has(state.decisionMode)) {
+    throw new Error(`Invalid caption decision mode: ${state.decisionMode}`);
+  }
   return { state, statePath: resolvedStatePath };
 };
 
@@ -141,6 +145,9 @@ export const validateGenerationInteraction = ({
   if (mode === "overlay") {
     if (!state.preview || !state.approval) {
       throw new Error("The interaction state has no confirmed preview evidence.");
+    }
+    if (state.approval.actor && state.approval.actor !== state.decisionMode) {
+      throw new Error("Render approval actor does not match the interaction decision mode.");
     }
     if (state.preview.overridesSha256 !== currentOverridesHash) {
       throw new Error("Overrides changed after preview confirmation. Generate and confirm a new preview.");

@@ -9,8 +9,11 @@ $required = @(
     "scripts\caption_interaction_state.mjs",
     "scripts\caption_interaction.mjs",
     "scripts\check_caption_style_config.mjs",
+    "scripts\check_project_protocol.py",
+    "scripts\build_caption_review.py",
     "scripts\generate_caption_project.mjs",
     "scripts\composite_caption_overlay.ps1",
+    "public\gsap.min.js",
     "public\fonts\CalSans-Regular.ttf"
 )
 
@@ -39,6 +42,11 @@ foreach ($marker in $requiredMarkers) {
         Write-Error "Missing HyperFrames marker: $marker"
         exit 1
     }
+}
+
+if ($html -match '<script[^>]+src="https?://') {
+    Write-Error "Caption example must not load remote runtime scripts"
+    exit 1
 }
 
 Write-Host "Structure check passed: $skillRoot"

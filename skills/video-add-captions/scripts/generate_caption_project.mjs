@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   captionBackgroundThemeNames,
@@ -11,6 +11,7 @@ import {
   resolveKaraoke,
 } from "./caption_style_config.mjs";
 import {
+  hashFile,
   readInteractionState,
   selectionOptionsFromState,
   validateGenerationInteraction,
@@ -23,7 +24,9 @@ const usage = `Usage:
     --video <source-video> \\
     --captions <captions-json> \\
     --out <project-dir> \\
-    --interaction-state <json-file> \\
+    [--interaction-state <json-file>] \\
+    [--approved-plan true] \\
+    [--project-root <project-root>] \\
     [--preset ${captionPresetNames.join("|")}] \\
     [--highlight-theme ${captionHighlightThemeNames.join("|")}] \\
     [--background-theme ${captionBackgroundThemeNames.join("|")}] \\
@@ -59,7 +62,11 @@ try {
   process.exit(1);
 }
 
-if (!options.video || !options.captions || !options.out || !options.interactionState) {
+const approvedPlanMode = options.approvedPlan === "true";
+if (options.approvedPlan && !new Set(["true", "false"]).has(options.approvedPlan)) {
+  throw new Error("--approved-plan must be true or false.");
+}
+if (!options.video || !options.captions || !options.out || (!approvedPlanMode && !options.interactionState)) {
   console.error(usage);
   process.exit(1);
 }
@@ -71,6 +78,8 @@ const assetsDir = join(projectDir, "assets");
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const skillRoot = resolve(scriptDir, "..");
 const fontSource = join(skillRoot, "public", "fonts", "CalSans-Regular.ttf");
+const gsapSource = join(skillRoot, "public", "gsap.min.js");
+const projectRoot = options.projectRoot ? resolve(options.projectRoot) : null;
 const overridesPath = options.overrides ? resolve(options.overrides) : null;
 const overrides = overridesPath
   ? JSON.parse(readFileSync(overridesPath, "utf8").replace(/^\uFEFF/, ""))
@@ -80,31 +89,70 @@ if (!new Set(["preview", "overlay"]).has(mode)) {
   throw new Error(`[captions] invalid render mode: ${mode}`);
 }
 
-const interactionState = readInteractionState(options.interactionState);
-const recordedSelection = selectionOptionsFromState(interactionState.state.selection ?? {});
-const requestedSelection = {
-  preset: options.preset ?? recordedSelection.preset,
-  highlightTheme: options.highlightTheme ?? recordedSelection.highlightTheme,
-  backgroundTheme: options.backgroundTheme ?? recordedSelection.backgroundTheme,
-  strokeTheme: options.strokeTheme ?? recordedSelection.strokeTheme,
-  karaoke: options.karaoke ?? recordedSelection.karaoke,
-};
-const interaction = validateGenerationInteraction({
-  statePath: options.interactionState,
-  mode,
-  sourceVideo,
-  captionsPath,
-  requestedSelection,
-  overridesPath,
-});
-const style = resolveCaptionStyle({
-  preset: requestedSelection.preset,
-  highlightTheme: requestedSelection.highlightTheme,
-  backgroundTheme: requestedSelection.backgroundTheme,
-  strokeTheme: requestedSelection.strokeTheme,
-  overrides,
-});
-const karaoke = resolveKaraoke(requestedSelection.karaoke, style);
+const captionDocument = JSON.parse(readFileSync(captionsPath, "utf8").replace(/^\uFEFF/, ""));
+const canonicalPlan = Array.isArray(captionDocument) ? null : captionDocument;
+const captions = canonicalPlan?.cues ?? captionDocument;
+if (!Array.isArray(captions) || captions.length === 0) {
+  throw new Error("Caption JSON must contain a non-empty cue array or a canonical plan with cues");
+}
+if (canonicalPlan && (
+  canonicalPlan.schema_version !== 1
+  || canonicalPlan.target !== "overlay"
+  || canonicalPlan.timebase !== "program"
+)) {
+  throw new Error("Canonical caption plan must be schema_version 1, target overlay, and program timebase");
+}
+if (approvedPlanMode && !canonicalPlan) {
+  throw new Error("--approved-plan requires a canonical caption plan, not a legacy cue array.");
+}
+
+let interaction = null;
+let requestedSelection;
+let style;
+let karaoke;
+if (approvedPlanMode) {
+  if (canonicalPlan.style?.status !== "approved" || canonicalPlan.review?.status !== "approved") {
+    throw new Error("--approved-plan requires approved style and review records.");
+  }
+  if (!canonicalPlan.style.resolved || typeof canonicalPlan.style.resolved !== "object") {
+    throw new Error("Approved caption plan is missing the resolved style.");
+  }
+  requestedSelection = {
+    preset: canonicalPlan.style.preset,
+    highlightTheme: canonicalPlan.style.highlight_theme ?? null,
+    backgroundTheme: canonicalPlan.style.background_theme ?? null,
+    strokeTheme: canonicalPlan.style.stroke_theme ?? null,
+    karaoke: String(Boolean(canonicalPlan.style.karaoke)),
+  };
+  style = canonicalPlan.style.resolved;
+  karaoke = Boolean(canonicalPlan.style.karaoke);
+} else {
+  const interactionState = readInteractionState(options.interactionState);
+  const recordedSelection = selectionOptionsFromState(interactionState.state.selection ?? {});
+  requestedSelection = {
+    preset: options.preset ?? recordedSelection.preset,
+    highlightTheme: options.highlightTheme ?? recordedSelection.highlightTheme,
+    backgroundTheme: options.backgroundTheme ?? recordedSelection.backgroundTheme,
+    strokeTheme: options.strokeTheme ?? recordedSelection.strokeTheme,
+    karaoke: options.karaoke ?? recordedSelection.karaoke,
+  };
+  interaction = validateGenerationInteraction({
+    statePath: options.interactionState,
+    mode,
+    sourceVideo,
+    captionsPath,
+    requestedSelection,
+    overridesPath,
+  });
+  style = resolveCaptionStyle({
+    preset: requestedSelection.preset,
+    highlightTheme: requestedSelection.highlightTheme,
+    backgroundTheme: requestedSelection.backgroundTheme,
+    strokeTheme: requestedSelection.strokeTheme,
+    overrides,
+  });
+  karaoke = resolveKaraoke(requestedSelection.karaoke, style);
+}
 
 const probe = JSON.parse(execFileSync("ffprobe", [
   "-v", "error",
@@ -116,26 +164,52 @@ const probe = JSON.parse(execFileSync("ffprobe", [
 ], { encoding: "utf8" }));
 
 const stream = probe.streams?.[0];
-const duration = Number(probe.format?.duration);
-if (!stream || !Number.isFinite(duration)) {
+const probedDuration = Number(probe.format?.duration);
+if (!stream || !Number.isFinite(probedDuration)) {
   throw new Error("Unable to read source video metadata");
 }
 
-const [fpsNumerator, fpsDenominator] = String(stream.r_frame_rate).split("/").map(Number);
+const [probedFpsNumerator, probedFpsDenominator] = String(stream.r_frame_rate).split("/").map(Number);
+const planFps = canonicalPlan?.renderer_recipe?.fps;
+const fpsNumerator = Number(planFps?.num ?? probedFpsNumerator);
+const fpsDenominator = Number(planFps?.den ?? probedFpsDenominator);
+if (
+  !Number.isInteger(fpsNumerator)
+  || !Number.isInteger(fpsDenominator)
+  || fpsNumerator <= 0
+  || fpsDenominator <= 0
+) {
+  throw new Error("Caption FPS must be a positive rational {num, den}.");
+}
 const fps = fpsNumerator / fpsDenominator;
+if (fpsNumerator * probedFpsDenominator !== probedFpsNumerator * fpsDenominator) {
+  throw new Error("Caption plan FPS does not match the source video FPS.");
+}
 const width = Number(stream.width);
 const height = Number(stream.height);
-const captions = JSON.parse(readFileSync(captionsPath, "utf8"));
+const duration = Number(canonicalPlan?.program_duration_s ?? probedDuration);
+if (!Number.isFinite(duration) || duration <= 0) {
+  throw new Error("Caption duration must be positive.");
+}
 
-if (!Array.isArray(captions) || captions.length === 0) {
-  throw new Error("Caption JSON must contain a non-empty cue array");
+const runtimeAssets = [
+  { path: "assets/gsap.min.js", sha256: hashFile(gsapSource) },
+  { path: "assets/CalSans-Regular.ttf", sha256: hashFile(fontSource) },
+];
+if (approvedPlanMode) {
+  const approvedAssets = new Map(
+    (canonicalPlan.renderer_recipe?.runtime_assets ?? []).map((asset) => [asset.path, asset.sha256]),
+  );
+  for (const asset of runtimeAssets) {
+    if (approvedAssets.get(asset.path) !== asset.sha256) {
+      throw new Error(`Approved runtime asset is missing or changed: ${asset.path}`);
+    }
+  }
 }
 
 mkdirSync(assetsDir, { recursive: true });
-if (mode === "preview") {
-  copyFileSync(sourceVideo, join(assetsDir, "source.mp4"));
-}
 copyFileSync(fontSource, join(assetsDir, "CalSans-Regular.ttf"));
+copyFileSync(gsapSource, join(assetsDir, "gsap.min.js"));
 
 const escapeHtml = (value) => String(value)
   .replaceAll("&", "&amp;")
@@ -241,18 +315,14 @@ const compositionSuffix = [
   .join("-")
   .replaceAll(/[^a-zA-Z0-9-]/g, "-");
 const compositionId = `video-add-captions-${compositionSuffix || style.preset}`;
-const mediaMarkup = mode === "preview"
-  ? `<video id="source-video" class="clip" src="assets/source.mp4" data-start="0" data-duration="${duration.toFixed(3)}" data-track-index="0" muted playsinline></video>
-      <audio id="source-audio" src="assets/source.mp4" data-start="0" data-duration="${duration.toFixed(3)}" data-track-index="10" data-volume="1"></audio>`
-  : "";
-const pageBackground = mode === "overlay" ? "transparent" : "#000000";
+const pageBackground = "transparent";
 
 const html = `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <title>${escapeHtml(style.preset)} captions</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script src="assets/gsap.min.js"></script>
     <style>
       @font-face {
         font-family: "Caption_System";
@@ -278,18 +348,12 @@ const html = `<!doctype html>
         background: ${pageBackground};
       }
 
-      #source-video {
-        position: absolute;
-        inset: 0;
+      #stage {
+        position: relative;
         width: ${width}px;
         height: ${height}px;
-        object-fit: cover;
-      }
-
-      .caption-layer {
-        position: absolute;
-        inset: 0;
-        box-sizing: border-box;
+        overflow: hidden;
+        background: ${pageBackground};
       }
 
       .caption-cue {
@@ -339,35 +403,93 @@ const html = `<!doctype html>
       data-width="${width}"
       data-height="${height}"
     >
-      ${mediaMarkup}
-
-      <div class="caption-layer">
-        ${cueMarkup}
-      </div>
-
-      <script>
-        const timeline = gsap.timeline({ paused: true });
-        ${timelineCode}
-        window.__timelines = window.__timelines || {};
-        window.__timelines["${compositionId}"] = timeline;
-      </script>
+      ${cueMarkup}
     </div>
+    <script>
+      const timeline = gsap.timeline({ paused: true });
+      ${timelineCode}
+      window.__timelines = window.__timelines || {};
+      window.__timelines["${compositionId}"] = timeline;
+    </script>
   </body>
 </html>
 `;
 
 writeFileSync(join(projectDir, "index.html"), html, "utf8");
+if (canonicalPlan && mode === "overlay" && !approvedPlanMode) {
+  const toPlanPath = (path) => {
+    if (!projectRoot) {
+      return resolve(path).split(sep).join("/");
+    }
+    return relative(join(projectRoot, "work"), resolve(path)).split(sep).join("/");
+  };
+  const selection = interaction.state.selection;
+  const approval = interaction.state.approval;
+  canonicalPlan.style = {
+    status: "approved",
+    selection_mode: interaction.state.decisionMode,
+    selection_rationale: selection.rationale ?? `Human selected ${selection.choiceId}.`,
+    choice_id: selection.choiceId,
+    preset: style.preset,
+    highlight_theme: requestedSelection.highlightTheme ?? null,
+    background_theme: requestedSelection.backgroundTheme ?? null,
+    stroke_theme: requestedSelection.strokeTheme ?? null,
+    karaoke,
+    resolved: style,
+  };
+  canonicalPlan.review = {
+    status: "approved",
+    approval_actor: approval.actor ?? interaction.state.decisionMode,
+    approval_rationale: approval.rationale ?? "Human approval recorded by the caption interaction receipt.",
+    approved_at: approval.recordedAt,
+    evidence: interaction.state.preview.evidence.map((item) => toPlanPath(item.path)),
+    evidence_details: interaction.state.preview.evidence.map((item) => ({
+      path: toPlanPath(item.path),
+      sha256: item.sha256,
+    })),
+  };
+  canonicalPlan.renderer_recipe = {
+    ...canonicalPlan.renderer_recipe,
+    engine: "hyperframes",
+    composition: canonicalPlan.renderer_recipe?.composition ?? "cache/captions/index.html",
+    asset: canonicalPlan.renderer_recipe?.asset ?? "cache/captions/overlay-frames",
+    asset_type: "image-sequence",
+    pattern: canonicalPlan.renderer_recipe?.pattern ?? "frame_%06d.png",
+    start_number: canonicalPlan.renderer_recipe?.start_number ?? 1,
+    fps: { num: fpsNumerator, den: fpsDenominator },
+    runtime_assets: runtimeAssets,
+  };
+  writeFileSync(captionsPath, `${JSON.stringify(canonicalPlan, null, 2)}\n`, "utf8");
+}
+
+const selectionRecord = interaction?.state.selection ?? {
+  choiceId: canonicalPlan.style.choice_id,
+  skipped: false,
+};
+const interactionMeta = interaction ? {
+  statePath: interaction.statePath,
+  phase: interaction.state.phase,
+  decisionMode: interaction.state.decisionMode,
+  selectionId: interaction.state.selection.choiceId,
+  selectionResponse: interaction.state.selection.response ?? null,
+  sourceSha256: interaction.state.sourceVideo.sha256,
+  captionsSha256: interaction.state.captions.sha256,
+  overridesPath,
+  overridesSha256: interaction.currentOverridesHash,
+} : null;
 writeFileSync(join(projectDir, "project-meta.json"), JSON.stringify({
   sourceVideo,
   captionsPath,
   width,
   height,
   fps,
+  fpsRational: { num: fpsNumerator, den: fpsDenominator },
   duration,
   cueCount: captions.length,
+  approvedPlan: approvedPlanMode,
   selection: {
-    choiceId: interaction.state.selection.choiceId,
-    skipped: interaction.state.selection.skipped,
+    choiceId: selectionRecord.choiceId,
+    skipped: selectionRecord.skipped,
     preset: style.preset,
     highlightTheme: requestedSelection.highlightTheme ?? null,
     backgroundTheme: requestedSelection.backgroundTheme ?? null,
@@ -375,20 +497,12 @@ writeFileSync(join(projectDir, "project-meta.json"), JSON.stringify({
     karaoke,
     mode,
   },
-  interaction: {
-    statePath: interaction.statePath,
-    phase: interaction.state.phase,
-    selectionId: interaction.state.selection.choiceId,
-    selectionResponse: interaction.state.selection.response,
-    sourceSha256: interaction.state.sourceVideo.sha256,
-    captionsSha256: interaction.state.captions.sha256,
-    overridesPath,
-    overridesSha256: interaction.currentOverridesHash,
-  },
+  interaction: interactionMeta,
+  runtimeAssets,
   resolvedStyle: style,
 }, null, 2), "utf8");
 
 console.log(`[hyperframes-captions] generated ${captions.length} cues`);
-console.log(`[hyperframes-captions] selection=${interaction.state.selection.choiceId} style=${style.preset} karaoke=${karaoke} mode=${mode}`);
+console.log(`[hyperframes-captions] selection=${selectionRecord.choiceId} style=${style.preset} karaoke=${karaoke} mode=${mode}`);
 console.log(`[hyperframes-captions] ${width}x${height} @ ${fps}fps, ${duration.toFixed(3)}s`);
 console.log(`[hyperframes-captions] ${join(projectDir, "index.html")}`);

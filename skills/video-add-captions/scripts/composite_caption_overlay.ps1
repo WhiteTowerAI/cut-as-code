@@ -52,11 +52,12 @@ $ffmpegArgs += @(
   "-filter_complex", "[0:v][1:v]overlay=0:0:format=${overlayFormat}:eof_action=pass[v]",
   "-map", "[v]",
   "-map", "0:a?",
-  "-c:v", "libx264rgb",
+  "-c:v", "libx264",
   "-preset", "medium",
-  "-crf", "0",
-  "-pix_fmt", "rgb24",
+  "-crf", "18",
+  "-pix_fmt", "yuv420p",
   "-c:a", "copy",
+  "-movflags", "+faststart",
   $output
 )
 

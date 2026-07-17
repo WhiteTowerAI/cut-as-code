@@ -86,6 +86,11 @@ def check_image_sequence_overlay():
         (root / "review/05-captions/captions-summary.md").write_text(
             "# Captions\n", encoding="utf-8"
         )
+        evidence = []
+        for name in ("early", "middle", "late", "no-caption"):
+            path = root / f"review/05-captions/preview-{name}.png"
+            path.write_bytes(b"\x89PNG\r\n\x1a\n")
+            evidence.append(f"../review/05-captions/preview-{name}.png")
         timeline = {
             "schema_version": 1,
             "timeline_id": "source",
@@ -111,24 +116,41 @@ def check_image_sequence_overlay():
                 "target": "overlay",
                 "timeline_id": "source",
                 "timebase": "program",
+                "source_transcript": "understand/transcript.json",
+                "program_duration_s": 6.0,
                 "style": {
+                    "status": "approved",
                     "selection_mode": "agent",
                     "selection_rationale": "Fixture decision.",
+                    "choice_id": "clean",
+                    "preset": "clean",
+                    "resolved": {"preset": "clean"},
                 },
-                "review": {"status": "approved", "evidence": ["fixture.png"]},
+                "review": {"status": "approved", "evidence": evidence},
                 "cues": [
                     {
                         "start": 0.2,
                         "end": 0.6,
+                        "program_range": {"start_s": 0.2, "end_s": 0.6},
                         "text": "Fixture",
                         "lines": ["Fixture"],
-                        "words": [],
+                        "words": [{
+                            "word": "Fixture",
+                            "start": 0.2,
+                            "end": 0.6,
+                            "clip_id": "clip-001",
+                            "source_range": {"start_s": 0.2, "end_s": 0.6},
+                            "program_range": {"start_s": 0.2, "end_s": 0.6},
+                        }],
                     }
                 ],
                 "renderer_recipe": {
+                    "engine": "hyperframes",
+                    "asset_type": "image-sequence",
                     "fps": {"num": 30000, "den": 1001},
                     "composition": "cache/captions/index.html",
                     "asset": "cache/captions/overlay-frames",
+                    "runtime_assets": [{"path": "assets/gsap.min.js", "sha256": "0" * 64}],
                 },
             },
         )
@@ -216,6 +238,19 @@ def check_image_sequence_overlay():
         assert command[command.index("-i", command.index("-framerate")) + 1].endswith(
             "overlay-frames\\frame_%06d.png"
         )
+
+        caption_plan_path = root / "work/captions/captions-plan.json"
+        caption_plan = projectlib.load_json(caption_plan_path)
+        caption_plan["style"]["status"] = "draft"
+        projectlib.write_json(caption_plan_path, caption_plan)
+        try:
+            projectlib.build_render_plan(project, root)
+        except ValueError as error:
+            assert "caption style is not approved" in str(error)
+        else:
+            raise AssertionError("draft caption style was accepted")
+        caption_plan["style"]["status"] = "approved"
+        projectlib.write_json(caption_plan_path, caption_plan)
 
         project["operations"][1]["render"]["pattern"] = "../frame_%06d.png"
         try:
