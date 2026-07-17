@@ -59,7 +59,17 @@ scripts in sync.
 - Render contribution kinds are `timeline-transform`, `video-filter`, `audio-filter`,
   `overlay`, `precomputed-asset`, and `output-constraint`.
 - Domain decisions remain in `work/rough-cut/edit-plan.json`,
-  `work/color-grade/grade-plan.json`, and `work/content-cards/cards-plan.json`.
+  `work/color-grade/grade-plan.json`, `work/content-cards/cards-plan.json`,
+  `work/captions/captions-plan.json`, and `work/shorts/shorts-plan.json`.
+- Caption cues use program time mapped from the canonical source transcript through
+  `timeline.json`; they preserve source evidence and contribute a transparent PNG sequence
+  overlay at the exact rational timeline FPS. Browser runtime assets must be local and hashed.
+- Shorts consume the verified main delivery plus a program-time transcript. The `shorts`
+  operation is present in the DAG but absent from `sequences.main.operations`, so derivative
+  media under `final/shorts/` never changes or re-renders the main delivery.
+- Human and explicitly delegated Agent decisions are both valid when the domain receipt
+  names the decision mode, binds reviewed artifacts by hash, and stores a non-empty rationale.
+  Never write a fake human response for an Agent decision.
 - User-facing files live in `input/`, `review/`, and `final/`; `work/cache/` is disposable.
 - Compile approved active operations with `build_render_plan.py`, then render delivery once
   with `render_project.py`. Timeline changes require audio filtering/encoding; `-c:a copy`
@@ -70,6 +80,9 @@ scripts in sync.
   full-length intermediate only when a whole-program pacing decision requires it.
 - Preserve compatibility adapters for current edit, looks, and cue formats until every
   documented consumer has migrated.
+- Image-sequence overlays declare `asset_type`, a basename-only printf `pattern`,
+  `start_number`, and rational `fps`; the compiler requires the directory, first frame, and
+  FPS match before delivery rendering.
 
 ## Architecture that spans skills
 
