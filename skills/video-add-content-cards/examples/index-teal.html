@@ -6,8 +6,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 
     <!-- teal theme: font "serif" = system Georgia/Times (no webfont <link>).
-         In video-to-remotion this is the "serif" family the old components
-         never set explicitly; here we spell it out on --serif. -->
+         The family is explicit on --serif. -->
 
     <style>
       /* ── teal theme ────────────────────────────────────────────────────────
@@ -451,7 +450,7 @@
          every card is eyeballable in one render — the teal port of the almanac
          card catalog. teal is NOT fullBleed: full-width scenes drop a .scrim
          gradient (not an opaque fill) behind light text. In production, keep
-         each cue's transcript-derived at/dur (from work/cues.json) and set the
+         each cue's approved timing (from work/content-cards/cards-plan.json) and set the
          stage data-duration to the SOURCE length; scenes fire on the spoken word. -->
     <div data-hf-id="hf-r0kp" id="stage" data-composition-id="v2hf-teal" data-start="0" data-duration="78" data-fps="24" data-width="1920" data-height="1080">
       <!-- cue 1: Intro (0–6s) — Scrim -->
@@ -668,7 +667,7 @@
 
         // ─── cue 4: StatCallout — value counts 0→N (motion-independent) ───────
         // Count-up = tween a counter object, write textContent on update.
-        // power3.out ≈ Remotion's easeOutCubic; onUpdate fires per seeked frame.
+        // power3.out provides cubic ease-out; onUpdate fires per seeked frame.
         slideFade("#stat .stat", 18, 6);
         const valueEl = document.querySelector("#stat .value");
         const counter = { v: 0 };

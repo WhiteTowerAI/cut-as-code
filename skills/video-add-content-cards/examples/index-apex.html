@@ -466,9 +466,9 @@
   </head>
   <body>
     <!-- Worked example: all 13 cards packed back-to-back at 6s each (78s) so
-         every card is eyeballable in one render — the apex port of
-         video-to-remotion's card catalog. In production, keep each cue's
-         transcript-derived at/dur (from work/cues.json) and set the stage
+         every card is eyeballable in one render — the apex card catalog.
+         In production, keep each cue's
+         approved timing (from work/content-cards/cards-plan.json) and set the stage
          data-duration to the SOURCE length; scenes fire on the spoken word. -->
     <div data-hf-id="ha-stg0" id="stage" data-composition-id="v2hf-apex" data-start="0" data-duration="78" data-fps="24" data-width="1920" data-height="1080">
       <!-- cue 1: Intro (0–6s) — Scrim -->
@@ -688,7 +688,7 @@
 
         // ─── cue 4: StatCallout (value counts 0→N over REVEAL) ───────────────
         // Count-up = tween a counter object, write textContent on update.
-        // power3.out ≈ Remotion's easeOutCubic; onUpdate fires per seeked frame.
+        // power3.out provides cubic ease-out; onUpdate fires per seeked frame.
         slideFade("#stat .stat", 18, 6);
         const valueEl = document.querySelector("#stat .value");
         const counter = { v: 0 };

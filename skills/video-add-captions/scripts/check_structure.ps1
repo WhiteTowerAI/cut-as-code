@@ -4,7 +4,6 @@ $skillRoot = Split-Path -Parent $PSScriptRoot
 $required = @(
     "SKILL.md",
     "examples\index.html",
-    "reference\MIGRATION.md",
     "scripts\caption-styles.json",
     "scripts\caption_style_config.mjs",
     "scripts\caption_interaction_state.mjs",

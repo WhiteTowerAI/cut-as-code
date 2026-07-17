@@ -28,9 +28,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Open-Recut is **a stack of agentic video-editing skills**, not an application. Each
 directory under `skills/<name>/` is a self-contained skill: a `SKILL.md` (the agent
 playbook — read it first), plus `scripts/`, `examples/`, and `reference/`. There is no
-root build, package manifest, or lint config. Protocol and ffmpeg integration checks live
-under `tests/` and use Python `unittest`. When you change a skill, the SKILL.md *is* the
-spec; keep it, scripts, and tests in sync.
+root build, package manifest, lint config, or aggregate test suite. Scripts and skill-local
+checks run ad hoc. When you change a skill, the SKILL.md *is* the spec; keep it and its
+scripts in sync.
 
 ## Skills
 
@@ -40,12 +40,9 @@ spec; keep it, scripts, and tests in sync.
 | `video-rough-cut` | Raw long video → compact first cut (download, transcribe, diagnose, hand-written JSON cut plan, varispeed, render, self-check) | Python · yt-dlp · ffmpeg · faster-whisper |
 | `video-edit-compare` | Original versus actual final pixels projected onto the source clock | Python · ffmpeg · Pillow |
 | `video-color-grade` | Assess footage → corrective base + named looks → human picks → bake `.cube` LUT + apply | Python · ffmpeg · numpy · Pillow |
-| `video-overlay-cards(legacy)` | Composite intro/chapter/lower-third/outro cards onto a video (no re-cut) | Python · ffmpeg · Pillow |
 | `video-add-captions` | Preset-driven, word-timed captions with optional karaoke | HyperFrames · ffmpeg |
-| `video-add-captions-legacy` | Legacy styled captions and karaoke | Remotion (React/TS) · ffmpeg |
-| `video-to-remotion(legacy)` | Watch content → auto-generate *selective* motion graphics (lower-thirds, stats, chapter cards) | Remotion (React/TS) · ffmpeg · faster-whisper |
-| `video-add-content-cards` | Same as video-to-remotion, authored as HTML + GSAP instead of React (agents iterate HTML faster; no bundler) | HyperFrames (HTML/GSAP) · ffmpeg · faster-whisper |
-| `design-frames-to-motion(legacy)` | Rebuild designer PNG frames as parametric Remotion components, transcript-synced | Remotion (React/TS) · ffmpeg |
+| `video-add-content-cards` | Add selective transcript-timed titles, lower-thirds, statistics, quotes, and chapter cards | HyperFrames · ffmpeg |
+| `video-to-shorts` | Find, review, and render short vertical clips from long-form video | Python · ffmpeg |
 
 ## Shared project protocol V1
 
@@ -80,15 +77,13 @@ These conventions are shared and load-bearing — match them in any new skill:
 
 - **The transcript is the shared interchange format.** `skills/video-understand/scripts/transcribe.py`
   is the canonical transcriber (faster-whisper, CPU/int8, VAD, word-level). It emits
-  `transcript.json` = `segments[] → words[]` with per-word `start`/`end`. The Remotion
-  skills (`video-add-captions`, `video-to-remotion`) deliberately reuse it via a relative
-  path (`../video-rough-cut/scripts/transcribe.py`) rather than copying. Note it is
+  `transcript.json` = `segments[] → words[]` with per-word `start`/`end`. Note it is
   **English-only** (`base.en`, `language="en"`); for other languages the caller swaps the
   model/lang — downstream scripts only consume the resulting JSON.
 
 - **Code is the edit.** No timeline scrubbing. The edit is always text you can read, diff,
   and re-render: a JSON cut plan (`edit_coarse.json`/`edit_final.json`), a `looks.json`, an
-  `overlays.json`, or a Remotion cue sheet. Beats land on the spoken word by grepping the
+  `cards-plan.json`, or caption cues. Beats land on the spoken word by grepping the
   transcript for the phrase and reading its `start` time.
 
 - **Human decides content; scripts do precision.** Editorial calls (what to keep, which
@@ -106,14 +101,11 @@ These conventions are shared and load-bearing — match them in any new skill:
   - *ffmpeg/Python* standalone operations copy audio when they do not change time. The
     shared delivery renderer encodes audio after cuts, concatenation, varispeed, or an
     audio filter; otherwise it uses `-c:a copy`.
-  - *Remotion/React* (`captions`, `to-remotion`, `design-frames-to-motion`): default to
-    rendering a **transparent overlay** (ProRes 4444) at the **source's own resolution**,
-    then ffmpeg-composite onto the source (`-c:a copy`). The full-frame `<OffthreadVideo>`
-    path is the slow fallback for very short clips only — it decodes the source every frame.
+  - *HyperFrames* (`video-add-captions`, `video-add-content-cards`) renders transparent
+    overlays at the source dimensions, then ffmpeg-composites them onto the source.
 
-- **`color-grade` and `to-remotion`/`overlay-cards` are two-phase by design:** present
-  options (look contact sheet, draft cues) and STOP for the human pick before the full
-  render / LUT bake.
+- **Review before delivery.** Color grade records a human or delegated agent look choice;
+  content cards uses interview and candidate-review gates before rendering.
 
 ## Windows / ffmpeg gotchas (this repo is developed on Windows)
 
@@ -121,13 +113,10 @@ These conventions are shared and load-bearing — match them in any new skill:
   `metadata=print:file=`). The pattern used throughout: run ffmpeg with `cwd` set to the
   file's folder and reference it by **basename**. Keep this for any new path-taking filter.
 - **Never use ffmpeg `drawtext` for labels.** The `fontfile` drive-colon path is
-  unreliable on Windows. Render text to a PIL PNG and overlay it (see `video-color-grade`
-  and `video-overlay-cards`). Fonts are configured at the top of the relevant script.
+  unreliable on Windows. Render text to a PIL PNG and overlay it (see `video-color-grade`).
+  Fonts are configured at the top of the relevant script.
 - **Bash `grep`/`sed` one-liners in SKILL.md won't run in PowerShell.** Capture ffmpeg
-  output to a file and parse with Python instead (e.g. scene detection in `video-to-remotion`).
-- **Remotion:** pin one Remotion 4.x and **`react`/`react-dom` to `18.3.1`** (don't let npm
-  pull React 19 against an older Remotion). `OffthreadVideo` resolves `staticFile()` only
-  from `public/`, so the source must live at `public/source.mp4`.
+  output to a file and parse with Python instead.
 
 ## Common commands
 
@@ -137,10 +126,6 @@ There is no aggregate runner; commands live inside each `SKILL.md` pipeline. Can
 # transcribe (the shared step) — produces transcript.json + .srt
 ffmpeg -y -i work/source.mp4 -ac 1 -ar 16000 work/audio16k.wav
 python skills/video-understand/scripts/transcribe.py work/audio16k.wav work/transcript
-
-# Remotion render (overlay path) — run from inside the scaffolded project
-npx remotion still src/index.ts <Comp> work/stills/f295.png --frame=295
-npx remotion render src/index.ts <Comp>Overlay out/overlay.mov --codec=prores --prores-profile=4444 --pixel-format=yuva444p10le --image-format=png
 ```
 
 Sanity-check tool availability before running a pipeline:

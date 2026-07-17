@@ -470,7 +470,7 @@
          a .scrim gradient (not an opaque fill) behind light text, and the small
          widgets sit on a local scrim-plate instead of a solid card. In
          production, keep each cue's transcript-derived at/dur (from
-         work/cues.json) and set the stage data-duration to the SOURCE length. -->
+         work/content-cards/cards-plan.json) and set the stage data-duration to the SOURCE length. -->
     <div data-hf-id="hf-r0kp" id="stage" data-composition-id="v2hf-editorial" data-start="0" data-duration="78" data-fps="24" data-width="1920" data-height="1080">
       <!-- cue 1: Intro (0–6s) — Scrim -->
       <div data-hf-id="hf-n4ne" id="intro" class="scene bleed anchor-bl clip" data-start="0" data-duration="6" data-track-index="0">
@@ -734,7 +734,7 @@
 
         // ─── cue 4: StatCallout (plate pops in, value counts 0→N over REVEAL) ─
         // Count-up = tween a counter object, write textContent on update.
-        // power3.out ≈ Remotion's easeOutCubic; onUpdate fires per seeked frame.
+        // power3.out provides cubic ease-out; onUpdate fires per seeked frame.
         sceneFade("#stat .stat", 18, 6);
         const stat = document.querySelector("#stat");
         popIn("#stat .card", 18);

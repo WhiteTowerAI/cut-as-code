@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/Claude%20Code-supported-D97757" alt="Claude Code supported">
 </p>
 
-Open-Recut is a collection of self-contained agent skills, not a timeline-editor application. Agents inspect media, write readable JSON edit decisions, generate review artifacts, and render with ffmpeg, HyperFrames, or Remotion.
+Open-Recut is a collection of self-contained agent skills, not a timeline-editor application. Agents inspect media, write readable JSON edit decisions, generate review artifacts, and render with ffmpeg or HyperFrames.
 
 ## Project Model
 
@@ -51,9 +51,7 @@ Only directories for selected operations need to exist. Durable decisions stay o
 | `video-add-content-cards` | Map semantic moments to HyperFrames cards and render a transparent graphics overlay. |
 | `video-edit-compare` | Compare original and actual final pixels on the original source clock. |
 | `video-add-captions` | Render styled every-line captions with optional karaoke timing. |
-| `video-overlay-cards(legacy)` | Composite static card families without the shared project protocol. |
-| `video-to-remotion(legacy)` | Generate selective transcript-timed graphics with Remotion. |
-| `design-frames-to-motion(legacy)` | Rebuild supplied design frames as transcript-synced Remotion components. |
+| `video-to-shorts` | Find, review, and render short vertical clips from long-form video. |
 
 Read a skill's `SKILL.md` before running its scripts. Editorial choices remain human-reviewed; scripts handle timestamp precision, compositing, and checks.
 
@@ -85,14 +83,4 @@ python skills/video-understand/scripts/render_project.py work/render/render-plan
 python skills/video-edit-compare/scripts/make_compare.py work/timeline.json input/original-video.mp4 final/final-video.mp4 review/04-edit-compare/original-vs-final-source-time.mp4
 ```
 
-Each skill still supports focused review artifacts and legacy adapters where documented. Do not use a full delivery render as the default preview.
-
-## Verification
-
-The protocol and ffmpeg integrations use Python's standard `unittest` runner:
-
-```powershell
-python -m unittest discover -s tests -p 'test_*.py' -v
-```
-
-Tests cover schema validation, revision checks, timeline mapping, legacy compatibility, real one-pass delivery rendering, source-time comparison, audio continuity, and pixel samples.
+Each skill still supports focused review artifacts and compatibility adapters where documented. Do not use a full delivery render as the default preview.
