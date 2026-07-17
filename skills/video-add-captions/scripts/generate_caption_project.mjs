@@ -204,6 +204,9 @@ const timelineCode = captions.map((cue, cueIndex) => {
 }).join("\n\n        ");
 
 const fontSize = Math.max(1, Math.round(height * style.font.sizeRatio));
+const renderFontFamily = style.font.family.includes("system-ui")
+  ? `"Caption_System", ${style.font.family}`
+  : style.font.family;
 const paddingBottom = Math.round(height * style.layout.paddingBottomRatio);
 const backgroundPaddingX = Math.round(height * style.background.paddingXRatio);
 const backgroundPaddingY = Math.round(height * style.background.paddingYRatio);
@@ -252,6 +255,14 @@ const html = `<!doctype html>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
     <style>
       @font-face {
+        font-family: "Caption_System";
+        src: url("assets/CalSans-Regular.ttf") format("truetype");
+        font-weight: 100 900;
+        font-style: normal;
+        unicode-range: U+E000;
+      }
+
+      @font-face {
         font-family: "Cal_Sans";
         src: url("assets/CalSans-Regular.ttf") format("truetype");
         font-weight: 900;
@@ -290,7 +301,7 @@ const html = `<!doctype html>
         max-width: ${style.layout.maxWidth * 100}%;
         box-sizing: border-box;
         color: ${style.font.color};
-        font-family: ${style.font.family};
+        font-family: ${renderFontFamily};
         font-size: ${fontSize}px;
         font-weight: ${style.font.weight};
         line-height: ${style.font.lineHeight};
