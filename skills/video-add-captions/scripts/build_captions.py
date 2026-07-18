@@ -33,7 +33,10 @@ def _cjk(ch):
 
 def needs_space(a, b):
     # a space between Latin tokens, never around CJK characters
-    return bool(a) and bool(b) and not _cjk(a[-1]) and not _cjk(b[0])
+    return (
+        bool(a) and bool(b) and not b.startswith("-")
+        and not _cjk(a[-1]) and not _cjk(b[0])
+    )
 
 def join_tokens(tokens):
     s = ""

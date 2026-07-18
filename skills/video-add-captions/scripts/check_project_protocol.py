@@ -112,6 +112,10 @@ def check_orphan_merge_keeps_grouping_limits():
     assert all(len(cue["text"]) <= 8 for cue in cues)
 
 
+def check_hyphenated_tokens_do_not_gain_space():
+    assert build_captions.join_tokens(["Earth", "-like", "planet."]) == "Earth-like planet."
+
+
 def check_adjacent_cues_do_not_overlap():
     cues = build_captions.build(
         [
@@ -342,10 +346,12 @@ def check_delegated_caption_review():
 def main():
     check_canonical_caption_plan()
     check_orphan_merge_keeps_grouping_limits()
+    check_hyphenated_tokens_do_not_gain_space()
     check_adjacent_cues_do_not_overlap()
     check_delegated_caption_review()
     print("[caption-protocol] canonical caption plan passed")
     print("[caption-protocol] grouping limits passed")
+    print("[caption-protocol] hyphenated token spacing passed")
     print("[caption-protocol] non-overlapping cue timing passed")
     print("[caption-protocol] delegated review passed")
 
