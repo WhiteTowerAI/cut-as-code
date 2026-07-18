@@ -220,9 +220,11 @@ node "$SkillRoot\scripts\generate_caption_project.mjs" `
 
 npx.cmd hyperframes check $OverlayProject --at 1 --timeout 10000 --no-contrast
 
+$RenderMeta = Get-Content -Raw "$OverlayProject\project-meta.json" | ConvertFrom-Json
+$RenderFps = "$($RenderMeta.fpsRational.num)/$($RenderMeta.fpsRational.den)"
 Push-Location $OverlayProject
 try {
-  npx.cmd hyperframes render --format png-sequence --output $OverlayFrames
+  npx.cmd hyperframes render --format png-sequence --fps $RenderFps --output $OverlayFrames
 }
 finally {
   Pop-Location
@@ -316,7 +318,8 @@ Also verify:
 - early/middle/late captions appear on the correct mapped source pixels;
 - dropped speech has no cue;
 - overlay first frame exists, dimensions match, FPS equals timeline rational FPS,
-  duration covers the complete program, and non-caption pixels are transparent;
+  frame count equals `ceil(program_duration_s * fps.num / fps.den)`, duration covers
+  the complete program, and non-caption pixels are transparent;
 - the shared delivery exists, has synchronized audio, and passes the project's
   delivery report;
 - `captions-summary.md` records the selected style, approval mode/rationale,

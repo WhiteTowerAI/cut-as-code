@@ -77,6 +77,24 @@ def check_canonical_caption_plan():
     }
     assert plan["renderer_recipe"]["fps"] == {"num": 30, "den": 1}
 
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        transcript_path = root / "transcript.json"
+        timeline_path = root / "timeline.json"
+        plan_path = root / "captions-plan.json"
+        srt_path = root / "captions.srt"
+        transcript_path.write_text(json.dumps(transcript), encoding="utf-8")
+        timeline_path.write_text(json.dumps(timeline), encoding="utf-8")
+        build_captions.main([
+            str(transcript_path),
+            str(plan_path),
+            str(srt_path),
+            "--timeline", str(timeline_path),
+            "--source-transcript", "understand/transcript.json",
+        ])
+        assert json.loads(plan_path.read_text(encoding="utf-8"))["cues"]
+        assert "First" in srt_path.read_text(encoding="utf-8")
+
 
 def check_orphan_merge_keeps_grouping_limits():
     cues = build_captions.build(
@@ -92,6 +110,23 @@ def check_orphan_merge_keeps_grouping_limits():
     )
     assert all(cue["end"] - cue["start"] <= 6.0 for cue in cues)
     assert all(len(cue["text"]) <= 8 for cue in cues)
+
+
+def check_adjacent_cues_do_not_overlap():
+    cues = build_captions.build(
+        [
+            {"word": "One", "start": 0.0, "end": 0.5, "clip_id": "clip-001"},
+            {"word": "way...", "start": 1.0, "end": 1.001, "clip_id": "clip-001"},
+            {"word": "Next", "start": 1.0, "end": 1.3, "clip_id": "clip-001"},
+            {"word": "phrase.", "start": 1.3, "end": 2.0, "clip_id": "clip-001"},
+        ],
+        max_chars=42,
+        max_lines=2,
+        max_dur=6.0,
+        gap=0.6,
+    )
+    assert len(cues) == 2
+    assert cues[0]["end"] <= cues[1]["start"]
 
 
 def check_delegated_caption_review():
@@ -244,6 +279,10 @@ def check_delegated_caption_review():
         html = (project / "index.html").read_text(encoding="utf-8")
         assert "assets/gsap.min.js" in html
         assert "https://" not in html and "http://" not in html
+        assert 'data-fps="30/1"' in html
+        word_style = html.split(".caption-word {", 1)[1].split("}", 1)[0]
+        assert "max-width:" in word_style
+        assert "overflow: hidden;" in word_style
         assert (project / "assets/gsap.min.js").is_file()
         meta = json.loads((project / "project-meta.json").read_text(encoding="utf-8"))
         assert meta["fpsRational"] == {"num": 30, "den": 1}
@@ -303,9 +342,11 @@ def check_delegated_caption_review():
 def main():
     check_canonical_caption_plan()
     check_orphan_merge_keeps_grouping_limits()
+    check_adjacent_cues_do_not_overlap()
     check_delegated_caption_review()
     print("[caption-protocol] canonical caption plan passed")
     print("[caption-protocol] grouping limits passed")
+    print("[caption-protocol] non-overlapping cue timing passed")
     print("[caption-protocol] delegated review passed")
 
 

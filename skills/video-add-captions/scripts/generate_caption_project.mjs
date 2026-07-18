@@ -383,6 +383,8 @@ const html = `<!doctype html>
 
       .caption-word {
         display: inline-block;
+        max-width: ${Math.round(width * style.layout.maxWidth)}px;
+        overflow: hidden;
         color: ${style.font.color};
         opacity: ${initialWordOpacity};
         white-space: nowrap;
@@ -399,7 +401,7 @@ const html = `<!doctype html>
       data-composition-id="${compositionId}"
       data-start="0"
       data-duration="${duration.toFixed(3)}"
-      data-fps="${fps}"
+      data-fps="${fpsNumerator}/${fpsDenominator}"
       data-width="${width}"
       data-height="${height}"
     >

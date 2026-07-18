@@ -18,6 +18,7 @@ CONTRIBUTION_KINDS = {
     "precomputed-asset",
     "output-constraint",
 }
+POINT_WORD_DURATION_S = 0.001
 
 
 def load_json(path):
@@ -1039,11 +1040,15 @@ def map_transcript_to_timeline(transcript, timeline):
                 not math.isfinite(source_start)
                 or not math.isfinite(source_end)
                 or source_start < 0
-                or source_end <= source_start
+                or source_end < source_start
             ):
                 raise ValueError(
                     f"segment {segment_index} word {word_index} has invalid timing"
                 )
+            if source_end == source_start:
+                # faster-whisper can emit point-timed words; preserve the word and
+                # its clip assignment while giving downstream cues a positive range.
+                source_end = source_start + POINT_WORD_DURATION_S
             if source_start < previous_source_start - 1e-6:
                 raise ValueError("transcript words must stay chronological")
             previous_source_start = source_start

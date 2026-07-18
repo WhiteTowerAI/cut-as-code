@@ -142,6 +142,12 @@ def build(words, max_chars, max_lines, max_dur, gap):
         merged = merged[1:]
     cues = merged
 
+    for current, following in zip(cues, cues[1:]):
+        if current["end"] > following["start"]:
+            if following["start"] <= current["start"]:
+                raise ValueError("caption cue timing collapsed after millisecond rounding")
+            current["end"] = following["start"]
+
     for idx, c in enumerate(cues, 1):
         c["index"] = idx
         c["lines"] = wrap_tokens([w["word"] for w in c["words"]], max_chars)
@@ -255,7 +261,8 @@ def main(argv=None):
 
     durs = [c["end"] - c["start"] for c in cues]
     chars = [len(c["text"]) for c in cues]
-    print(f"[captions] {len(cues)} cues from {len(words)} words "
+    word_count = sum(len(cue["words"]) for cue in cues)
+    print(f"[captions] {len(cues)} cues from {word_count} words "
           f"-> {out_json} + {out_srt}")
     print(f"[captions] dur avg={sum(durs)/len(durs):.1f}s max={max(durs):.1f}s | "
           f"chars avg={sum(chars)//len(chars)} max={max(chars)} "

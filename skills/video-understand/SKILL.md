@@ -40,7 +40,9 @@ Require `ffmpeg`/`ffprobe`, Python, and `faster-whisper` for transcription. Chec
    Use `--lang auto` for unknown or mixed-language speech. Never infer the spoken language
    from the language of the user's prompt. Pass a fixed language such as `--lang zh` only
    when the audio itself or explicit user metadata establishes it. Keep model downloads in
-   the project-local `work/cache/faster-whisper/` cache.
+   the project-local `work/cache/faster-whisper/` cache. Faster-whisper may emit an
+   occasional point-timed word with equal start/end values; the shared timeline mapper
+   preserves it as a 1 ms interval so captions and derivatives do not silently lose text.
 
 4. Generate objective metrics and semantic candidates:
 

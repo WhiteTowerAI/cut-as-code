@@ -46,6 +46,7 @@ def check_program_transcript_mapping():
                 "text": "keep drop fast",
                 "words": [
                     {"start": 0.2, "end": 0.6, "word": " keep"},
+                    {"start": 0.7, "end": 0.7, "word": " point"},
                     {"start": 2.5, "end": 2.8, "word": " drop"},
                     {"start": 4.0, "end": 4.5, "word": " fast"},
                 ],
@@ -59,9 +60,11 @@ def check_program_transcript_mapping():
     assert mapped["duration"] == 3.0
     assert len(mapped["segments"]) == 2
     words = [word for segment in mapped["segments"] for word in segment["words"]]
-    assert [word["word"].strip() for word in words] == ["keep", "fast"]
+    assert [word["word"].strip() for word in words] == ["keep", "point", "fast"]
     assert words[0]["source_range"] == {"start_s": 0.2, "end_s": 0.6}
-    assert words[1]["program_range"] == {"start_s": 2.0, "end_s": 2.25}
+    assert words[1]["source_range"]["end_s"] > words[1]["source_range"]["start_s"]
+    assert words[1]["program_range"]["end_s"] > words[1]["program_range"]["start_s"]
+    assert words[2]["program_range"] == {"start_s": 2.0, "end_s": 2.25}
     assert mapped["segments"][0]["clip_id"] == "clip-001"
     assert mapped["segments"][1]["clip_id"] == "clip-002"
 
