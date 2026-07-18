@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -462,6 +462,33 @@ if (canonicalPlan && mode === "overlay" && !approvedPlanMode) {
     runtime_assets: runtimeAssets,
   };
   writeFileSync(captionsPath, `${JSON.stringify(canonicalPlan, null, 2)}\n`, "utf8");
+  if (projectRoot) {
+    const summaryDir = join(projectRoot, "review", "05-captions");
+    const summaryPath = join(summaryDir, "captions-summary.md");
+    mkdirSync(summaryDir, { recursive: true });
+    const existing = existsSync(summaryPath) ? readFileSync(summaryPath, "utf8") : "# Caption Review\n";
+    const base = existing.split(/\r?\n## Approval\r?\n/, 1)[0].trimEnd();
+    const oneLine = (value) => String(value ?? "").replaceAll(/\s+/g, " ").trim();
+    const approvalLines = [
+      base,
+      "",
+      "## Approval",
+      "",
+      `- Style: \`${selection.choiceId}\``,
+      `- Preset: \`${style.preset}\``,
+      `- Karaoke: \`${karaoke ? "on" : "off"}\``,
+      `- Decision mode: \`${interaction.state.decisionMode}\``,
+      `- Selection rationale: ${oneLine(canonicalPlan.style.selection_rationale)}`,
+      `- Approval actor: \`${canonicalPlan.review.approval_actor}\``,
+      `- Approval rationale: ${oneLine(canonicalPlan.review.approval_rationale)}`,
+      `- Preview evidence: ${canonicalPlan.review.evidence.length} hash-bound files`,
+      "- Approval binding validation: pass",
+      "- Formal overlay project generation: pass",
+      "- Rendered-frame and shared-delivery checks remain required before operation verification.",
+      "",
+    ];
+    writeFileSync(summaryPath, approvalLines.join("\n"), "utf8");
+  }
 }
 
 const selectionRecord = interaction?.state.selection ?? {

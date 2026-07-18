@@ -88,6 +88,27 @@ const assertBoundFile = (binding, actualPath, label) => {
   }
 };
 
+export const assertPreviewBindings = (preview) => {
+  if (!preview || !preview.projectMetaPath || !preview.projectMetaSha256) {
+    throw new Error("Preview project metadata binding is missing. Generate a new preview.");
+  }
+  if (!Array.isArray(preview.evidence) || preview.evidence.length < 4) {
+    throw new Error("Preview evidence bindings are incomplete. Generate a new preview.");
+  }
+
+  assertBoundFile(
+    { path: preview.projectMetaPath, sha256: preview.projectMetaSha256 },
+    preview.projectMetaPath,
+    "Preview project metadata",
+  );
+  preview.evidence.forEach((binding, index) => {
+    assertBoundFile(binding, binding.path, `Preview evidence ${index + 1}`);
+  });
+  if (preview.evidenceSignature !== hashJson(preview.evidence)) {
+    throw new Error("Preview evidence signature differs from the interaction state. Generate a new preview.");
+  }
+};
+
 const normalizeNullable = (value) => value ?? null;
 
 export const selectionOptionsFromState = (selection) => ({
@@ -146,6 +167,7 @@ export const validateGenerationInteraction = ({
     if (!state.preview || !state.approval) {
       throw new Error("The interaction state has no confirmed preview evidence.");
     }
+    assertPreviewBindings(state.preview);
     if (state.approval.actor && state.approval.actor !== state.decisionMode) {
       throw new Error("Render approval actor does not match the interaction decision mode.");
     }

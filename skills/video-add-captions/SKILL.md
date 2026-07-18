@@ -231,6 +231,12 @@ finally {
 }
 ```
 
+Canonical overlay generation refreshes the `## Approval` section in
+`captions-summary.md` with the selected style, decision actor/rationale, and
+hash-binding result. It deliberately leaves rendered-frame and shared-delivery
+checks pending; replace that pending line with the measured results before marking
+the operation verified.
+
 After cache deletion, rebuild the composition without replaying approval:
 
 ```powershell

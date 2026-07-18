@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, extname, resolve } from "node:path";
 import {
+  assertPreviewBindings,
   galleryPath,
   hashFile,
   hashJson,
@@ -265,6 +266,7 @@ try {
     if (response !== "确认渲染") {
       throw new Error('Render approval requires the exact user response "确认渲染".');
     }
+    assertPreviewBindings(state.preview);
     state.phase = "render_approved";
     state.updatedAt = now();
     state.approval = {
@@ -285,6 +287,7 @@ try {
       throw new Error(`Agent render approval requires preview evidence. Current phase: ${state.phase}`);
     }
     const rationale = requireRationale(options);
+    assertPreviewBindings(state.preview);
     state.phase = "render_approved";
     state.updatedAt = now();
     state.approval = {

@@ -247,6 +247,16 @@ def check_delegated_caption_review():
         )
         assert rejected.returncode != 0
         assert "agent-confirm" in rejected.stderr
+
+        Path(evidence[0]).write_bytes(b"changed")
+        rejected = run(
+            "agent-confirm", "--state", state,
+            "--rationale", "Mutated evidence must not be approved.", check=False,
+        )
+        assert rejected.returncode != 0
+        assert "Preview evidence" in rejected.stderr
+        Path(evidence[0]).write_bytes(b"png")
+
         run(
             "agent-confirm", "--state", state,
             "--rationale", "All four source-backed previews are legible and collision-free.",
@@ -261,7 +271,7 @@ def check_delegated_caption_review():
 
         generator = Path(__file__).resolve().parent / "generate_caption_project.mjs"
         project = root / "overlay-project"
-        def run_generator(*arguments):
+        def run_generator(*arguments, check=True):
             result = subprocess.run(
                 ["node", str(generator), *map(str, arguments)],
                 check=False,
@@ -269,8 +279,28 @@ def check_delegated_caption_review():
                 encoding="utf-8",
                 errors="replace",
             )
-            assert result.returncode == 0, result.stderr
+            if check:
+                assert result.returncode == 0, result.stderr
             return result
+
+        summary = root / "review/05-captions/captions-summary.md"
+        summary.parent.mkdir(parents=True, exist_ok=True)
+        summary.write_bytes(
+            b"# Caption Review\r\n\r\n## Approval\r\n\r\n- Style: `stale`\r\n"
+        )
+        Path(evidence[1]).write_bytes(b"changed")
+        rejected = run_generator(
+            "--video", source,
+            "--captions", captions,
+            "--out", project,
+            "--interaction-state", state,
+            "--project-root", root,
+            "--mode", "overlay",
+            check=False,
+        )
+        assert rejected.returncode != 0
+        assert "Preview evidence" in rejected.stderr
+        Path(evidence[1]).write_bytes(b"png")
 
         run_generator(
             "--video", source,
@@ -280,6 +310,15 @@ def check_delegated_caption_review():
             "--project-root", root,
             "--mode", "overlay",
         )
+        summary_text = summary.read_text(encoding="utf-8")
+        assert summary_text.count("## Approval") == 1
+        assert "`stale`" not in summary_text
+        assert "- Style: `clean`" in summary_text
+        assert "- Decision mode: `agent`" in summary_text
+        assert "Clean captions preserve the interview framing." in summary_text
+        assert "All four source-backed previews are legible and collision-free." in summary_text
+        assert "- Approval binding validation: pass" in summary_text
+        assert "Rendered-frame and shared-delivery checks remain required" in summary_text
         html = (project / "index.html").read_text(encoding="utf-8")
         assert "assets/gsap.min.js" in html
         assert "https://" not in html and "http://" not in html
