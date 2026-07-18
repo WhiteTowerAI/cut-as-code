@@ -189,6 +189,7 @@ def _build(plan, project_root, plan_dir):
             overlays.append(
                 {
                     "path": _resolve(project_root, plan_dir, contribution["asset"]),
+                    "asset_type": "file",
                     "start_s": float(contribution.get("start_s", 0)),
                     "duration_s": contribution.get("duration_s"),
                 }

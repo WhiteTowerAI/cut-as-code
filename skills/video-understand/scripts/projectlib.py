@@ -74,6 +74,14 @@ def _validate_node(node, nodes, errors, *, allow_render=False):
     if not isinstance(based_on, dict):
         errors.append(f"{node_id} based_on must be an object")
         return
+    expected_dependencies = set(dependencies)
+    if allow_render:
+        expected_dependencies.discard("render")
+    recorded_dependencies = set(based_on)
+    for dependency in sorted(expected_dependencies - recorded_dependencies):
+        errors.append(f"{node_id} based_on missing revision for dependency: {dependency}")
+    for dependency in sorted(recorded_dependencies - expected_dependencies):
+        errors.append(f"{node_id} based_on has unexpected dependency: {dependency}")
     for dependency, expected_revision in based_on.items():
         current = nodes.get(dependency, {}).get("revision")
         if current is None:
@@ -128,6 +136,29 @@ def _validate_source(project, project_root, errors, check_media=False):
                     "source fingerprint duration mismatch: "
                     f"expected {expected_duration}, current {current_duration:.6f}"
                 )
+
+
+def _validate_operation_outputs(operation, project_root, errors):
+    operation_id = operation.get("id") or "<missing-id>"
+    outputs = operation.get("outputs", [])
+    if not isinstance(outputs, list):
+        errors.append(f"{operation_id} outputs must be a list")
+        return
+
+    cache_root = (Path(project_root).resolve() / "work" / "cache").resolve()
+    for value in outputs:
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"{operation_id} output path must be a non-empty string")
+            continue
+        try:
+            path = resolve_project_path(project_root, value)
+        except ValueError as exc:
+            errors.append(str(exc))
+            continue
+        if os.path.commonpath((str(cache_root), str(path))) == str(cache_root):
+            continue
+        if operation.get("status") == "verified" and not path.exists():
+            errors.append(f"{operation_id} missing output: {value}")
 
 
 def validate_project(project, project_root, check_files=True, check_media=False):
@@ -223,6 +254,8 @@ def validate_project(project, project_root, check_files=True, check_media=False)
 
     if check_files:
         _validate_source(project, project_root, errors, check_media=check_media)
+        for operation in operations:
+            _validate_operation_outputs(operation, project_root, errors)
         for node in [*operations, *project.get("reviews", [])]:
             plan = node.get("plan")
             if plan:
