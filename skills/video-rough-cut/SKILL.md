@@ -211,6 +211,8 @@ python scripts/cut_render.py    work/edit_final.json   work/source.mp4 first_cut
 
 ### 6. Self-check — do not declare done until this passes
 ```
+# protocol precision regression check (run from the repository root)
+python skills/video-rough-cut/scripts/check_project_protocol.py
 # re-transcribe the finished cut
 ffmpeg -y -i first_cut.mp4 -ac 1 -ar 16000 work/selfcheck/cut_audio16k.wav
 python scripts/transcribe.py work/selfcheck/cut_audio16k.wav work/selfcheck/cut_transcript

@@ -111,7 +111,7 @@ def main():
     total = sum(s["out"] - s["in"] for s in merged)
     out = {
         "source": coarse.get("source", "work/source.mp4"),
-        "source_duration_s": round(dur, 1),
+        "source_duration_s": dur,
         "source_duration_min": round(dur/60, 2),
         "final_duration_s": round(total, 1),
         "final_duration_min": round(total/60, 2),
