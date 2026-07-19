@@ -247,6 +247,7 @@ are `PRESENTER`, `WIDE_INFORMATION`, `PRODUCT`, `MULTI_SUBJECT`, and `OTHER`.
 $ShortId = "short-001"
 $Horizontal = Join-Path $ProjectRoot "final\shorts\$ShortId-horizontal.mp4"
 $VerticalWork = Join-Path $ShortsWork "$ShortId\vertical-agent"
+$ExtractionReport = Join-Path $ShortsWork "$ShortId\extraction-report.json"
 
 python "$SkillRoot\scripts\prepare_visual_context.py" $Horizontal `
   --out "$Work\cache\shorts\$ShortId-vertical-visual" --interval 1
@@ -254,11 +255,17 @@ python "$SkillRoot\scripts\prepare_visual_context.py" $Horizontal `
 python "$SkillRoot\scripts\vertical_plan.py" `
   --video $Horizontal `
   --input "$VerticalWork\agent_vertical_plan.json" `
-  --out $VerticalWork
+  --out $VerticalWork `
+  --source-video $FinalVideo `
+  --extraction-report $ExtractionReport
 ```
 
 `vertical_plan.json` preserves exact FPS as `{num, den}` and deterministically
-validates geometry, coverage, strategy duration, and warnings.
+validates geometry, coverage, strategy duration, and warnings. The direct-render
+binding hashes the verified main delivery and the exact extraction report. Preview
+review still uses the approved horizontal short timeline, while formal rendering maps
+that timeline through the recorded `keep_spans` and reads pixels directly from the
+verified main delivery.
 
 Render a smaller preview into the user-facing review directory:
 
@@ -286,8 +293,10 @@ python "$SkillRoot\scripts\render_vertical.py" `
   --out $VerticalWork --review-out $ShortsReview --mode final
 ```
 
-The renderer uses rational `num/den`, H.264/yuv420p, and encoded continuous audio;
-then checks dimensions, duration, FPS, and audio presence.
+The formal renderer uses rational `num/den`, one H.264/yuv420p generation from the
+verified main delivery, `libx264 -preset slow -crf 16`, and encoded continuous audio.
+Preview rendering remains `medium` / CRF 20 for faster review. The renderer checks
+dimensions, duration, FPS, audio presence, source/report hashes, and keep-span mapping.
 
 ## Project Operation
 
@@ -347,7 +356,8 @@ For every delivered short verify:
 - short transcript starts at zero, ends within media, and excludes removed words;
 - horizontal output has expected FPS, H.264 video, synchronized audio, and review still;
 - vertical output is 9:16, uses the exact rational FPS, keeps required content safe,
-  has synchronized audio, and matches its approved preview/plan hashes;
+  has synchronized audio, matches its approved preview/plan hashes, and records
+  `direct_render: true` with the verified main delivery as `render_source`;
 - all user-facing media is under `review/` or `final/`, and disposable material is
   under `work/cache/`;
 - `shorts-summary.md` records outputs, decisions, warnings, and checks.

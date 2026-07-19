@@ -29,6 +29,13 @@ Vertical strategies are `STATIC_CROP`, `SCENE_CROP`, `LETTERBOX`, and
 `REVIEW_REQUIRED`. Plans preserve FPS as `{num, den}`. Python validates an
 agent-authored crop; it does not invent coordinates or claim continuous tracking.
 
+New vertical plans may bind the original verified delivery and the horizontal
+extraction report. Preview review remains based on the approved horizontal short, but
+formal rendering maps short-relative segments through `keep_spans` and reads the
+original delivery directly. This removes the former horizontal-H.264-to-vertical-H.264
+generation. Formal output uses `libx264 -preset slow -crf 16`; legacy plans without the
+binding remain supported.
+
 See [SKILL.md](SKILL.md) for the complete protocol, commands, candidate contract,
 review modes, vertical rules, compatibility behavior, and self-check.
 
