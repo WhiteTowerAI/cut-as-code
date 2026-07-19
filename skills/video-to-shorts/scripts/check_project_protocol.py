@@ -6,6 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import extract_shorts
+import boundary_refine
 import candidates
 import plan as shorts_plan
 import prepare_transcript
@@ -41,6 +42,51 @@ def timeline_fixture():
             },
         ],
     }
+
+
+def check_boundary_release_guard():
+    transcript = {
+        "duration": 3.0,
+        "segments": [{
+            "start": 0.2,
+            "end": 1.4,
+            "text": "complete. next",
+            "words": [
+                {"start": 0.2, "end": 1.0, "word": " complete."},
+                {"start": 1.1, "end": 1.4, "word": " next"},
+            ],
+        }],
+    }
+    refined = boundary_refine.refine_short_boundary(
+        {"short_id": "short-release", "start_time": 0.2, "end_time": 1.0},
+        transcript,
+        media_duration=3.0,
+        snap_to_phrases=False,
+    )
+    assert refined["content_end_time"] == 1.0
+    assert refined["refined_end_time"] == 1.3
+    assert refined["media_tail_after_content_end_s"] == 0.3
+    assert "RAW_END_PROTECTED_BY_RELEASE_HANDLE" in refined["reasons"]
+    assert "TAIL_OVERLAP_ALLOWED_FOR_FINAL_WORD_RELEASE" in refined["warnings"]
+
+    keep_spans = [{"start_time": 0.2, "end_time": 1.3}]
+    remapped = extract_shorts.remap_transcript(
+        transcript,
+        {"short_id": "short-release"},
+        Path("source.mp4"),
+        Path("transcript.json"),
+        keep_spans,
+        1.1,
+        refined["content_start_time"],
+        refined["content_end_time"],
+    )
+    words = [
+        word["word"].strip()
+        for segment in remapped["segments"]
+        for word in segment["words"]
+    ]
+    assert words == ["complete."]
+    assert extract_shorts.map_source_time_to_output(keep_spans, 1.0) == 0.8
 
 
 def transcript_fixture():
@@ -471,6 +517,7 @@ def check_project_candidate_binding():
 
 
 def main():
+    check_boundary_release_guard()
     check_exact_excerpt()
     check_program_transcript()
     check_delegated_reviews()
@@ -478,6 +525,7 @@ def main():
     check_media_integration()
     check_direct_vertical_rendering()
     check_project_candidate_binding()
+    print("[shorts-protocol] boundary release guard passed")
     print("[shorts-protocol] exact word excerpt passed")
     print("[shorts-protocol] program transcript passed")
     print("[shorts-protocol] delegated reviews passed")

@@ -15,6 +15,12 @@ The canonical workflow is:
 6. Extract seeked keep ranges into `final/shorts/*-horizontal.mp4`.
 7. Optionally author, preview, approve, and render a deterministic 9:16 plan.
 
+Extraction treats the selected final word and the media endpoint separately. Every
+short targets 0.30 seconds and requires at least 0.25 seconds of release audio after
+the selected content, including when semantic boundary refinement is disabled. The
+short transcript excludes any following words that appear only inside this media
+handle.
+
 Shorts are recorded as a derived `project.json` operation but are not added to
 the main sequence. They never modify or re-render the main delivery.
 

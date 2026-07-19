@@ -218,6 +218,12 @@ video. Each keep range becomes its own seeked `-ss/-t/-i` input; ffmpeg concaten
 those inputs and performs one H.264/AAC encode. It does not decode the complete main
 video once per keep range.
 
+The selected final transcript word and the media cut endpoint are separate boundaries.
+Extraction preserves at least 0.25 seconds of release audio after selected content and
+targets 0.30 seconds. `--no-refine-boundaries` disables semantic phrase snapping only;
+it never disables the mandatory release handle. If the source ends before the required
+handle can be preserved, extraction fails instead of marking the short verified.
+
 The short-relative transcript excludes dropped words, shifts later words onto a
 continuous zero-based clock, and retains input program/source evidence. Horizontal
 media goes directly to `final/shorts`; work contains only its transcript and report.
@@ -353,7 +359,8 @@ For every delivered short verify:
 - candidate excerpt equals overlapping program words and the thought is complete;
 - source/program ranges and dependency revisions resolve;
 - horizontal duration approximately equals keep-span sum;
-- short transcript starts at zero, ends within media, and excludes removed words;
+- short transcript starts at zero, ends within media, excludes removed words and words
+  heard only inside the release handle, and reports `tail_release_verified: true`;
 - horizontal output has expected FPS, H.264 video, synchronized audio, and review still;
 - vertical output is 9:16, uses the exact rational FPS, keeps required content safe,
   has synchronized audio, matches its approved preview/plan hashes, and records
