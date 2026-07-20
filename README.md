@@ -78,8 +78,6 @@ The approved horizontal shorts are then reframed for vertical delivery. Captions
 
 <video src="https://github.com/user-attachments/assets/a439ed43-6e98-4ce0-8d54-362029fa659e" width="320" controls muted playsinline></video>
 
-[Open Short 04](https://github.com/user-attachments/assets/a439ed43-6e98-4ce0-8d54-362029fa659e)
-
 ### Short 05
 
 Upload pending.
