@@ -58,17 +58,17 @@ The approved horizontal shorts are then reframed for vertical delivery. Captions
       <code>short-01.mp4</code>
     </td>
     <td align="center">
-      <video src="https://github.com/user-attachments/assets/144854cf-71bc-4106-b8c6-46605dbd287a" width="240" controls muted playsinline></video>
+      <video src="https://github.com/user-attachments/assets/9c71db5e-320d-40ca-843b-1656b0f388be" width="240" controls muted playsinline></video>
       <br>
       <code>short-02.mp4</code>
     </td>
     <td align="center">
-      <video src="https://github.com/user-attachments/assets/56af369f-e2dd-48c0-a4a2-b91dcba96955" width="240" controls muted playsinline></video>
+      <video src="https://github.com/user-attachments/assets/6f3c82a7-f01c-4b94-b059-033b3116165b" width="240" controls muted playsinline></video>
       <br>
       <code>short-03.mp4</code>
     </td>
     <td align="center">
-      <video src="https://github.com/user-attachments/assets/a439ed43-6e98-4ce0-8d54-362029fa659e" width="240" controls muted playsinline></video>
+      <video src="https://github.com/user-attachments/assets/6f6a1a16-8b2a-4b46-8081-a77e21a9d986" width="240" controls muted playsinline></video>
       <br>
       <code>short-04.mp4</code>
     </td>
