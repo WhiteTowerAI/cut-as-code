@@ -44,22 +44,45 @@ The approved horizontal shorts are then reframed for vertical delivery. Captions
 
 **Source footage:** [Watch the original video on YouTube](https://www.youtube.com/watch?v=wSp6AiNIrsY)
 
-<!-- TODO: Add three poster images and replace the video attachment URLs. -->
-
-| Short 01 | Short 02 | Short 03 |
-|---|---|---|
-| [![Watch Short 01](docs/assets/readme/short-01.jpg)](SHORT_01_VIDEO_URL) | [![Watch Short 02](docs/assets/readme/short-02.jpg)](SHORT_02_VIDEO_URL) | [![Watch Short 03](docs/assets/readme/short-03.jpg)](SHORT_03_VIDEO_URL) |
+<table>
+  <tr>
+    <th align="center">Short 01</th>
+    <th align="center">Short 02</th>
+    <th align="center">Short 03</th>
+  </tr>
+  <tr>
+    <td align="center">
+      <video src="https://github.com/user-attachments/assets/828c1800-3914-4077-bc1e-4db4d175311d" width="240" controls muted playsinline></video>
+      <br>
+      <a href="https://github.com/user-attachments/assets/828c1800-3914-4077-bc1e-4db4d175311d">Open Short 01</a>
+    </td>
+    <td align="center">
+      <video src="https://github.com/user-attachments/assets/144854cf-71bc-4106-b8c6-46605dbd287a" width="240" controls muted playsinline></video>
+      <br>
+      <a href="https://github.com/user-attachments/assets/144854cf-71bc-4106-b8c6-46605dbd287a">Open Short 02</a>
+    </td>
+    <td align="center">
+      <video src="https://github.com/user-attachments/assets/56af369f-e2dd-48c0-a4a2-b91dcba96955" width="240" controls muted playsinline></video>
+      <br>
+      <a href="https://github.com/user-attachments/assets/56af369f-e2dd-48c0-a4a2-b91dcba96955">Open Short 03</a>
+    </td>
+  </tr>
+</table>
 
 <details>
 <summary><strong>Watch all five vertical shorts</strong></summary>
 
 <br>
 
-1. [Watch Short 01](SHORT_01_VIDEO_URL)
-2. [Watch Short 02](SHORT_02_VIDEO_URL)
-3. [Watch Short 03](SHORT_03_VIDEO_URL)
-4. [Watch Short 04](SHORT_04_VIDEO_URL)
-5. [Watch Short 05](SHORT_05_VIDEO_URL)
+### Short 04
+
+<video src="https://github.com/user-attachments/assets/a439ed43-6e98-4ce0-8d54-362029fa659e" width="320" controls muted playsinline></video>
+
+[Open Short 04](https://github.com/user-attachments/assets/a439ed43-6e98-4ce0-8d54-362029fa659e)
+
+### Short 05
+
+Upload pending.
 
 Each short follows the same reviewable workflow:
 
