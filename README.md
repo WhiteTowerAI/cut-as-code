@@ -49,38 +49,31 @@ The approved horizontal shorts are then reframed for vertical delivery. Captions
     <th align="center">Short 01</th>
     <th align="center">Short 02</th>
     <th align="center">Short 03</th>
+    <th align="center">Short 04</th>
   </tr>
   <tr>
     <td align="center">
       <video src="https://github.com/user-attachments/assets/828c1800-3914-4077-bc1e-4db4d175311d" width="240" controls muted playsinline></video>
       <br>
-      <a href="https://github.com/user-attachments/assets/828c1800-3914-4077-bc1e-4db4d175311d">Open Short 01</a>
+      <code>short-01.mp4</code>
     </td>
     <td align="center">
       <video src="https://github.com/user-attachments/assets/144854cf-71bc-4106-b8c6-46605dbd287a" width="240" controls muted playsinline></video>
       <br>
-      <a href="https://github.com/user-attachments/assets/144854cf-71bc-4106-b8c6-46605dbd287a">Open Short 02</a>
+      <code>short-02.mp4</code>
     </td>
     <td align="center">
       <video src="https://github.com/user-attachments/assets/56af369f-e2dd-48c0-a4a2-b91dcba96955" width="240" controls muted playsinline></video>
       <br>
-      <a href="https://github.com/user-attachments/assets/56af369f-e2dd-48c0-a4a2-b91dcba96955">Open Short 03</a>
+      <code>short-03.mp4</code>
+    </td>
+    <td align="center">
+      <video src="https://github.com/user-attachments/assets/a439ed43-6e98-4ce0-8d54-362029fa659e" width="240" controls muted playsinline></video>
+      <br>
+      <code>short-04.mp4</code>
     </td>
   </tr>
 </table>
-
-<details>
-<summary><strong>Watch all five vertical shorts</strong></summary>
-
-<br>
-
-### Short 04
-
-<video src="https://github.com/user-attachments/assets/a439ed43-6e98-4ce0-8d54-362029fa659e" width="320" controls muted playsinline></video>
-
-### Short 05
-
-Upload pending.
 
 Each short follows the same reviewable workflow:
 
@@ -106,17 +99,13 @@ add content cards
 verify final vertical short
 ```
 
-</details>
-
 ### Original vs. color graded
 
 This side-by-side demo shows the original footage and the selected color grade on the same timeline.
 
 **Source footage:** [Watch the original video on YouTube](https://www.youtube.com/watch?v=BBJtM_s0HKE)
 
-<!-- TODO: Add the poster image and replace YOUTUBE_COLOR_GRADE_URL after upload. -->
-
-[![Watch the original vs. color-graded comparison](docs/assets/readme/color-grade-comparison.jpg)](YOUTUBE_COLOR_GRADE_URL)
+[![Watch the original vs. color-graded comparison](https://img.youtube.com/vi/dF2vhhrf5lI/maxresdefault.jpg)](https://youtu.be/dF2vhhrf5lI)
 
 The comparison contains two synchronized 16:9 views: the original footage on one side and the graded result on the other.
 
@@ -582,7 +571,7 @@ agent-cut supplies the video-editing structure.
 The roadmap describes planned work. Items in this section should not be interpreted as features that are already available.
 
 - [ ] Publish the complete long-form workflow demo on YouTube.
-- [ ] Publish the five vertical-short demos.
+- [ ] Publish the four vertical-short demos.
 - [ ] Publish the original-versus-color-graded comparison.
 - [ ] Make the full shorts workflow—from horizontal extraction through vertical captions and content cards—a first-class project operation.
 - [ ] Make skills easier to install and update.
