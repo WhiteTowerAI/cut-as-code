@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>HyperFrames Caption Preview</title>
+    <script src="../public/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: "Cal Sans";
+        src: url("fonts/CalSans-Regular.ttf") format("truetype");
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        background: #10141d;
+        font-family: "Cal Sans", Inter, sans-serif;
+      }
+
+      .preview-background {
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(circle at 50% 28%, rgba(79, 110, 164, 0.55), transparent 34%),
+          linear-gradient(180deg, #182131 0%, #0b0f17 100%);
+      }
+
+      .safe-area {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        padding: 0 72px 360px;
+        box-sizing: border-box;
+      }
+
+      .caption-cue {
+        position: absolute;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0 18px;
+        width: calc(100% - 144px);
+        color: #ffffff;
+        font-size: 78px;
+        font-weight: 700;
+        line-height: 1.08;
+        letter-spacing: -0.02em;
+        text-align: center;
+        opacity: 0;
+        transform: translateY(28px) scale(0.92);
+        text-shadow: 0 5px 18px rgba(0, 0, 0, 0.8);
+      }
+
+      .word {
+        color: #ffffff;
+        transition: none;
+      }
+
+      .word.active {
+        color: #ffe45c;
+        text-shadow: 0 0 20px rgba(255, 228, 92, 0.35), 0 5px 18px rgba(0, 0, 0, 0.8);
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="stage"
+      data-composition-id="video-add-captions-preview"
+      data-start="0"
+      data-duration="9"
+      data-fps="30"
+      data-width="1080"
+      data-height="1920"
+    >
+      <div class="preview-background"></div>
+
+      <div class="safe-area">
+        <div id="cue-1" class="caption-cue clip" data-start="0" data-duration="3" data-track-index="1">
+          <span id="cue-1-word-1" class="word">Make</span>
+          <span id="cue-1-word-2" class="word">every</span>
+          <span id="cue-1-word-3" class="word">word</span>
+          <span id="cue-1-word-4" class="word">count</span>
+        </div>
+
+        <div id="cue-2" class="caption-cue clip" data-start="3" data-duration="3" data-track-index="1">
+          <span id="cue-2-word-1" class="word">Captions</span>
+          <span id="cue-2-word-2" class="word">should</span>
+          <span id="cue-2-word-3" class="word">feel</span>
+          <span id="cue-2-word-4" class="word">alive</span>
+        </div>
+
+        <div id="cue-3" class="caption-cue clip" data-start="6" data-duration="3" data-track-index="1">
+          <span id="cue-3-word-1" class="word">Built</span>
+          <span id="cue-3-word-2" class="word">with</span>
+          <span id="cue-3-word-3" class="word">HyperFrames</span>
+        </div>
+      </div>
+
+      <script>
+        const timeline = gsap.timeline({ paused: true });
+
+        const addCue = (cueId, start, duration, wordWindows) => {
+          const cue = document.getElementById(cueId);
+          timeline.fromTo(
+            cue,
+            { opacity: 0, y: 28, scale: 0.92 },
+            { opacity: 1, y: 0, scale: 1, duration: 0.2, ease: "power3.out" },
+            start,
+          );
+          timeline.set(cue, { opacity: 0 }, start + duration);
+
+          wordWindows.forEach(({ id, from, to }) => {
+            const word = document.getElementById(id);
+            timeline.set(word, { color: "#ffe45c" }, from);
+            timeline.set(word, { color: "#ffffff" }, to);
+          });
+        };
+
+        addCue("cue-1", 0, 3, [
+          { id: "cue-1-word-1", from: 0.2, to: 0.8 },
+          { id: "cue-1-word-2", from: 0.8, to: 1.4 },
+          { id: "cue-1-word-3", from: 1.4, to: 2.0 },
+          { id: "cue-1-word-4", from: 2.0, to: 2.8 },
+        ]);
+
+        addCue("cue-2", 3, 3, [
+          { id: "cue-2-word-1", from: 3.2, to: 3.9 },
+          { id: "cue-2-word-2", from: 3.9, to: 4.5 },
+          { id: "cue-2-word-3", from: 4.5, to: 5.1 },
+          { id: "cue-2-word-4", from: 5.1, to: 5.8 },
+        ]);
+
+        addCue("cue-3", 6, 3, [
+          { id: "cue-3-word-1", from: 6.2, to: 6.9 },
+          { id: "cue-3-word-2", from: 6.9, to: 7.5 },
+          { id: "cue-3-word-3", from: 7.5, to: 8.8 },
+        ]);
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["video-add-captions-preview"] = timeline;
+      </script>
+    </div>
+  </body>
+</html>

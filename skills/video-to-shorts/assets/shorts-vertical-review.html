@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shorts vertical review</title>
+  <style>
+    :root {
+      --bg: #151719;
+      --band: #1d2023;
+      --surface: #24282b;
+      --line: #3b4145;
+      --text: #f2eee5;
+      --muted: #aeb4b7;
+      --accent: #4fc3b4;
+      --warning: #f3bd5b;
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); line-height: 1.5; }
+    button, textarea, input { font: inherit; }
+    button, textarea {
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--text);
+    }
+    button { padding: 7px 12px; cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: .55; }
+    button:focus-visible, textarea:focus-visible, input:focus-visible, .sheet-button:focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .shell { width: min(1180px, calc(100% - 32px)); margin: 0 auto; }
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      min-height: 38px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(29, 32, 35, .97);
+    }
+    .toolbar-inner { display: flex; min-height: 54px; align-items: center; justify-content: space-between; gap: 16px; }
+    h1 { margin: 0; font-size: 20px; letter-spacing: 0; }
+    h2 { margin: 0 0 12px; font-size: 17px; letter-spacing: 0; }
+    main { padding: 24px 0 48px; }
+    section { padding: 20px 0; border-bottom: 1px solid var(--line); }
+    .meta { display: flex; flex-wrap: wrap; gap: 10px 24px; color: var(--muted); }
+    .meta strong, dt { color: var(--text); }
+    .media-grid { display: grid; grid-template-columns: minmax(260px, 420px) minmax(0, 1fr); gap: 20px; align-items: start; }
+    video { display: block; width: 100%; max-height: 72vh; background: #000; }
+    .sheet-button { display: block; width: 100%; padding: 0; border: 0; background: transparent; cursor: zoom-in; }
+    .sheet-button img { display: block; width: 100%; height: auto; border: 1px solid var(--line); }
+    .empty-media { color: var(--warning); }
+    .warnings { margin: 0; padding-left: 22px; color: var(--warning); }
+    .segments { width: 100%; border-collapse: collapse; }
+    .segments th, .segments td { padding: 10px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+    .segments th { color: var(--muted); font-size: 13px; }
+    code { color: var(--accent); }
+    fieldset { margin: 0; padding: 0; border: 0; }
+    .decisions { display: flex; flex-wrap: wrap; gap: 10px 20px; }
+    .decision { display: inline-flex; min-height: 38px; align-items: center; gap: 8px; }
+    .decision input { width: 18px; height: 18px; accent-color: var(--accent); }
+    #approval-reason { margin: 8px 0 0; color: var(--warning); }
+    #changes-wrap { margin-top: 14px; }
+    #changes { width: 100%; min-height: 96px; padding: 10px; resize: vertical; }
+    #review-errors { min-height: 24px; margin-top: 8px; color: var(--warning); }
+    #summary-output { margin: 12px 0 0; padding: 14px; min-height: 122px; overflow-wrap: anywhere; white-space: pre-wrap; background: var(--band); }
+    dialog { width: min(1100px, calc(100% - 32px)); padding: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+    dialog::backdrop { background: rgba(0, 0, 0, .82); }
+    dialog img { display: block; max-width: 100%; max-height: calc(100vh - 100px); margin: auto; }
+    .dialog-actions { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+    [hidden] { display: none !important; }
+    @media (max-width: 1100px) {
+      .media-grid { grid-template-columns: 340px minmax(0, 1fr); }
+      .segments { font-size: 14px; }
+    }
+    @media (max-width: 780px) {
+      .shell { width: min(1180px, calc(100% - 32px)); }
+      .toolbar-inner, .media-grid { display: block; }
+      .toolbar-inner { padding: 10px 0; }
+      #review-status { margin-top: 4px; }
+      .media-grid > * + * { margin-top: 16px; }
+      .segments, .segments tbody, .segments tr, .segments td { display: block; }
+      .segments thead { display: none; }
+      .segments tr { padding: 10px 0; border-bottom: 1px solid var(--line); }
+      .segments td { padding: 4px 0; border: 0; }
+      .segments td::before { content: attr(data-label) ": "; color: var(--muted); font-weight: 600; }
+    }
+  </style>
+</head>
+<body>
+  <header class="toolbar">
+    <div class="shell toolbar-inner">
+      <h1>Shorts vertical review</h1>
+      <div id="review-status" aria-live="polite">Pending</div>
+    </div>
+  </header>
+  <main class="shell">
+    <section aria-labelledby="overview-heading">
+      <h2 id="overview-heading">Overview</h2>
+      <div class="meta">
+        <span><strong>Short:</strong> <span id="short-id"></span></span>
+        <span><strong>Review:</strong> <span id="review-id"></span></span>
+        <span><strong>Strategy:</strong> <code id="strategy"></code></span>
+      </div>
+    </section>
+    <section id="media-section" aria-labelledby="media-heading">
+      <h2 id="media-heading">Complete preview</h2>
+      <div class="media-grid">
+        <video id="preview-video" controls preload="metadata"></video>
+        <button class="sheet-button" id="open-sheet" type="button">
+          <img id="contact-sheet" alt="Vertical preview contact sheet">
+        </button>
+      </div>
+      <p class="empty-media" id="media-unavailable" hidden></p>
+    </section>
+    <section aria-labelledby="probe-heading">
+      <h2 id="probe-heading">Media probe</h2>
+      <dl class="meta" id="probe"></dl>
+    </section>
+    <section aria-labelledby="segments-heading">
+      <h2 id="segments-heading">Segments</h2>
+      <table class="segments">
+        <thead><tr><th>Range</th><th>Content</th><th>Strategy</th><th>Crop or fit</th><th>Rationale</th></tr></thead>
+        <tbody id="segments"></tbody>
+      </table>
+    </section>
+    <section aria-labelledby="warnings-heading">
+      <h2 id="warnings-heading">Warnings</h2>
+      <ul class="warnings" id="warnings"></ul>
+    </section>
+    <section aria-labelledby="decision-heading">
+      <h2 id="decision-heading">Decision</h2>
+      <form id="review-form" novalidate>
+        <fieldset class="decisions">
+          <label class="decision"><input type="radio" name="decision" value="approve" id="decision-approve">Approve</label>
+          <label class="decision"><input type="radio" name="decision" value="revise">Revise</label>
+          <label class="decision"><input type="radio" name="decision" value="skip">Skip</label>
+        </fieldset>
+        <p id="approval-reason" aria-live="polite" hidden></p>
+        <label id="changes-wrap" hidden>Changes:
+          <textarea id="changes"></textarea>
+        </label>
+        <div id="review-errors" role="alert"></div>
+        <button id="copy-summary" type="button" disabled>Copy summary</button>
+        <pre id="summary-output" aria-live="polite"></pre>
+      </form>
+    </section>
+  </main>
+  <dialog id="sheet-dialog" aria-label="Vertical preview contact sheet">
+    <div class="dialog-actions"><button id="close-sheet" type="button">Close</button></div>
+    <img id="dialog-sheet" alt="Enlarged vertical preview contact sheet">
+  </dialog>
+  <script>
+    const REVIEW_DATA_B64 = "__SHORTS_VERTICAL_REVIEW_DATA__";
+    const data = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(REVIEW_DATA_B64), c => c.charCodeAt(0))));
+    const byId = id => document.getElementById(id);
+    const put = (id, value) => { byId(id).textContent = value; };
+    put("short-id", data.shortId);
+    put("review-id", data.reviewId);
+    put("strategy", data.strategy);
+
+    const probe = byId("probe");
+    ["source", "output"].forEach(label => {
+      const item = data.probe[label];
+      if (!item) return;
+      const dt = document.createElement("dt");
+      const dd = document.createElement("dd");
+      dt.textContent = label[0].toUpperCase() + label.slice(1);
+      dd.textContent = `${item.width}x${item.height} / ${item.fps} fps / audio ${item.audio ? "present" : "absent"}`;
+      probe.append(dt, dd);
+    });
+
+    const segmentBody = byId("segments");
+    data.segments.forEach(segment => {
+      const row = document.createElement("tr");
+      [
+        ["Range", `${segment.start.toFixed(3)} - ${segment.end.toFixed(3)}s`],
+        ["Content", segment.contentType],
+        ["Strategy", segment.strategy],
+        ["Crop or fit", segment.cropOrFit],
+        ["Rationale", segment.rationale],
+      ].forEach(([label, value]) => {
+        const cell = document.createElement("td");
+        cell.dataset.label = label;
+        cell.textContent = value;
+        row.append(cell);
+      });
+      segmentBody.append(row);
+    });
+
+    const warnings = byId("warnings");
+    (data.warnings.length ? data.warnings : ["None."]).forEach(value => {
+      const item = document.createElement("li");
+      item.textContent = value;
+      warnings.append(item);
+    });
+
+    const video = byId("preview-video");
+    const sheetButton = byId("open-sheet");
+    const sheet = byId("contact-sheet");
+    const unavailable = byId("media-unavailable");
+    if (data.renderable) {
+      video.src = data.previewPath;
+      sheet.src = data.contactPath;
+    } else {
+      video.hidden = true;
+      sheetButton.hidden = true;
+      unavailable.hidden = false;
+      unavailable.textContent = data.approvalReason;
+    }
+
+    const dialog = byId("sheet-dialog");
+    const closeSheet = byId("close-sheet");
+    sheetButton.addEventListener("click", () => {
+      byId("dialog-sheet").src = data.contactPath;
+      dialog.showModal();
+      closeSheet.focus();
+    });
+    const closeDialog = () => { dialog.close(); sheetButton.focus(); };
+    closeSheet.addEventListener("click", closeDialog);
+    dialog.addEventListener("cancel", event => { event.preventDefault(); closeDialog(); });
+
+    const form = byId("review-form");
+    const approve = byId("decision-approve");
+    const reason = byId("approval-reason");
+    const changesWrap = byId("changes-wrap");
+    const changes = byId("changes");
+    const copy = byId("copy-summary");
+    const output = byId("summary-output");
+    let mediaFailed = false;
+    let mediaFailureMessage = "";
+    approve.disabled = !data.renderable;
+    approve.setAttribute("aria-disabled", String(!data.renderable));
+    if (!data.renderable) {
+      reason.hidden = false;
+      reason.textContent = data.approvalReason;
+    }
+
+    const currentDecision = () => form.elements.decision.value;
+    const update = () => {
+      const decision = currentDecision();
+      const revising = decision === "revise";
+      changesWrap.hidden = !revising;
+      changes.required = revising;
+      const valid = Boolean(decision) && (!revising || Boolean(changes.value.trim())) && !(decision === "approve" && mediaFailed);
+      copy.disabled = !valid;
+      put("review-status", decision ? decision[0].toUpperCase() + decision.slice(1) : "Pending");
+      put("review-errors", mediaFailed ? mediaFailureMessage : (revising && !changes.value.trim() ? "Revision requires non-empty changes." : ""));
+      if (!decision) {
+        output.textContent = "";
+        return;
+      }
+      const lines = [
+        "Shorts vertical review",
+        `Short: ${data.shortId}`,
+        `Review: ${data.reviewId}`,
+        `Decision: ${decision}`,
+      ];
+      if (revising) lines.push(`Changes: ${changes.value.trim()}`);
+      output.textContent = lines.join("\n");
+    };
+    const blockApprovalForMedia = message => {
+      mediaFailed = true;
+      mediaFailureMessage = message;
+      approve.disabled = true;
+      approve.checked = false;
+      approve.setAttribute("aria-disabled", "true");
+      reason.hidden = false;
+      reason.textContent = message;
+      copy.disabled = true;
+      update();
+    };
+    video.addEventListener("error", () => blockApprovalForMedia("The complete preview could not be loaded. Approval is unavailable."));
+    sheet.addEventListener("error", () => blockApprovalForMedia("The contact sheet could not be loaded. Approval is unavailable."));
+    byId("dialog-sheet").addEventListener("error", () => blockApprovalForMedia("The contact sheet could not be loaded. Approval is unavailable."));
+    form.addEventListener("input", update);
+    form.addEventListener("change", update);
+    copy.addEventListener("click", async () => {
+      if (copy.disabled) return;
+      try {
+        await navigator.clipboard.writeText(output.textContent);
+      } catch (_error) {
+        const field = document.createElement("textarea");
+        field.value = output.textContent;
+        document.body.append(field);
+        field.select();
+        document.execCommand("copy");
+        field.remove();
+      }
+      put("review-status", "Summary copied");
+    });
+    update();
+  </script>
+</body>
+</html>

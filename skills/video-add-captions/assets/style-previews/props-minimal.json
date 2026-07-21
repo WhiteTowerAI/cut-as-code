@@ -1,0 +1,79 @@
+﻿{
+    "id":  "minimal",
+    "preset":  "minimal",
+    "backgroundTheme":  null,
+    "strokeTheme":  null,
+    "highlightTheme":  null,
+    "karaoke":  false,
+    "mode":  "preview",
+    "width":  1280,
+    "height":  720,
+    "fps":  30,
+    "snapshotTime":  1.55,
+    "sourceVideo":  "TEST/videos/video-add-captions-work/phase-4-style-previews/fixtures/preview-landscape.mp4",
+    "captionsFile":  "TEST/videos/video-add-captions-work/phase-4-style-previews/fixtures/preview-captions.json",
+    "resolvedStyle":  {
+                          "preset":  "minimal",
+                          "font":  {
+                                       "family":  "system-ui, sans-serif",
+                                       "sizeRatio":  0.0352,
+                                       "weight":  650,
+                                       "color":  "#FFFFFF",
+                                       "lineHeight":  1.342,
+                                       "letterSpacing":  0
+                                   },
+                          "layout":  {
+                                         "anchor":  "bottom",
+                                         "align":  "center",
+                                         "maxWidth":  0.86,
+                                         "paddingBottomRatio":  0.075
+                                     },
+                          "background":  {
+                                             "enabled":  false,
+                                             "theme":  "gray",
+                                             "shape":  "rounded",
+                                             "color":  "#000000",
+                                             "opacity":  0.32,
+                                             "radiusRatio":  0.014,
+                                             "paddingXRatio":  0.028,
+                                             "paddingYRatio":  0.014
+                                         },
+                          "effects":  {
+                                          "shadow":  {
+                                                         "strength":  "none",
+                                                         "color":  "#000000",
+                                                         "opacity":  0,
+                                                         "offsetYRatio":  0,
+                                                         "blurRatio":  0
+                                                     },
+                                          "stroke":  {
+                                                         "strength":  "none",
+                                                         "color":  "#000000",
+                                                         "widthRatio":  0
+                                                     }
+                                      },
+                          "stroke":  {
+                                         "enabled":  false,
+                                         "theme":  "black",
+                                         "color":  "#000000",
+                                         "opacity":  0.85,
+                                         "widthRatio":  0
+                                     },
+                          "wordHighlight":  {
+                                                "enabled":  false,
+                                                "mode":  "none",
+                                                "activeColor":  "#FFFFFF",
+                                                "activeScale":  1,
+                                                "upcomingOpacity":  1,
+                                                "backgroundColor":  "#FFFFFF",
+                                                "backgroundOpacity":  0,
+                                                "backgroundRadiusRatio":  0.01
+                                            },
+                          "animation":  {
+                                            "type":  "fade",
+                                            "popInFrames":  6,
+                                            "popOutFrames":  4,
+                                            "translateYPx":  0
+                                        }
+                      }
+}

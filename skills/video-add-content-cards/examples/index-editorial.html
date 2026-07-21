@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>video-add-content-cards — editorial composition</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+    <!-- editorial font: Archivo (grotesque sans). Google Fonts <link>, weights
+         enumerated (only what the CSS uses: 500/600/800). Swap the family +
+         weights to re-theme. A proprietary face needs a self-hosted @font-face. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;800&display=swap" rel="stylesheet" />
+
+    <style>
+      /* ── editorial theme ───────────────────────────────────────────────────
+         Dark "documentary" overlay: warm off-white text on a near-black scrim
+         (full-width scenes) or a local dark scrim-plate (small widgets). Gold
+         accent. NO solid cards — legibility comes from the scrim/plate, not a
+         filled panel. Change these vars + the fonts <link> to re-color/re-font.
+         Sizes are vh so the design reads at any output resolution — never
+         hardcode px for type/spacing.
+         Background is transparent: the render is an OVERLAY, composited onto the
+         footage by ffmpeg. editorial is NOT fullBleed — full-width scenes paint
+         no opaque fill; each drops a bottom-gradient .scrim behind its text. */
+      :root {
+        --ink: #f4f1ea; /* warm off-white text (on dark scrim/plate) */
+        --muted: #c7c2b6; /* warm grey, secondary text */
+        --accent: #e0b252; /* gold accent */
+        --scrim-base: #0b0d10; /* near-black scrim base */
+        --plate-bg: rgba(11, 13, 16, 0.62); /* local dark scrim-plate under widget text */
+        --font: "Archivo", system-ui, sans-serif;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 1920px; /* set to your source W/H (data-width/height below too) */
+        height: 1080px;
+        overflow: hidden;
+        background: transparent;
+        font-family: var(--font);
+      }
+      /* No opacity:0 here — the HF runtime windows each .clip by its
+         data-start/data-duration via style.visibility. Pinning opacity:0 would
+         leave a scene visible-but-transparent during its window (blank canvas).
+         Inner wrappers do the fade; the runtime does show/hide. */
+      .scene {
+        position: absolute;
+        inset: 0;
+      }
+      /* Scrim: bottom gradient (transparent → near-black scrimBase) behind a
+         full-width scene's text, so light text stays legible on bright footage.
+         editorial is NOT fullBleed, so the scene's .bleed class paints NO opaque
+         fill — this layer is what carries legibility. Absolutely positioned
+         bottom band, painted BEHIND the text (inner wrappers are
+         position:relative + z-index so they sit on top). */
+      .scrim {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 50%;
+        bottom: 0;
+        background: linear-gradient(to bottom, rgba(11, 13, 16, 0) 0%, rgba(11, 13, 16, 0.9) 100%);
+        z-index: 0;
+      }
+      /* Anchor wrappers. flex-direction:column is load-bearing: a plain flex div
+         defaults to row and maps justify/align to the wrong axes, landing cards
+         top-right instead of bottom-left. Flip to top by swapping justify-content
+         to flex-start (and move a bottom scene's padding to the top). */
+      .anchor-bl {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end; /* bottom — the lower-third safe zone */
+        align-items: flex-start; /* left */
+      }
+      .anchor-center {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+      }
+      /* Inner wrappers of full-width scenes ride ABOVE the .scrim layer. */
+      .intro,
+      .section,
+      .outro,
+      .tb,
+      .list {
+        position: relative;
+        z-index: 1;
+      }
+
+      /* ── Intro (Scrim): kicker → title → sub, left accent bar ─────────────── */
+      .intro-wrap {
+        display: flex;
+        gap: 2.4vh;
+        padding: 0 0 9vh 6vh;
+      }
+      .accent-bar {
+        width: 0.8vh;
+        background: var(--accent);
+        border-radius: 0.4vh;
+      }
+      .kicker {
+        color: var(--accent);
+        font-size: 2.6vh;
+        font-weight: 600;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+      }
+      .title {
+        color: var(--ink);
+        font-weight: 800;
+        line-height: 0.98;
+        letter-spacing: -1.5px;
+      }
+      .intro .title {
+        font-size: 10vh;
+        margin-top: 1vh;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 3.4vh;
+        font-weight: 500;
+        margin-top: 1.4vh;
+      }
+
+      /* ── SectionCard (Scrim): kicker + title + hairline rule ──────────────── */
+      .section-wrap {
+        padding: 0 0 9vh 6vh;
+      }
+      .section .title {
+        font-size: 8.5vh;
+        letter-spacing: -1px;
+        line-height: 1;
+      }
+      /* editorial rule = hairline: a thin full line in faint text color, with a
+         short gold accent segment layered at its left (a ::before, so the DOM
+         stays identical to the almanac template). scaleX-drawn from the left. */
+      .rule-bar {
+        position: relative;
+        height: 0.35vh;
+        width: 36vh;
+        background: rgba(244, 241, 234, 0.32);
+        margin-top: 2vh;
+        transform-origin: left center;
+      }
+      .rule-bar::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
+        width: 6vh;
+        background: var(--accent);
+      }
+
+      /* ── LowerThird: scrim-plate (no solid card), line1 + line2 ───────────── */
+      .lt-wrap {
+        padding: 0 0 8vh 5vh;
+      }
+      /* editorial has NO solid card: .card is a local dark scrim-plate under the
+         widget text (no border, no shadow). Text stays light. */
+      .card {
+        background: var(--plate-bg);
+        border-radius: 0.8vh;
+      }
+      .lt .line1 {
+        color: var(--ink);
+        font-size: 6vh;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+        line-height: 1.05;
+      }
+      .lt .line2 {
+        color: var(--muted);
+        font-size: 3.6vh;
+        font-weight: 500;
+        margin-top: 0.8vh;
+      }
+      .lt .card {
+        padding: 2.2vh 3vh;
+        transform-origin: left center; /* spring pop grows from the left edge */
+      }
+
+      /* ── StatCallout: scrim-plate, count-up + label ───────────────────────── */
+      .stat-wrap {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end; /* bottom */
+        align-items: flex-end; /* right */
+        padding: 0 5vh 8vh 0;
+      }
+      .stat .card {
+        display: flex;
+        align-items: baseline;
+        gap: 1.6vh;
+        padding: 1.8vh 3vh;
+        transform-origin: center; /* spring pop grows from center */
+      }
+      .stat .value {
+        color: var(--accent);
+        font-size: 9vh;
+        font-weight: 800;
+        letter-spacing: -1px;
+        line-height: 1;
+      }
+      .stat .label {
+        color: var(--ink);
+        font-size: 3.4vh;
+        font-weight: 600;
+      }
+
+      /* ── Outro (Scrim): centered gold diamond + wordmark lockup ───────────── */
+      .outro-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+      .diamond {
+        width: 2.6vh;
+        height: 2.6vh;
+        background: var(--accent);
+        border-radius: 0.3vh;
+        transform: rotate(45deg);
+        margin-bottom: 3vh;
+      }
+      .outro .title {
+        font-size: 8.5vh;
+        letter-spacing: -1px;
+      }
+      .outro .sub {
+        color: var(--ink);
+        margin-top: 1.4vh;
+      }
+      .outro .small {
+        color: var(--muted);
+        font-size: 2.8vh;
+        font-weight: 500;
+        margin-top: 0.8vh;
+      }
+
+      /* ── TitleBumper (Scrim): big kicker + huge title, bottom-left ────────── */
+      .tb-wrap {
+        padding: 0 0 12vh 8vh;
+      }
+      .tb .kicker {
+        margin-bottom: 1.6vh;
+      }
+      .tb .title {
+        font-size: 10vh;
+        letter-spacing: -1px;
+        line-height: 1;
+        max-width: 72%;
+      }
+
+      /* ── KeypointCallout: scrim-plate, one big line ───────────────────────── */
+      .key-wrap {
+        padding: 0 8vh 8vh 5vh;
+      }
+      .key .card {
+        padding: 2.4vh 3vh;
+        max-width: 72%;
+      }
+      .key .text {
+        color: var(--ink);
+        font-size: 5vh;
+        font-weight: 600;
+        line-height: 1.18;
+      }
+
+      /* ── ReframeCard: avoid(strike) → INSTEAD SAY → gold instead ──────────── */
+      .reframe-wrap {
+        padding: 0 6vh 8vh 6vh;
+      }
+      .reframe .card {
+        padding: 3.2vh 4vh;
+        max-width: 76%;
+      }
+      .reframe .kicker {
+        margin-bottom: 1.6vh;
+      }
+      .reframe .avoid {
+        color: var(--muted);
+        font-size: 3.4vh;
+        font-weight: 500;
+        text-decoration: line-through;
+        margin-bottom: 1.6vh;
+      }
+      .reframe .instead-label {
+        color: var(--muted);
+        font-size: 2.2vh;
+        font-weight: 600;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        margin-bottom: 1vh;
+      }
+      .reframe .instead {
+        color: var(--accent);
+        font-size: 5vh;
+        font-weight: 800;
+        line-height: 1.15;
+      }
+
+      /* ── PromptCard: scrim-plate, quote body, gold highlight words ────────── */
+      .prompt-wrap {
+        padding: 0 6vh 8vh 6vh;
+      }
+      .prompt .card {
+        padding: 3.2vh 4vh;
+        max-width: 78%;
+      }
+      .prompt .kicker {
+        margin-bottom: 1.6vh;
+      }
+      .prompt .body {
+        font-size: 4.4vh;
+        font-weight: 600;
+        line-height: 1.32;
+        color: var(--ink);
+      }
+      .prompt .hl {
+        color: var(--accent);
+        font-weight: 800;
+      }
+
+      /* ── BeforeAfter: two columns split by a hairline divider ─────────────── */
+      .ba-wrap {
+        padding: 0 6vh 8vh 6vh;
+      }
+      .ba .card {
+        padding: 3vh 3.6vh;
+        display: flex;
+        gap: 3.6vh;
+      }
+      .ba .col {
+        flex: 1;
+      }
+      .ba .col-label {
+        color: var(--muted);
+        font-size: 2.2vh;
+        font-weight: 600;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        margin-bottom: 1.2vh;
+      }
+      .ba .col-label.after {
+        color: var(--accent);
+      }
+      .ba .value {
+        font-size: 4.6vh;
+        font-weight: 600;
+        line-height: 1.15;
+      }
+      .ba .value.before {
+        color: var(--muted);
+        text-decoration: line-through;
+      }
+      .ba .value.after {
+        color: var(--ink);
+      }
+      .ba .divider {
+        width: 0.15vh;
+        align-self: stretch;
+        background: var(--muted);
+        opacity: 0.35;
+      }
+
+      /* ── Checklist: scrim-plate, gold 01/02/03 numbers, staggered rows ────── */
+      .checklist-wrap {
+        padding: 0 0 8vh 6vh;
+      }
+      .checklist .card {
+        padding: 3vh 4vh;
+        display: flex;
+        flex-direction: column;
+        gap: 1.8vh;
+      }
+      .checklist .kicker {
+        margin-bottom: 0.6vh;
+      }
+      .checklist .row {
+        display: flex;
+        align-items: baseline;
+        gap: 2vh;
+      }
+      .checklist .num {
+        color: var(--accent);
+        font-size: 3.4vh;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+      }
+      .checklist .item {
+        color: var(--ink);
+        font-size: 4vh;
+        font-weight: 600;
+      }
+
+      /* ── CommandChips: monospace cmd chip + sans desc, staggered rows ─────── */
+      .cmd-wrap {
+        padding: 0 0 8vh 6vh;
+      }
+      .cmd .card {
+        padding: 3vh 4vh;
+        display: flex;
+        flex-direction: column;
+        gap: 1.8vh;
+      }
+      .cmd .kicker {
+        margin-bottom: 0.6vh;
+      }
+      .cmd .row {
+        display: flex;
+        align-items: center;
+        gap: 2vh;
+      }
+      .cmd .chip {
+        font-family: ui-monospace, monospace;
+        font-size: 2.8vh;
+        font-weight: 600;
+        color: var(--accent);
+        background: rgba(224, 178, 82, 0.1);
+        border: 0.12vh solid rgba(224, 178, 82, 0.5);
+        border-radius: 0.6vh;
+        padding: 0.6vh 1.2vh;
+        white-space: nowrap;
+      }
+      .cmd .desc {
+        color: var(--ink);
+        font-size: 3.4vh;
+        font-weight: 500;
+      }
+
+      /* ── ListReveal (Scrim): gold title + numbered rows, staggered ────────── */
+      .list-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 1.6vh;
+        padding: 0 0 8vh 6vh;
+      }
+      .list .list-title {
+        color: var(--accent);
+        font-size: 3vh;
+        font-weight: 600;
+        letter-spacing: 0.3vh;
+        margin-bottom: 1vh;
+      }
+      .list .row {
+        display: flex;
+        align-items: baseline;
+        gap: 2vh;
+      }
+      .list .num {
+        color: var(--accent);
+        font-size: 4vh;
+        font-weight: 800;
+      }
+      .list .item {
+        color: var(--ink);
+        font-size: 5vh;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Worked example: all 13 cards packed back-to-back at 6s each (78s) so
+         every card is eyeballable in one render — the editorial port of the
+         almanac card catalog. editorial is NOT fullBleed: full-width scenes drop
+         a .scrim gradient (not an opaque fill) behind light text, and the small
+         widgets sit on a local scrim-plate instead of a solid card. In
+         production, keep each cue's transcript-derived at/dur (from
+         work/content-cards/cards-plan.json) and set the stage data-duration to the SOURCE length. -->
+    <div data-hf-id="hf-r0kp" id="stage" data-composition-id="v2hf-editorial" data-start="0" data-duration="78" data-fps="24" data-width="1920" data-height="1080">
+      <!-- cue 1: Intro (0–6s) — Scrim -->
+      <div data-hf-id="hf-n4ne" id="intro" class="scene bleed anchor-bl clip" data-start="0" data-duration="6" data-track-index="0">
+        <div data-hf-id="hf-scr1" class="scrim"></div>
+        <div data-hf-id="hf-hdnq" class="intro">
+          <div data-hf-id="hf-xgk7" class="intro-wrap">
+            <div data-hf-id="hf-ty56" class="accent-bar"></div>
+            <div data-hf-id="hf-yeow">
+              <div data-hf-id="hf-18a1" class="kicker">MONDAY MORNING MEETING · EP 14</div>
+              <div data-hf-id="hf-gcj6" class="title">HS TOP 200</div>
+              <div data-hf-id="hf-rj9i" class="sub">with Herschel Fruean — NZ Schoolboy Rugby</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- cue 2: SectionCard (6–12s) — Scrim -->
+      <div data-hf-id="hf-eqkj" id="section" class="scene bleed anchor-bl clip" data-start="6" data-duration="6" data-track-index="0">
+        <div data-hf-id="hf-scr2" class="scrim"></div>
+        <div data-hf-id="hf-pvpx" class="section">
+          <div data-hf-id="hf-ysym" class="section-wrap">
+            <div data-hf-id="hf-hra9" class="kicker">PART 1</div>
+            <div data-hf-id="hf-rce3" class="title" style="margin-top: 1.2vh">The Christchurch Trip</div>
+            <div data-hf-id="hf-tw22" class="rule-bar"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- cue 3: LowerThird (12–18s) — scrim-plate over footage -->
+      <div data-hf-id="hf-ht2y" id="lt" class="scene anchor-bl clip" data-start="12" data-duration="6" data-track-index="1" data-hidden="">
+        <div data-hf-id="hf-156o" class="lt">
+          <div data-hf-id="hf-ofa5" class="lt-wrap">
+            <div data-hf-id="hf-vn2y" class="card">
+              <div data-hf-id="hf-592i" class="line1">St Bede's vs Christ's</div>
+              <div data-hf-id="hf-7abr" class="line2">His two best teams down south</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- cue 4: StatCallout (18–24s) — count-up; data-stat-value drives it -->
+      <div data-hf-id="hf-i5av" id="stat" class="scene stat-wrap clip" data-start="18" data-duration="6" data-track-index="1" data-hidden="">
+        <div data-hf-id="hf-xa0m" class="stat">
+          <div data-hf-id="hf-i08u" class="card">
+            <div data-hf-id="hf-pt07" class="value" data-stat-value="62">0</div>
+            <div data-hf-id="hf-vk7a" class="label">points — a blowout</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- cue 5: Outro (24–30s) — Scrim -->
+      <div data-hf-id="hf-ul5o" id="outro" class="scene bleed anchor-center clip" data-start="24" data-duration="6" data-track-index="0">
+        <div data-hf-id="hf-scr3" class="scrim"></div>
+        <div data-hf-id="hf-e0lx" class="outro">
+          <div data-hf-id="hf-qq1q" class="outro-wrap">
+            <div data-hf-id="hf-k2l8" class="diamond"></div>
+            <div data-hf-id="hf-1d12" class="title">HS TOP 200</div>
+            <div data-hf-id="hf-s0r5" class="sub">Thanks for watching</div>
+            <div data-hf-id="hf-k338" class="small">Monday Morning Meeting Podcast</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- cue 6: TitleBumper (30–36s) — Scrim full-screen title takeover -->
+      <div data-hf-id="hf-1okx" id="tb" class="scene bleed anchor-bl clip" data-start="30" data-duration="6" data-track-index="0">
+        <div data-hf-id="hf-scr4" class="scrim"></div>
+        <div data-hf-id="hf-ash2" class="tb">
+          <div data-hf-id="hf-b7br" class="tb-wrap">
+            <div data-hf-id="hf-3f9t" class="kicker">EPISODE 14</div>
+            <div data-hf-id="hf-hbc7" class="title">The Season Ahead</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- cue 7: KeypointCallout (36–42s) — scrim-plate, one pinned line -->
+      <div data-hf-id="hf-npod" id="key" class="scene anchor-bl clip" data-start="36" data-duration="6" data-track-index="1" data-hidden="">
+        <div data-hf-id="hf-l8jp" class="key">
+          <div data-hf-id="hf-h2q6" class="key-wrap">
+            <div data-hf-id="hf-iejv" class="card">
+              <div data-hf-id="hf-gv1x" class="text">"Depth wins championships, not one star player."</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- cue 8: ReframeCard (42–48s) — avoid → INSTEAD SAY → gold instead -->
+      <div data-hf-id="hf-xoxn" id="reframe" class="scene anchor-bl clip" data-start="42" data-duration="6" data-track-index="1" data-hidden="">
+        <div data-hf-id="hf-og1i" class="reframe">
+          <div data-hf-id="hf-fqhz" class="reframe-wrap">
+            <div data-hf-id="hf-isuw" class="card">
+              <div data-hf-id="hf-9m1b" class="kicker">CONTEXT, NOT CONSTRAINTS</div>
+              <div data-hf-id="hf-yeyo" class="avoid">He's not fast enough for the wing</div>
+              <div data-hf-id="hf-pom0" class="instead-label">Instead say</div>
+              <div data-hf-id="hf-tszf" class="instead">He plays a different game — vision over pace</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- cue 9: PromptCard (48–54s) — quote body, gold highlight words -->
+      <div data-hf-id="hf-rbmj" id="prompt" class="scene anchor-bl clip" data-start="48" data-duration="6" data-track-index="1" data-hidden="">
+        <div data-hf-id="hf-3k5u" class="prompt">
+          <div data-hf-id="hf-f4gb" class="prompt-wrap">
+            <div data-hf-id="hf-byql" class="card">
+              <div data-hf-id="hf-zvza" class="kicker">TRY PROMPTING</div>
+              <div data-hf-id="hf-evhk" class="body">"Rank the top 200 by <span data-hf-id="hf-ewo7" class="hl">upside</span>, not just <span data-hf-id="hf-y6tg" class="hl">current form</span>."</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- cue 10: BeforeAfter (54–60s) — two-column strike vs clean -->
+      <div data-hf-id="hf-58or" id="ba" class="scene anchor-bl clip" data-start="54" data-duration="6" data-track-index="1" data-hidden="">
+        <div data-hf-id="hf-hhlj" class="ba">
+          <div data-hf-id="hf-6sb8" class="ba-wrap">
+            <div data-hf-id="hf-cd1m" class="card">
+              <div data-hf-id="hf-7s1i" class="col">
+                <div data-hf-id="hf-f834" class="col-label">BEFORE</div>
+                <div data-hf-id="hf-tqfd" class="value before">Ranked 47th nationally</div>
+              </div>
+              <div data-hf-id="hf-jk23" class="divider"></div>
+              <div data-hf-id="hf-vmze" class="col">
+                <div data-hf-id="hf-4v7d" class="col-label after">AFTER</div>
+                <div data-hf-id="hf-z7zd" class="value after">Top 10 in one season</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- cue 11: Checklist (60–66s) — gold 01/02/03 rows on a scrim-plate -->
+      <div data-hf-id="hf-ilkl" id="checklist" class="scene anchor-bl clip" data-start="60" data-duration="6" data-track-index="1" data-hidden="">
+        <div data-hf-id="hf-g1yo" class="checklist">
+          <div data-hf-id="hf-q8el" class="checklist-wrap">
+            <div data-hf-id="hf-crcn" class="card">
+              <div data-hf-id="hf-hotv" class="kicker">WHAT SCOUTS WATCH</div>
+              <div data-hf-id="hf-thy4" class="row"><span data-hf-id="hf-cshg" class="num">01</span><span data-hf-id="hf-3sd5" class="item">Decision-making under pressure</span></div>
+              <div data-hf-id="hf-lt04" class="row"><span data-hf-id="hf-blkd" class="num">02</span><span data-hf-id="hf-y6ks" class="item">Work rate off the ball</span></div>
+              <div data-hf-id="hf-km31" class="row"><span data-hf-id="hf-bzve" class="num">03</span><span data-hf-id="hf-xd9k" class="item">Composure in contact</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- cue 12: CommandChips (66–72s) — mono chip + sans desc rows -->
+      <div data-hf-id="hf-mz8b" id="cmd" class="scene anchor-bl clip" data-start="66" data-duration="6" data-track-index="1" data-hidden="">
+        <div data-hf-id="hf-03wg" class="cmd">
+          <div data-hf-id="hf-wba5" class="cmd-wrap">
+            <div data-hf-id="hf-d5no" class="card">
+              <div data-hf-id="hf-4xfj" class="kicker">HOW TO WATCH</div>
+              <div data-hf-id="hf-l0e2" class="row"><span data-hf-id="hf-2f97" class="chip">/rankings</span><span data-hf-id="hf-mj2t" class="desc">the full top 200 list</span></div>
+              <div data-hf-id="hf-mzx7" class="row"><span data-hf-id="hf-67oe" class="chip">/players 62</span><span data-hf-id="hf-gcal" class="desc">jump to a player card</span></div>
+              <div data-hf-id="hf-ne88" class="row"><span data-hf-id="hf-p953" class="chip">/compare</span><span data-hf-id="hf-cxsw" class="desc">two prospects side by side</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- cue 13: ListReveal (72–78s) — Scrim numbered enumeration -->
+      <div data-hf-id="hf-josl" id="list" class="scene bleed anchor-bl clip" data-start="72" data-duration="6" data-track-index="0">
+        <div data-hf-id="hf-scr5" class="scrim"></div>
+        <div data-hf-id="hf-33o8" class="list">
+          <div data-hf-id="hf-95qt" class="list-wrap">
+            <div data-hf-id="hf-8kx6" class="list-title">THREE THINGS TO WATCH</div>
+            <div data-hf-id="hf-m7b5" class="row"><span data-hf-id="hf-uzws" class="num">01</span><span data-hf-id="hf-dv7h" class="item">The Christchurch derby</span></div>
+            <div data-hf-id="hf-mlm6" class="row"><span data-hf-id="hf-8jhd" class="num">02</span><span data-hf-id="hf-6r97" class="item">A record points margin</span></div>
+            <div data-hf-id="hf-ol5b" class="row"><span data-hf-id="hf-jd6m" class="num">03</span><span data-hf-id="hf-x054" class="item">Next year's breakout name</span></div>
+          </div>
+        </div>
+      </div>
+
+      <script>
+        // ────────────────────────────────────────────────────────────────────
+        // One paused GSAP timeline, keyed in SECONDS (HF seeks it per frame).
+        // Timing mirrors the editorial design language (was anim.tsx @24fps):
+        //   fade 0.292s · reveal 0.542s · stagger beat 0.167s · rule-draw 0.417s
+        // EASE_OUT bezier(0.16,1,0.3,1) ≈ power4.out. stagger entrance = title
+        // clip-wipe + kicker/sub fade-rise; each scene's inner wrapper fades.
+        //
+        // editorial adds two motions on top of the almanac stagger family:
+        //   • blur focus-pull (riseInBlur): kicker/sub/label/small rises also
+        //     pull filter blur(24px)→0, DECOUPLED from opacity — opacity finishes
+        //     over REVEAL, blur releases over the longer REVEAL*2.2 window (so the
+        //     text reads before it's fully sharp — a lens rack-focus). Titles keep
+        //     the plain clip-wipe (no blur).
+        //   • spring pop (popIn): the Stat number plate and the LowerThird name
+        //     plate pop in with an overshoot (scale 0.7→1, back.out) — the only
+        //     bounce in the piece, reserved for the two info-highlight widgets.
+        //
+        // Two seek-safety rules the HF linter enforces (learned the hard way):
+        //   1. Animate an INNER wrapper, never the .clip div — the runtime owns
+        //      clip visibility; animating it leaves stale state on non-linear seeks.
+        //   2. Animate a CSS-initialized transform (scaleX/scale) with fromTo (not
+        //      to), so GSAP owns the whole transform (no scaleX/scale clobber).
+        // ────────────────────────────────────────────────────────────────────
+        const EO = "power4.out";
+        const FADE = 0.292,
+          REVEAL = 0.542,
+          STAG = 0.167,
+          IN = 0.417;
+
+        const tl = gsap.timeline({ paused: true });
+
+        // Fade a scene's inner wrapper in at `start`, out over its last FADE s.
+        function sceneFade(sel, start, dur) {
+          const el = document.querySelector(sel);
+          tl.fromTo(el, { opacity: 0 }, { opacity: 1, duration: FADE, ease: "none" }, start);
+          tl.to(el, { opacity: 0, duration: FADE, ease: "none" }, start + dur - FADE);
+          tl.set(el, { opacity: 0 }, start + dur); // hard kill (seek-safe)
+        }
+        // title entrance: clip-path wipe L→R + fade, over REVEAL after `at`.
+        function titleIn(el, at) {
+          tl.fromTo(
+            el,
+            { opacity: 0, clipPath: "inset(0 100% 0 0)" },
+            { opacity: 1, clipPath: "inset(0 0% 0 0)", duration: REVEAL, ease: EO },
+            at,
+          );
+        }
+        // kicker/sub/label/small entrance: fade + translateY(1.2vh→0) over REVEAL,
+        // PLUS a blur focus-pull decoupled onto the longer REVEAL*2.2 window.
+        function riseInBlur(el, at) {
+          tl.fromTo(el, { opacity: 0, y: "1.2vh" }, { opacity: 1, y: 0, duration: REVEAL, ease: EO }, at);
+          tl.fromTo(el, { filter: "blur(24px)" }, { filter: "blur(0px)", duration: REVEAL * 2.2, ease: EO }, at);
+        }
+        // spring pop-in for an info-highlight plate: scale 0.7→1 with overshoot.
+        // fromTo (not to) so GSAP owns the transform; CSS sets transform-origin.
+        function popIn(sel, start) {
+          tl.fromTo(document.querySelector(sel), { scale: 0.7 }, { scale: 1, duration: 0.55, ease: "back.out(2.2)" }, start);
+        }
+        // list-row entrance: fade + translateX(2vh→0). Rows stagger per index —
+        // the editorial port of Checklist/CommandChips/ListReveal's per-item reveal.
+        function rowIn(el, at) {
+          tl.fromTo(el, { opacity: 0, x: "2vh" }, { opacity: 1, x: 0, duration: REVEAL, ease: EO }, at);
+        }
+        // stagger a list of rows: first at REVEAL after scene start, then +STAG each.
+        function rowsIn(rows, sceneStart) {
+          rows.forEach((el, i) => rowIn(el, sceneStart + REVEAL + i * STAG));
+        }
+
+        // ─── cue 1: Intro (kicker@0, title@1, sub@3 beats) ───────────────────
+        sceneFade("#intro .intro", 0, 6);
+        const intro = document.querySelector("#intro");
+        riseInBlur(intro.querySelector(".kicker"), 0 + 0 * STAG);
+        titleIn(intro.querySelector(".title"), 0 + 1 * STAG);
+        riseInBlur(intro.querySelector(".sub"), 0 + 3 * STAG);
+
+        // ─── cue 2: SectionCard (kicker@0, title@1, hairline drawn@2 beats) ──
+        sceneFade("#section .section", 6, 6);
+        const section = document.querySelector("#section");
+        riseInBlur(section.querySelector(".kicker"), 6 + 0 * STAG);
+        titleIn(section.querySelector(".title"), 6 + 1 * STAG);
+        tl.fromTo(section.querySelector(".rule-bar"), { scaleX: 0 }, { scaleX: 1, duration: IN, ease: EO }, 6 + 2 * STAG);
+
+        // ─── cue 3: LowerThird (plate pops in, line1 clip-wipe, line2 rise) ──
+        sceneFade("#lt .lt", 12, 6);
+        const lt = document.querySelector("#lt");
+        popIn("#lt .card", 12);
+        titleIn(lt.querySelector(".line1"), 12);
+        riseInBlur(lt.querySelector(".line2"), 12 + 3 * STAG);
+
+        // ─── cue 4: StatCallout (plate pops in, value counts 0→N over REVEAL) ─
+        // Count-up = tween a counter object, write textContent on update.
+        // power3.out provides cubic ease-out; onUpdate fires per seeked frame.
+        sceneFade("#stat .stat", 18, 6);
+        const stat = document.querySelector("#stat");
+        popIn("#stat .card", 18);
+        const valueEl = stat.querySelector(".value");
+        const counter = { v: 0 };
+        tl.to(
+          counter,
+          {
+            v: Number(valueEl.dataset.statValue),
+            duration: REVEAL,
+            ease: "power3.out",
+            onUpdate: () => {
+              valueEl.textContent = Math.round(counter.v).toLocaleString();
+            },
+          },
+          18,
+        );
+        riseInBlur(stat.querySelector(".label"), 18 + 3 * STAG);
+
+        // ─── cue 5: Outro (diamond rise, title wipe, sub/small rise) ─────────
+        sceneFade("#outro .outro", 24, 6);
+        const outro = document.querySelector("#outro");
+        riseInBlur(outro.querySelector(".diamond"), 24 + 0 * STAG);
+        titleIn(outro.querySelector(".title"), 24 + 1 * STAG);
+        riseInBlur(outro.querySelector(".sub"), 24 + 3 * STAG);
+        riseInBlur(outro.querySelector(".small"), 24 + 3 * STAG);
+
+        // ─── cue 6: TitleBumper (kicker@0, title wipe@1) — Scrim takeover ─────
+        sceneFade("#tb .tb", 30, 6);
+        const tb = document.querySelector("#tb");
+        riseInBlur(tb.querySelector(".kicker"), 30 + 0 * STAG);
+        titleIn(tb.querySelector(".title"), 30 + 1 * STAG);
+
+        // ─── cue 7: KeypointCallout (text clip-wipe) ─────────────────────────
+        sceneFade("#key .key", 36, 6);
+        titleIn(document.querySelector("#key .text"), 36);
+
+        // ─── cue 8: ReframeCard (avoid rise, label rise, instead wipe) ───────
+        sceneFade("#reframe .reframe", 42, 6);
+        const reframe = document.querySelector("#reframe");
+        riseInBlur(reframe.querySelector(".kicker"), 42 + 0 * STAG);
+        riseInBlur(reframe.querySelector(".avoid"), 42 + 1 * STAG);
+        riseInBlur(reframe.querySelector(".instead-label"), 42 + 2 * STAG);
+        titleIn(reframe.querySelector(".instead"), 42 + 3 * STAG);
+
+        // ─── cue 9: PromptCard (kicker rise, body wipe) ──────────────────────
+        sceneFade("#prompt .prompt", 48, 6);
+        const prompt = document.querySelector("#prompt");
+        riseInBlur(prompt.querySelector(".kicker"), 48 + 0 * STAG);
+        titleIn(prompt.querySelector(".body"), 48 + 1 * STAG);
+
+        // ─── cue 10: BeforeAfter (two columns rise together) ─────────────────
+        sceneFade("#ba .ba", 54, 6);
+        const ba = document.querySelector("#ba");
+        ba.querySelectorAll(".col").forEach((el, i) => riseInBlur(el, 54 + i * STAG));
+
+        // ─── cue 11: Checklist (kicker rise, rows stagger in) ────────────────
+        sceneFade("#checklist .checklist", 60, 6);
+        const checklist = document.querySelector("#checklist");
+        riseInBlur(checklist.querySelector(".kicker"), 60);
+        rowsIn(checklist.querySelectorAll(".row"), 60);
+
+        // ─── cue 12: CommandChips (kicker rise, rows stagger in) ─────────────
+        sceneFade("#cmd .cmd", 66, 6);
+        const cmd = document.querySelector("#cmd");
+        riseInBlur(cmd.querySelector(".kicker"), 66);
+        rowsIn(cmd.querySelectorAll(".row"), 66);
+
+        // ─── cue 13: ListReveal (title rise, rows stagger in) — Scrim ────────
+        sceneFade("#list .list", 72, 6);
+        const list = document.querySelector("#list");
+        riseInBlur(list.querySelector(".list-title"), 72);
+        rowsIn(list.querySelectorAll(".row"), 72);
+
+        // Register the timeline — key MUST equal the stage's data-composition-id.
+        window.__timelines = window.__timelines || {};
+        window.__timelines["v2hf-editorial"] = tl;
+
+        // Gallery loop driver — dormant unless the URL hash asks for it, so
+        // direct-open / shoot.mjs / the HF runtime are unaffected. The animated
+        // gallery embeds this file as a self-playing iframe (a file:// parent
+        // can't script a cross-origin iframe, so each frame drives itself).
+        // Hash #loop=<start>,<dur>: paint only that cue's scene, then loop the
+        // paused timeline within [start, start+dur).
+        (function () {
+          const m = /#loop=([\d.]+),([\d.]+)/.exec(location.hash);
+          if (!m) return;
+          const start = parseFloat(m[1]), dur = parseFloat(m[2]);
+          document.querySelectorAll(".clip").forEach((el) => {
+            const s = parseFloat(el.dataset.start ?? "0") || 0;
+            const d = parseFloat(el.dataset.duration ?? "0") || 0;
+            el.style.visibility = start >= s && start < s + d ? "visible" : "hidden";
+          });
+          tl.pause();
+          if (window.parent === window) {
+            // opened directly: self-drive with GSAP's own ticker (elapsed s).
+            gsap.ticker.add((time) => tl.seek(start + (time % dur), false));
+          } else {
+            // embedded in the animated gallery: Chrome throttles rAF inside a
+            // cross-origin iframe, so our own ticker would stall. The parent
+            // can't script us across origins, but it CAN postMessage a master
+            // clock (its top-level rAF is never throttled) — seek on that.
+            addEventListener("message", (e) => {
+              const t = e.data && e.data.hfClock;
+              if (typeof t === "number") tl.seek(start + (t % dur), false);
+            });
+          }
+        })();
+      </script>
+    </div>
+  </body>
+</html>

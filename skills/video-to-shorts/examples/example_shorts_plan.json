@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "target": "derived",
+  "timebase": "program",
+  "timeline_id": "main",
+  "source_render": {
+    "path": "../final/final-video.mp4",
+    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "size": 12345678,
+    "modified_ns": 1784250000000000000
+  },
+  "source_transcript": "understand/transcript.json",
+  "transcript": {"path": "shorts/transcript.json", "timebase": "program"},
+  "depends_on": ["understanding", "captions"],
+  "based_on": {"understanding": 1, "captions": 1},
+  "selection": {
+    "mode": "agent",
+    "rationale": "The selected range has a self-contained hook and measurable payoff.",
+    "delivery_mode": "horizontal_and_vertical",
+    "review_id": "example-review"
+  },
+  "shorts": [
+    {
+      "id": "short-001",
+      "short_id": "short-001",
+      "candidate_id": "cand-001",
+      "order": 1,
+      "title": "A Claim With a Measurable Payoff",
+      "scene_type": "solo_talk",
+      "evidence_mode": "text_visual",
+      "start_time": 2.0,
+      "end_time": 27.0,
+      "duration": 25.0,
+      "program_range": {"start_s": 2.0, "end_s": 27.0},
+      "source_ranges": [
+        {"start_s": 5.0, "end_s": 7.0},
+        {"start_s": 10.0, "end_s": 38.0}
+      ],
+      "score": 82,
+      "score_breakdown": {
+        "hook": {"score": 18, "reason": "The opening claim creates immediate curiosity."},
+        "completeness": {"score": 19, "reason": "The claim resolves with a concrete result."},
+        "audience_value": {"score": 17, "reason": "The measured improvement is understandable."},
+        "emotion_tension": {"score": 8, "reason": "The contrast creates moderate stakes."},
+        "quotability": {"score": 12, "reason": "The payoff is concise and repeatable."},
+        "pace_editability": {"score": 8, "reason": "The range contains no required internal restructuring."}
+      },
+      "editorial_reason": "The bold opening and measured payoff form a complete short.",
+      "transcript_excerpt": "This changes everything. The result is three times faster.",
+      "filler_drop_spans": [],
+      "keep_spans": [{"start_time": 2.0, "end_time": 27.0}],
+      "estimated_output_duration": 25.0,
+      "validation": {"passed": true, "errors": [], "warnings": []},
+      "outputs": {
+        "work_directory": "shorts/short-001",
+        "transcript": "shorts/short-001/transcript.json",
+        "extraction_report": "shorts/short-001/extraction-report.json",
+        "horizontal_video": "../final/shorts/short-001-horizontal.mp4",
+        "vertical_video": "../final/shorts/short-001-vertical.mp4"
+      },
+      "status": "planned"
+    }
+  ],
+  "rejected_candidates": []
+}

@@ -1,0 +1,601 @@
+{
+  "presets": {
+    "clean": {
+      "preset": "clean",
+      "font": {
+        "family": "system-ui, sans-serif",
+        "sizeRatio": 0.0416,
+        "weight": 800,
+        "color": "#F5F4ED",
+        "lineHeight": 1.32,
+        "letterSpacing": 0
+      },
+      "layout": {
+        "anchor": "bottom",
+        "align": "center",
+        "maxWidth": 0.92,
+        "paddingBottomRatio": 0.07
+      },
+      "background": {
+        "enabled": false,
+        "theme": "gray",
+        "shape": "rounded",
+        "color": "#000000",
+        "opacity": 0.48,
+        "radiusRatio": 0.018,
+        "paddingXRatio": 0.035,
+        "paddingYRatio": 0.018
+      },
+      "effects": {
+        "shadow": {
+          "strength": "none",
+          "color": "#000000",
+          "opacity": 0.55,
+          "offsetYRatio": 0.02,
+          "blurRatio": 0.04
+        },
+        "stroke": {
+          "strength": "none",
+          "color": "#000000",
+          "widthRatio": 0
+        }
+      },
+      "stroke": {
+        "enabled": false,
+        "theme": "black",
+        "color": "#000000",
+        "opacity": 0.85,
+        "widthRatio": 0
+      },
+      "wordHighlight": {
+        "enabled": true,
+        "mode": "textColor",
+        "activeColor": "#FF7A45",
+        "activeScale": 1.12,
+        "upcomingOpacity": 0.55,
+        "backgroundColor": "#FF7A45",
+        "backgroundOpacity": 0.24,
+        "backgroundRadiusRatio": 0.01
+      },
+      "animation": {
+        "type": "pop",
+        "popInFrames": 6,
+        "popOutFrames": 4,
+        "translateYPx": 22
+      }
+    },
+    "minimal": {
+      "preset": "minimal",
+      "font": {
+        "family": "system-ui, sans-serif",
+        "sizeRatio": 0.0352,
+        "weight": 650,
+        "color": "#FFFFFF",
+        "lineHeight": 1.342,
+        "letterSpacing": 0
+      },
+      "layout": {
+        "anchor": "bottom",
+        "align": "center",
+        "maxWidth": 0.86,
+        "paddingBottomRatio": 0.075
+      },
+      "background": {
+        "enabled": false,
+        "theme": "gray",
+        "shape": "rounded",
+        "color": "#000000",
+        "opacity": 0.32,
+        "radiusRatio": 0.014,
+        "paddingXRatio": 0.028,
+        "paddingYRatio": 0.014
+      },
+      "effects": {
+        "shadow": {
+          "strength": "none",
+          "color": "#000000",
+          "opacity": 0,
+          "offsetYRatio": 0,
+          "blurRatio": 0
+        },
+        "stroke": {
+          "strength": "none",
+          "color": "#000000",
+          "widthRatio": 0
+        }
+      },
+      "stroke": {
+        "enabled": false,
+        "theme": "black",
+        "color": "#000000",
+        "opacity": 0.85,
+        "widthRatio": 0
+      },
+      "wordHighlight": {
+        "enabled": false,
+        "mode": "none",
+        "activeColor": "#FFFFFF",
+        "activeScale": 1,
+        "upcomingOpacity": 1,
+        "backgroundColor": "#FFFFFF",
+        "backgroundOpacity": 0,
+        "backgroundRadiusRatio": 0.01
+      },
+      "animation": {
+        "type": "fade",
+        "popInFrames": 6,
+        "popOutFrames": 4,
+        "translateYPx": 0
+      }
+    },
+    "social-bold": {
+      "preset": "social-bold",
+      "font": {
+        "family": "system-ui, sans-serif",
+        "sizeRatio": 0.0826,
+        "weight": 850,
+        "color": "#FFFFFF",
+        "lineHeight": 1.232,
+        "letterSpacing": 0
+      },
+      "layout": {
+        "anchor": "bottom",
+        "align": "center",
+        "maxWidth": 0.94,
+        "paddingBottomRatio": 0.08
+      },
+      "background": {
+        "enabled": false,
+        "theme": "gray",
+        "shape": "rounded",
+        "color": "#000000",
+        "opacity": 0.5,
+        "radiusRatio": 0.018,
+        "paddingXRatio": 0.035,
+        "paddingYRatio": 0.018
+      },
+      "effects": {
+        "shadow": {
+          "strength": "none",
+          "color": "#000000",
+          "opacity": 0.78,
+          "offsetYRatio": 0.04,
+          "blurRatio": 0.08
+        },
+        "stroke": {
+          "strength": "soft",
+          "color": "#000000",
+          "widthRatio": 0.0035
+        }
+      },
+      "stroke": {
+        "enabled": false,
+        "theme": "black",
+        "color": "#000000",
+        "opacity": 0.85,
+        "widthRatio": 0
+      },
+      "wordHighlight": {
+        "enabled": true,
+        "mode": "textColor",
+        "activeColor": "#FFD43B",
+        "activeScale": 1.14,
+        "upcomingOpacity": 0.58,
+        "backgroundColor": "#FFD43B",
+        "backgroundOpacity": 0.28,
+        "backgroundRadiusRatio": 0.012
+      },
+      "animation": {
+        "type": "pop",
+        "popInFrames": 5,
+        "popOutFrames": 4,
+        "translateYPx": 24
+      }
+    },
+    "pill": {
+      "preset": "pill",
+      "font": {
+        "family": "system-ui, sans-serif",
+        "sizeRatio": 0.0416,
+        "weight": 800,
+        "color": "#FFFFFF",
+        "lineHeight": 1.298,
+        "letterSpacing": 0
+      },
+      "layout": {
+        "anchor": "bottom",
+        "align": "center",
+        "maxWidth": 0.9,
+        "paddingBottomRatio": 0.075
+      },
+      "background": {
+        "enabled": true,
+        "theme": "gray",
+        "shape": "pill",
+        "color": "#111827",
+        "opacity": 0.62,
+        "radiusRatio": 0.04,
+        "paddingXRatio": 0.04,
+        "paddingYRatio": 0.0126
+      },
+      "effects": {
+        "shadow": {
+          "strength": "none",
+          "color": "#000000",
+          "opacity": 0.34,
+          "offsetYRatio": 0.014,
+          "blurRatio": 0.035
+        },
+        "stroke": {
+          "strength": "none",
+          "color": "#000000",
+          "widthRatio": 0
+        }
+      },
+      "stroke": {
+        "enabled": false,
+        "theme": "black",
+        "color": "#000000",
+        "opacity": 0.85,
+        "widthRatio": 0
+      },
+      "wordHighlight": {
+        "enabled": true,
+        "mode": "textColor",
+        "activeColor": "#FFB000",
+        "activeScale": 1.12,
+        "upcomingOpacity": 0.62,
+        "backgroundColor": "#FFB000",
+        "backgroundOpacity": 0.28,
+        "backgroundRadiusRatio": 0.012
+      },
+      "animation": {
+        "type": "pop",
+        "popInFrames": 6,
+        "popOutFrames": 4,
+        "translateYPx": 18
+      }
+    },
+    "boxed": {
+      "preset": "boxed",
+      "font": {
+        "family": "system-ui, sans-serif",
+        "sizeRatio": 0.0416,
+        "weight": 800,
+        "color": "#FFFFFF",
+        "lineHeight": 1.298,
+        "letterSpacing": 0
+      },
+      "layout": {
+        "anchor": "bottom",
+        "align": "center",
+        "maxWidth": 0.9,
+        "paddingBottomRatio": 0.07
+      },
+      "background": {
+        "enabled": true,
+        "theme": "gray",
+        "shape": "rounded",
+        "color": "#111111",
+        "opacity": 0.72,
+        "radiusRatio": 0.008,
+        "paddingXRatio": 0.032,
+        "paddingYRatio": 0.0112
+      },
+      "effects": {
+        "shadow": {
+          "strength": "none",
+          "color": "#000000",
+          "opacity": 0,
+          "offsetYRatio": 0,
+          "blurRatio": 0
+        },
+        "stroke": {
+          "strength": "none",
+          "color": "#000000",
+          "widthRatio": 0
+        }
+      },
+      "stroke": {
+        "enabled": false,
+        "theme": "black",
+        "color": "#000000",
+        "opacity": 0.85,
+        "widthRatio": 0
+      },
+      "wordHighlight": {
+        "enabled": true,
+        "mode": "textColor",
+        "activeColor": "#8BE9FD",
+        "activeScale": 1.12,
+        "upcomingOpacity": 0.68,
+        "backgroundColor": "#8BE9FD",
+        "backgroundOpacity": 0.22,
+        "backgroundRadiusRatio": 0.008
+      },
+      "animation": {
+        "type": "fade",
+        "popInFrames": 5,
+        "popOutFrames": 4,
+        "translateYPx": 0
+      }
+    },
+    "stroked": {
+      "preset": "stroked",
+      "font": {
+        "family": "system-ui, sans-serif",
+        "sizeRatio": 0.0416,
+        "weight": 800,
+        "color": "#F5F4ED",
+        "lineHeight": 1.32,
+        "letterSpacing": 0
+      },
+      "layout": {
+        "anchor": "bottom",
+        "align": "center",
+        "maxWidth": 0.92,
+        "paddingBottomRatio": 0.07
+      },
+      "background": {
+        "enabled": false,
+        "theme": "gray",
+        "shape": "rounded",
+        "color": "#000000",
+        "opacity": 0.48,
+        "radiusRatio": 0.018,
+        "paddingXRatio": 0.035,
+        "paddingYRatio": 0.018
+      },
+      "effects": {
+        "shadow": {
+          "strength": "none",
+          "color": "#000000",
+          "opacity": 0,
+          "offsetYRatio": 0,
+          "blurRatio": 0
+        },
+        "stroke": {
+          "strength": "none",
+          "color": "#000000",
+          "widthRatio": 0
+        }
+      },
+      "stroke": {
+        "enabled": true,
+        "theme": "black",
+        "color": "#000000",
+        "opacity": 0.9,
+        "widthRatio": 0.009
+      },
+      "wordHighlight": {
+        "enabled": true,
+        "mode": "textColor",
+        "activeColor": "#FFD43B",
+        "activeScale": 1,
+        "upcomingOpacity": 0.58,
+        "backgroundColor": "#FFD43B",
+        "backgroundOpacity": 0.28,
+        "backgroundRadiusRatio": 0.012
+      },
+      "animation": {
+        "type": "pop",
+        "popInFrames": 6,
+        "popOutFrames": 4,
+        "translateYPx": 18
+      }
+    },
+    "shorts": {
+      "preset": "shorts",
+      "font": {
+        "family": "Cal_Sans, Inter, system-ui, sans-serif",
+        "sizeRatio": 0.035,
+        "weight": 900,
+        "color": "#FFFFFF",
+        "lineHeight": 1.18,
+        "letterSpacing": 0.012
+      },
+      "layout": {
+        "anchor": "bottom",
+        "align": "center",
+        "maxWidth": 0.9,
+        "paddingBottomRatio": 0.2
+      },
+      "background": {
+        "enabled": false,
+        "theme": "gray",
+        "shape": "rounded",
+        "color": "#000000",
+        "opacity": 0.48,
+        "radiusRatio": 0.018,
+        "paddingXRatio": 0.035,
+        "paddingYRatio": 0.018
+      },
+      "effects": {
+        "shadow": {
+          "strength": "none",
+          "color": "#000000",
+          "opacity": 0.35,
+          "offsetYRatio": 0.014,
+          "blurRatio": 0.03
+        },
+        "stroke": {
+          "strength": "none",
+          "color": "#000000",
+          "widthRatio": 0
+        }
+      },
+      "stroke": {
+        "enabled": true,
+        "theme": "black",
+        "color": "#000000",
+        "opacity": 0.92,
+        "widthRatio": 0.008
+      },
+      "wordHighlight": {
+        "enabled": true,
+        "mode": "textColor",
+        "activeColor": "#21D32E",
+        "activeScale": 1,
+        "upcomingOpacity": 0.62,
+        "backgroundColor": "#21D32E",
+        "backgroundOpacity": 0.28,
+        "backgroundRadiusRatio": 0.012
+      },
+      "animation": {
+        "type": "pop",
+        "popInFrames": 5,
+        "popOutFrames": 4,
+        "translateYPx": 20
+      }
+    }
+  },
+  "themes": {
+    "highlight": {
+      "yellow": {
+        "wordHighlight": {
+          "activeColor": "#F8F54F",
+          "backgroundColor": "#F8F54F"
+        }
+      },
+      "green": {
+        "wordHighlight": {
+          "activeColor": "#21D32E",
+          "backgroundColor": "#21D32E"
+        }
+      },
+      "orange": {
+        "wordHighlight": {
+          "activeColor": "#F8BD6D",
+          "backgroundColor": "#F8BD6D"
+        }
+      },
+      "purple": {
+        "wordHighlight": {
+          "activeColor": "#C084FC",
+          "backgroundColor": "#C084FC"
+        }
+      },
+      "blue": {
+        "wordHighlight": {
+          "activeColor": "#2563EB",
+          "backgroundColor": "#2563EB"
+        }
+      },
+      "pink": {
+        "wordHighlight": {
+          "activeColor": "#DB2777",
+          "backgroundColor": "#DB2777"
+        }
+      }
+    },
+    "background": {
+      "gray": {
+        "background": {
+          "color": "#111827",
+          "opacity": 0.62
+        },
+        "font": {
+          "color": "#FFFFFF"
+        },
+        "wordHighlight": {
+          "activeColor": "#FFD43B"
+        }
+      },
+      "yellow": {
+        "background": {
+          "color": "#FACC15",
+          "opacity": 0.82
+        },
+        "font": {
+          "color": "#1A1A1A"
+        },
+        "wordHighlight": {
+          "activeColor": "#B45309"
+        }
+      },
+      "blue": {
+        "background": {
+          "color": "#2563EB",
+          "opacity": 0.72
+        },
+        "font": {
+          "color": "#FFFFFF"
+        },
+        "wordHighlight": {
+          "activeColor": "#BFDBFE"
+        }
+      },
+      "pink": {
+        "background": {
+          "color": "#DB2777",
+          "opacity": 0.72
+        },
+        "font": {
+          "color": "#FFFFFF"
+        },
+        "wordHighlight": {
+          "activeColor": "#FBCFE8"
+        }
+      },
+      "green": {
+        "background": {
+          "color": "#16A34A",
+          "opacity": 0.72
+        },
+        "font": {
+          "color": "#FFFFFF"
+        },
+        "wordHighlight": {
+          "activeColor": "#BBF7D0"
+        }
+      }
+    },
+    "stroke": {
+      "black": {
+        "stroke": {
+          "color": "#000000",
+          "opacity": 0.9
+        },
+        "wordHighlight": {
+          "activeColor": "#FFD43B"
+        }
+      },
+      "yellow": {
+        "stroke": {
+          "color": "#CA8A04",
+          "opacity": 0.95
+        },
+        "wordHighlight": {
+          "activeColor": "#CA8A04"
+        }
+      },
+      "blue": {
+        "stroke": {
+          "color": "#2563EB",
+          "opacity": 0.95
+        },
+        "wordHighlight": {
+          "activeColor": "#93C5FD"
+        }
+      },
+      "pink": {
+        "stroke": {
+          "color": "#DB2777",
+          "opacity": 0.95
+        },
+        "wordHighlight": {
+          "activeColor": "#F9A8D4"
+        }
+      },
+      "green": {
+        "stroke": {
+          "color": "#16A34A",
+          "opacity": 0.95
+        },
+        "wordHighlight": {
+          "activeColor": "#86EFAC"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,868 @@
+{
+ "source": "work/source.mp4",
+ "source_duration_s": 3978.5,
+ "source_duration_min": 66.31,
+ "final_duration_s": 1867.8,
+ "final_duration_min": 31.13,
+ "compression_pct": 46.9,
+ "n_coarse_blocks": 13,
+ "n_render_segments": 111,
+ "params": {
+  "split_gap_s": 1.5,
+  "lead_s": 0.1,
+  "trail_s": 0.3
+ },
+ "strategy": "66-min single-shot talking-head podcast. The first ~27 min is slow preamble (intro boilerplate, platform/subscription plugs, a long self-justifying manifesto, trip logistics, a crossover-fixture wish-list) that the host himself thrice calls 'way too long' -> keep only a few high-value nuggets. The real value (27-66 min) is team-by-team / player-by-player rugby analysis from his Christchurch trip -> keep as large blocks, drop only clear tangents (height aside, 'waiting for games' filler, a coast-as-a-kid life lesson) and let internal >0.6s pauses be auto-trimmed. Chronological order preserved (monologue back-references). Target ~half length.",
+ "keep": [
+  {
+   "in": 6.64,
+   "out": 17.86,
+   "first_word": "What's",
+   "last_word": "200.",
+   "reason": "Cold open: host + show intro (Herschel, HS Top 200, Monday Morning Meeting podcast). Trims the 6.7s dead lead-in; drops the platform-listing plugs that follow."
+  },
+  {
+   "in": 362.31,
+   "out": 387.88,
+   "first_word": "And",
+   "last_word": "it.",
+   "reason": "Core framing kept in one clean bite: the rankings are his blunt, honest opinion put out to be challenged. Drops ~3 min of repetitive 'why I do this' around it."
+  },
+  {
+   "in": 1010.42,
+   "out": 1023.6,
+   "first_word": "because",
+   "last_word": "TV.",
+   "reason": "Best rationale nugget: ~99% of players want to be seen/filmed, so he runs a Top 200 to widen their exposure. Drops the surrounding 8 min self-defense manifesto."
+  },
+  {
+   "in": 1026.5,
+   "out": 1054.14,
+   "first_word": "I",
+   "last_word": "200.",
+   "reason": "Best rationale nugget: ~99% of players want to be seen/filmed, so he runs a Top 200 to widen their exposure. Drops the surrounding 8 min self-defense manifesto."
+  },
+  {
+   "in": 1199.95,
+   "out": 1204.49,
+   "first_word": "But",
+   "last_word": "trip.",
+   "reason": "Pivot out of the bloated preamble into content: 'getting on to some of these games - Christchurch was a massive trip.'"
+  },
+  {
+   "in": 1311.3,
+   "out": 1312.86,
+   "first_word": "Now",
+   "last_word": "I",
+   "reason": "Trip takeaway: South Island schoolboy rugby surprised him by playing closer to Super 8 style than Auckland/Wellington. Drops the long 'I wish they had crossover fixtures' wish-list."
+  },
+  {
+   "in": 1314.45,
+   "out": 1337.81,
+   "first_word": "think",
+   "last_word": "plays.",
+   "reason": "Trip takeaway: South Island schoolboy rugby surprised him by playing closer to Super 8 style than Auckland/Wellington. Drops the long 'I wish they had crossover fixtures' wish-list."
+  },
+  {
+   "in": 1547.83,
+   "out": 1561.33,
+   "first_word": "Seeing",
+   "last_word": "person.",
+   "reason": "Seeing the teams live changed his perspective; they play like Super 8 teams."
+  },
+  {
+   "in": 1562.82,
+   "out": 1565.74,
+   "first_word": "And",
+   "last_word": "teams.",
+   "reason": "Seeing the teams live changed his perspective; they play like Super 8 teams."
+  },
+  {
+   "in": 1608.06,
+   "out": 1657.49,
+   "first_word": "and",
+   "last_word": "Because",
+   "reason": "Style analysis: top teams transition defense-to-attack in unison, which is why they win by big margins."
+  },
+  {
+   "in": 1737.58,
+   "out": 1762.58,
+   "first_word": "But",
+   "last_word": "it.",
+   "reason": "His recurring thesis: too many boys lack the 'green light' to play on instinct; creativity gets coached out, and that should change."
+  },
+  {
+   "in": 1764.77,
+   "out": 1796.47,
+   "first_word": "But",
+   "last_word": "in",
+   "reason": "His recurring thesis: too many boys lack the 'green light' to play on instinct; creativity gets coached out, and that should change."
+  },
+  {
+   "in": 1808.03,
+   "out": 1817.35,
+   "first_word": "In",
+   "last_word": "else.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 1820.34,
+   "out": 1836.43,
+   "first_word": "Self",
+   "last_word": "now.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 1837.89,
+   "out": 1847.24,
+   "first_word": "And",
+   "last_word": "28,",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 1849.12,
+   "out": 1868.66,
+   "first_word": "23",
+   "last_word": "playing.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 1873.23,
+   "out": 1892.2,
+   "first_word": "I",
+   "last_word": "obviously",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 1894.14,
+   "out": 1909.02,
+   "first_word": "if",
+   "last_word": "team.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 1910.39,
+   "out": 1939.19,
+   "first_word": "And",
+   "last_word": "of",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 1941.22,
+   "out": 1962.79,
+   "first_word": "unfair",
+   "last_word": "them",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 1964.92,
+   "out": 1984.16,
+   "first_word": "being",
+   "last_word": "made",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 1985.96,
+   "out": 1992.04,
+   "first_word": "him",
+   "last_word": "I",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 1993.66,
+   "out": 1998.94,
+   "first_word": "think",
+   "last_word": "on",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2000.34,
+   "out": 2031.43,
+   "first_word": "and",
+   "last_word": "the",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2033.27,
+   "out": 2040.71,
+   "first_word": "more",
+   "last_word": "know,",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2041.84,
+   "out": 2058.84,
+   "first_word": "attacking",
+   "last_word": "money",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2061.06,
+   "out": 2064.69,
+   "first_word": "there",
+   "last_word": "Flynn,",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2066.99,
+   "out": 2080.6,
+   "first_word": "I",
+   "last_word": "well.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2081.78,
+   "out": 2082.7,
+   "first_word": "And",
+   "last_word": "And",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2084.96,
+   "out": 2091.32,
+   "first_word": "so",
+   "last_word": "different,",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2093.67,
+   "out": 2099.95,
+   "first_word": "a",
+   "last_word": "how",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2102.05,
+   "out": 2107.03,
+   "first_word": "organized",
+   "last_word": "it'll",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2109.25,
+   "out": 2125.02,
+   "first_word": "be",
+   "last_word": "too.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2128.69,
+   "out": 2132.69,
+   "first_word": "All",
+   "last_word": "College,",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2134.2,
+   "out": 2171.67,
+   "first_word": "that's",
+   "last_word": "prop.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2173.34,
+   "out": 2188.76,
+   "first_word": "Because",
+   "last_word": "You",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2190.06,
+   "out": 2192.7,
+   "first_word": "know,",
+   "last_word": "like.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2197.7,
+   "out": 2221.56,
+   "first_word": "The",
+   "last_word": "well.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2224.35,
+   "out": 2226.81,
+   "first_word": "Ethan",
+   "last_word": "too.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2228.77,
+   "out": 2230.43,
+   "first_word": "Felipe",
+   "last_word": "Paul.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2233.47,
+   "out": 2235.31,
+   "first_word": "Paul,",
+   "last_word": "too.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2236.72,
+   "out": 2246.18,
+   "first_word": "There",
+   "last_word": "Boys.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2249.22,
+   "out": 2267.57,
+   "first_word": "Saffron",
+   "last_word": "Elliot.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2269.28,
+   "out": 2281.96,
+   "first_word": "Elliot",
+   "last_word": "I",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2283.2,
+   "out": 2287.68,
+   "first_word": "think",
+   "last_word": "is",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2289.71,
+   "out": 2339.69,
+   "first_word": "cool,",
+   "last_word": "difference.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2341.05,
+   "out": 2350.12,
+   "first_word": "And",
+   "last_word": "sort",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2352.09,
+   "out": 2362.41,
+   "first_word": "of",
+   "last_word": "know,",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2364.25,
+   "out": 2367.27,
+   "first_word": "you",
+   "last_word": "Caleb.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2368.64,
+   "out": 2400.26,
+   "first_word": "How",
+   "last_word": "yeah,",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2401.42,
+   "out": 2418.42,
+   "first_word": "it's",
+   "last_word": "there.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2420.17,
+   "out": 2422.79,
+   "first_word": "I",
+   "last_word": "out",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2424.69,
+   "out": 2446.47,
+   "first_word": "of",
+   "last_word": "powerful.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2447.93,
+   "out": 2466.11,
+   "first_word": "When",
+   "last_word": "just",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2467.44,
+   "out": 2474.72,
+   "first_word": "one",
+   "last_word": "hurt.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2478.21,
+   "out": 2497.04,
+   "first_word": "If",
+   "last_word": "when",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2498.79,
+   "out": 2516.24,
+   "first_word": "you",
+   "last_word": "guys,",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2518.09,
+   "out": 2568.28,
+   "first_word": "you",
+   "last_word": "that.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2569.76,
+   "out": 2619.7,
+   "first_word": "But,",
+   "last_word": "person.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2620.92,
+   "out": 2624.28,
+   "first_word": "Lucas",
+   "last_word": "playing.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2626.63,
+   "out": 2655.56,
+   "first_word": "Fran",
+   "last_word": "sideways.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2656.7,
+   "out": 2661.16,
+   "first_word": "You",
+   "last_word": "Dead,",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2663.15,
+   "out": 2668.13,
+   "first_word": "but",
+   "last_word": "Christ's.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2670.21,
+   "out": 2673.77,
+   "first_word": "Hoani",
+   "last_word": "good.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2675.09,
+   "out": 2771.41,
+   "first_word": "Henry,",
+   "last_word": "there.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2773.15,
+   "out": 2789.54,
+   "first_word": "I",
+   "last_word": "Huani",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2791.7,
+   "out": 2812.4,
+   "first_word": "can",
+   "last_word": "line.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2814.28,
+   "out": 2830.12,
+   "first_word": "But",
+   "last_word": "anyway.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2832.61,
+   "out": 2867.53,
+   "first_word": "But",
+   "last_word": "Adam",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2868.96,
+   "out": 2878.88,
+   "first_word": "Forbes",
+   "last_word": "seven.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2880.12,
+   "out": 2894.97,
+   "first_word": "And",
+   "last_word": "everything.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2898.7,
+   "out": 2950.46,
+   "first_word": "In",
+   "last_word": "Um,",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2952.23,
+   "out": 2960.16,
+   "first_word": "if",
+   "last_word": "well.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 2961.27,
+   "out": 2993.36,
+   "first_word": "And",
+   "last_word": "too.",
+   "reason": "MAIN ANALYSIS BLOCK (30:08-49:52): St Bede's vs Christ's ranking debate; deep dive on a very young Nelson College (Vili yr10, Liam, Flynn, Kobe Davis...); Otago Boys standouts; Southland Boys' dominance (Simpson, Hunter Newell, Caleb, Jack Brock, Mason); into Christ's College players (Lucas Sterling) incl. the knocked-out 'Walking Dead' sideline anecdote. Internal dead air auto-trimmed."
+  },
+  {
+   "in": 3050.5,
+   "out": 3058.15,
+   "first_word": "Um,",
+   "last_word": "Um,",
+   "reason": "Game reviews (50:50-54:25): Wellington College's 62-19 blowout and why he still ranks them ~13th; Whanganui/Francis Douglas; Hamilton Boys edging a New Plymouth side that should have won. Drops the preceding 6'5'' height aside."
+  },
+  {
+   "in": 3060.2,
+   "out": 3062.5,
+   "first_word": "and",
+   "last_word": "um,",
+   "reason": "Game reviews (50:50-54:25): Wellington College's 62-19 blowout and why he still ranks them ~13th; Whanganui/Francis Douglas; Hamilton Boys edging a New Plymouth side that should have won. Drops the preceding 6'5'' height aside."
+  },
+  {
+   "in": 3066.58,
+   "out": 3119.31,
+   "first_word": "19",
+   "last_word": "Um,",
+   "reason": "Game reviews (50:50-54:25): Wellington College's 62-19 blowout and why he still ranks them ~13th; Whanganui/Francis Douglas; Hamilton Boys edging a New Plymouth side that should have won. Drops the preceding 6'5'' height aside."
+  },
+  {
+   "in": 3121.57,
+   "out": 3143.82,
+   "first_word": "yeah,",
+   "last_word": "more.",
+   "reason": "Game reviews (50:50-54:25): Wellington College's 62-19 blowout and why he still ranks them ~13th; Whanganui/Francis Douglas; Hamilton Boys edging a New Plymouth side that should have won. Drops the preceding 6'5'' height aside."
+  },
+  {
+   "in": 3145.94,
+   "out": 3159.82,
+   "first_word": "I",
+   "last_word": "anyway.",
+   "reason": "Game reviews (50:50-54:25): Wellington College's 62-19 blowout and why he still ranks them ~13th; Whanganui/Francis Douglas; Hamilton Boys edging a New Plymouth side that should have won. Drops the preceding 6'5'' height aside."
+  },
+  {
+   "in": 3164.12,
+   "out": 3174.86,
+   "first_word": "And",
+   "last_word": "Um,",
+   "reason": "Game reviews (50:50-54:25): Wellington College's 62-19 blowout and why he still ranks them ~13th; Whanganui/Francis Douglas; Hamilton Boys edging a New Plymouth side that should have won. Drops the preceding 6'5'' height aside."
+  },
+  {
+   "in": 3177.88,
+   "out": 3185.26,
+   "first_word": "Fungary",
+   "last_word": "And",
+   "reason": "Game reviews (50:50-54:25): Wellington College's 62-19 blowout and why he still ranks them ~13th; Whanganui/Francis Douglas; Hamilton Boys edging a New Plymouth side that should have won. Drops the preceding 6'5'' height aside."
+  },
+  {
+   "in": 3190.27,
+   "out": 3233.36,
+   "first_word": "I",
+   "last_word": "most,",
+   "reason": "Game reviews (50:50-54:25): Wellington College's 62-19 blowout and why he still ranks them ~13th; Whanganui/Francis Douglas; Hamilton Boys edging a New Plymouth side that should have won. Drops the preceding 6'5'' height aside."
+  },
+  {
+   "in": 3235.01,
+   "out": 3237.73,
+   "first_word": "I",
+   "last_word": "say,",
+   "reason": "Game reviews (50:50-54:25): Wellington College's 62-19 blowout and why he still ranks them ~13th; Whanganui/Francis Douglas; Hamilton Boys edging a New Plymouth side that should have won. Drops the preceding 6'5'' height aside."
+  },
+  {
+   "in": 3238.94,
+   "out": 3250.68,
+   "first_word": "that",
+   "last_word": "ah,",
+   "reason": "Game reviews (50:50-54:25): Wellington College's 62-19 blowout and why he still ranks them ~13th; Whanganui/Francis Douglas; Hamilton Boys edging a New Plymouth side that should have won. Drops the preceding 6'5'' height aside."
+  },
+  {
+   "in": 3252.21,
+   "out": 3258.33,
+   "first_word": "I",
+   "last_word": "off.",
+   "reason": "Game reviews (50:50-54:25): Wellington College's 62-19 blowout and why he still ranks them ~13th; Whanganui/Francis Douglas; Hamilton Boys edging a New Plymouth side that should have won. Drops the preceding 6'5'' height aside."
+  },
+  {
+   "in": 3259.86,
+   "out": 3265.7,
+   "first_word": "That",
+   "last_word": "things.",
+   "reason": "Game reviews (50:50-54:25): Wellington College's 62-19 blowout and why he still ranks them ~13th; Whanganui/Francis Douglas; Hamilton Boys edging a New Plymouth side that should have won. Drops the preceding 6'5'' height aside."
+  },
+  {
+   "in": 3356.28,
+   "out": 3356.8,
+   "first_word": "But",
+   "last_word": "yeah,",
+   "reason": "More reviews (55:56-61:12): Rotorua Boys grinding out a wet defensive win; the top-of-table St Kentigern's vs Auckland Grammar (39-12) with Auckland Grammar dominant - Niko Stanley (#1 in country) and a deep supporting cast. Drops the 'I used to coast as a kid' tangent before it."
+  },
+  {
+   "in": 3357.94,
+   "out": 3368.16,
+   "first_word": "that's",
+   "last_word": "Yeah.",
+   "reason": "More reviews (55:56-61:12): Rotorua Boys grinding out a wet defensive win; the top-of-table St Kentigern's vs Auckland Grammar (39-12) with Auckland Grammar dominant - Niko Stanley (#1 in country) and a deep supporting cast. Drops the 'I used to coast as a kid' tangent before it."
+  },
+  {
+   "in": 3370.16,
+   "out": 3373.69,
+   "first_word": "I",
+   "last_word": "lot,",
+   "reason": "More reviews (55:56-61:12): Rotorua Boys grinding out a wet defensive win; the top-of-table St Kentigern's vs Auckland Grammar (39-12) with Auckland Grammar dominant - Niko Stanley (#1 in country) and a deep supporting cast. Drops the 'I used to coast as a kid' tangent before it."
+  },
+  {
+   "in": 3375.52,
+   "out": 3378.14,
+   "first_word": "really",
+   "last_word": "one.",
+   "reason": "More reviews (55:56-61:12): Rotorua Boys grinding out a wet defensive win; the top-of-table St Kentigern's vs Auckland Grammar (39-12) with Auckland Grammar dominant - Niko Stanley (#1 in country) and a deep supporting cast. Drops the 'I used to coast as a kid' tangent before it."
+  },
+  {
+   "in": 3379.6,
+   "out": 3381.5,
+   "first_word": "Rotary",
+   "last_word": "now.",
+   "reason": "More reviews (55:56-61:12): Rotorua Boys grinding out a wet defensive win; the top-of-table St Kentigern's vs Auckland Grammar (39-12) with Auckland Grammar dominant - Niko Stanley (#1 in country) and a deep supporting cast. Drops the 'I used to coast as a kid' tangent before it."
+  },
+  {
+   "in": 3382.82,
+   "out": 3385.18,
+   "first_word": "Such",
+   "last_word": "game.",
+   "reason": "More reviews (55:56-61:12): Rotorua Boys grinding out a wet defensive win; the top-of-table St Kentigern's vs Auckland Grammar (39-12) with Auckland Grammar dominant - Niko Stanley (#1 in country) and a deep supporting cast. Drops the 'I used to coast as a kid' tangent before it."
+  },
+  {
+   "in": 3389.83,
+   "out": 3404.45,
+   "first_word": "Really",
+   "last_word": "win.",
+   "reason": "More reviews (55:56-61:12): Rotorua Boys grinding out a wet defensive win; the top-of-table St Kentigern's vs Auckland Grammar (39-12) with Auckland Grammar dominant - Niko Stanley (#1 in country) and a deep supporting cast. Drops the 'I used to coast as a kid' tangent before it."
+  },
+  {
+   "in": 3408.59,
+   "out": 3430.95,
+   "first_word": "Really,",
+   "last_word": "done.",
+   "reason": "More reviews (55:56-61:12): Rotorua Boys grinding out a wet defensive win; the top-of-table St Kentigern's vs Auckland Grammar (39-12) with Auckland Grammar dominant - Niko Stanley (#1 in country) and a deep supporting cast. Drops the 'I used to coast as a kid' tangent before it."
+  },
+  {
+   "in": 3432.36,
+   "out": 3438.05,
+   "first_word": "And",
+   "last_word": "percent.",
+   "reason": "More reviews (55:56-61:12): Rotorua Boys grinding out a wet defensive win; the top-of-table St Kentigern's vs Auckland Grammar (39-12) with Auckland Grammar dominant - Niko Stanley (#1 in country) and a deep supporting cast. Drops the 'I used to coast as a kid' tangent before it."
+  },
+  {
+   "in": 3439.82,
+   "out": 3441.26,
+   "first_word": "Shoot,",
+   "last_word": "as.",
+   "reason": "More reviews (55:56-61:12): Rotorua Boys grinding out a wet defensive win; the top-of-table St Kentigern's vs Auckland Grammar (39-12) with Auckland Grammar dominant - Niko Stanley (#1 in country) and a deep supporting cast. Drops the 'I used to coast as a kid' tangent before it."
+  },
+  {
+   "in": 3443.7,
+   "out": 3487.96,
+   "first_word": "Purposely",
+   "last_word": "-5.",
+   "reason": "More reviews (55:56-61:12): Rotorua Boys grinding out a wet defensive win; the top-of-table St Kentigern's vs Auckland Grammar (39-12) with Auckland Grammar dominant - Niko Stanley (#1 in country) and a deep supporting cast. Drops the 'I used to coast as a kid' tangent before it."
+  },
+  {
+   "in": 3490.8,
+   "out": 3523.35,
+   "first_word": "And",
+   "last_word": "good.",
+   "reason": "More reviews (55:56-61:12): Rotorua Boys grinding out a wet defensive win; the top-of-table St Kentigern's vs Auckland Grammar (39-12) with Auckland Grammar dominant - Niko Stanley (#1 in country) and a deep supporting cast. Drops the 'I used to coast as a kid' tangent before it."
+  },
+  {
+   "in": 3524.83,
+   "out": 3530.13,
+   "first_word": "What's",
+   "last_word": "good.",
+   "reason": "More reviews (55:56-61:12): Rotorua Boys grinding out a wet defensive win; the top-of-table St Kentigern's vs Auckland Grammar (39-12) with Auckland Grammar dominant - Niko Stanley (#1 in country) and a deep supporting cast. Drops the 'I used to coast as a kid' tangent before it."
+  },
+  {
+   "in": 3533.43,
+   "out": 3549.72,
+   "first_word": "What's",
+   "last_word": "thing.",
+   "reason": "More reviews (55:56-61:12): Rotorua Boys grinding out a wet defensive win; the top-of-table St Kentigern's vs Auckland Grammar (39-12) with Auckland Grammar dominant - Niko Stanley (#1 in country) and a deep supporting cast. Drops the 'I used to coast as a kid' tangent before it."
+  },
+  {
+   "in": 3550.99,
+   "out": 3602.66,
+   "first_word": "He",
+   "last_word": "it.",
+   "reason": "More reviews (55:56-61:12): Rotorua Boys grinding out a wet defensive win; the top-of-table St Kentigern's vs Auckland Grammar (39-12) with Auckland Grammar dominant - Niko Stanley (#1 in country) and a deep supporting cast. Drops the 'I used to coast as a kid' tangent before it."
+  },
+  {
+   "in": 3604.06,
+   "out": 3628.32,
+   "first_word": "Open",
+   "last_word": "12.",
+   "reason": "More reviews (55:56-61:12): Rotorua Boys grinding out a wet defensive win; the top-of-table St Kentigern's vs Auckland Grammar (39-12) with Auckland Grammar dominant - Niko Stanley (#1 in country) and a deep supporting cast. Drops the 'I used to coast as a kid' tangent before it."
+  },
+  {
+   "in": 3629.8,
+   "out": 3649.04,
+   "first_word": "And",
+   "last_word": "like,",
+   "reason": "More reviews (55:56-61:12): Rotorua Boys grinding out a wet defensive win; the top-of-table St Kentigern's vs Auckland Grammar (39-12) with Auckland Grammar dominant - Niko Stanley (#1 in country) and a deep supporting cast. Drops the 'I used to coast as a kid' tangent before it."
+  },
+  {
+   "in": 3650.89,
+   "out": 3657.24,
+   "first_word": "I",
+   "last_word": "Grandma.",
+   "reason": "More reviews (55:56-61:12): Rotorua Boys grinding out a wet defensive win; the top-of-table St Kentigern's vs Auckland Grammar (39-12) with Auckland Grammar dominant - Niko Stanley (#1 in country) and a deep supporting cast. Drops the 'I used to coast as a kid' tangent before it."
+  },
+  {
+   "in": 3659.13,
+   "out": 3672.85,
+   "first_word": "But",
+   "last_word": "teams.",
+   "reason": "More reviews (55:56-61:12): Rotorua Boys grinding out a wet defensive win; the top-of-table St Kentigern's vs Auckland Grammar (39-12) with Auckland Grammar dominant - Niko Stanley (#1 in country) and a deep supporting cast. Drops the 'I used to coast as a kid' tangent before it."
+  },
+  {
+   "in": 3805.92,
+   "out": 3841.56,
+   "first_word": "Especially",
+   "last_word": "team",
+   "reason": "Analytical close: St Paul's is no longer just a 'rugby league school' - they produce genuinely good rugby players (a dual-sport school). Drops the 'waiting for games to be sent' filler and the 'I don't think' stammer before it."
+  },
+  {
+   "in": 3843.22,
+   "out": 3845.92,
+   "first_word": "to",
+   "last_word": "like,",
+   "reason": "Analytical close: St Paul's is no longer just a 'rugby league school' - they produce genuinely good rugby players (a dual-sport school). Drops the 'waiting for games to be sent' filler and the 'I don't think' stammer before it."
+  },
+  {
+   "in": 3847.75,
+   "out": 3870.97,
+   "first_word": "I",
+   "last_word": "players.",
+   "reason": "Analytical close: St Paul's is no longer just a 'rugby league school' - they produce genuinely good rugby players (a dual-sport school). Drops the 'waiting for games to be sent' filler and the 'I don't think' stammer before it."
+  },
+  {
+   "in": 3872.46,
+   "out": 3875.28,
+   "first_word": "And",
+   "last_word": "like,",
+   "reason": "Analytical close: St Paul's is no longer just a 'rugby league school' - they produce genuinely good rugby players (a dual-sport school). Drops the 'waiting for games to be sent' filler and the 'I don't think' stammer before it."
+  },
+  {
+   "in": 3876.46,
+   "out": 3908.5,
+   "first_word": "in",
+   "last_word": "too.",
+   "reason": "Analytical close: St Paul's is no longer just a 'rugby league school' - they produce genuinely good rugby players (a dual-sport school). Drops the 'waiting for games to be sent' filler and the 'I don't think' stammer before it."
+  },
+  {
+   "in": 3964.55,
+   "out": 3977.15,
+   "first_word": "But",
+   "last_word": "edible.",
+   "reason": "Tight sign-off: 'that's enough for now... High School Top 200, love you all.'"
+  }
+ ],
+ "drop": [
+  {
+   "in": 0.0,
+   "out": 6.5,
+   "reason": "Dead cold-open / silent lead-in before he starts talking."
+  },
+  {
+   "in": 18.0,
+   "out": 362.5,
+   "reason": "Platform & subscription plugs + 'I'm the only one doing this full time' self-promo + Christchurch-trip thanks and 20-years-ago reminiscing + the opening of the 'why I do this' mission monologue. Pure preamble."
+  },
+  {
+   "in": 388.0,
+   "out": 1010.5,
+   "reason": "Bulk of the mission manifesto: boys-are-appreciated repetition, how scouts/recruiters use the rankings as a 'landing point' (said many times), and social-media advice to players ('clean up your socials'). One nugget is kept at 6:02; the rest is repetitive."
+  },
+  {
+   "in": 1054.0,
+   "out": 1200.0,
+   "reason": "Self-defense block: 'if you challenge me, be informed', money-loss/average-car aside, 'kids say prove-you-wrong' - which he himself ends with 'that ran way too long'."
+  },
+  {
+   "in": 1205.5,
+   "out": 1311.5,
+   "reason": "Trip logistics and school fanboying (went to see the grounds, in awe of St Bede's) - low information."
+  },
+  {
+   "in": 1338.5,
+   "out": 1547.6,
+   "reason": "Long crossover-fixture wish-list tangent: 'I wish South Island and Auckland/North Island schools played/travelled to each other more', repeated many ways."
+  },
+  {
+   "in": 1566.0,
+   "out": 1607.7,
+   "reason": "Connective repetition about seeing teams in person / pacing being different - already covered by the kept lines around it."
+  },
+  {
+   "in": 1657.5,
+   "out": 1737.0,
+   "reason": "Wind-up repetition of the 'creativity gets coached out' thesis before the tighter statement kept at 28:57."
+  },
+  {
+   "in": 1796.4,
+   "out": 1808.0,
+   "reason": "Throwaway connective ('I guess I wonder, rugby's different down there but it's all the same')."
+  },
+  {
+   "in": 2993.0,
+   "out": 3050.0,
+   "reason": "6'5'' height aside (he judges players' heights off his own) + 'shoot, so much to cover' filler."
+  },
+  {
+   "in": 3265.5,
+   "out": 3356.0,
+   "reason": "'I used to coast as a kid when I thought we'd won' personal life-lesson tangent off the New Plymouth game."
+  },
+  {
+   "in": 3673.0,
+   "out": 3805.0,
+   "reason": "'Waiting for games to be sent to me' filler (Rongotai, Campbell, Rosmini/Mahurangi) + a stuttered 'I don't think, I don't think...' run."
+  },
+  {
+   "in": 3909.0,
+   "out": 3964.0,
+   "reason": "Southern Cross point that just repeats the St Paul's dual-sport-school argument, plus another 'we've gone way over time'."
+  },
+  {
+   "in": 3977.0,
+   "out": 3978.5,
+   "reason": "Trailing silence after sign-off."
+  }
+ ],
+ "drop_note": "Coarse (structural) drop spans only. Within each KEEP block, internal pauses > 1.5 s were also trimmed as dead air (see build_edit.py); those micro-drops total ~9 min and are not enumerated individually."
+}

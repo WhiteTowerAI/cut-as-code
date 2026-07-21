@@ -1,1 +1,15 @@
+# Python
+__pycache__/
+*.pyc
 
+.superpowers/
+
+work/
+docs/
+tests/
+
+.claude/worktrees/
+# HyperFrames preview cache + regenerable self-check stills/gallery
+.hyperframes/
+snapshots/
+gallery.html

@@ -1,0 +1,383 @@
+﻿{
+    "schemaVersion":  1,
+    "generatedAt":  "2026-07-16T03:50:50.1057047Z",
+    "generator":  "scripts/render_style_previews.ps1",
+    "total":  25,
+    "groups":  [
+                   {
+                       "id":  "core",
+                       "items":  [
+                                     {
+                                         "id":  "clean",
+                                         "label":  "Clean",
+                                         "preset":  "clean",
+                                         "themeType":  "none",
+                                         "theme":  null,
+                                         "karaoke":  false,
+                                         "orientation":  "landscape",
+                                         "aspectRatio":  "16:9",
+                                         "width":  1280,
+                                         "height":  720,
+                                         "image":  "preview-clean.png",
+                                         "props":  "props-clean.json"
+                                     },
+                                     {
+                                         "id":  "minimal",
+                                         "label":  "Minimal",
+                                         "preset":  "minimal",
+                                         "themeType":  "none",
+                                         "theme":  null,
+                                         "karaoke":  false,
+                                         "orientation":  "landscape",
+                                         "aspectRatio":  "16:9",
+                                         "width":  1280,
+                                         "height":  720,
+                                         "image":  "preview-minimal.png",
+                                         "props":  "props-minimal.json"
+                                     },
+                                     {
+                                         "id":  "social-bold",
+                                         "label":  "Social Bold",
+                                         "preset":  "social-bold",
+                                         "themeType":  "none",
+                                         "theme":  null,
+                                         "karaoke":  false,
+                                         "orientation":  "landscape",
+                                         "aspectRatio":  "16:9",
+                                         "width":  1280,
+                                         "height":  720,
+                                         "image":  "preview-social-bold.png",
+                                         "props":  "props-social-bold.json"
+                                     },
+                                     {
+                                         "id":  "social-bold-karaoke",
+                                         "label":  "Social Bold Karaoke",
+                                         "preset":  "social-bold",
+                                         "themeType":  "none",
+                                         "theme":  null,
+                                         "karaoke":  true,
+                                         "orientation":  "landscape",
+                                         "aspectRatio":  "16:9",
+                                         "width":  1280,
+                                         "height":  720,
+                                         "image":  "preview-social-bold-karaoke.png",
+                                         "props":  "props-social-bold-karaoke.json"
+                                     }
+                                 ]
+                   },
+                   {
+                       "id":  "pill",
+                       "items":  [
+                                     {
+                                         "id":  "pill-gray",
+                                         "label":  "Pill Gray",
+                                         "preset":  "pill",
+                                         "themeType":  "background",
+                                         "theme":  "gray",
+                                         "karaoke":  false,
+                                         "orientation":  "landscape",
+                                         "aspectRatio":  "16:9",
+                                         "width":  1280,
+                                         "height":  720,
+                                         "image":  "preview-pill-gray.png",
+                                         "props":  "props-pill-gray.json"
+                                     },
+                                     {
+                                         "id":  "pill-yellow",
+                                         "label":  "Pill Yellow",
+                                         "preset":  "pill",
+                                         "themeType":  "background",
+                                         "theme":  "yellow",
+                                         "karaoke":  false,
+                                         "orientation":  "landscape",
+                                         "aspectRatio":  "16:9",
+                                         "width":  1280,
+                                         "height":  720,
+                                         "image":  "preview-pill-yellow.png",
+                                         "props":  "props-pill-yellow.json"
+                                     },
+                                     {
+                                         "id":  "pill-blue",
+                                         "label":  "Pill Blue",
+                                         "preset":  "pill",
+                                         "themeType":  "background",
+                                         "theme":  "blue",
+                                         "karaoke":  false,
+                                         "orientation":  "landscape",
+                                         "aspectRatio":  "16:9",
+                                         "width":  1280,
+                                         "height":  720,
+                                         "image":  "preview-pill-blue.png",
+                                         "props":  "props-pill-blue.json"
+                                     },
+                                     {
+                                         "id":  "pill-pink",
+                                         "label":  "Pill Pink",
+                                         "preset":  "pill",
+                                         "themeType":  "background",
+                                         "theme":  "pink",
+                                         "karaoke":  false,
+                                         "orientation":  "landscape",
+                                         "aspectRatio":  "16:9",
+                                         "width":  1280,
+                                         "height":  720,
+                                         "image":  "preview-pill-pink.png",
+                                         "props":  "props-pill-pink.json"
+                                     },
+                                     {
+                                         "id":  "pill-green",
+                                         "label":  "Pill Green",
+                                         "preset":  "pill",
+                                         "themeType":  "background",
+                                         "theme":  "green",
+                                         "karaoke":  false,
+                                         "orientation":  "landscape",
+                                         "aspectRatio":  "16:9",
+                                         "width":  1280,
+                                         "height":  720,
+                                         "image":  "preview-pill-green.png",
+                                         "props":  "props-pill-green.json"
+                                     }
+                                 ]
+                   },
+                   {
+                       "id":  "boxed",
+                       "items":  [
+                                     {
+                                         "id":  "boxed-gray",
+                                         "label":  "Boxed Gray",
+                                         "preset":  "boxed",
+                                         "themeType":  "background",
+                                         "theme":  "gray",
+                                         "karaoke":  false,
+                                         "orientation":  "landscape",
+                                         "aspectRatio":  "16:9",
+                                         "width":  1280,
+                                         "height":  720,
+                                         "image":  "preview-boxed-gray.png",
+                                         "props":  "props-boxed-gray.json"
+                                     },
+                                     {
+                                         "id":  "boxed-yellow",
+                                         "label":  "Boxed Yellow",
+                                         "preset":  "boxed",
+                                         "themeType":  "background",
+                                         "theme":  "yellow",
+                                         "karaoke":  false,
+                                         "orientation":  "landscape",
+                                         "aspectRatio":  "16:9",
+                                         "width":  1280,
+                                         "height":  720,
+                                         "image":  "preview-boxed-yellow.png",
+                                         "props":  "props-boxed-yellow.json"
+                                     },
+                                     {
+                                         "id":  "boxed-blue",
+                                         "label":  "Boxed Blue",
+                                         "preset":  "boxed",
+                                         "themeType":  "background",
+                                         "theme":  "blue",
+                                         "karaoke":  false,
+                                         "orientation":  "landscape",
+                                         "aspectRatio":  "16:9",
+                                         "width":  1280,
+                                         "height":  720,
+                                         "image":  "preview-boxed-blue.png",
+                                         "props":  "props-boxed-blue.json"
+                                     },
+                                     {
+                                         "id":  "boxed-pink",
+                                         "label":  "Boxed Pink",
+                                         "preset":  "boxed",
+                                         "themeType":  "background",
+                                         "theme":  "pink",
+                                         "karaoke":  false,
+                                         "orientation":  "landscape",
+                                         "aspectRatio":  "16:9",
+                                         "width":  1280,
+                                         "height":  720,
+                                         "image":  "preview-boxed-pink.png",
+                                         "props":  "props-boxed-pink.json"
+                                     },
+                                     {
+                                         "id":  "boxed-green",
+                                         "label":  "Boxed Green",
+                                         "preset":  "boxed",
+                                         "themeType":  "background",
+                                         "theme":  "green",
+                                         "karaoke":  false,
+                                         "orientation":  "landscape",
+                                         "aspectRatio":  "16:9",
+                                         "width":  1280,
+                                         "height":  720,
+                                         "image":  "preview-boxed-green.png",
+                                         "props":  "props-boxed-green.json"
+                                     }
+                                 ]
+                   },
+                   {
+                       "id":  "stroked",
+                       "items":  [
+                                     {
+                                         "id":  "stroked-black",
+                                         "label":  "Stroked Black",
+                                         "preset":  "stroked",
+                                         "themeType":  "stroke",
+                                         "theme":  "black",
+                                         "karaoke":  false,
+                                         "orientation":  "landscape",
+                                         "aspectRatio":  "16:9",
+                                         "width":  1280,
+                                         "height":  720,
+                                         "image":  "preview-stroked-black.png",
+                                         "props":  "props-stroked-black.json"
+                                     },
+                                     {
+                                         "id":  "stroked-yellow",
+                                         "label":  "Stroked Yellow",
+                                         "preset":  "stroked",
+                                         "themeType":  "stroke",
+                                         "theme":  "yellow",
+                                         "karaoke":  false,
+                                         "orientation":  "landscape",
+                                         "aspectRatio":  "16:9",
+                                         "width":  1280,
+                                         "height":  720,
+                                         "image":  "preview-stroked-yellow.png",
+                                         "props":  "props-stroked-yellow.json"
+                                     },
+                                     {
+                                         "id":  "stroked-blue",
+                                         "label":  "Stroked Blue",
+                                         "preset":  "stroked",
+                                         "themeType":  "stroke",
+                                         "theme":  "blue",
+                                         "karaoke":  false,
+                                         "orientation":  "landscape",
+                                         "aspectRatio":  "16:9",
+                                         "width":  1280,
+                                         "height":  720,
+                                         "image":  "preview-stroked-blue.png",
+                                         "props":  "props-stroked-blue.json"
+                                     },
+                                     {
+                                         "id":  "stroked-pink",
+                                         "label":  "Stroked Pink",
+                                         "preset":  "stroked",
+                                         "themeType":  "stroke",
+                                         "theme":  "pink",
+                                         "karaoke":  false,
+                                         "orientation":  "landscape",
+                                         "aspectRatio":  "16:9",
+                                         "width":  1280,
+                                         "height":  720,
+                                         "image":  "preview-stroked-pink.png",
+                                         "props":  "props-stroked-pink.json"
+                                     },
+                                     {
+                                         "id":  "stroked-green",
+                                         "label":  "Stroked Green",
+                                         "preset":  "stroked",
+                                         "themeType":  "stroke",
+                                         "theme":  "green",
+                                         "karaoke":  false,
+                                         "orientation":  "landscape",
+                                         "aspectRatio":  "16:9",
+                                         "width":  1280,
+                                         "height":  720,
+                                         "image":  "preview-stroked-green.png",
+                                         "props":  "props-stroked-green.json"
+                                     }
+                                 ]
+                   },
+                   {
+                       "id":  "shorts",
+                       "items":  [
+                                     {
+                                         "id":  "shorts-yellow",
+                                         "label":  "Shorts Yellow",
+                                         "preset":  "shorts",
+                                         "themeType":  "highlight",
+                                         "theme":  "yellow",
+                                         "karaoke":  true,
+                                         "orientation":  "shorts",
+                                         "aspectRatio":  "9:16",
+                                         "width":  1080,
+                                         "height":  1920,
+                                         "image":  "preview-shorts-yellow.png",
+                                         "props":  "props-shorts-yellow.json"
+                                     },
+                                     {
+                                         "id":  "shorts-green",
+                                         "label":  "Shorts Green",
+                                         "preset":  "shorts",
+                                         "themeType":  "highlight",
+                                         "theme":  "green",
+                                         "karaoke":  true,
+                                         "orientation":  "shorts",
+                                         "aspectRatio":  "9:16",
+                                         "width":  1080,
+                                         "height":  1920,
+                                         "image":  "preview-shorts-green.png",
+                                         "props":  "props-shorts-green.json"
+                                     },
+                                     {
+                                         "id":  "shorts-orange",
+                                         "label":  "Shorts Orange",
+                                         "preset":  "shorts",
+                                         "themeType":  "highlight",
+                                         "theme":  "orange",
+                                         "karaoke":  true,
+                                         "orientation":  "shorts",
+                                         "aspectRatio":  "9:16",
+                                         "width":  1080,
+                                         "height":  1920,
+                                         "image":  "preview-shorts-orange.png",
+                                         "props":  "props-shorts-orange.json"
+                                     },
+                                     {
+                                         "id":  "shorts-purple",
+                                         "label":  "Shorts Purple",
+                                         "preset":  "shorts",
+                                         "themeType":  "highlight",
+                                         "theme":  "purple",
+                                         "karaoke":  true,
+                                         "orientation":  "shorts",
+                                         "aspectRatio":  "9:16",
+                                         "width":  1080,
+                                         "height":  1920,
+                                         "image":  "preview-shorts-purple.png",
+                                         "props":  "props-shorts-purple.json"
+                                     },
+                                     {
+                                         "id":  "shorts-blue",
+                                         "label":  "Shorts Blue",
+                                         "preset":  "shorts",
+                                         "themeType":  "highlight",
+                                         "theme":  "blue",
+                                         "karaoke":  true,
+                                         "orientation":  "shorts",
+                                         "aspectRatio":  "9:16",
+                                         "width":  1080,
+                                         "height":  1920,
+                                         "image":  "preview-shorts-blue.png",
+                                         "props":  "props-shorts-blue.json"
+                                     },
+                                     {
+                                         "id":  "shorts-pink",
+                                         "label":  "Shorts Pink",
+                                         "preset":  "shorts",
+                                         "themeType":  "highlight",
+                                         "theme":  "pink",
+                                         "karaoke":  true,
+                                         "orientation":  "shorts",
+                                         "aspectRatio":  "9:16",
+                                         "width":  1080,
+                                         "height":  1920,
+                                         "image":  "preview-shorts-pink.png",
+                                         "props":  "props-shorts-pink.json"
+                                     }
+                                 ]
+                   }
+               ]
+}

@@ -1,0 +1,42 @@
+{
+  "_comment": "Corrective base + creative looks. Each look's full ffmpeg filter = base + ',' + chain (base is auto-prepended unless prepend_base:false). RETUNE 'base' per footage from assess.py output: log footage -> put the log->Rec.709 conversion here; already-Rec.709 -> neutralize the WB cast (move signalstats U/V toward 128, but NOT all the way, to keep skin warmth), lift exposure, add mild contrast/saturation. The example base below is tuned for footage with a mild WARM cast + slight underexposure.",
+  "base": "colorbalance=rm=-0.03:bm=0.05:bh=0.04:rh=-0.02,eq=gamma=1.05:contrast=1.07:saturation=1.06:brightness=0.012",
+  "looks": [
+    {
+      "name": "clean_neutral",
+      "label": "1 · CLEAN NEUTRAL",
+      "desc": "corrected only, true color (the honest reference)",
+      "chain": "eq=contrast=1.02"
+    },
+    {
+      "name": "warm_filmic",
+      "label": "2 · WARM FILMIC",
+      "desc": "golden highlights, soft film toe, lifted blacks",
+      "chain": "colorbalance=rh=0.06:bh=-0.05:rs=-0.02:bs=0.03,curves=all='0/0.03 0.25/0.24 0.75/0.80 1/0.98',eq=saturation=1.03"
+    },
+    {
+      "name": "cool_desat",
+      "label": "3 · COOL DESAT",
+      "desc": "modern muted; cools ONLY shadows/highlights to keep skin alive",
+      "chain": "colorbalance=bs=0.07:gs=0.02:bh=0.03,eq=saturation=0.90:contrast=1.05"
+    },
+    {
+      "name": "teal_orange",
+      "label": "4 · TEAL & ORANGE",
+      "desc": "cinematic split-tone: teal shadows, warm midtones/skin",
+      "chain": "colorbalance=rs=-0.05:gs=0.02:bs=0.08:rm=0.04:bm=-0.03:rh=0.06:bh=-0.05,eq=contrast=1.08:saturation=1.08"
+    },
+    {
+      "name": "punchy_vibrant",
+      "label": "5 · PUNCHY VIBRANT",
+      "desc": "high contrast + vibrance (protects skin from over-saturating)",
+      "chain": "curves=all='0/0 0.28/0.22 0.5/0.5 0.72/0.80 1/1',vibrance=intensity=0.30,eq=contrast=1.02:saturation=0.97"
+    },
+    {
+      "name": "vintage_faded",
+      "label": "6 · VINTAGE FADED",
+      "desc": "lifted/faded blacks, low saturation, warm-green tint",
+      "chain": "curves=all='0/0.10 0.5/0.5 1/0.92',colorbalance=rs=0.04:gs=0.03:bs=-0.03:gh=0.03:bh=0.02,eq=saturation=0.82:contrast=0.96"
+    }
+  ]
+}

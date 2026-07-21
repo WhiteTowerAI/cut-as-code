@@ -1,0 +1,31 @@
+{
+  "schema_version": "shorts-candidates.v2",
+  "video": {"source": "final/final-video.mp4", "duration_s": 30.0},
+  "transcript": {"path": "work/shorts/transcript.json", "timebase": "program"},
+  "selection": {"target_count": 1, "evidence_mode": "text_visual"},
+  "candidates": [
+    {
+      "candidate_id": "cand-001",
+      "title": "A Claim With a Measurable Payoff",
+      "scene_type": "solo_talk",
+      "start_time": 2.0,
+      "end_time": 27.0,
+      "transcript_excerpt": "This changes everything. The result is three times faster.",
+      "evidence_mode": "text_visual",
+      "score_breakdown": {
+        "hook": {"score": 18, "reason": "The opening claim creates immediate curiosity."},
+        "completeness": {"score": 19, "reason": "The claim resolves with a concrete result."},
+        "audience_value": {"score": 17, "reason": "The measured improvement is understandable."},
+        "emotion_tension": {"score": 8, "reason": "The contrast creates moderate stakes."},
+        "quotability": {"score": 12, "reason": "The payoff is concise and repeatable."},
+        "pace_editability": {"score": 8, "reason": "The range contains no required internal restructuring."}
+      },
+      "metadata": {"editorial_reason": "The bold opening and measured payoff form a complete short."},
+      "warnings": [],
+      "filler_drop_spans": [],
+      "visual_observations": ["The presenter remains visible throughout the claim and payoff."],
+      "visual_risks": [],
+      "visual_keyframes": []
+    }
+  ]
+}

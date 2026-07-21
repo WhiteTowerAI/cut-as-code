@@ -1,0 +1,63 @@
+{
+  "duration": 30.0,
+  "language": "en",
+  "timebase": "program",
+  "timeline_id": "main",
+  "source_duration": 40.0,
+  "segments": [
+    {
+      "id": "1.clip-001.1",
+      "clip_id": "clip-001",
+      "start": 2.0,
+      "end": 3.2,
+      "text": "This changes everything.",
+      "source_range": {"start_s": 5.0, "end_s": 6.2},
+      "program_range": {"start_s": 2.0, "end_s": 3.2},
+      "words": [
+        {
+          "word": " This",
+          "start": 2.0,
+          "end": 2.3,
+          "clip_id": "clip-001",
+          "source_range": {"start_s": 5.0, "end_s": 5.3},
+          "program_range": {"start_s": 2.0, "end_s": 2.3}
+        },
+        {
+          "word": " changes",
+          "start": 2.3,
+          "end": 2.8,
+          "clip_id": "clip-001",
+          "source_range": {"start_s": 5.3, "end_s": 5.8},
+          "program_range": {"start_s": 2.3, "end_s": 2.8}
+        },
+        {
+          "word": " everything.",
+          "start": 2.8,
+          "end": 3.2,
+          "clip_id": "clip-001",
+          "source_range": {"start_s": 5.8, "end_s": 6.2},
+          "program_range": {"start_s": 2.8, "end_s": 3.2}
+        }
+      ]
+    },
+    {
+      "id": "2.clip-002.1",
+      "clip_id": "clip-002",
+      "start": 24.0,
+      "end": 27.0,
+      "text": "The result is three times faster.",
+      "source_range": {"start_s": 32.0, "end_s": 38.0},
+      "program_range": {"start_s": 24.0, "end_s": 27.0},
+      "words": [
+        {
+          "word": " The result is three times faster.",
+          "start": 24.0,
+          "end": 27.0,
+          "clip_id": "clip-002",
+          "source_range": {"start_s": 32.0, "end_s": 38.0},
+          "program_range": {"start_s": 24.0, "end_s": 27.0}
+        }
+      ]
+    }
+  ]
+}
