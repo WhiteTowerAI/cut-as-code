@@ -136,20 +136,30 @@ def validate_project_input(project_root, plan, video_path):
             fail(f"shorts plan dependency revision is stale: {dependency}")
 
 
-def refined_boundary(short_item, transcript, ffmpeg, video_path, media_duration, args):
-    return refine_short_boundary(
-        short_item,
-        transcript,
-        ffmpeg=ffmpeg,
-        video_path=video_path,
-        pre_roll=args.pre_roll,
-        post_roll=args.post_roll,
-        scene_threshold=args.scene_threshold,
-        max_duration=args.max_duration,
-        min_tail_margin=args.min_tail_margin,
-        media_duration=media_duration,
-        snap_to_phrases=not args.no_refine_boundaries,
-    )
+def refined_boundary(short_item, transcript, ffmpeg, video_path, args):
+    if not args.no_refine_boundaries:
+        return refine_short_boundary(
+            short_item,
+            transcript,
+            ffmpeg=ffmpeg,
+            video_path=video_path,
+            pre_roll=args.pre_roll,
+            post_roll=args.post_roll,
+            scene_threshold=args.scene_threshold,
+            max_duration=args.max_duration,
+            min_tail_margin=args.min_tail_margin,
+        )
+    start = float(short_item["start_time"])
+    end = float(short_item["end_time"])
+    return {
+        "short_id": short_item.get("id") or short_item.get("short_id"),
+        "original_start_time": round(start, 3), "original_end_time": round(end, 3),
+        "original_duration": round(end - start, 3), "refined_start_time": round(start, 3),
+        "refined_end_time": round(end, 3), "refined_duration": round(end - start, 3),
+        "content_start_time": round(start, 3), "content_end_time": round(end, 3),
+        "content_duration": round(end - start, 3), "boundary_adjustment_s": {"start": 0.0, "end": 0.0},
+        "reasons": ["BOUNDARY_REFINEMENT_DISABLED"], "warnings": [], "scene_cuts": [],
+    }
 
 
 def extraction_keep_spans(short_item, refined):
@@ -214,16 +224,7 @@ def extract_keep_spans(ffmpeg, ffprobe, video_path, output_path, keep_spans):
     ))
 
 
-def remap_transcript(
-    transcript,
-    short_item,
-    video_path,
-    transcript_path,
-    keep_spans,
-    media_duration,
-    content_start,
-    content_end,
-):
+def remap_transcript(transcript, short_item, video_path, transcript_path, keep_spans, media_duration):
     segments = []
     elapsed = 0.0
     for keep in keep_spans:
@@ -237,12 +238,7 @@ def remap_transcript(
                     word_end = float(word["end"])
                 except (KeyError, TypeError, ValueError):
                     continue
-                if (
-                    word_start >= keep_start - 0.001
-                    and word_end <= keep_end + 0.001
-                    and word_start >= content_start - 0.001
-                    and word_end <= content_end + 0.001
-                ):
+                if word_start >= keep_start - 0.001 and word_end <= keep_end + 0.001:
                     mapped_words.append({
                         **word,
                         "start": round(elapsed + word_start - keep_start, 3),
@@ -274,17 +270,6 @@ def remap_transcript(
             "keep_spans": keep_spans,
         },
     }
-
-
-def map_source_time_to_output(keep_spans, source_time):
-    elapsed = 0.0
-    for keep in keep_spans:
-        keep_start = float(keep["start_time"])
-        keep_end = float(keep["end_time"])
-        if keep_start - 0.001 <= source_time <= keep_end + 0.001:
-            return elapsed + max(0.0, min(source_time, keep_end) - keep_start)
-        elapsed += keep_end - keep_start
-    return elapsed
 
 
 def executed_drop_spans(short_item):
@@ -334,15 +319,12 @@ def run_extract(args):
     validate_plan_review(out_dir, plan, video_path)
     transcript = load_json(transcript_path)
     source_probe = probe_media(ffprobe, video_path)
-    media_duration = float(source_probe.get("format", {}).get("duration") or 0.0)
     shorts = plan.get("shorts") or []
     if not shorts:
         fail("shorts_plan.json contains no shorts")
     reports = []
     for short_item in shorts:
-        refined = refined_boundary(
-            short_item, transcript, ffmpeg, video_path, media_duration, args
-        )
+        refined = refined_boundary(short_item, transcript, ffmpeg, video_path, args)
         keep_spans = extraction_keep_spans(short_item, refined)
         if canonical:
             paths = canonical_output_paths(project_root, short_item)
@@ -361,34 +343,20 @@ def run_extract(args):
         output_probe = probe_media(ffprobe, source_path)
         expected_duration = sum(span["end_time"] - span["start_time"] for span in keep_spans)
         validate_extracted_media(source_probe, output_probe, expected_duration)
-        short_transcript = remap_transcript(
-            transcript,
-            short_item,
-            video_path,
-            transcript_path,
-            keep_spans,
-            actual_duration,
-            float(refined["content_start_time"]),
-            float(refined["content_end_time"]),
-        )
+        short_transcript = remap_transcript(transcript, short_item, video_path, transcript_path, keep_spans, actual_duration)
         write_json(short_transcript_path, short_transcript)
         words = [word for segment in short_transcript["segments"] for word in segment.get("words") or []]
         last_word_end = max((float(word["end"]) for word in words), default=0.0)
         estimated_output_duration = expected_duration
         warnings = list(refined.get("warnings") or [])
         transcript_within_media = last_word_end <= actual_duration + 0.05
-        content_end_in_output = map_source_time_to_output(
-            keep_spans, float(refined["content_end_time"])
-        )
-        tail_margin = actual_duration - content_end_in_output
-        transcript_tail_margin = actual_duration - last_word_end
-        tail_release_verified = tail_margin + 0.001 >= args.min_tail_margin
+        tail_margin = actual_duration - last_word_end
         if tail_margin < args.min_tail_margin:
             warnings.append("LOW_TAIL_MARGIN")
         if not transcript_within_media:
             warnings.append("TRANSCRIPT_EXCEEDS_MEDIA_DURATION")
-        refined_source_duration = refined["refined_end_time"] - refined["refined_start_time"]
-        filler_removed_duration = refined_source_duration - estimated_output_duration
+        source_duration = refined["refined_end_time"] - refined["refined_start_time"]
+        filler_removed_duration = source_duration - estimated_output_duration
         report = {
             "schema_version": "short-extraction-report.v2",
             "short_id": short_item.get("id") or short_item.get("short_id"),
@@ -399,15 +367,12 @@ def run_extract(args):
             "executed_filler_drop_spans": executed_drop_spans(short_item),
             "rejected_filler_drop_spans": short_item.get("rejected_filler_drop_spans") or [],
             "keep_spans": keep_spans,
-            "source_duration": round(refined_source_duration, 3),
+            "source_duration": round(source_duration, 3),
             "filler_removed_duration": round(filler_removed_duration, 3),
             "estimated_output_duration": round(estimated_output_duration, 3),
             "actual_duration": round(actual_duration, 3),
             "transcript_last_word_end": round(last_word_end, 3),
-            "content_end_in_output_s": round(content_end_in_output, 3),
             "tail_margin_s": round(tail_margin, 3),
-            "transcript_tail_margin_s": round(transcript_tail_margin, 3),
-            "tail_release_verified": tail_release_verified,
             "transcript_within_media": transcript_within_media,
             "boundary_refinement": refined,
             "warnings": list(dict.fromkeys(warnings)),
@@ -418,11 +383,6 @@ def run_extract(args):
             },
         }
         write_json(report_path, report)
-        if not tail_release_verified:
-            fail(
-                f"{report['short_id']} has only {tail_margin:.3f}s after its selected final word; "
-                f"minimum is {args.min_tail_margin:.3f}s"
-            )
         if canonical:
             short_item["status"] = "verified"
             short_item["actual_duration_s"] = round(actual_duration, 3)
@@ -457,16 +417,12 @@ def build_parser():
     parser.add_argument("--project-root")
     parser.add_argument("--ffmpeg")
     parser.add_argument("--ffprobe")
-    parser.add_argument(
-        "--no-refine-boundaries",
-        action="store_true",
-        help="Disable semantic phrase snapping while retaining mandatory audio release handles.",
-    )
+    parser.add_argument("--no-refine-boundaries", action="store_true", help="Use raw outer plan times without boundary refinement.")
     parser.add_argument("--pre-roll", type=float, default=0.25)
-    parser.add_argument("--post-roll", type=float, default=0.30)
+    parser.add_argument("--post-roll", type=float, default=0.35)
     parser.add_argument("--scene-threshold", type=float, default=0.35)
     parser.add_argument("--max-duration", type=float, default=90.0)
-    parser.add_argument("--min-tail-margin", type=float, default=0.25)
+    parser.add_argument("--min-tail-margin", type=float, default=0.08)
     return parser
 
 

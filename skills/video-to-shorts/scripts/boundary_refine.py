@@ -262,26 +262,39 @@ def cap_handle_after(
     words,
     content_end,
     desired_end,
-    target_tail=0.30,
-    min_final_word_tail=0.25,
-    max_tail=0.45,
-    min_tail_margin=0.25,
+    target_tail=0.16,
+    min_final_word_tail=0.12,
+    max_tail=0.22,
+    next_word_overlap_budget=0.10,
+    hard_next_word_overlap_limit=0.12,
+    min_tail_margin=0.12,
 ):
     following = [
         word
         for word in words
-        if word["end"] > content_end + 0.001
+        if word["start"] >= content_end - 0.001 and word["end"] > content_end + 0.001
     ]
     reasons = []
     desired_tail = max(0.0, desired_end - content_end)
-    desired_tail = min(
-        max_tail,
-        max(target_tail, min_final_word_tail, min(desired_tail, max_tail)),
-    )
-    desired_end = content_end + desired_tail
+    desired_tail = min(max_tail, max(target_tail, min(desired_tail, max_tail)))
 
-    if following and desired_end > following[0]["start"]:
-        reasons.append("TAIL_OVERLAP_ALLOWED_FOR_FINAL_WORD_RELEASE")
+    if not following:
+        desired_end = content_end + desired_tail
+        return desired_end, reasons
+
+    next_start = following[0]["start"]
+    gap_to_next = next_start - content_end
+    if gap_to_next >= target_tail:
+        desired_end = content_end + min(desired_tail, gap_to_next)
+    else:
+        allowed_overlap = min(next_word_overlap_budget, hard_next_word_overlap_limit)
+        tail = min(max_tail, target_tail, max(min_final_word_tail, gap_to_next + allowed_overlap))
+        desired_end = content_end + tail
+        if desired_end > next_start:
+            desired_end = min(desired_end, next_start + allowed_overlap)
+            reasons.append("TAIL_OVERLAP_ALLOWED_FOR_FINAL_WORD_RELEASE")
+        if desired_end - content_end < min_final_word_tail:
+            reasons.append("TIGHT_TAIL_MARGIN")
 
     if desired_end - content_end < min_tail_margin:
         reasons.append("TIGHT_TAIL_MARGIN")
@@ -390,70 +403,49 @@ def refine_short_boundary(
     ffmpeg=None,
     video_path=None,
     pre_roll=0.25,
-    post_roll=0.30,
+    post_roll=0.35,
     max_expand=1.5,
     pause_threshold=0.45,
     scene_threshold=0.35,
     max_duration=90.0,
-    tail_padding=0.30,
-    target_tail=0.30,
-    min_final_word_tail=0.25,
-    max_tail=0.45,
-    hard_next_word_overlap_limit=0.20,
-    min_tail_margin=0.25,
-    media_duration=None,
-    snap_to_phrases=True,
+    tail_padding=0.3,
+    target_tail=0.16,
+    min_final_word_tail=0.12,
+    max_tail=0.22,
+    next_word_overlap_budget=0.10,
+    hard_next_word_overlap_limit=0.12,
+    min_tail_margin=0.12,
 ):
     original_start = float(short_item["start_time"])
     original_end = float(short_item["end_time"])
-    video_duration = (
-        float(media_duration)
-        if isinstance(media_duration, (int, float))
-        else transcript_duration(transcript)
-    )
+    video_duration = transcript_duration(transcript)
     warnings = []
     reasons = []
 
     words = flatten_words(transcript)
     segments = segment_word_ranges(transcript, pause_threshold=pause_threshold)
-    if snap_to_phrases:
-        content_start, start_reasons = choose_start(
-            words,
-            segments,
-            original_start,
-            original_end,
-            max_expand,
-            pause_threshold,
-        )
-        content_end, end_reasons = choose_end(
-            words,
-            segments,
-            original_start,
-            original_end,
-            max_expand,
-            pause_threshold,
-            max_duration,
-        )
-    else:
-        overlapping = [
-            word for word in words if word_overlaps(word, original_start, original_end)
-        ]
-        content_start = original_start
-        content_end = overlapping[-1]["end"] if overlapping else original_end
-        start_reasons = ["SEMANTIC_BOUNDARY_REFINEMENT_DISABLED"]
-        end_reasons = ["RAW_END_PROTECTED_BY_RELEASE_HANDLE"]
+    content_start, start_reasons = choose_start(
+        words,
+        segments,
+        original_start,
+        original_end,
+        max_expand,
+        pause_threshold,
+    )
+    content_end, end_reasons = choose_end(
+        words,
+        segments,
+        original_start,
+        original_end,
+        max_expand,
+        pause_threshold,
+        max_duration,
+    )
     reasons.extend(start_reasons)
     reasons.extend(end_reasons)
-    start = (
-        cap_handle_before(
-            words,
-            content_start,
-            clamp(content_start - pre_roll, 0.0, video_duration),
-        )
-        if snap_to_phrases
-        else clamp(original_start, 0.0, video_duration)
-    )
-    end = max(original_end, content_end + max(post_roll, tail_padding))
+    start = clamp(content_start - pre_roll, 0.0, video_duration)
+    end = clamp(content_end + max(post_roll, tail_padding), 0.0, video_duration)
+    start = cap_handle_before(words, content_start, start)
     end, tail_cap_reasons = cap_handle_after(
         words,
         content_end,
@@ -461,9 +453,10 @@ def refine_short_boundary(
         target_tail=target_tail,
         min_final_word_tail=min_final_word_tail,
         max_tail=max_tail,
+        next_word_overlap_budget=next_word_overlap_budget,
+        hard_next_word_overlap_limit=hard_next_word_overlap_limit,
         min_tail_margin=min_tail_margin,
     )
-    end = clamp(end, 0.0, video_duration)
     reasons.extend(tail_cap_reasons)
     if "TAIL_OVERLAP_ALLOWED_FOR_FINAL_WORD_RELEASE" in tail_cap_reasons:
         warnings.append("TAIL_OVERLAP_ALLOWED_FOR_FINAL_WORD_RELEASE")

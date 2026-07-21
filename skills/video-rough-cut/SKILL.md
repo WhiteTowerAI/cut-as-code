@@ -175,22 +175,28 @@ python scripts/cut_render.py    work/edit_final.json   work/source.mp4 first_cut
   and trims every boundary INTO the silence (LEAD 0.10s / TRAIL 0.30s) so no word is
   clipped and dead air is reclaimed. Lower SPLIT_GAP = tighter but choppier; for a
   slow, deliberate speaker prefer ~1.5, not 0.6 (avoids twitchy micro-cuts).
-- `assign_speed.py` (auto varispeed) — groups render segments by `decision_ref`, measures
-  the speaking pace of each hand-authored keep decision, and writes one shared `speed`
-  factor plus each segment's resulting `out_dur` back into `edit_final.json`. Pace already
-  inside the comfortable band stays at 1.0; out-of-band pace moves only to the nearest
-  deadband edge. Adjacent decision blocks differ by at most 0.08x to avoid "pumpy" joins.
-  It changes pace only — never which content is kept. Read the printed table before rendering:
+- `assign_speed.py` (auto varispeed) — for each kept segment it measures the speaking
+  pace and writes a `speed` factor + the resulting `out_dur` back into `edit_final.json`.
+  **Slow stretches get sped up, fast stretches slowed down**, toward a comfortable target
+  band; pace already in-band is left at 1.0. It changes pace only — never which content
+  is kept. Read the printed table and tune before rendering:
   - Metric: words/min (English) — auto-switches to **chars/min for CJK** (zh/ja/ko).
-  - Defaults are **first-run starting points, not validated constants**: deadband 145–185
-    WPM and speed clamped to **1.0–1.3**. This is speed-up-only: slow decision blocks can
-    be tightened, while natural-fast delivery remains at 1.0. Short decision blocks
-    (<3.5s / <6 words) are too noisy to measure and inherit the global factor.
-  - The rate is measured after dead-air reclaim, so it reads higher than gross WPM and is
-    closer to articulation rate. **The printed-table review is load-bearing**: eyeball it
-    and tune `deadband` to the speaker before rendering, don't trust the defaults blind.
+  - Defaults are **first-run starting points, not validated constants**: target 165 WPM,
+    deadband 145–185 (no change inside it), speed clamped to **0.9–1.5** (keeps voices
+    natural — `atempo` changes tempo, NOT pitch). Short segments (<3.5s / <6 words) are
+    too noisy to measure and inherit the global factor. Note the WPM is measured on the
+    *dead-air-reclaimed* segment, so it reads higher than gross WPM (it's closer to
+    articulation rate) — **the printed-table review is load-bearing**: eyeball it and
+    tune `target`/`deadband` to the speaker before rendering, don't trust the defaults blind.
+  - **Single-shot talking-heads / podcasts: prefer `min_speed=1.0` (speed-up-only).**
+    After dead-air reclaim a deliberate speaker's articulation rate reads high, so the
+    default `min_speed=0.9` *slows* many natural-fast segments to 0.90 — draggy, and the
+    varying speeds make joins "pumpy" (one run: 47/89 segments re-timed, cut got *longer*).
+    `min_speed=1.0` only tightens genuinely slow stretches and leaves fast delivery at 1.0
+    (same run: 25/89 re-timed, slightly shorter, no slowing). Consider it the default for
+    this footage class.
   - Knobs (k=v): `mode=segment|global|off` (default `segment`; `global`=one factor for
-    the whole video, `off`=disable), `deadband=lo,hi`, `min_speed=`/`max_speed=`,
+    the whole video, `off`=disable), `target=`, `deadband=lo,hi`, `min_speed=`/`max_speed=`,
     `min_seg=`/`min_words=`, `lang=auto|en|cjk`. To skip the feature entirely, just don't
     run this step — `cut_render.py` treats a missing `speed` as 1.0.
 - `cut_render.py` uses **N separate seeked inputs + concat filter, single re-encode**.
@@ -247,10 +253,10 @@ higher after speed-up (same words, shorter minutes) — a reporting artifact, no
 ## Key principles (the hard-won ones)
 - **You decide content; scripts decide frames.** Hand-write `edit_coarse.json`;
   let `build_edit.py` do precision and `assign_speed.py` do pace.
-- **Speed touches pace, never content.** Auto-varispeed gives all render segments from
-  one `decision_ref` the same speed, moves out-of-band pace only to the nearest deadband
-  edge, limits adjacent decisions to a 0.08x delta, and clamps output to 1.0–1.3.
-  `atempo` preserves pitch. Review the table; `mode=off` or skip the step to disable.
+- **Speed touches pace, never content.** Auto-varispeed only re-times kept segments
+  (slow→faster, fast→slower) toward a comfortable band; clamp 0.9–1.5 and `atempo`
+  keep the voice natural (no pitch shift). Review the table; `mode=off` or skip the
+  step to disable.
 - **Never clip a word.** Boundaries always fall inside silence.
 - **Memory-safe render only** (N seeked inputs + concat). Never multi-trim one input.
 - **Be decisive.** Make reasonable calls and proceed; don't over-ask.

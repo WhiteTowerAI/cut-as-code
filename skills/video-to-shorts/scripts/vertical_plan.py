@@ -10,7 +10,7 @@ import subprocess
 from fractions import Fraction
 from pathlib import Path
 
-from review_gate import sha256_file, validate_vertical_delivery_allowed
+from review_gate import validate_vertical_delivery_allowed
 
 
 ALLOWED_STRATEGIES = {"STATIC_CROP", "SCENE_CROP", "LETTERBOX", "REVIEW_REQUIRED"}
@@ -52,17 +52,6 @@ def load_json(path):
 
 def write_json(path, payload):
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-
-
-def file_binding(path):
-    path = Path(path).resolve()
-    stat = path.stat()
-    return {
-        "path": str(path),
-        "sha256": sha256_file(path),
-        "size": stat.st_size,
-        "modified_ns": stat.st_mtime_ns,
-    }
 
 
 def parse_rate(value):
@@ -316,59 +305,6 @@ def validate_vertical_plan_data(plan, video, source):
     if "output_video" in plan:
         validated["output_video"] = plan["output_video"]
     return validated
-def validate_keep_spans(value, source_duration_s):
-    if not isinstance(value, list) or not value:
-        fail("extraction report keep_spans must be a non-empty array")
-    normalized = []
-    previous_end = -1.0
-    for index, span in enumerate(value):
-        if not isinstance(span, dict):
-            fail(f"extraction report keep_spans[{index}] must be an object")
-        start = number(span.get("start_time"), f"keep_spans[{index}].start_time")
-        end = number(span.get("end_time"), f"keep_spans[{index}].end_time")
-        if start < 0 or end <= start or end > source_duration_s + TIME_TOLERANCE:
-            fail(f"keep_spans[{index}] must satisfy 0 <= start_time < end_time <= {source_duration_s:.3f}")
-        if start < previous_end - TIME_TOLERANCE:
-            fail(f"keep_spans[{index}] overlaps or is not sorted")
-        normalized.append({"start_time": round(start, 6), "end_time": round(end, 6)})
-        previous_end = end
-    return normalized
-
-
-def bind_direct_render(plan, horizontal_video, horizontal_source, source_video, extraction_report, ffprobe):
-    source_video = Path(source_video).resolve()
-    extraction_report = Path(extraction_report).resolve()
-    if not source_video.is_file():
-        fail(f"direct render source not found: {source_video}")
-    if not extraction_report.is_file():
-        fail(f"extraction report not found: {extraction_report}")
-    report = load_json(extraction_report)
-    if report.get("schema_version") != "short-extraction-report.v2":
-        fail("direct rendering requires short-extraction-report.v2")
-    if Path(report.get("source_video", "")).resolve() != source_video:
-        fail("extraction report source_video does not match --source-video")
-    report_horizontal = Path((report.get("outputs") or {}).get("horizontal_video", "")).resolve()
-    if report_horizontal != Path(horizontal_video).resolve():
-        fail("extraction report horizontal_video does not match --video")
-    render_source = probe_video(ffprobe, source_video)
-    if (
-        render_source["width"] != horizontal_source["width"]
-        or render_source["height"] != horizontal_source["height"]
-        or render_source["fps"] != horizontal_source["fps"]
-    ):
-        fail("direct render source geometry or FPS differs from the horizontal short")
-    keep_spans = validate_keep_spans(report.get("keep_spans"), render_source["duration_s"])
-    mapped_duration = sum(span["end_time"] - span["start_time"] for span in keep_spans)
-    fps_value = horizontal_source["fps"]["num"] / horizontal_source["fps"]["den"]
-    if abs(mapped_duration - horizontal_source["duration_s"]) > max(0.1, 2 / fps_value):
-        fail("extraction report keep_spans duration does not match the horizontal short")
-    plan["direct_render"] = {
-        "source_video": file_binding(source_video),
-        "extraction_report": file_binding(extraction_report),
-        "keep_spans": keep_spans,
-        "mapped_duration_s": round(mapped_duration, 6),
-    }
-    return plan
 
 
 def write_markdown(path, plan):
@@ -387,11 +323,6 @@ def write_markdown(path, plan):
         "## Strategy Duration",
         "",
     ]
-    if plan.get("direct_render"):
-        lines[8:8] = [
-            f"- Formal render source: `{plan['direct_render']['source_video']['path']}`",
-            "- Formal render generations after the bound source: `1`",
-        ]
     for strategy in STRATEGY_ORDER:
         item = plan["strategy_summary"][strategy]
         lines.append(f"- `{strategy}`: {item['duration_s']:.3f}s ({item['percentage']:.2f}%)")
@@ -469,8 +400,6 @@ def main():
     parser.add_argument("--video", required=True)
     parser.add_argument("--input", required=True)
     parser.add_argument("--out", required=True)
-    parser.add_argument("--source-video", help="Original verified render used for one-generation final vertical rendering.")
-    parser.add_argument("--extraction-report", help="Horizontal short extraction report containing source keep_spans.")
     parser.add_argument("--ffprobe")
     args = parser.parse_args()
     video = Path(args.video).resolve()
@@ -485,12 +414,6 @@ def main():
     ffprobe = resolve_tool("ffprobe", args.ffprobe)
     source = probe_video(ffprobe, video)
     plan = validate_plan(load_json(input_path), video, source)
-    if bool(args.source_video) != bool(args.extraction_report):
-        fail("--source-video and --extraction-report must be provided together")
-    if args.source_video:
-        plan = bind_direct_render(
-            plan, video, source, args.source_video, args.extraction_report, ffprobe
-        )
     if video.name.lower().endswith("-horizontal.mp4") and video.parent.name == "shorts":
         plan["output_video"] = str(
             video.with_name(video.name[:-len("-horizontal.mp4")] + "-vertical.mp4")
