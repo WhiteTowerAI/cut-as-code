@@ -46,9 +46,7 @@ The agent found self-contained moments in the long-form program, extracted them 
 **Original video:** [Jensen Huang: NVIDIA GTC Taipei 2026 Keynote](https://www.youtube.com/watch?v=wSp6AiNIrsY)
 
 **Prompt:**
-```text
-For [video-path], use /video-understand, /video-to-shorts, /video-add-captions, /video-add-content-cards.
-```
+> For [video-path], use /video-understand, /video-to-shorts, /video-add-captions, /video-add-content-cards.
 
 ### Raw podcast edit
 
@@ -63,9 +61,7 @@ The agent studied the footage, cut a tighter edit, then added captions and conte
 **Original video:** [Elon Musk : How to Build the Future](https://www.youtube.com/watch?v=tnBQmEqBCY0&t=67s)
 
 **Prompt:**
-```text
-For [video-path], use /video-understand, /video-rough-cut, /video-add-captions, and /video-add-content-cards.
-```
+> For [video-path], use /video-understand, /video-rough-cut, /video-add-captions, and /video-add-content-cards.
 
 ### Color grading
 
@@ -80,9 +76,7 @@ The agent assessed the footage, generated named looks, then rendered a side-by-s
 **Original video:** [DJI MAVIC PRO 2 Ungraded Footage to practice grading](https://www.youtube.com/watch?v=BBJtM_s0HKE)
 
 **Prompt:**
-```text
-For [video-path], use /video-color-grade, and /video-edit-compare.
-```
+> For [video-path], use /video-color-grade, and /video-edit-compare.
 
 ## Why agent-cut?
 
@@ -94,120 +88,9 @@ Timeline editors such as Premiere Pro and CapCut are powerful but complex and ti
 - **Review before delivery.** Agents generate stills, contact sheets, boundary reels, and short previews before committing to an expensive full render.
 - **Composable.** Skills work independently or combined. There is no mandatory global pipeline.
 
-## Quick Start
-
-### 1. Clone agent-cut
-
-```powershell
-git clone https://github.com/WhiteTowerAI/agent-cut.git
-Set-Location agent-cut
-
-$Repo = (Get-Location).Path
-```
-
-### 2. Check the shared dependencies
-
-```powershell
-ffmpeg -version
-ffprobe -version
-python -c "import faster_whisper"
-```
-
-Individual skills may need additional dependencies — read the skill's `SKILL.md` before running its scripts.
-
-### 3. Initialize a video project
-
-```powershell
-$Source = "C:\path\to\source-video.mp4"
-$Project = Join-Path $Repo "my-video-project"
-
-python "$Repo\skills\video-understand\scripts\init_project.py" `
-  $Source `
-  $Project
-
-Set-Location $Project
-```
-
-This creates the human-facing `input/`, `review/`, and `final/` directories, plus the machine-facing manifest, timeline, evidence, and cache files under `work/`.
-
-### 4. Build the shared evidence layer
-
-```powershell
-ffmpeg -y `
-  -i input/original-video.mp4 `
-  -ac 1 `
-  -ar 16000 `
-  work/cache/audio16k.wav
-
-python "$Repo\skills\video-understand\scripts\transcribe.py" `
-  work/cache/audio16k.wav `
-  work/understand/transcript `
-  medium `
-  --lang auto `
-  --cache-dir work/cache/faster-whisper
-
-python "$Repo\skills\video-understand\scripts\analyze.py" `
-  work/understand/transcript.json `
-  work/understand/analysis.json
-```
-
-### 5. Tell your agent what you want
-
-For a rough cut:
-
-```text
-Read skills/video-rough-cut/SKILL.md and use it to turn this project
-into a tighter first cut.
-
-Show me the summary, timeline map, and boundary review before rendering
-the final delivery.
-```
-
-For captions and content cards:
-
-```text
-Add captions to the approved program first.
-
-After the captions are approved, add selective content cards without
-changing the underlying timeline.
-```
-
-For shorts:
-
-```text
-Read skills/video-to-shorts/SKILL.md and propose five short-form clips
-from the approved base program.
-
-Show me the candidate review artifacts before extraction.
-
-After I approve the horizontal shorts, create vertical versions. Add
-captions first and content cards afterward.
-```
-
-### 6. Compile and render approved operations
-
-After the selected main-sequence operations are approved and their revision checks pass:
-
-```powershell
-python "$Repo\skills\video-understand\scripts\build_render_plan.py" .
-
-python "$Repo\skills\video-understand\scripts\render_project.py" `
-  work/render/render-plan.json
-```
-
-To compare the actual final pixels against the original source:
-
-```powershell
-python "$Repo\skills\video-edit-compare\scripts\make_compare.py" `
-  work/timeline.json `
-  input/original-video.mp4 `
-  final/final-video.mp4 `
-  review/edit-compare/original-vs-final-source-time.mp4
-```
-
 ## Skills
 
-Each directory under `skills/` is a self-contained agent skill. Its `SKILL.md` is both the agent playbook and the specification for that skill. Skills are optional and composable — a project uses only the operations it needs.
+Each directory under `skills/` is a self-contained agent skill. Its `SKILL.md` is both the agent playbook and the specification for that skill. 
 
 | Skill | Purpose |
 |---|---|
@@ -218,6 +101,18 @@ Each directory under `skills/` is a self-contained agent skill. Its `SKILL.md` i
 | `video-add-content-cards` | Add selective transcript-timed titles, lower thirds, statistics, lists, quotes, chapter cards, and calls to action. |
 | `video-to-shorts` | Find and extract approved horizontal shorts, then optionally create reviewed 9:16 vertical deliveries. |
 | `video-edit-compare` | Compare the original source with the actual final delivery on the original source clock. |
+
+## Quick Start
+
+Install the skills into your agent:
+
+```bash
+npx skills add WhiteTowerAI/agent-cut
+```
+
+Then with a prompt, point your agent at a video and name the skills you want:
+
+> For [video-path], use /video-understand, /video-rough-cut, /video-add-captions, and /video-add-content-cards.
 
 ## How it works
 
