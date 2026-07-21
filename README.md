@@ -8,21 +8,6 @@ agent-cut turns video editing into an inspectable, code-driven workflow. The age
 
 ## Demos
 
-### Raw podcast edit
-
-The agent studied the footage, cut a tighter edit, then added captions and content cards with graphic motion.
-
-[![Watch the complete agent-cut workflow](https://img.youtube.com/vi/YVmCi59aBPY/maxresdefault.jpg)](https://youtu.be/YVmCi59aBPY)
-
-*Click to view on YouTube.*
-
-**Original video:** [Elon Musk : How to Build the Future](https://www.youtube.com/watch?v=tnBQmEqBCY0&t=67s)
-
-**Prompt:**
-```text
-For [video-path], use /video-understand, /video-rough-cut, /video-add-captions, and /video-add-content-cards.
-```
-
 ### 2h video to shorts
 
 The agent found self-contained moments in the long-form program, extracted them as horizontal shorts, reframed the approved picks for vertical delivery, then added captions and content cards.
@@ -65,13 +50,32 @@ The agent found self-contained moments in the long-form program, extracted them 
 For [video-path], use /video-understand, /video-to-shorts, /video-add-captions, /video-add-content-cards.
 ```
 
+### Raw podcast edit
+
+The agent studied the footage, cut a tighter edit, then added captions and content cards with graphic motion.
+
+<p align="center">
+  <a href="https://youtu.be/YVmCi59aBPY"><img src="https://img.youtube.com/vi/YVmCi59aBPY/maxresdefault.jpg" alt="Watch the complete agent-cut workflow" width="480"></a>
+</p>
+
+<p align="center"><em>Click to view on YouTube.</em></p>
+
+**Original video:** [Elon Musk : How to Build the Future](https://www.youtube.com/watch?v=tnBQmEqBCY0&t=67s)
+
+**Prompt:**
+```text
+For [video-path], use /video-understand, /video-rough-cut, /video-add-captions, and /video-add-content-cards.
+```
+
 ### Color grading
 
 The agent assessed the footage, generated named looks, then rendered a side-by-side comparison of the original and the selected grade on the same timeline.
 
-[![Watch the original vs. color-graded comparison](https://img.youtube.com/vi/dF2vhhrf5lI/maxresdefault.jpg)](https://youtu.be/dF2vhhrf5lI)
+<p align="center">
+  <a href="https://youtu.be/dF2vhhrf5lI"><img src="https://img.youtube.com/vi/dF2vhhrf5lI/maxresdefault.jpg" alt="Watch the original vs. color-graded comparison" width="480"></a>
+</p>
 
-*Click to view on YouTube.*
+<p align="center"><em>Click to view on YouTube.</em></p>
 
 **Original video:** [DJI MAVIC PRO 2 Ungraded Footage to practice grading](https://www.youtube.com/watch?v=BBJtM_s0HKE)
 
@@ -336,11 +340,7 @@ A capable model can already write scripts and assemble custom video workflows fo
 
 Planned work — these items are not yet available.
 
-- [ ] Publish the complete long-form workflow demo on YouTube.
-- [ ] Publish the four vertical-short demos.
-- [ ] Publish the original-versus-color-graded comparison.
-- [ ] Make the full shorts workflow — horizontal extraction through vertical captions and content cards — a first-class project operation.
 - [ ] Make skills easier to install and update.
-- [ ] Add more reproducible example projects and review artifacts.
+- [ ] Improve UI & UX design.
 - [ ] Continue expanding the collection of composable video-editing skills.
 
