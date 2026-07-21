@@ -30,11 +30,11 @@ The agent proposes and records editing decisions. You review the evidence, appro
 
 A complete agent-driven editing workflow using an approximately two-hour horizontal video.
 
-<!-- TODO: Replace VIDEO_ID and YOUTUBE_LONG_DEMO_URL after publishing the video. -->
+**Source footage:** [Watch the original video on YouTube](https://www.youtube.com/watch?v=tnBQmEqBCY0&t=67s)
 
-[![Watch the complete agent-cut workflow](https://img.youtube.com/vi/VIDEO_ID/maxresdefault.jpg)](YOUTUBE_LONG_DEMO_URL)
+[![Watch the complete agent-cut workflow](https://img.youtube.com/vi/YVmCi59aBPY/maxresdefault.jpg)](https://youtu.be/YVmCi59aBPY)
 
-> The complete demo will be linked here after its YouTube release.
+The final cut was created with `//video-rough-cut`, `//video-add-captions`, and `//video-add-content-cards`.
 
 ### Long-form video to vertical shorts
 
