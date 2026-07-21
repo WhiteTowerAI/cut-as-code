@@ -123,40 +123,38 @@ Then with a prompt, point your agent at a video and name the skills you want:
 
 > For [video-path], use /video-understand, /video-rough-cut, /video-add-captions, and /video-add-content-cards.
 
-## Project Model
-
-**Agent-cut** does not enforce one fixed global pipeline. Skills declare their dependencies and contributions, and projects use only the operations they need. Only directories for selected operations need to exist.
+## Project Layout
 
 ```text
 my-video-project/
 |-- START-HERE.md
-|-- input/                     # original user-provided media
+|-- input/                        # original user-provided media
 |   `-- original-video.mp4
-|-- review/                    # summaries, stills, contact sheets, previews
-|   |-- video-understanding/
-|   |-- rough-cut/
-|   |-- color-grade/
-|   |-- captions/
-|   |-- content-cards/
-|   |-- shorts/
-|   `-- edit-compare/
-|-- final/                     # main delivery and derivative shorts
+|-- review/                       # summaries, stills, contact sheets, previews
+|   |-- 00-video-understanding/
+|   |-- 01-rough-cut/
+|   |-- 02-color-grade/
+|   |-- 03-content-cards/
+|   |-- 04-edit-compare/
+|   |-- 05-captions/
+|   `-- 06-shorts/
+|-- final/                        # main delivery and derivative shorts
 |   |-- final-video.mp4
 |   `-- shorts/
 |       |-- short-001-horizontal.mp4
 |       `-- short-001-vertical.mp4
-`-- work/                      # manifests, plans, outputs, evidence
+`-- work/                         # intermediate files for the agents themselves
     |-- project.json
     |-- timeline.json
     |-- understand/
     |-- rough-cut/
     |-- color-grade/
-    |-- captions/
     |-- content-cards/
-    |-- shorts/
     |-- edit-compare/
+    |-- captions/
+    |-- shorts/
     |-- render/
-    `-- cache/                 # disposable, regenerable files
+    `-- cache/                    # disposable, regenerable files
 ```
 
 Durable editing decisions and approval records must never live only in `work/cache/`.
