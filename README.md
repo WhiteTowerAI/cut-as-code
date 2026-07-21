@@ -4,7 +4,7 @@
   <strong>The open skill stack for agentic video editing.</strong>
 </p>
 
-agent-cut turns video editing into an inspectable, code-driven workflow. The agent proposes and records editing decisions as readable files; you review the evidence, approve the work, and then render the final videos.
+**Agent-cut** turns video editing into an inspectable, code-driven workflow. The agent proposes and records editing decisions as readable files; you review the evidence, approve the work, and then render the final videos.
 
 ## Demos
 
@@ -80,13 +80,22 @@ The agent assessed the footage, generated named looks, then rendered a side-by-s
 
 ## Why agent-cut?
 
-Timeline editors such as Premiere Pro and CapCut are powerful but complex and time-consuming. agent-cut takes a different approach: it uses the coding ability of AI models so editing tasks can be handled by agents, much like software development. Instead of clicking through timelines, you let agents inspect media, write edit plans, generate review artifacts, run renders, and refine iteratively.
+**Agent-cut** treats editing like software: the edit is not a timeline you scrub but readable JSON and Markdown a coding agent authors, reviews, and re-renders.
 
-- **Agent-friendly editing.** Agents trim, retime, crop, color grade, caption, add graphics, extract shorts, and export through code instead of manual clicks — working from reusable tools for probing media, transcribing, analyzing speech, and finding key moments.
-- **Readable decisions.** Cuts, grades, captions, cards, and shorts are inspectable JSON and Markdown that can be reviewed, diffed, revised, and rendered again.
+- **The edit is code.** Every cut, grade, caption, card, and short is inspectable, diffable JSON you can revise and render again — no scrubbing.
+- **Visual, not just a CLI.** Decisions surface in browser review pages — template galleries for caption styles and card themes rendered on your own footage, selectable candidate and boundary reviews — so you see and pick, instead of reading raw output.
+- **Safe by construction.** Revision and dependency checks refuse to render against stale decisions, and each delivery self-verifies against the source (duration, dimensions, frames).
+- **Review before render.** Stills, contact sheets, boundary reels, and previews gate every step before one coordinated final render of the whole program.
 - **Polished motion.** HyperFrames and code-based renderers create titles, lower thirds, statistics, captions, overlays, and motion graphics in the same workflow.
-- **Review before delivery.** Agents generate stills, contact sheets, boundary reels, and short previews before committing to an expensive full render.
-- **Composable.** Skills work independently or combined. There is no mandatory global pipeline.
+- **Free, local, composable.** Free and open source (MIT), runs entirely on your machine, and skills work alone or combined with no mandatory pipeline.
+
+### How we compare
+
+**vs. OpusClip.** OpusClip is a hosted AI clipper: you upload to their cloud and it returns short clips on a paid, credit-based plan. **Agent-cut** is free, open source, and fully local — nothing is uploaded, no credits — and its scope is a full pipeline (understand, rough cut, color grade, captions, content cards, shorts, comparison), not just long-to-short.
+
+**vs. Premiere Pro and CapCut.** These are GUI editors you scrub, drag, and re-export by hand. In **agent-cut** the edit *is* the file — a validated timeline and per-operation plans an agent authors, checks against stale dependencies, and self-verifies against the source. Built to be driven by a coding agent, not clicked.
+
+**vs. one-off agent scripts.** A capable model can already script a pipeline for one video — but it typically leaves you reading raw JSON and logs. **Agent-cut** is the reusable layer it operates instead: composable skills over a shared, validated protocol, one coordinated render, enforced self-verification, and browser review pages that visualize every decision — template galleries and selectable candidate reviews — so you see and approve, not just trust the output. The model brings reasoning; agent-cut brings structure and visibility that hold across projects.
 
 ## Skills
 
@@ -114,65 +123,9 @@ Then with a prompt, point your agent at a video and name the skills you want:
 
 > For [video-path], use /video-understand, /video-rough-cut, /video-add-captions, and /video-add-content-cards.
 
-## How it works
-
-agent-cut separates the reusable base edit from the packaging applied to each delivery. Every operation is optional: a project can analyze and grade without a rough cut, caption without cards, produce only horizontal shorts, or add captions and cards to vertical shorts after reframing. Creating or revising shorts never forces the main delivery to re-render.
-
-```text
-input/original-video.mp4
-          |
-          v
-   video-understand
-   probe + transcript
-   objective analysis
-          |
-          v
-   rough cut (optional)
-          |
-          v
-   color grade (optional)
-          |
-          v
-   approved base program
-          |
-          +--------------------------------+
-          |                                |
-          v                                v
-   main delivery path              shorts delivery path
-          |                                |
-          v                                v
-   captions (optional)               to shorts
-          |                                |
-          v                                v
-   content cards (optional)          horizontal shorts
-          |                                |
-          v                                v
-   final main video                  vertical reframe
-                                           |
-                                           v
-                                     captions (optional)
-                                           |
-                                           v
-                                  content cards (optional)
-                                           |
-                                           v
-                                   final vertical shorts
-```
-
-1. **Understand the source once.** `video-understand` builds reusable evidence — media metadata, a word-level transcript, objective speech analysis, and evidence-backed semantic understanding. Downstream skills consume the same evidence instead of re-interpreting the source.
-2. **Create an optional base edit.** Apply a rough cut, color grade, both, or neither. `video-rough-cut` is used only when content needs to be removed, shortened, or retimed. The result is an approved base program.
-3. **Package the main delivery.** The main video can optionally receive captions and then content cards, in that order.
-4. **Create derivative shorts.** Shorts start from the approved base program, not from a version that already carries the main delivery's captions and cards — so each short uses caption placement, card timing, and layouts designed for the vertical frame. Order: select moments → extract horizontal → reframe vertical → captions → content cards → verify.
-5. **Review before rendering.** Each operation produces focused artifacts (stills, contact sheets, candidate summaries, timeline maps, boundary reels, previews) for review before the next step.
-6. **Render and verify.** Approved operations render in one coordinated pass, and results are checked against the plans. Success is never declared from JSON or logs alone — final videos must be visually or mechanically verified.
-
-### One coordinated final render
-
-Approved skills do not repeatedly export full-length videos. Each contributes only what it owns — `video-rough-cut` timing and speed, `video-color-grade` color instructions, `video-add-captions` the caption overlay, `video-add-content-cards` the graphics. agent-cut validates dependencies, combines the contributions into one render plan, and produces the main delivery in a single pass. Shorts remain separate derivative deliveries, prepared and verified independently.
-
 ## Project Model
 
-agent-cut does not enforce one fixed global pipeline. Skills declare their dependencies and contributions, and projects use only the operations they need. Only directories for selected operations need to exist.
+**Agent-cut** does not enforce one fixed global pipeline. Skills declare their dependencies and contributions, and projects use only the operations they need. Only directories for selected operations need to exist.
 
 ```text
 my-video-project/
@@ -210,26 +163,6 @@ Durable editing decisions and approval records must never live only in `work/cac
 
 - **`work/project.json`** is the shared manifest: available sequences, active operations and dependencies, operation status, integer revision numbers, `based_on` revision checks, review outputs, render contributions, and the final render path and status. Revision checks prevent an operation from silently rendering against stale upstream decisions.
 - **`work/timeline.json`** is the canonical source-to-program mapping. Time values are in seconds and ranges are half-open `[start_s, end_s)`. The V1 model stays small and inspectable — chronological clips from one source with linear positive speed, no OpenTimelineIO required.
-
-## How we compare
-
-### vs. OpusClip
-
-[OpusClip](https://www.opus.pro/) is a hosted AI clipping product focused on quickly turning long videos into social clips, with a limited free tier and paid credit-based plans. agent-cut prioritizes control, inspectability, composability, and repeatability instead:
-
-- an open, code-driven skill stack rather than a hosted service;
-- editing decisions stored as readable JSON and Markdown, with media and project files kept in your own environment;
-- selected boundaries can be inspected and revised before rendering;
-- scope covers understanding, rough cutting, color grading, captions, content cards, shorts, and final comparison — not only long-to-short conversion;
-- workflows extend by changing or adding skills, not by waiting for a hosted service.
-
-### vs. Premiere Pro and CapCut
-
-Premiere Pro and CapCut are visual timeline editors built for direct human operation. They are powerful, but complex projects require repeated clicking, timeline navigation, parameter adjustment, and manual export management. agent-cut instead represents the edit as readable files and executable operations: agents inspect the media, humans or delegated agents make editorial decisions, scripts handle timing and rendering precision, and review artifacts make decisions visible before delivery. It does not try to reproduce every timeline-editor control — it makes repeatable workflows easier for coding agents to execute.
-
-### vs. one-off coding-agent video workflows
-
-A capable model can already write scripts and assemble custom video workflows for a single project — recent demonstrations like [Claude Fable 5](https://www.anthropic.com/claude/fable) show how much a coding agent can do. agent-cut is not a competing model; it is the reusable workflow layer a model operates. Instead of rebuilding a one-off pipeline per video, it supplies reusable skill contracts, shared project and timeline formats, readable editorial plans, explicit review checkpoints, reproducible render instructions, and verification requirements. The model supplies reasoning and execution; agent-cut supplies the video-editing structure.
 
 ## Roadmap
 
