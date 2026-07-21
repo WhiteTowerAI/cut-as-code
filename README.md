@@ -4,11 +4,13 @@
   <strong>The open skill stack for agentic video editing.</strong>
 </p>
 
-**Agent-cut** turns video editing into an inspectable, code-driven workflow. The agent proposes and records editing decisions as readable files; you review the evidence, approve the work, and then render the final videos.
+**Agent-cut** turns video editing into an inspectable, code-driven workflow you can drive with AI coding agents like Claude Code, Codex, and OpenClaw. The agent proposes and records editing decisions as readable files; you review them in browser pages and template galleries, approve the work, and then render the final videos — all free, open source (MIT), and with nothing uploaded to a cloud service.
 
-- 🧩 **The edit is code.** Unleash AI coding agents like Claude Code, Codex, and OpenClaw.
-- 👁️ **Visual, not just a CLI.** Review decisions in browser pages and template galleries, not raw output.
-- 🆓 **Free, no cloud.** Open source (MIT); nothing is uploaded to a cloud service.
+- ✂️ **Cut** — reviewed keep/drop decisions and a compact first cut.
+- 🎨 **Color grade** — candidate looks to review, then a baked LUT.
+- 💬 **Captions** — word-timed, preset styles with optional karaoke.
+- 🃏 **Graphic motion cards** — titles, lower thirds, stats, quotes, and calls to action.
+- 📱 **To shorts** — extract moments and reframe them for 9:16 vertical.
 
 ## Demos
 
