@@ -6,6 +6,10 @@
 
 **Agent-cut** turns video editing into an inspectable, code-driven workflow. The agent proposes and records editing decisions as readable files; you review the evidence, approve the work, and then render the final videos.
 
+- 🧩 **The edit is code.** Unleash AI coding agents like Claude Code, Codex, and OpenClaw.
+- 👁️ **Visual, not just a CLI.** Review decisions in browser pages and template galleries, not raw output.
+- 🆓 **Free, no cloud.** Open source (MIT); nothing is uploaded to a cloud service.
+
 ## Demos
 
 ### 1. 2h video to shorts
@@ -47,7 +51,7 @@
 
 Original video: [Jensen Huang: NVIDIA GTC Taipei 2026 Keynote](https://www.youtube.com/watch?v=wSp6AiNIrsY)
 
-### 2. Raw podcast edit
+### 2. Cut, caption & card an interview
 
 > **Prompt:** For [video-path], use /video-understand, /video-rough-cut, /video-add-captions, and /video-add-content-cards.
 >
@@ -67,7 +71,7 @@ Original video: [Elon Musk : How to Build the Future](https://www.youtube.com/wa
 
 > **Prompt:** For [video-path], use /video-color-grade, and /video-edit-compare.
 >
-> **Agent:** Displays a few candidate grading options for your review and then do the grading.
+> **Agent:** Displays a few candidate grading options for your review, then do the final grading.
 
 [![Watch the original vs. color-graded comparison](https://img.youtube.com/vi/dF2vhhrf5lI/maxresdefault.jpg)](https://youtu.be/dF2vhhrf5lI)
 
@@ -103,17 +107,6 @@ npx skills add WhiteTowerAI/agent-cut
 Then with a prompt, point your agent at a video and name the skills you want:
 
 > For [video-path], use /video-understand, /video-rough-cut, /video-add-captions, and /video-add-content-cards.
-
-## Why agent-cut?
-
-**Agent-cut** treats editing like software: the edit is not a timeline you scrub but readable JSON and Markdown a coding agent authors, reviews, and re-renders.
-
-- **The edit is code.** Every cut, grade, caption, card, and short is inspectable, diffable JSON you can revise and render again — no scrubbing.
-- **Visual, not just a CLI.** Decisions surface in browser review pages — template galleries for caption styles and card themes rendered on your own footage, selectable candidate and boundary reviews — so you see and pick, instead of reading raw output.
-- **Safe by construction.** Revision and dependency checks refuse to render against stale decisions, and each delivery self-verifies against the source (duration, dimensions, frames).
-- **Review before render.** Stills, contact sheets, boundary reels, and previews gate every step before one coordinated final render of the whole program.
-- **Polished motion.** HyperFrames and code-based renderers create titles, lower thirds, statistics, captions, overlays, and motion graphics in the same workflow.
-- **Free, local, composable.** Free and open source (MIT), runs entirely on your machine, and skills work alone or combined with no mandatory pipeline.
 
 ## Project Layout
 
