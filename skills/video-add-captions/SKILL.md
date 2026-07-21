@@ -9,6 +9,10 @@ description: >
 
 # Video Add Captions
 
+## Dependencies
+
+Require `ffmpeg`/`ffprobe` on PATH, Python with `Pillow`, and Node.js >= 22 (for the `.mjs` scripts and `npx hyperframes`, fetched on demand). `hyperframes render`/`snapshot` drives a headless Chrome — it manages its own `chrome-headless-shell`, and falls back to a system Chrome (set `CHROME` to override) when the cached one is unusable. Check these before processing media.
+
 ## Scope
 
 This skill owns caption grouping, style selection, review, and the transparent

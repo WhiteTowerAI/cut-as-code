@@ -9,6 +9,10 @@ Render the single V1 comparison mode: `original-vs-final-source-time`.
 
 The left panel plays the original continuously. The right panel projects actual final-delivery pixels back onto the original source clock. Dropped ranges are black, kept final ranges are stretched to their source duration, and audio is copied from the original.
 
+## Dependencies
+
+Require `ffmpeg`/`ffprobe` on PATH and Python with `Pillow`. Check them before processing media.
+
 ## Inputs
 
 - `work/timeline.json`: canonical chronological source-to-program mapping

@@ -7,6 +7,10 @@ description: Use when an understood video project needs selective transcript-tim
 
 Turn approved semantic moments into one coherent HyperFrames graphics overlay. Use shared evidence and the canonical timeline; do not re-transcribe or re-analyze the source inside this skill.
 
+## Dependencies
+
+Require `ffmpeg` on PATH, Python, and Node.js >= 22 (for `npx hyperframes`, fetched on demand). `hyperframes render`/`snapshot` drives a headless Chrome — it manages its own `chrome-headless-shell`, and falls back to a system Chrome (set `CHROME` to override) when the cached one is unusable. Check these before processing media.
+
 ## Inputs
 
 - `work/project.json`: operation revisions and dependencies

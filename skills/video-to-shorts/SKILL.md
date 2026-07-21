@@ -9,6 +9,10 @@ description: >
 
 # Video To Shorts
 
+## Dependencies
+
+Require `ffmpeg`/`ffprobe` on PATH and Python with `Pillow`. Check them before processing media.
+
 ## Scope
 
 This skill owns short candidate judgment, deterministic qualification, horizontal
