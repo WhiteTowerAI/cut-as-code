@@ -12,8 +12,12 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont, ImageStat
 
-from review_gate import open_vertical_review, sha256_file, validate_vertical_delivery_allowed, validate_vertical_review
-
+from review_gate import (
+      load_validated_vertical_review,
+      open_vertical_review,
+      sha256_file,
+      validate_vertical_delivery_allowed,
+)
 
 RENDERABLE_STRATEGIES = {"STATIC_CROP", "SCENE_CROP", "LETTERBOX"}
 
@@ -402,39 +406,20 @@ def make_contact_sheet(ffmpeg, video, output, duration, label):
 
 
 def write_summary(path, mode, plan, source, output=None, output_probe=None, contact_sheet=None, note=None):
-    lines = [
-        f"# Vertical {mode.title()} Summary",
-        "",
-        f"- Source: `{source}`",
-        f"- Strategy: `{plan['strategy']}`",
-        f"- Target aspect ratio: `{plan['target_aspect_ratio']}`",
-        f"- Segment count: {len(plan['segments'])}",
-        f"- Formal render allowed: `{str(plan.get('render_allowed', plan['strategy'] != 'REVIEW_REQUIRED')).lower()}`",
-    ]
-    if output:
-        lines.append(f"- Output: `{output}`")
-    if mode == "final" and plan.get("direct_render"):
-        lines.extend([
-            f"- Formal render source: `{plan['direct_render']['source_video']['path']}`",
-            "- Formal render generations after the bound source: `1`",
-        ])
-    if output_probe:
-        video_stream = next(stream for stream in output_probe.get("streams", []) if stream.get("codec_type") == "video")
-        lines.extend([
-            f"- Output dimensions: {video_stream.get('width')}x{video_stream.get('height')}",
-            f"- Output duration: {float(output_probe.get('format', {}).get('duration') or 0):.3f}s",
-            f"- Audio stream present: `{str(any(stream.get('codec_type') == 'audio' for stream in output_probe.get('streams', []))).lower()}`",
-        ])
-    if contact_sheet:
-        lines.append(f"- Contact sheet: `{contact_sheet}`")
-    if note:
-        lines.extend(["", note])
-    lines.extend(["", "## Segments", ""])
-    for segment in plan["segments"]:
-        lines.append(f"- `{segment['start_time']:.3f}` - `{segment['end_time']:.3f}` `{segment['strategy']}`: {segment['reason']}")
-    if plan.get("warnings"):
-        lines.extend(["", "## Warnings", ""] + [f"- {warning}" for warning in plan["warnings"]])
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    write_json(path, {
+        "schema_version": f"video-to-shorts.vertical-{mode}-summary.v1",
+        "mode": mode,
+        "source": str(source),
+        "strategy": plan["strategy"],
+        "target_aspect_ratio": plan["target_aspect_ratio"],
+        "renderable": plan.get("render_allowed", plan["strategy"] != "REVIEW_REQUIRED") is True,
+        "output": str(output) if output else None,
+        "contact_sheet": str(contact_sheet) if contact_sheet else None,
+        "output_probe": output_probe,
+        "segments": plan["segments"],
+        "warnings": [*plan.get("warnings", []), *plan.get("validator_warnings", [])],
+        "note": note,
+    })
 
 
 def main():
@@ -459,7 +444,10 @@ def main():
     validate_vertical_delivery_allowed(video)
     ffmpeg = resolve_tool("ffmpeg", args.ffmpeg)
     ffprobe = resolve_tool("ffprobe", args.ffprobe)
-    plan = load_json(plan_path)
+    if args.mode == "final":
+        _review, plan = load_validated_vertical_review(root, video, plan_path)
+    else:
+        plan = load_json(plan_path)
     if plan.get("schema_version") != "video-to-shorts.vertical-plan.v1":
         fail("plan must be a validated video-to-shorts.vertical-plan.v1 file")
     if str(Path(plan.get("source_video", "")).resolve()) != str(video):
@@ -480,6 +468,7 @@ def main():
         fail("source duration no longer matches the validated vertical plan")
     slug = video.stem[:-len("-horizontal")] if video.stem.endswith("-horizontal") else video.stem
     review_destination = Path(args.review_out).resolve() if args.review_out else None
+    review_page_directory = review_destination or root / "review"
     if args.mode == "preview":
         destination = review_destination or root / "preview"
         output_path = destination / (
@@ -489,7 +478,7 @@ def main():
             f"{slug}-vertical-contact-sheet.jpg" if review_destination else "preview_contact_sheet.jpg"
         )
         summary_path = destination / (
-            f"{slug}-vertical-preview-summary.md" if review_destination else "preview_summary.md"
+            f"{slug}-vertical-preview-summary.json" if review_destination else "preview_summary.json"
         )
         probe_path = destination / (
             f"{slug}-vertical-preview-probe.json" if review_destination else "media_probe.json"
@@ -506,7 +495,7 @@ def main():
             f"{slug}-vertical-final-contact-sheet.jpg" if review_destination else "final_contact_sheet.jpg"
         )
         summary_path = destination / (
-            f"{slug}-vertical-final-summary.md" if review_destination else "final_summary.md"
+            f"{slug}-vertical-final-summary.json" if review_destination else "final_summary.json"
         )
         probe_path = destination / (
             f"{slug}-vertical-final-probe.json" if review_destination else "media_probe.json"
@@ -519,18 +508,20 @@ def main():
         write_summary(summary_path, args.mode, plan, video, note=note)
         if args.mode == "final":
             fail(f"REVIEW_REQUIRED plans cannot be rendered; summary: {summary_path}")
-        review_path, question_path = open_vertical_review(root, video, plan_path, summary_path, probe_path)
+        review_path, question_path, review_page = open_vertical_review(
+            root, video, plan_path, summary_path, probe_path,
+            review_out=review_page_directory, short_id=slug,
+        )
         print(f"[video-to-shorts] review summary: {summary_path}")
         print(f"[video-to-shorts] vertical review: {review_path}")
         print(f"[video-to-shorts] fixed question: {question_path}")
+        print(f"[video-to-shorts] authoritative page: {review_page}")
         print("[video-to-shorts] STOP: show the question to the user and end the current turn")
         return
     if plan.get("strategy") not in RENDERABLE_STRATEGIES:
         fail(f"unsupported plan strategy: {plan.get('strategy')}")
     if args.mode == "final" and plan.get("render_allowed") is not True:
         fail("formal render is not allowed by the validated plan")
-    if args.mode == "final":
-        validate_vertical_review(root, video, plan_path)
     output_width, output_height = dimensions_for_mode(plan, args.mode, args.preview_height)
     render_video = video
     render_probe = source_probe
@@ -582,7 +573,10 @@ def main():
     })
     write_summary(summary_path, args.mode, plan, video, output_path, output_probe, contact_path)
     if args.mode == "preview":
-        review_path, question_path = open_vertical_review(root, video, plan_path, summary_path, probe_path, output_path, contact_path)
+        review_path, question_path, review_page = open_vertical_review(
+            root, video, plan_path, summary_path, probe_path, output_path, contact_path,
+            review_out=review_page_directory, short_id=slug,
+        )
     print(f"[video-to-shorts] vertical {args.mode}: {output_path}")
     print(f"[video-to-shorts] contact sheet: {contact_path}")
     print(f"[video-to-shorts] media probe: {probe_path}")
@@ -590,6 +584,7 @@ def main():
     if args.mode == "preview":
         print(f"[video-to-shorts] vertical review: {review_path}")
         print(f"[video-to-shorts] fixed question: {question_path}")
+        print(f"[video-to-shorts] authoritative page: {review_page}")
         print("[video-to-shorts] STOP: show the question to the user and end the current turn")
 
 

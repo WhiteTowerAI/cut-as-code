@@ -275,6 +275,47 @@ def validate_plan(raw, video, source):
     }
 
 
+def validate_vertical_plan_data(plan, video, source):
+    """Validate an already-normalized plan against its bound source probe."""
+    if not isinstance(plan, dict) or plan.get("schema_version") != "video-to-shorts.vertical-plan.v1":
+        fail("plan must use video-to-shorts.vertical-plan.v1")
+    video = Path(video).resolve()
+    if Path(plan.get("source_video", "")).resolve() != video:
+        fail("plan source_video does not match the reviewed source")
+    width = integer(source.get("width"), "source.width")
+    height = integer(source.get("height"), "source.height")
+    duration = number(source.get("duration_s"), "source.duration_s")
+    if width <= 0 or height <= 0 or duration <= 0:
+        fail("source dimensions and duration must be positive")
+    fps = source.get("fps")
+    if not isinstance(fps, dict):
+        fail("source.fps must use num and den")
+    num = integer(fps.get("num"), "source.fps.num")
+    den = integer(fps.get("den"), "source.fps.den")
+    if num <= 0 or den <= 0:
+        fail("source FPS must be positive")
+    normalized_source = {
+        "width": width, "height": height, "duration_s": duration,
+        "fps": {"num": num, "den": den},
+    }
+    if integer(plan.get("source_width"), "source_width") != width:
+        fail("plan source_width does not match the reviewed source")
+    if integer(plan.get("source_height"), "source_height") != height:
+        fail("plan source_height does not match the reviewed source")
+    if plan.get("source_fps") != normalized_source["fps"]:
+        fail("plan source_fps does not match the reviewed source")
+    if abs(number(plan.get("source_duration_s"), "source_duration_s") - duration) > TIME_TOLERANCE:
+        fail("plan source_duration_s does not match the reviewed source")
+    validated = validate_plan(plan, video, normalized_source)
+    if integer(plan.get("output_width"), "output_width") != validated["output_width"]:
+        fail("plan output_width does not match deterministic validation")
+    if integer(plan.get("output_height"), "output_height") != validated["output_height"]:
+        fail("plan output_height does not match deterministic validation")
+    if plan.get("render_allowed") is not validated["render_allowed"]:
+        fail("plan render_allowed does not match its strategy")
+    if "output_video" in plan:
+        validated["output_video"] = plan["output_video"]
+    return validated
 def validate_keep_spans(value, source_duration_s):
     if not isinstance(value, list) or not value:
         fail("extraction report keep_spans must be a non-empty array")

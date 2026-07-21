@@ -1,7 +1,9 @@
 """Small executable checks for the video-to-shorts project protocol."""
 
-import tempfile
+import re
 import subprocess
+import sys
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -516,6 +518,150 @@ def check_project_candidate_binding():
             raise AssertionError("changed project timeline was accepted")
 
 
+def normalize_whitespace(value):
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def markdown_section(document, heading):
+    match = re.search(
+        rf"(?ms)^## {re.escape(heading)}\s*$\n(.*?)(?=^## |\Z)", document
+    )
+    assert match, f"missing ## {heading} section"
+    return match.group(1)
+
+
+def fenced_blocks(section):
+    return re.findall(r"(?ms)^```[^\n]*\n(.*?)^```\s*$", section)
+
+
+def require_block(section, *parts):
+    expected = [normalize_whitespace(part) for part in parts]
+    assert any(
+        all(part in normalize_whitespace(block) for part in expected)
+        for block in fenced_blocks(section)
+    ), f"no command/summary block contains: {', '.join(parts)}"
+
+
+def require_exact_block(section, pattern, label):
+    assert any(
+        re.fullmatch(pattern, normalize_whitespace(block))
+        for block in fenced_blocks(section)
+    ), f"missing exact {label} block"
+
+
+def check_workflow_ui():
+    script = Path(__file__).with_name("check_review_ui.py")
+    subprocess.run([sys.executable, str(script)], check=True)
+    print("[shorts-protocol] bound workflow UI passed")
+
+
+def check_documented_review_workflow():
+    skill_root = Path(__file__).resolve().parent.parent
+    skill = (skill_root / "SKILL.md").read_text(encoding="utf-8")
+    readme = (skill_root / "README.md").read_text(encoding="utf-8")
+    output = markdown_section(skill, "Output Layout")
+    candidates_review = markdown_section(skill, "Review Modes")
+    vertical_review = markdown_section(skill, "Vertical Planning")
+    compatibility = markdown_section(skill, "Compatibility")
+
+    assert not re.search(r"\bUUIDs?\b", f"{skill}\n{readme}", re.IGNORECASE), (
+        "token_hex review IDs must not be described as UUIDs"
+    )
+
+    for marker in (
+        "candidates-<review-id>.html", "assets/candidates-<review-id>/",
+        "candidates.html", "<short-id>-vertical-review-<review-id>.html",
+        "<short-id>-vertical-review.html", "vertical-preview.mp4",
+        "vertical-contact-sheet.jpg", "vertical-preview-summary.json",
+        "vertical-preview-probe.json",
+    ):
+        assert marker in output, f"output layout omits {marker}"
+    require_block(
+        output, "<short-id>-vertical-review-assets/", "<review-id>/",
+        "preview.mp4", "contact-sheet.jpg", "preview-summary.json", "media-probe.json",
+    )
+
+    require_exact_block(
+        candidates_review,
+        r'python "\$SkillRoot\\scripts\\interaction\.py" candidate-open '
+        r'--out \$ShortsWork --review-out \$ShortsReview',
+        "candidate-open command",
+    )
+    require_block(
+        candidates_review, "Start-Process", "Resolve-Path", "open", "xdg-open",
+        "Present the authoritative page and STOP.",
+    )
+    require_block(
+        candidates_review, "Shorts candidate review", "Review:", "Candidates:", "Delivery:"
+    )
+    require_block(
+        candidates_review, "Shorts candidate review", "Review:", "Decision: revise", "Changes:"
+    )
+    candidate_text = normalize_whitespace(candidates_review)
+    for marker in (
+        "authoritative", "non-authoritative", "initially unselected", "1-5",
+        "copy", "unchanged", "retry", "Present", "STOP", "explicit candidate",
+        "explicit delivery", "rationale", "fake human",
+    ):
+        assert marker in candidate_text, f"candidate review workflow omits {marker}"
+    assert "default top five" not in candidate_text.lower(), (
+        "bound candidate workflow must not mention default top five"
+    )
+
+    require_exact_block(
+        vertical_review,
+        r'python "\$SkillRoot\\scripts\\render_vertical\.py" ` '
+        r'--video \$Horizontal --plan "\$VerticalWork\\vertical_plan\.json" ` '
+        r'--out \$VerticalWork --review-out \$ShortsReview --mode preview',
+        "vertical preview command",
+    )
+    require_block(
+        vertical_review, "Start-Process", "Resolve-Path", "open", "xdg-open",
+        "Present the authoritative page and STOP.",
+    )
+    require_block(
+        vertical_review, "Shorts vertical review", "Short:", "Review:", "Decision: approve"
+    )
+    require_block(
+        vertical_review, "Shorts vertical review", "Short:", "Review:",
+        "Decision: revise", "Changes:"
+    )
+    require_block(
+        vertical_review, "Shorts vertical review", "Short:", "Review:", "Decision: skip"
+    )
+    vertical_text = normalize_whitespace(vertical_review)
+    for marker in (
+        "authoritative", "non-authoritative", "preview", "contact sheet", "segments",
+        "media probe", "warnings", "copy", "unchanged", "retry", "Present", "STOP",
+        "REVIEW_REQUIRED", "revise", "skip", "Agent", "rationale",
+    ):
+        assert marker in vertical_text, f"vertical review workflow omits {marker}"
+
+    assert normalize_whitespace(skill).count("Present the authoritative page and STOP.") == 2, (
+        "candidate and vertical workflows each need their own Present + STOP gate"
+    )
+    for marker in ("human and Agent modes are mutually exclusive", "page and media hashes"):
+        assert marker.casefold() in normalize_whitespace(skill).casefold(), f"workflow omits {marker}"
+    assert "candidate review invalidates" in vertical_text.casefold()
+    assert "only approved" in vertical_text.casefold()
+    assert "review-ID-scoped" in vertical_review
+    assert "authoritative page and receipt bind" in vertical_text
+    assert re.search(r"`?REVIEW_REQUIRED`? stores only", vertical_review)
+    assert skill.casefold().count("default top five") == compatibility.casefold().count(
+        "default top five"
+    ) >= 1
+
+    readme_text = normalize_whitespace(readme)
+    assert all(re.search(rf"(?m)^{number}\. ", readme) for number in range(1, 8))
+    assert not re.search(r"(?m)^8\. ", readme)
+    for marker in (
+        "interactive candidate", "interactive vertical", "work/shorts/",
+        "work/cache/shorts/", "review/06-shorts/", "final/shorts/", "[SKILL.md](SKILL.md)",
+        "review-ID-scoped",
+    ):
+        assert marker in readme_text, f"README omits {marker}"
+
+
 def main():
     check_boundary_release_guard()
     check_exact_excerpt()
@@ -525,6 +671,8 @@ def main():
     check_media_integration()
     check_direct_vertical_rendering()
     check_project_candidate_binding()
+    check_workflow_ui()
+    check_documented_review_workflow()
     print("[shorts-protocol] boundary release guard passed")
     print("[shorts-protocol] exact word excerpt passed")
     print("[shorts-protocol] program transcript passed")
@@ -533,6 +681,7 @@ def main():
     print("[shorts-protocol] horizontal and vertical media integration passed")
     print("[shorts-protocol] direct-source vertical rendering passed")
     print("[shorts-protocol] project candidate bindings passed")
+    print("[shorts-protocol] documented review workflow passed")
 
 
 if __name__ == "__main__":

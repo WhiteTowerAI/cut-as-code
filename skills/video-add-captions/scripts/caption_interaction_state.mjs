@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const skillRoot = resolve(scriptDirectory, "..");
 const manifestPath = join(skillRoot, "assets", "style-previews", "preview-manifest.json");
+const styleConfigPath = join(skillRoot, "scripts", "caption-styles.json");
 
 const readJson = (path) => JSON.parse(readFileSync(path, "utf8").replace(/^\uFEFF/, ""));
 
@@ -15,6 +16,8 @@ const galleryById = new Map(galleryItems.map((item) => [item.id.toLowerCase(), i
 
 export const galleryPath = join(skillRoot, "assets", "style-previews", "index.html");
 export const validSelectionIds = galleryItems.map((item) => item.id);
+export const galleryAssetFiles = galleryItems.flatMap((item) => [item.image, item.props]);
+export const styleDefinitionPaths = [styleConfigPath, manifestPath];
 
 export const hashFile = (path) => createHash("sha256")
   .update(readFileSync(resolve(path)))
@@ -61,6 +64,95 @@ export const resolveGallerySelection = (response) => {
   };
 };
 
+export const parseCaptionStyleSummary = (response, expectedReviewId) => {
+  const lines = String(response ?? "").trim().split(/\r?\n/);
+  if (lines.shift()?.trim().toLowerCase() !== "caption style review") {
+    throw new Error('Caption style response must start with "Caption style review".');
+  }
+
+  const fields = new Map();
+  for (const line of lines) {
+    const separator = line.indexOf(":");
+    const name = separator >= 0 ? line.slice(0, separator).trim().toLowerCase() : "";
+    const value = separator >= 0 ? line.slice(separator + 1).trim() : "";
+    if (!new Set(["review", "decision", "choice"]).has(name)) {
+      throw new Error(`Unknown caption style response field: ${name || line.trim() || "<empty>"}`);
+    }
+    if (fields.has(name)) {
+      throw new Error(`Duplicate caption style response field: ${name}`);
+    }
+    fields.set(name, value);
+  }
+
+  const missing = ["review", "decision", "choice"].filter((name) => !fields.get(name));
+  if (missing.length) {
+    throw new Error(`Missing caption style response fields: ${missing.join(", ")}`);
+  }
+  if (fields.get("review") !== expectedReviewId) {
+    throw new Error("Caption style response review ID does not match the current interaction.");
+  }
+  if (fields.get("decision") !== "select") {
+    throw new Error('Caption style response Decision must be exactly "select".');
+  }
+  const choiceId = fields.get("choice");
+  if (!validSelectionIds.includes(choiceId)) {
+    throw new Error(`Caption style response Choice must be one valid combination ID. Received: ${choiceId}`);
+  }
+  return { reviewId: fields.get("review"), decision: fields.get("decision"), choiceId };
+};
+
+const parseSummaryFields = (response, title, allowedFields) => {
+  const lines = String(response ?? "").trim().split(/\r?\n/);
+  if (lines.shift()?.trim().toLowerCase() !== title.toLowerCase()) {
+    throw new Error(`Caption preview response must start with "${title}".`);
+  }
+  const fields = new Map();
+  for (const line of lines) {
+    const separator = line.indexOf(":");
+    const name = separator >= 0 ? line.slice(0, separator).trim().toLowerCase() : "";
+    const value = separator >= 0 ? line.slice(separator + 1).trim() : "";
+    if (!allowedFields.includes(name)) {
+      throw new Error(`Unknown caption preview response field: ${name || line.trim() || "<empty>"}`);
+    }
+    if (fields.has(name)) throw new Error(`Duplicate caption preview response field: ${name}`);
+    fields.set(name, value);
+  }
+  const missing = allowedFields.filter((name) => !fields.get(name));
+  if (missing.length) throw new Error(`Missing caption preview response fields: ${missing.join(", ")}`);
+  return fields;
+};
+
+const assertPreviewReview = (fields, expectedReviewId, decision) => {
+  if (fields.get("review") !== expectedReviewId) {
+    throw new Error("Caption preview response review ID does not match the current interaction.");
+  }
+  if (fields.get("decision") !== decision) {
+    throw new Error(`Caption preview response Decision must be exactly "${decision}".`);
+  }
+};
+
+export const parseCaptionPreviewApproval = (response, expectedReviewId) => {
+  const fields = parseSummaryFields(
+    response, "Caption preview review", ["review", "decision", "evidence"],
+  );
+  assertPreviewReview(fields, expectedReviewId, "approve");
+  const evidence = fields.get("evidence").split(",").map((value) => value.trim().toLowerCase());
+  const required = ["early", "middle", "late", "no-caption"];
+  if (evidence.length !== required.length || new Set(evidence).size !== required.length
+    || required.some((label) => !evidence.includes(label))) {
+    throw new Error("Caption preview approval Evidence must contain exactly early, middle, late, and no-caption once each.");
+  }
+  return { reviewId: fields.get("review"), decision: "approve", evidence };
+};
+
+export const parseCaptionPreviewRevision = (response, expectedReviewId) => {
+  const fields = parseSummaryFields(
+    response, "Caption preview review", ["review", "decision", "changes"],
+  );
+  assertPreviewReview(fields, expectedReviewId, "revise");
+  return { reviewId: fields.get("review"), decision: "revise", changes: fields.get("changes") };
+};
+
 export const readInteractionState = (statePath) => {
   const resolvedStatePath = resolve(statePath);
   if (!existsSync(resolvedStatePath)) {
@@ -72,6 +164,12 @@ export const readInteractionState = (statePath) => {
     throw new Error(`Invalid video-add-captions interaction state: ${resolvedStatePath}`);
   }
   state.decisionMode ??= "human";
+  state.reviewId ??= null;
+  state.reviewPage ??= null;
+  if (state.approval && state.selection && state.preview) {
+    state.approval.selectionId ??= state.selection.choiceId;
+    state.approval.previewEvidenceSignature ??= state.preview.evidenceSignature;
+  }
   if (!new Set(["human", "agent"]).has(state.decisionMode)) {
     throw new Error(`Invalid caption decision mode: ${state.decisionMode}`);
   }
@@ -88,6 +186,39 @@ const assertBoundFile = (binding, actualPath, label) => {
   }
 };
 
+export const assertReviewPageBinding = (state) => {
+  if (!state.reviewId || !state.reviewPage?.path || !state.reviewPage?.sha256) {
+    throw new Error("Caption style review page binding is missing. Start a new interaction.");
+  }
+  assertBoundFile(state.reviewPage, state.reviewPage.path, "Caption style review page");
+  if (!Array.isArray(state.reviewPage.assets) || state.reviewPage.assets.length !== galleryAssetFiles.length) {
+    throw new Error("Caption style review asset bindings are incomplete. Start a new interaction.");
+  }
+  const boundNames = state.reviewPage.assets.map((binding) => basename(binding.path));
+  if (new Set(boundNames).size !== galleryAssetFiles.length
+    || galleryAssetFiles.some((fileName) => !boundNames.includes(fileName))) {
+    throw new Error("Caption style review asset bindings do not match the gallery. Start a new interaction.");
+  }
+  state.reviewPage.assets.forEach((binding) => {
+    assertBoundFile(binding, binding.path, `Caption style review asset ${basename(binding.path)}`);
+  });
+};
+
+export const assertStyleDefinitionBindings = (state) => {
+  if (!Array.isArray(state.styleDefinitions) || state.styleDefinitions.length !== styleDefinitionPaths.length) {
+    throw new Error("Maintained caption style definition bindings are incomplete. Start a new interaction.");
+  }
+  const expectedNames = styleDefinitionPaths.map((path) => basename(path));
+  const boundNames = state.styleDefinitions.map((binding) => basename(binding.path));
+  if (new Set(boundNames).size !== expectedNames.length
+    || expectedNames.some((name) => !boundNames.includes(name))) {
+    throw new Error("Maintained caption style definition bindings are invalid. Start a new interaction.");
+  }
+  state.styleDefinitions.forEach((binding) => {
+    assertBoundFile(binding, binding.path, `Caption style definition ${basename(binding.path)}`);
+  });
+};
+
 export const assertPreviewBindings = (preview) => {
   if (!preview || !preview.projectMetaPath || !preview.projectMetaSha256) {
     throw new Error("Preview project metadata binding is missing. Generate a new preview.");
@@ -101,6 +232,30 @@ export const assertPreviewBindings = (preview) => {
     preview.projectMetaPath,
     "Preview project metadata",
   );
+  if (preview.reviewPagePath || preview.reviewPageSha256) {
+    if (!preview.reviewPagePath || !preview.reviewPageSha256) {
+      throw new Error("Caption preview review page binding is incomplete. Generate a new preview.");
+    }
+    assertBoundFile(
+      { path: preview.reviewPagePath, sha256: preview.reviewPageSha256 },
+      preview.reviewPagePath,
+      "Caption preview review page",
+    );
+    if (!preview.timeline?.path || !preview.timeline?.sha256 || !preview.timeline?.timelineId) {
+      throw new Error("Caption preview timeline binding is missing. Generate a new preview.");
+    }
+    assertBoundFile(preview.timeline, preview.timeline.path, "Caption preview timeline");
+    const timeline = readJson(preview.timeline.path);
+    if (timeline.timeline_id !== preview.timeline.timelineId) {
+      throw new Error("Caption preview timeline identity changed. Generate a new preview.");
+    }
+    const requiredLabels = ["early", "middle", "late", "no-caption"];
+    const labels = preview.evidence.map((binding) => binding.label);
+    if (labels.length !== requiredLabels.length || new Set(labels).size !== requiredLabels.length
+      || requiredLabels.some((label) => !labels.includes(label))) {
+      throw new Error("Caption preview evidence labels must be exactly early, middle, late, and no-caption.");
+    }
+  }
   preview.evidence.forEach((binding, index) => {
     assertBoundFile(binding, binding.path, `Preview evidence ${index + 1}`);
   });
@@ -152,6 +307,10 @@ export const validateGenerationInteraction = ({
 
   assertBoundFile(state.sourceVideo, sourceVideo, "Source video");
   assertBoundFile(state.captions, captionsPath, "Captions JSON");
+  if (state.reviewId || state.reviewPage || state.styleDefinitions) {
+    assertStyleDefinitionBindings(state);
+  }
+  if (state.reviewPage) assertReviewPageBinding(state);
 
   const expectedSelection = selectionOptionsFromState(state.selection);
   for (const key of ["preset", "highlightTheme", "backgroundTheme", "strokeTheme", "karaoke"]) {
@@ -173,6 +332,10 @@ export const validateGenerationInteraction = ({
     }
     if (state.preview.overridesSha256 !== currentOverridesHash) {
       throw new Error("Overrides changed after preview confirmation. Generate and confirm a new preview.");
+    }
+    if (state.approval.selectionId !== state.selection.choiceId
+      || state.approval.previewEvidenceSignature !== state.preview.evidenceSignature) {
+      throw new Error("Approval no longer matches the selected style and preview evidence.");
     }
   }
 

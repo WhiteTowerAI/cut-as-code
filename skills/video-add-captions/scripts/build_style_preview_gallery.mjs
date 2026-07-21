@@ -17,8 +17,8 @@ if (JSON.stringify(actualGroups) !== JSON.stringify(expectedGroups)) {
 
 const groupMap = Object.fromEntries(manifest.groups.map((group) => [group.id, group.items]));
 const allItems = manifest.groups.flatMap((group) => group.items);
-if (manifest.total !== 25 || allItems.length !== 25) {
-  throw new Error(`Expected 25 preview items, found manifest.total=${manifest.total}, items=${allItems.length}`);
+if (manifest.total !== 25 || allItems.length !== 25 || new Set(allItems.map((item) => item.id)).size !== 25) {
+  throw new Error(`Expected 25 unique preview items, found manifest.total=${manifest.total}, items=${allItems.length}`);
 }
 
 for (const item of allItems) {
@@ -44,492 +44,234 @@ const renderCard = (item) => {
   const theme = item.theme ?? "Default";
   const isShorts = item.orientation === "shorts";
   return `
-    <article
-      class="style-card ${isShorts ? "style-card--shorts" : "style-card--landscape"}"
-      data-preview-id="${escapeHtml(item.id)}"
-      data-preview-image="${escapeHtml(item.image)}"
-      data-preview-label="${escapeHtml(item.label)}"
-      role="button"
-      tabindex="0"
-      aria-pressed="false"
-      aria-haspopup="dialog"
-      aria-controls="preview-dialog"
-      aria-label="Select and enlarge ${escapeHtml(item.label)} caption style"
-    >
-      <span class="selection-mark" aria-hidden="true">&#10003;</span>
-      <div class="preview-frame ${isShorts ? "preview-frame--shorts" : "preview-frame--landscape"}">
-        <img src="./${escapeHtml(item.image)}" alt="${escapeHtml(item.label)} caption preview" loading="lazy" draggable="false">
-      </div>
-      <div class="card-copy">
-        <div class="card-heading">
-          <h4>${escapeHtml(item.id)}</h4>
-          <span class="aspect-badge">${escapeHtml(item.aspectRatio)}</span>
-        </div>
-        <dl class="metadata-grid">
-          <div><dt>Official preset</dt><dd>${escapeHtml(item.preset)}</dd></div>
-          <div><dt>Theme</dt><dd>${escapeHtml(titleCase(theme))}</dd></div>
-          <div><dt>Karaoke</dt><dd class="${item.karaoke ? "status-on" : "status-off"}">${item.karaoke ? "On" : "Off"}</dd></div>
-        </dl>
-      </div>
-    </article>`;
+      <article class="style-card ${isShorts ? "style-card--shorts" : "style-card--landscape"}"
+        data-preview-id="${escapeHtml(item.id)}" data-preview-image="${escapeHtml(item.image)}"
+        data-preview-props="${escapeHtml(item.props)}" data-preview-label="${escapeHtml(item.label)}">
+        <label class="style-choice">
+          <input type="radio" name="caption-style" value="${escapeHtml(item.id)}">
+          <span class="selection-mark" aria-hidden="true">Selected</span>
+          <span class="preview-frame ${isShorts ? "preview-frame--shorts" : "preview-frame--landscape"}">
+            <img src="./${escapeHtml(item.image)}" alt="${escapeHtml(item.label)} caption preview" loading="lazy" draggable="false">
+          </span>
+          <span class="card-copy">
+            <span class="card-heading"><strong>${escapeHtml(item.id)}</strong><span>${escapeHtml(item.aspectRatio)}</span></span>
+            <span class="metadata-grid">
+              <span><small>Preset</small>${escapeHtml(item.preset)}</span>
+              <span><small>Theme</small>${escapeHtml(titleCase(theme))}</span>
+              <span><small>Karaoke</small>${item.karaoke ? "On" : "Off"}</span>
+            </span>
+          </span>
+        </label>
+        <button class="enlarge-preview" type="button" aria-haspopup="dialog" aria-controls="preview-dialog">Enlarge preview</button>
+      </article>`;
 };
 
-const renderGrid = (items, className) => `<div class="card-grid ${className}">${items.map(renderCard).join("")}</div>`;
-const manifestJson = JSON.stringify(manifest).replaceAll("<", "\\u003c");
+const renderSection = (id, title, copy, items, gridClass = "") => `
+    <section class="gallery-section" aria-labelledby="${id}-title">
+      <div class="section-heading">
+        <h2 id="${id}-title">${title}</h2>
+        <p>${copy}</p>
+      </div>
+      <div class="card-grid ${gridClass}">${items.map(renderCard).join("")}</div>
+    </section>`;
 
+const manifestJson = JSON.stringify(manifest).replaceAll("<", "\\u003c");
 const html = `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light">
-  <title>Caption Style Gallery</title>
+  <meta name="color-scheme" content="dark">
+  <base href="./">
+  <title>Caption style review</title>
   <style>
     :root {
-      --page: #f3f5f8;
-      --surface: #ffffff;
-      --surface-soft: #f8fafc;
-      --ink: #172033;
-      --muted: #667085;
-      --line: #dfe4ec;
-      --line-strong: #c8d0dc;
-      --accent: #2563eb;
-      --accent-soft: #eaf1ff;
-      --success: #15803d;
-      --navy: #111827;
-      --radius-lg: 24px;
-      --radius-md: 17px;
-      --shadow: 0 10px 30px rgba(15, 23, 42, 0.07);
-      --shadow-selected: 0 14px 34px rgba(37, 99, 235, 0.18);
+      color-scheme: dark;
+      --bg: #151719;
+      --band: #1d2023;
+      --surface: #24282b;
+      --line: #3b4145;
+      --text: #f2eee5;
+      --muted: #aeb4b7;
+      --accent: #4fc3b4;
+      --warning: #f3bd5b;
     }
-
     * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
     body {
       margin: 0;
       min-width: 320px;
-      background: var(--page);
-      color: var(--ink);
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      line-height: 1.5;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.45 system-ui, sans-serif;
+      letter-spacing: 0;
     }
-    button, input, select, textarea { font: inherit; }
-    code { font-family: inherit; }
-    img { max-width: 100%; }
-
-    .page-shell {
-      width: min(1480px, calc(100% - 40px));
-      margin: 0 auto;
-      padding: 28px 0 64px;
-    }
-
-    .hero {
-      position: relative;
-      overflow: hidden;
-      padding: clamp(28px, 5vw, 56px);
-      border-radius: 30px;
-      background: var(--navy);
-      color: #ffffff;
-      box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18);
-    }
-    .hero::after {
-      content: "";
-      position: absolute;
-      width: 300px;
-      height: 300px;
-      right: -120px;
-      top: -150px;
-      border-radius: 50%;
-      background: rgba(96, 165, 250, 0.16);
-    }
-    .eyebrow {
-      margin: 0 0 10px;
-      color: #93c5fd;
-      font-size: 0.78rem;
-      font-weight: 800;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-    }
-    .hero h1 {
-      position: relative;
-      margin: 0;
-      max-width: 850px;
-      font-size: clamp(2.15rem, 5vw, 4.4rem);
-      line-height: 1.03;
-      letter-spacing: -0.045em;
-    }
-    .hero-copy {
-      position: relative;
-      max-width: 760px;
-      margin: 20px 0 0;
-      color: #cbd5e1;
-      font-size: clamp(1rem, 1.7vw, 1.16rem);
-    }
-    .default-note {
-      position: relative;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      margin-top: 22px;
-      padding: 9px 13px;
-      border: 1px solid rgba(147, 197, 253, 0.34);
-      border-radius: 999px;
-      background: rgba(37, 99, 235, 0.16);
-      color: #dbeafe;
-      font-size: 0.88rem;
-      font-weight: 700;
-    }
-
-    .selection-summary {
+    button, input { font: inherit; }
+    header { border-bottom: 1px solid var(--line); background: var(--band); }
+    .header-inner, main { width: min(1180px, calc(100% - 32px)); margin: 0 auto; }
+    .header-inner { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; padding: 20px 0; }
+    h1 { margin: 0; font-size: 22px; letter-spacing: 0; }
+    .header-copy { margin: 0; color: var(--muted); }
+    main { padding: 0 0 40px; }
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 3;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 18px;
-      margin: 22px 0 0;
-      padding: 15px 18px;
-      border: 1px solid #bfdbfe;
-      border-radius: 16px;
-      background: var(--accent-soft);
-      color: #1e3a8a;
+      gap: 12px;
+      min-height: 58px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--line);
+      background: var(--bg);
     }
-    .selection-copy { min-width: 0; }
-    .selection-copy p { margin: 0; }
-    .selection-label {
-      color: #5270aa;
-      font-size: 0.7rem;
-      font-weight: 800;
-      letter-spacing: 0.09em;
-      text-transform: uppercase;
-    }
-    .selected-value {
-      margin-top: 2px !important;
-      color: #5270aa;
-      font-size: 1rem;
-      font-weight: 800;
-    }
-    .selected-value.has-selection { color: #1d4ed8; }
-    .selection-help {
-      margin-top: 3px !important;
-      color: var(--muted);
-      font-size: 0.79rem;
-    }
-    .selection-help code { color: #344054; }
-    .copy-selection {
-      flex: 0 0 auto;
-      padding: 9px 14px;
-      border: 1px solid #93c5fd;
-      border-radius: 10px;
-      background: #ffffff;
-      color: #1d4ed8;
-      font-weight: 800;
+    #review-status { color: var(--muted); }
+    .toolbar-actions { display: flex; gap: 8px; }
+    button {
+      min-height: 38px;
+      padding: 8px 12px;
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text);
       cursor: pointer;
     }
-    .copy-selection:disabled { color: #98a2b3; border-color: var(--line); background: #f2f4f7; cursor: not-allowed; }
-    .copy-selection.is-copied { color: var(--success); border-color: #a9d8b8; background: #f2fbf5; }
-
-    .gallery-section { margin-top: clamp(48px, 7vw, 78px); }
-    .section-heading {
-      display: flex;
-      align-items: end;
-      justify-content: space-between;
-      gap: 24px;
-      margin-bottom: 22px;
-      padding-bottom: 14px;
-      border-bottom: 1px solid var(--line);
-    }
-    .section-heading h2 { margin: 0; font-size: clamp(1.55rem, 3vw, 2.25rem); line-height: 1.15; letter-spacing: -0.025em; }
-    .section-heading p { max-width: 620px; margin: 0; color: var(--muted); text-align: right; }
-    .subgroup + .subgroup { margin-top: 38px; }
-    .subgroup-heading { display: flex; align-items: center; gap: 11px; margin: 0 0 16px; }
-    .subgroup-heading h3 { margin: 0; font-size: 1.18rem; }
-    .count-badge { padding: 3px 9px; border-radius: 999px; background: #e8edf4; color: #596579; font-size: 0.76rem; font-weight: 800; }
-
-    .card-grid {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      align-items: stretch;
-      gap: 18px;
-    }
-    .card-grid--core {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
-    .card-grid--shorts {
-      display: grid;
-      grid-template-columns: repeat(6, minmax(0, 1fr));
-    }
+    button:hover, button:focus-visible { background: #253b38; outline: none; }
+    button:disabled { border-color: var(--line); color: #737a7e; cursor: not-allowed; }
+    #copy-summary.copied { border-color: var(--accent); background: #253b38; }
+    #review-form { display: grid; gap: 28px; padding-top: 20px; }
+    .section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; margin-bottom: 10px; }
+    .section-heading h2 { margin: 0; font-size: 17px; letter-spacing: 0; }
+    .section-heading p { margin: 0; color: var(--muted); text-align: right; }
+    .card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .card-grid--core { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .card-grid--shorts { grid-template-columns: repeat(6, minmax(0, 1fr)); }
     .style-card {
       position: relative;
       display: flex;
-      flex-direction: column;
       min-width: 0;
-      padding: 12px;
+      flex-direction: column;
       border: 1px solid var(--line);
-      border-radius: var(--radius-md);
+      border-radius: 6px;
       background: var(--surface);
-      box-shadow: var(--shadow);
-      cursor: pointer;
-      outline: none;
-      transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
     }
-    .style-card--landscape { flex: 1 1 245px; max-width: 310px; }
-    .style-card--shorts { flex: 0 1 210px; width: min(100%, 210px); }
-    .card-grid--core .style-card--landscape,
-    .card-grid--shorts .style-card--shorts {
-      width: 100%;
-      max-width: none;
-    }
-    .style-card:hover { transform: translateY(-3px); border-color: var(--line-strong); }
-    .style-card:focus-visible { box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.2), var(--shadow); }
-    .style-card.is-selected {
-      transform: translateY(-3px);
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16), var(--shadow-selected);
-    }
-
-    .preview-frame {
-      display: grid;
-      place-items: center;
-      overflow: hidden;
-      border: 1px solid #e4e8ee;
-      border-radius: 12px;
-      background: #3b404f;
-    }
-    .preview-frame--landscape { width: 100%; aspect-ratio: 16 / 9; }
-    .preview-frame--shorts { width: min(100%, 168px); aspect-ratio: 9 / 16; margin: 0 auto; }
-    .card-grid--shorts .preview-frame--shorts { width: min(100%, 184px); }
-    .preview-frame img { width: 100%; height: 100%; object-fit: contain; }
-
-    .card-copy { display: grid; gap: 12px; padding: 13px 4px 3px; }
-    .card-heading { display: flex; align-items: start; justify-content: space-between; gap: 10px; margin: 0; }
-    .card-heading h4 { min-width: 0; margin: 0; color: var(--ink); font-size: 1rem; line-height: 1.28; overflow-wrap: anywhere; }
-    .aspect-badge { flex: 0 0 auto; padding: 3px 8px; border-radius: 999px; background: #eef2f7; color: #526074; font-size: 0.72rem; font-weight: 800; }
-    .metadata-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 12px; margin: 0; }
-    .metadata-grid div:last-child { grid-column: 1 / -1; }
-    .metadata-grid dt {
-      color: #8a94a5;
-      font-size: 0.66rem;
-      font-weight: 800;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-    }
-    .metadata-grid dd {
-      margin: 2px 0 0;
-      color: #344054;
-      font-size: 0.82rem;
-      font-weight: 700;
-      overflow-wrap: anywhere;
-    }
-    .metadata-grid dd.status-on { color: var(--success); }
-    .metadata-grid dd.status-off { color: #667085; }
+    .style-card:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 2px #265950; }
+    .style-card:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .style-choice { display: flex; min-width: 0; flex: 1; flex-direction: column; padding: 10px; cursor: pointer; }
+    .style-choice > input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+    .style-choice > input:focus-visible + .selection-mark { outline: 2px solid var(--accent); outline-offset: 3px; }
     .selection-mark {
       position: absolute;
-      top: 20px;
-      right: 20px;
-      display: grid;
-      width: 28px;
-      height: 28px;
-      place-items: center;
-      border-radius: 50%;
+      z-index: 1;
+      top: 16px;
+      right: 16px;
+      display: none;
+      padding: 3px 6px;
+      border-radius: 4px;
       background: var(--accent);
-      color: #ffffff;
-      font-size: 0.85rem;
-      font-weight: 900;
-      opacity: 0;
-      transform: scale(0.75);
-      transition: opacity 150ms ease, transform 150ms ease;
+      color: #10211f;
+      font-size: 11px;
+      font-weight: 700;
     }
-    .style-card.is-selected .selection-mark { opacity: 1; transform: scale(1); }
-
-    .option-panel {
-      display: grid;
-      grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
-      gap: 24px;
-      align-items: center;
-      padding: clamp(24px, 4vw, 42px);
-      border: 1px solid #cbd5e1;
-      border-radius: var(--radius-lg);
-      background: var(--surface);
-      box-shadow: var(--shadow);
+    .style-card:has(input:checked) .selection-mark { display: block; }
+    .preview-frame { display: grid; place-items: center; overflow: hidden; border: 1px solid #50575c; border-radius: 4px; background: #090a0b; }
+    .preview-frame--landscape { aspect-ratio: 16 / 9; }
+    .preview-frame--shorts { width: min(100%, 146px); aspect-ratio: 9 / 16; margin: 0 auto; }
+    .preview-frame img { display: block; width: 100%; height: 100%; object-fit: contain; }
+    .card-copy { display: grid; gap: 9px; padding-top: 10px; }
+    .card-heading { display: flex; justify-content: space-between; gap: 8px; color: var(--text); }
+    .card-heading strong { min-width: 0; overflow-wrap: anywhere; }
+    .card-heading > span { color: var(--muted); font-size: 12px; }
+    .metadata-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; color: var(--text); font-size: 12px; }
+    .metadata-grid > span { min-width: 0; overflow-wrap: anywhere; }
+    .metadata-grid small { display: block; color: var(--muted); font-size: 10px; }
+    .enlarge-preview { min-height: 38px; margin: 0 10px 10px; border-color: #50575c; }
+    .summary-box { margin-top: 20px; padding: 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+    .summary-box-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+    .summary-box-header h2 { margin: 0; font-size: 16px; }
+    #summary-output {
+      width: 100%;
+      min-height: 92px;
+      margin: 0;
+      padding: 10px;
+      border: 1px solid #50575c;
+      border-radius: 4px;
+      background: #171a1c;
+      color: var(--text);
+      font: 13px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
     }
-    .option-panel h2 { margin: 0 0 10px; font-size: clamp(1.5rem, 3vw, 2.1rem); }
-    .option-panel p { margin: 0; color: var(--muted); }
-    .option-code { padding: 14px 16px; border-radius: 12px; background: var(--surface-soft); color: #475467; font-size: 0.9rem; font-weight: 700; text-align: center; }
-
+    #review-errors { min-height: 20px; margin: 8px 0 0; color: var(--warning); }
     .preview-dialog {
-      position: fixed;
-      inset: 0;
       width: min(980px, calc(100vw - 48px));
       max-width: none;
       max-height: calc(100vh - 40px);
-      margin: auto;
-      padding: 44px 12px 0;
+      padding: 44px 12px 12px;
       overflow: hidden;
-      border: 0;
-      border-radius: 18px;
-      background: #ffffff;
-      color: var(--ink);
-      box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--text);
     }
-    .preview-dialog.is-shorts { width: min(360px, calc(100vw - 24px)); }
-    .preview-dialog::backdrop {
-      background: rgba(15, 23, 42, 0.7);
-      backdrop-filter: blur(3px);
-    }
-    .preview-dialog__close {
-      display: grid;
-      position: absolute;
-      z-index: 2;
-      top: 8px;
-      right: 10px;
-      width: 34px;
-      height: 34px;
-      padding: 0;
-      place-items: center;
-      border: 0;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.9);
-      color: var(--ink);
-      cursor: pointer;
-      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.16);
-    }
-    .preview-dialog__close:hover { background: #ffffff; }
-    .preview-dialog__close:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
-    .preview-dialog__figure { margin: 0; }
-    .preview-dialog__media {
-      display: grid;
-      max-height: calc(100vh - 132px);
-      place-items: center;
-      overflow: hidden;
-      background: #ffffff;
-    }
-    .preview-dialog__image {
-      display: block;
-      width: auto;
-      max-width: 100%;
-      height: auto;
-      max-height: calc(100vh - 132px);
-      object-fit: contain;
-      border: 1px solid #e4e7ec;
-      border-radius: 12px;
-    }
-    .preview-dialog__caption {
-      padding: 11px 4px 13px;
-      color: var(--ink);
-      font-size: 1.404rem;
-      font-weight: 750;
-      line-height: 1.3;
-      text-align: center;
-      overflow-wrap: anywhere;
-    }
-
-    html.modal-open { scroll-behavior: auto; }
+    .preview-dialog.is-shorts { width: min(390px, calc(100vw - 24px)); }
+    .preview-dialog::backdrop { background: rgba(0, 0, 0, 0.78); }
+    .preview-dialog__close { position: absolute; top: 6px; right: 8px; min-width: 38px; padding: 0; }
+    .preview-dialog figure { margin: 0; }
+    .preview-dialog__media { display: grid; max-height: calc(100vh - 120px); place-items: center; overflow: hidden; background: #090a0b; }
+    .preview-dialog__image { display: block; max-width: 100%; max-height: calc(100vh - 150px); object-fit: contain; }
+    .preview-dialog__caption { padding-top: 10px; text-align: center; overflow-wrap: anywhere; }
     body.modal-open { overflow: hidden; }
-
-    @media (max-width: 820px) {
-      .page-shell { width: min(100% - 24px, 1480px); padding-top: 12px; }
-      .hero { border-radius: 22px; }
-      .selection-summary, .section-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
-      .section-heading p { text-align: left; }
-      .option-panel { grid-template-columns: 1fr; }
-      .style-card--landscape { flex-basis: 270px; }
-      .card-grid--core { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    @media (max-width: 1100px) {
+      .card-grid, .card-grid--core { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .card-grid--shorts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     }
-    @media (max-width: 540px) {
-      .hero { padding: 26px 22px; }
-      .gallery-section { margin-top: 44px; }
-      .selection-summary, .option-panel { align-items: stretch; flex-direction: column; }
-      .copy-selection { width: 100%; }
-      .card-grid { gap: 14px; }
-      .style-card--landscape { flex-basis: 100%; max-width: 420px; }
-      .style-card--shorts { flex-basis: 168px; width: 168px; }
-      .card-grid--core { grid-template-columns: 1fr; }
+    @media (max-width: 780px) {
+      .header-inner, .toolbar, .section-heading, .summary-box-header { align-items: stretch; flex-direction: column; gap: 10px; }
+      .toolbar { position: static; }
+      .toolbar-actions { display: grid; grid-template-columns: 1fr 1fr; }
+      .toolbar-actions button { width: 100%; }
+      .section-heading p { text-align: left; }
+      .card-grid, .card-grid--core { grid-template-columns: 1fr; }
       .card-grid--shorts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .card-grid--core .style-card--landscape,
-      .card-grid--shorts .style-card--shorts { width: 100%; max-width: none; }
-      .preview-frame--shorts { width: 138px; }
-      .preview-dialog { width: calc(100vw - 20px); max-height: calc(100vh - 20px); padding: 40px 8px 0; border-radius: 14px; }
-      .preview-dialog__close { top: 6px; right: 8px; }
-      .preview-dialog__media, .preview-dialog__image { max-height: calc(100vh - 100px); }
       .metadata-grid { grid-template-columns: 1fr; }
-      .metadata-grid div:last-child { grid-column: auto; }
+      .preview-dialog { width: calc(100vw - 20px); max-height: calc(100vh - 20px); }
     }
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
-    }
+    @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
   </style>
 </head>
 <body>
-  <main class="page-shell">
-    <header class="hero">
-      <p class="eyebrow">25 offline preview styles</p>
-      <h1>Caption Style Gallery</h1>
-      <p class="hero-copy">Compare the maintained caption combinations, select one card, copy its exact combination ID, and return that ID to the Agent.</p>
-      <div class="default-note">Reply <strong>skip</strong> to the Agent only when you explicitly want the default <strong>clean</strong> style.</div>
-    </header>
-
-    <div class="selection-summary" aria-live="polite">
-      <div class="selection-copy">
-        <p class="selection-label">Selected combination ID</p>
-        <p class="selected-value" id="selected-preview">No style selected</p>
-        <p class="selection-help">To use the default <code>clean</code> style without browsing, return to the Agent and explicitly reply <code>skip</code>.</p>
-      </div>
-      <button class="copy-selection" id="copy-selection" type="button" disabled>Copy ID</button>
+  <header>
+    <div class="header-inner">
+      <h1>Caption style review</h1>
+      <p class="header-copy">25 maintained local previews</p>
     </div>
-
-    <section class="gallery-section" aria-labelledby="core-title">
-      <div class="section-heading">
-        <h2 id="core-title">Core Presets</h2>
-        <p>The four primary starting points, including one explicit Karaoke combination.</p>
+  </header>
+  <main>
+    <div class="toolbar">
+      <strong id="review-status" aria-live="polite">No style selected</strong>
+      <div class="toolbar-actions">
+        <button id="select-default" type="button">Use clean default</button>
+        <button id="copy-summary" type="button" disabled>Copy ID</button>
       </div>
-      ${renderGrid(groupMap.core, "card-grid--core")}
-    </section>
-
-    <section class="gallery-section" aria-labelledby="background-title">
-      <div class="section-heading">
-        <h2 id="background-title">Background Styles</h2>
-        <p>Pill and boxed treatments are separated so their silhouette and padding differences remain easy to compare.</p>
-      </div>
-      <div class="subgroup">
-        <div class="subgroup-heading"><h3>Pill</h3><span class="count-badge">5 themes</span></div>
-        ${renderGrid(groupMap.pill, "")}
-      </div>
-      <div class="subgroup">
-        <div class="subgroup-heading"><h3>Boxed</h3><span class="count-badge">5 themes</span></div>
-        ${renderGrid(groupMap.boxed, "")}
-      </div>
-    </section>
-
-    <section class="gallery-section" aria-labelledby="stroked-title">
-      <div class="section-heading">
-        <h2 id="stroked-title">Stroked Styles</h2>
-        <p>Five background-free options arranged on the same five-column alignment as the background styles.</p>
-      </div>
-      ${renderGrid(groupMap.stroked, "")}
-    </section>
-
-    <section class="gallery-section" aria-labelledby="shorts-title">
-      <div class="section-heading">
-        <h2 id="shorts-title">Shorts Styles</h2>
-        <p>Six vertical-video treatments in one evenly aligned row on wide screens.</p>
-      </div>
-      ${renderGrid(groupMap.shorts, "card-grid--shorts")}
-    </section>
-
-    <section class="gallery-section option-panel" aria-labelledby="karaoke-title">
-      <div>
-        <h2 id="karaoke-title">Karaoke is an option, not a preset</h2>
-        <p>The gallery includes explicit combinations where Karaoke changes the visual result. Later preview adjustments can still turn it on or off.</p>
-      </div>
-      <span class="option-code">auto · true · false</span>
+    </div>
+    <form id="review-form">
+      ${renderSection("core", "Core presets", "Primary treatments, including one karaoke combination.", groupMap.core, "card-grid--core")}
+      ${renderSection("pill", "Pill", "Background themes with a compact rounded silhouette.", groupMap.pill)}
+      ${renderSection("boxed", "Boxed", "Background themes with a rectangular caption block.", groupMap.boxed)}
+      ${renderSection("stroked", "Stroked", "Background-free treatments with themed outlines.", groupMap.stroked)}
+      ${renderSection("shorts", "Shorts", "Vertical treatments for 9:16 delivery.", groupMap.shorts, "card-grid--shorts")}
+    </form>
+    <section class="summary-box" aria-labelledby="summary-title">
+      <div class="summary-box-header"><h2 id="summary-title">Return the selected style</h2></div>
+      <pre id="summary-output">No style selected yet.</pre>
+      <p id="review-errors" role="alert" aria-live="assertive"></p>
     </section>
   </main>
 
   <dialog class="preview-dialog" id="preview-dialog" aria-labelledby="preview-dialog-title">
-    <button class="preview-dialog__close" type="button" aria-label="Close enlarged preview">✕</button>
-    <figure class="preview-dialog__figure">
+    <button class="preview-dialog__close" type="button" aria-label="Close enlarged preview">Close</button>
+    <figure>
       <div class="preview-dialog__media"><img class="preview-dialog__image" alt=""></div>
       <figcaption class="preview-dialog__caption" id="preview-dialog-title">Caption preview</figcaption>
     </figure>
@@ -538,86 +280,107 @@ const html = `<!doctype html>
   <script id="embedded-preview-manifest" type="application/json">${manifestJson}</script>
   <script>
     (() => {
-      const cards = [...document.querySelectorAll(".style-card")];
-      const selectedPreview = document.getElementById("selected-preview");
-      const copySelection = document.getElementById("copy-selection");
+      const REVIEW_DATA_B64 = "__CAPTION_STYLE_REVIEW_DATA__";
+      const genericReviewData = {
+        schema_version: 1,
+        review_id: null,
+        source_name: null,
+        decision_mode: "human",
+        default_choice: "clean"
+      };
+      const reviewData = REVIEW_DATA_B64.startsWith("__CAPTION_STYLE_")
+        ? genericReviewData
+        : JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(REVIEW_DATA_B64), (character) => character.charCodeAt(0))));
+      const form = document.getElementById("review-form");
+      const cards = [...form.querySelectorAll(".style-card")];
+      const status = document.getElementById("review-status");
+      const defaultButton = document.getElementById("select-default");
+      const copyButton = document.getElementById("copy-summary");
+      const summaryOutput = document.getElementById("summary-output");
+      const errors = document.getElementById("review-errors");
       const previewDialog = document.getElementById("preview-dialog");
       const previewDialogImage = previewDialog.querySelector(".preview-dialog__image");
       const previewDialogTitle = document.getElementById("preview-dialog-title");
       const previewDialogClose = previewDialog.querySelector(".preview-dialog__close");
-      let selectedId = null;
       let lastTrigger = null;
-      let pageScrollPosition = 0;
 
-      const copyText = async (text) => {
-        if (navigator.clipboard && window.isSecureContext) {
-          await navigator.clipboard.writeText(text);
-          return;
-        }
+      copyButton.textContent = reviewData.review_id ? "Copy summary" : "Copy ID";
+
+      function buildSummary() {
+        const selected = form.querySelector('input[name="caption-style"]:checked');
+        if (!selected) return "No style selected yet.";
+        if (!reviewData.review_id) return selected.value;
+        return \`Caption style review\\nReview: \${reviewData.review_id}\\nDecision: select\\nChoice: \${selected.value}\`;
+      }
+
+      function updateSelection() {
+        const selected = form.querySelector('input[name="caption-style"]:checked');
+        cards.forEach((card) => card.classList.toggle("is-selected", card.querySelector("input").checked));
+        status.textContent = selected ? "Selected: " + selected.value : "No style selected";
+        summaryOutput.textContent = buildSummary();
+        copyButton.disabled = !selected;
+        copyButton.textContent = reviewData.review_id ? "Copy summary" : "Copy ID";
+        copyButton.classList.remove("copied");
+        errors.textContent = "";
+      }
+
+      for (const input of form.querySelectorAll('input[name="caption-style"]')) {
+        input.addEventListener("change", updateSelection);
+      }
+      defaultButton.addEventListener("click", () => {
+        const input = [...form.elements].find((element) => element.value === reviewData.default_choice);
+        if (!input) return;
+        input.checked = true;
+        updateSelection();
+        input.focus();
+      });
+
+      function fallbackCopy(text) {
         const textarea = document.createElement("textarea");
         textarea.value = text;
+        textarea.setAttribute("readonly", "");
         textarea.style.position = "fixed";
         textarea.style.opacity = "0";
-        document.body.appendChild(textarea);
+        document.body.append(textarea);
         textarea.select();
         const copied = document.execCommand("copy");
         textarea.remove();
-        if (!copied) throw new Error("Unable to copy selected style");
-      };
-
-      const selectCard = (card) => {
-        cards.forEach((candidate) => {
-          const selected = candidate === card;
-          candidate.classList.toggle("is-selected", selected);
-          candidate.setAttribute("aria-pressed", selected ? "true" : "false");
-        });
-        selectedId = card.dataset.previewId;
-        selectedPreview.textContent = selectedId;
-        selectedPreview.classList.add("has-selection");
-        copySelection.disabled = false;
-        copySelection.textContent = "Copy ID";
-        copySelection.classList.remove("is-copied");
-      };
-
-      const openPreview = (card) => {
-        pageScrollPosition = window.scrollY;
-        lastTrigger = card;
-        previewDialogImage.src = "./" + card.dataset.previewImage;
-        previewDialogImage.alt = card.dataset.previewLabel + " caption preview";
-        previewDialogTitle.textContent = card.dataset.previewId;
-        previewDialog.classList.toggle("is-shorts", card.classList.contains("style-card--shorts"));
-        document.documentElement.classList.add("modal-open");
-        document.body.classList.add("modal-open");
-        previewDialog.showModal();
-        previewDialogClose.focus({ preventScroll: true });
-        window.scrollTo(0, pageScrollPosition);
-      };
-
-      cards.forEach((card) => {
-        card.addEventListener("click", () => {
-          selectCard(card);
-          openPreview(card);
-        });
-        card.addEventListener("keydown", (event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            selectCard(card);
-            openPreview(card);
+        return copied;
+      }
+      async function copyText(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          try {
+            await navigator.clipboard.writeText(text);
+            return true;
+          } catch {
+            return fallbackCopy(text);
           }
-        });
-      });
-
-      copySelection.addEventListener("click", async () => {
-        if (!selectedId) return;
-        try {
-          await copyText(selectedId);
-          copySelection.textContent = "Copied";
-          copySelection.classList.add("is-copied");
-        } catch {
-          copySelection.textContent = "Copy failed";
         }
+        return fallbackCopy(text);
+      }
+      copyButton.addEventListener("click", async () => {
+        if (copyButton.disabled) return;
+        if (!(await copyText(summaryOutput.textContent))) {
+          errors.textContent = "Copy failed. Select the summary text manually.";
+          return;
+        }
+        copyButton.textContent = "Copied";
+        copyButton.classList.add("copied");
       });
 
+      for (const button of form.querySelectorAll(".enlarge-preview")) {
+        button.addEventListener("click", () => {
+          const card = button.closest(".style-card");
+          lastTrigger = button;
+          previewDialogImage.src = "./" + card.dataset.previewImage;
+          previewDialogImage.alt = card.dataset.previewLabel + " caption preview";
+          previewDialogTitle.textContent = card.dataset.previewId;
+          previewDialog.classList.toggle("is-shorts", card.classList.contains("style-card--shorts"));
+          document.body.classList.add("modal-open");
+          previewDialog.showModal();
+          previewDialogClose.focus({ preventScroll: true });
+        });
+      }
       previewDialogClose.addEventListener("click", () => previewDialog.close());
       previewDialog.addEventListener("click", (event) => {
         if (event.target === previewDialog) previewDialog.close();
@@ -625,9 +388,8 @@ const html = `<!doctype html>
       previewDialog.addEventListener("close", () => {
         document.body.classList.remove("modal-open");
         if (lastTrigger) lastTrigger.focus({ preventScroll: true });
-        window.scrollTo(0, pageScrollPosition);
-        document.documentElement.classList.remove("modal-open");
       });
+      updateSelection();
     })();
   </script>
 </body>

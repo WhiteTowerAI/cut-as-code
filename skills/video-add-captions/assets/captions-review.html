@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Caption preview review</title>
+  <style>
+    :root {
+      --bg: #151719;
+      --band: #1d2023;
+      --surface: #24282b;
+      --line: #3b4145;
+      --text: #f2eee5;
+      --muted: #aeb4b7;
+      --accent: #4fc3b4;
+      --warning: #f3bd5b;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
+    button, textarea, input { font: inherit; }
+    button, textarea { min-height: 38px; }
+    button { border: 1px solid var(--line); background: var(--surface); color: var(--text); padding: 8px 14px; cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: .48; }
+    :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+    .shell { width: min(1180px, calc(100% - 32px)); margin: 0 auto 48px; }
+    .toolbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 64px; padding: 12px 0; background: var(--band); border-bottom: 1px solid var(--line); }
+    .toolbar-band { position: sticky; top: 0; z-index: 4; background: var(--band); }
+    h1 { margin: 0; font-size: 20px; letter-spacing: 0; }
+    #review-status { color: var(--muted); white-space: nowrap; }
+    #review-form { display: grid; gap: 1px; margin-top: 24px; background: var(--line); border: 1px solid var(--line); }
+    .evidence-row { display: grid; grid-template-columns: minmax(150px, .55fr) minmax(320px, 1.45fr); gap: 20px; padding: 20px; background: var(--surface); }
+    .evidence-meta { display: grid; align-content: start; gap: 10px; }
+    .check-label { display: flex; align-items: center; gap: 10px; font-weight: 700; text-transform: capitalize; }
+    .check-label input { inline-size: 20px; block-size: 20px; accent-color: var(--accent); }
+    dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; margin: 0; }
+    dt { color: var(--muted); }
+    dd { margin: 0; overflow-wrap: anywhere; }
+    .preview-button { min-height: 0; padding: 0; border: 0; background: #000; aspect-ratio: 16 / 9; overflow: hidden; }
+    .preview-button img { display: block; width: 100%; height: 100%; object-fit: contain; }
+    .decision { display: grid; grid-template-columns: minmax(240px, .7fr) minmax(320px, 1.3fr); gap: 24px; padding: 24px 0; }
+    fieldset { min-width: 0; margin: 0; border: 1px solid var(--line); padding: 16px; }
+    legend { padding: 0 6px; font-weight: 700; }
+    .radio-row { display: flex; gap: 22px; }
+    .radio-row label { display: flex; align-items: center; gap: 8px; min-height: 38px; }
+    textarea { width: 100%; resize: vertical; border: 1px solid var(--line); background: var(--surface); color: var(--text); padding: 10px; }
+    textarea:disabled { opacity: .55; }
+    .actions { display: flex; align-items: start; gap: 12px; }
+    #copy-summary { background: var(--accent); border-color: var(--accent); color: #071c19; font-weight: 800; }
+    #summary-output { flex: 1; min-height: 92px; margin: 0; padding: 12px; border: 1px solid var(--line); background: var(--band); color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+    #review-errors { min-height: 24px; margin-top: 10px; color: var(--warning); }
+    dialog { width: min(1100px, calc(100% - 32px)); border: 1px solid var(--line); padding: 0; background: var(--bg); color: var(--text); }
+    dialog::backdrop { background: rgb(0 0 0 / .82); }
+    .dialog-bar { display: flex; justify-content: flex-end; padding: 10px; }
+    dialog img { display: block; width: 100%; height: auto; max-height: calc(100vh - 90px); object-fit: contain; }
+    @media (max-width: 1100px) { .evidence-row { grid-template-columns: minmax(140px, .45fr) 1fr; } }
+    @media (max-width: 780px) {
+      .shell { width: min(1180px, calc(100% - 32px)); }
+      .toolbar, .decision, .evidence-row { grid-template-columns: 1fr; }
+      .toolbar { align-items: flex-start; flex-direction: column; gap: 2px; }
+      .actions { flex-direction: column; }
+      #copy-summary, #summary-output { width: 100%; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }
+  </style>
+</head>
+<body>
+  <div class="toolbar-band">
+    <header class="toolbar shell">
+      <h1>Caption preview review</h1>
+      <strong id="review-status" aria-live="polite">0/4 checked</strong>
+    </header>
+  </div>
+  <main class="shell">
+    <form id="review-form">
+      <div id="evidence-list"></div>
+    </form>
+    <section class="decision">
+      <fieldset>
+        <legend>Decision</legend>
+        <div class="radio-row">
+          <label><input type="radio" name="decision" value="approve" checked> Approve</label>
+          <label><input type="radio" name="decision" value="revise"> Revise</label>
+        </div>
+      </fieldset>
+      <label>Changes
+        <textarea id="changes" rows="3" disabled></textarea>
+      </label>
+    </section>
+    <div class="actions">
+      <button id="copy-summary" type="button" disabled>Copy summary</button>
+      <output id="summary-output" aria-live="polite"></output>
+    </div>
+    <div id="review-errors" role="alert" aria-live="assertive"></div>
+  </main>
+  <dialog id="preview-dialog" aria-label="Caption evidence preview">
+    <div class="dialog-bar"><button id="close-preview" type="button" aria-label="Close preview">Close</button></div>
+    <img id="dialog-image" alt="">
+  </dialog>
+  <script>
+    const REVIEW_DATA_B64 = "__CAPTION_EVIDENCE_REVIEW_DATA__";
+    const reviewData = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(REVIEW_DATA_B64), c => c.charCodeAt(0))));
+    const labels = ["early", "middle", "late", "no-caption"];
+    const form = document.querySelector("#review-form");
+    const list = document.querySelector("#evidence-list");
+    const status = document.querySelector("#review-status");
+    const changes = document.querySelector("#changes");
+    const copyButton = document.querySelector("#copy-summary");
+    const output = document.querySelector("#summary-output");
+    const errors = document.querySelector("#review-errors");
+    const dialog = document.querySelector("#preview-dialog");
+    const dialogImage = document.querySelector("#dialog-image");
+    let lastTrigger = null;
+
+    const time = value => `${Number(value).toFixed(3)}s`;
+    for (const sample of reviewData.samples) {
+      const row = document.createElement("article");
+      row.className = "evidence-row";
+      const meta = document.createElement("div");
+      meta.className = "evidence-meta";
+      const checkLabel = document.createElement("label");
+      checkLabel.className = "check-label";
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.name = "evidence";
+      checkbox.value = sample.label;
+      checkLabel.append(checkbox, document.createTextNode(sample.label));
+      const details = document.createElement("dl");
+      for (const [name, value] of [["Program", time(sample.program_s)], ["Source", time(sample.source_s)], ["Cue", sample.cue_text || "None"]]) {
+        const term = document.createElement("dt");
+        term.textContent = name;
+        const description = document.createElement("dd");
+        description.textContent = value;
+        details.append(term, description);
+      }
+      meta.append(checkLabel, details);
+      const preview = document.createElement("button");
+      preview.type = "button";
+      preview.className = "preview-button";
+      preview.setAttribute("aria-label", `Enlarge ${sample.label} preview`);
+      const image = document.createElement("img");
+      image.src = sample.preview;
+      image.alt = `${sample.label} composited caption evidence`;
+      preview.append(image);
+      preview.addEventListener("click", () => {
+        lastTrigger = preview;
+        dialogImage.src = sample.preview;
+        dialogImage.alt = image.alt;
+        dialog.showModal();
+      });
+      row.append(meta, preview);
+      list.append(row);
+    }
+
+    const summary = () => {
+      const decision = form.ownerDocument.querySelector('input[name="decision"]:checked').value;
+      return decision === "approve"
+        ? `Caption preview review\nReview: ${reviewData.review_id}\nDecision: approve\nEvidence: early, middle, late, no-caption`
+        : `Caption preview review\nReview: ${reviewData.review_id}\nDecision: revise\nChanges: ${changes.value.trim()}`;
+    };
+    const update = () => {
+      const checked = [...form.querySelectorAll('input[name="evidence"]:checked')];
+      const decision = document.querySelector('input[name="decision"]:checked').value;
+      const valid = decision === "approve" ? checked.length === labels.length : Boolean(changes.value.trim());
+      status.textContent = `${checked.length}/${labels.length} checked`;
+      changes.disabled = decision !== "revise";
+      copyButton.disabled = !valid;
+      output.textContent = summary();
+      errors.textContent = valid ? "" : decision === "approve" ? "Check all four evidence frames to approve." : "Describe the requested changes.";
+    };
+    document.addEventListener("input", update);
+    document.addEventListener("change", update);
+    copyButton.addEventListener("click", async () => {
+      const text = summary();
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        const area = document.createElement("textarea");
+        area.value = text;
+        area.style.position = "fixed";
+        area.style.opacity = "0";
+        document.body.append(area);
+        area.select();
+        document.execCommand("copy");
+        area.remove();
+      }
+      output.textContent = text;
+    });
+    document.querySelector("#close-preview").addEventListener("click", () => dialog.close());
+    dialog.addEventListener("click", event => { if (event.target === dialog) dialog.close(); });
+    dialog.addEventListener("close", () => lastTrigger?.focus({ preventScroll: true }));
+    update();
+  </script>
+</body>
+</html>
