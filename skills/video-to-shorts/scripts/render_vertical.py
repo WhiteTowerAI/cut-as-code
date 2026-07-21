@@ -12,8 +12,12 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont, ImageStat
 
-from review_gate import load_validated_vertical_review, open_vertical_review, validate_vertical_delivery_allowed
-
+from review_gate import (
+      load_validated_vertical_review,
+      open_vertical_review,
+      sha256_file,
+      validate_vertical_delivery_allowed,
+)
 
 RENDERABLE_STRATEGIES = {"STATIC_CROP", "SCENE_CROP", "LETTERBOX"}
 
@@ -52,6 +56,22 @@ def write_json(path, payload):
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def verify_file_binding(binding, label):
+    if not isinstance(binding, dict):
+        fail(f"{label} binding is invalid")
+    path = Path(binding.get("path", "")).resolve()
+    if not path.is_file():
+        fail(f"{label} no longer exists: {path}")
+    stat = path.stat()
+    if (
+        binding.get("size") != stat.st_size
+        or binding.get("modified_ns") != stat.st_mtime_ns
+        or binding.get("sha256") != sha256_file(path)
+    ):
+        fail(f"{label} changed after vertical planning: {path}")
+    return path
+
+
 def probe_media(ffprobe, video):
     payload = json.loads(run([
         ffprobe, "-v", "error", "-show_entries",
@@ -75,6 +95,103 @@ def rational_fps(value):
     else:
         rate = Fraction(str(value)).limit_denominator(100000)
     return {"num": rate.numerator, "den": rate.denominator}
+
+
+def map_segments_to_render_source(segments, keep_spans):
+    timeline_spans = []
+    cursor = 0.0
+    for index, span in enumerate(keep_spans):
+        start = float(span["start_time"])
+        end = float(span["end_time"])
+        if end <= start:
+            fail(f"direct_render.keep_spans[{index}] has invalid duration")
+        duration = end - start
+        timeline_spans.append({
+            "short_start": cursor,
+            "short_end": cursor + duration,
+            "source_start": start,
+        })
+        cursor += duration
+    mapped = []
+    for segment in segments:
+        segment_start = float(segment["start_time"])
+        segment_end = float(segment["end_time"])
+        for span in timeline_spans:
+            overlap_start = max(segment_start, span["short_start"])
+            overlap_end = min(segment_end, span["short_end"])
+            if overlap_end - overlap_start <= 0.000001:
+                continue
+            mapped_segment = dict(segment)
+            mapped_segment["short_start_time"] = round(overlap_start, 6)
+            mapped_segment["short_end_time"] = round(overlap_end, 6)
+            mapped_segment["start_time"] = round(
+                span["source_start"] + overlap_start - span["short_start"], 6
+            )
+            mapped_segment["end_time"] = round(
+                span["source_start"] + overlap_end - span["short_start"], 6
+            )
+            mapped.append(mapped_segment)
+    if not mapped:
+        fail("vertical plan does not overlap the bound source keep_spans")
+    expected_duration = min(
+        float(segments[-1]["end_time"]),
+        sum(float(span["end_time"]) - float(span["start_time"]) for span in keep_spans),
+    )
+    mapped_duration = sum(segment["end_time"] - segment["start_time"] for segment in mapped)
+    if abs(mapped_duration - expected_duration) > 0.05:
+        fail("direct render mapping does not fully cover the vertical timeline")
+    return mapped, mapped_duration
+
+
+def normalized_keep_spans(value):
+    if not isinstance(value, list) or not value:
+        fail("bound extraction report keep_spans are invalid")
+    normalized = []
+    for index, span in enumerate(value):
+        if not isinstance(span, dict):
+            fail(f"bound extraction report keep_spans[{index}] is invalid")
+        start = float(span.get("start_time"))
+        end = float(span.get("end_time"))
+        if end <= start:
+            fail(f"bound extraction report keep_spans[{index}] has invalid duration")
+        normalized.append({"start_time": round(start, 6), "end_time": round(end, 6)})
+    return normalized
+
+
+def direct_render_context(plan, horizontal_video, ffprobe):
+    binding = plan.get("direct_render")
+    if not binding:
+        return None
+    source_video = verify_file_binding(binding.get("source_video"), "direct render source")
+    extraction_report = verify_file_binding(binding.get("extraction_report"), "extraction report")
+    report = load_json(extraction_report)
+    if Path(report.get("source_video", "")).resolve() != source_video:
+        fail("bound extraction report points to a different render source")
+    report_horizontal = Path((report.get("outputs") or {}).get("horizontal_video", "")).resolve()
+    if report_horizontal != Path(horizontal_video).resolve():
+        fail("bound extraction report points to a different horizontal short")
+    if normalized_keep_spans(report.get("keep_spans")) != binding.get("keep_spans"):
+        fail("bound extraction report keep_spans differ from the vertical plan")
+    source_probe = probe_media(ffprobe, source_video)
+    source_stream = next(
+        (stream for stream in source_probe.get("streams", []) if stream.get("codec_type") == "video"),
+        None,
+    )
+    if not source_stream:
+        fail("direct render source has no video stream")
+    if (
+        int(source_stream.get("width", 0)) != int(plan["source_width"])
+        or int(source_stream.get("height", 0)) != int(plan["source_height"])
+        or Fraction(source_stream.get("avg_frame_rate") or "0/1")
+        != Fraction(plan["source_fps"]["num"], plan["source_fps"]["den"])
+    ):
+        fail("direct render source geometry or FPS differs from the validated horizontal short")
+    mapped_segments, mapped_duration = map_segments_to_render_source(
+        plan["segments"], binding["keep_spans"]
+    )
+    render_plan = dict(plan)
+    render_plan["segments"] = mapped_segments
+    return source_video, source_probe, render_plan, mapped_duration, extraction_report
 
 
 def dimensions_for_mode(plan, mode, preview_height):
@@ -186,7 +303,10 @@ def segment_video_filters(segment, index, output_width, output_height):
     fail(f"segment strategy is not renderable: {strategy}")
 
 
-def render(ffmpeg, source_probe, video, plan, output, output_width, output_height, fps, background_analysis):
+def render(
+    ffmpeg, source_probe, video, plan, output, output_width, output_height, fps,
+    background_analysis, video_preset="medium", video_crf=20,
+):
     has_audio = any(stream.get("codec_type") == "audio" for stream in source_probe.get("streams", []))
     filters = []
     concat_inputs = []
@@ -225,7 +345,8 @@ def render(ffmpeg, source_probe, video, plan, output, output_width, output_heigh
         filters.append("".join(concat_inputs) + f"concat=n={len(plan['segments'])}:v=1:a=0[vout]")
     command = [
         ffmpeg, "-y", "-i", str(video), "-filter_complex", ";".join(filters),
-        "-map", "[vout]", "-c:v", "libx264", "-preset", "medium", "-crf", "20",
+        "-map", "[vout]", "-c:v", "libx264", "-preset", str(video_preset),
+        "-crf", str(video_crf),
         "-r", f"{fps['num']}/{fps['den']}", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
     ]
     if has_audio:
@@ -402,6 +523,14 @@ def main():
     if args.mode == "final" and plan.get("render_allowed") is not True:
         fail("formal render is not allowed by the validated plan")
     output_width, output_height = dimensions_for_mode(plan, args.mode, args.preview_height)
+    render_video = video
+    render_probe = source_probe
+    render_plan = plan
+    expected_duration = float(plan["source_duration_s"])
+    direct_context = direct_render_context(plan, video, ffprobe) if args.mode == "final" else None
+    extraction_report = None
+    if direct_context:
+        render_video, render_probe, render_plan, expected_duration, extraction_report = direct_context
     if any(segment["strategy"] == "LETTERBOX" for segment in plan["segments"]):
         background_analysis = detect_stable_black_bars(
             ffmpeg, video, destination, float(plan["source_duration_s"]),
@@ -414,15 +543,34 @@ def main():
             "background_crop": {"x": 0, "y": 0, "width": int(plan["source_width"]), "height": int(plan["source_height"])},
             "foreground_crop_applied": False,
         }
-    render(ffmpeg, source_probe, video, plan, output_path, output_width, output_height, fps, background_analysis)
+    render(
+        ffmpeg, render_probe, render_video, render_plan, output_path,
+        output_width, output_height, fps, background_analysis,
+        video_preset="slow" if args.mode == "final" else "medium",
+        video_crf=16 if args.mode == "final" else 20,
+    )
     output_probe = probe_media(ffprobe, output_path)
     validate_rendered_media(
-        output_probe, output_width, output_height, plan["source_duration_s"], fps,
-        any(stream.get("codec_type") == "audio" for stream in source_probe.get("streams", [])),
+        output_probe, output_width, output_height, expected_duration, fps,
+        any(stream.get("codec_type") == "audio" for stream in render_probe.get("streams", [])),
     )
     duration = float(output_probe.get("format", {}).get("duration") or 0.0)
     make_contact_sheet(ffmpeg, output_path, contact_path, duration, args.mode)
-    write_json(probe_path, {"source": source_probe, "output": output_probe, "plan": str(plan_path), "letterbox_background": background_analysis})
+    write_json(probe_path, {
+        "planning_source": source_probe,
+        "render_source": render_probe,
+        "direct_render": bool(direct_context),
+        "encoding": {
+            "video_codec": "libx264",
+            "preset": "slow" if args.mode == "final" else "medium",
+            "crf": 16 if args.mode == "final" else 20,
+            "pixel_format": "yuv420p",
+        },
+        "extraction_report": str(extraction_report) if extraction_report else None,
+        "output": output_probe,
+        "plan": str(plan_path),
+        "letterbox_background": background_analysis,
+    })
     write_summary(summary_path, args.mode, plan, video, output_path, output_probe, contact_path)
     if args.mode == "preview":
         review_path, question_path, review_page = open_vertical_review(

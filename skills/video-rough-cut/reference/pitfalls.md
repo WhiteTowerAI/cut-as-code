@@ -46,18 +46,19 @@ The traps that cost real time on the first run. Read before starting.
 - **`atempo`, never `asetrate`, for audio.** `atempo` changes tempo and preserves pitch;
   `asetrate` (or naive resampling) chipmunks/deepens the voice. `atempo` only accepts
   0.5–2.0 per instance — `cut_render.py` chains it for factors outside that, but the
-  default 0.9–1.5 clamp stays well inside one instance.
+  default 1.0–1.3 clamp stays well inside one instance.
 - **Normalize per input before concat.** Different `speed` values give different frame
   cadence; without per-input `fps`/`settb`/`aresample`+`asetpts` the concat filter can
   glitch or drift A/V at joins. `cut_render.py` does this only on the varispeed path and
   keeps the original graph untouched when every speed is 1.0 (no regression).
-- **Don't over-flatten.** Normalizing every segment exactly to target kills natural
-  rhythm and makes joins audibly "pumpy". The deadband (leave in-band pace alone) + the
-  0.9–1.5 clamp + the short-segment floor exist for this — widen the deadband or lower
-  max_speed before reaching for a bigger correction.
+- **Don't over-flatten.** Normalizing every render segment independently to a target kills
+  natural rhythm and makes joins audibly "pumpy". `assign_speed.py` instead groups segments
+  by `decision_ref`, moves out-of-band blocks only to the nearest deadband edge, clamps to
+  1.0–1.3, and limits adjacent decision blocks to a 0.08x speed delta. Widen the deadband
+  or lower `max_speed` before reaching for a bigger correction.
 - **WPM is wrong for CJK.** Chinese/Japanese/Korean have no word spaces; Whisper emits
   per-char tokens, so words/min is meaningless. `assign_speed.py` auto-detects CJK
-  (transcript `language` + char scan) and switches to chars/min with a CJK target band.
+  (transcript `language` + char scan) and switches to chars/min with a CJK deadband.
 - **Verify sync on a multi-segment clip, not a single one.** Small per-segment duration
   quantization can accumulate across many concat inputs. The A/V-duration check on the
   full cut is the real test — confirmed within ~1ms across varied-speed segments, but

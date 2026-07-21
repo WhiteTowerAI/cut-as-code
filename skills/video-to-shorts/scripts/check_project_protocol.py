@@ -8,6 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import extract_shorts
+import boundary_refine
 import candidates
 import plan as shorts_plan
 import prepare_transcript
@@ -43,6 +44,51 @@ def timeline_fixture():
             },
         ],
     }
+
+
+def check_boundary_release_guard():
+    transcript = {
+        "duration": 3.0,
+        "segments": [{
+            "start": 0.2,
+            "end": 1.4,
+            "text": "complete. next",
+            "words": [
+                {"start": 0.2, "end": 1.0, "word": " complete."},
+                {"start": 1.1, "end": 1.4, "word": " next"},
+            ],
+        }],
+    }
+    refined = boundary_refine.refine_short_boundary(
+        {"short_id": "short-release", "start_time": 0.2, "end_time": 1.0},
+        transcript,
+        media_duration=3.0,
+        snap_to_phrases=False,
+    )
+    assert refined["content_end_time"] == 1.0
+    assert refined["refined_end_time"] == 1.3
+    assert refined["media_tail_after_content_end_s"] == 0.3
+    assert "RAW_END_PROTECTED_BY_RELEASE_HANDLE" in refined["reasons"]
+    assert "TAIL_OVERLAP_ALLOWED_FOR_FINAL_WORD_RELEASE" in refined["warnings"]
+
+    keep_spans = [{"start_time": 0.2, "end_time": 1.3}]
+    remapped = extract_shorts.remap_transcript(
+        transcript,
+        {"short_id": "short-release"},
+        Path("source.mp4"),
+        Path("transcript.json"),
+        keep_spans,
+        1.1,
+        refined["content_start_time"],
+        refined["content_end_time"],
+    )
+    words = [
+        word["word"].strip()
+        for segment in remapped["segments"]
+        for word in segment["words"]
+    ]
+    assert words == ["complete."]
+    assert extract_shorts.map_source_time_to_output(keep_spans, 1.0) == 0.8
 
 
 def transcript_fixture():
@@ -320,6 +366,80 @@ def check_media_integration():
         )
 
 
+def check_direct_vertical_rendering():
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        source = root / "source.mp4"
+        subprocess.run([
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+            "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=30000/1001:duration=4",
+            "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=4",
+            "-shortest", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac",
+            str(source),
+        ], check=True)
+        keep_spans = [
+            {"start_time": 0.5, "end_time": 1.5},
+            {"start_time": 2.0, "end_time": 3.0},
+        ]
+        horizontal = root / "horizontal.mp4"
+        subprocess.run(
+            extract_shorts.build_extract_command(
+                "ffmpeg", source, horizontal, keep_spans, has_audio=True,
+            ),
+            check=True,
+            capture_output=True,
+        )
+        report_path = root / "extraction-report.json"
+        write_json(report_path, {
+            "schema_version": "short-extraction-report.v2",
+            "source_video": str(source.resolve()),
+            "keep_spans": keep_spans,
+            "outputs": {"horizontal_video": str(horizontal.resolve())},
+        })
+        horizontal_metadata = vertical_plan.probe_video("ffprobe", horizontal)
+        raw_plan = {
+            "target_aspect_ratio": "9:16",
+            "strategy": "STATIC_CROP",
+            "segments": [{
+                "start_time": 0.0,
+                "end_time": horizontal_metadata["duration_s"],
+                "strategy": "STATIC_CROP",
+                "content_type": "PRESENTER",
+                "crop_x": 110,
+                "crop_y": 0,
+                "crop_width": 100,
+                "crop_height": 178,
+                "reason": "Synthetic subject remains inside a stable crop.",
+            }],
+            "visual_evidence": [],
+            "warnings": [],
+        }
+        plan = vertical_plan.validate_plan(raw_plan, horizontal, horizontal_metadata)
+        vertical_plan.bind_direct_render(
+            plan, horizontal, horizontal_metadata, source, report_path, "ffprobe",
+        )
+        context = render_vertical.direct_render_context(plan, horizontal, "ffprobe")
+        render_source, source_probe, render_plan, mapped_duration, bound_report = context
+        assert render_source == source.resolve()
+        assert bound_report == report_path.resolve()
+        assert mapped_duration == 2.0
+        assert [
+            (segment["start_time"], segment["end_time"])
+            for segment in render_plan["segments"]
+        ] == [(0.5, 1.5), (2.0, 3.0)]
+        output = root / "vertical-direct.mp4"
+        render_vertical.render(
+            "ffmpeg", source_probe, render_source, render_plan, output,
+            plan["output_width"], plan["output_height"], plan["source_fps"],
+            {"background_crop": {"x": 0, "y": 0, "width": 320, "height": 180}},
+        )
+        output_probe = render_vertical.probe_media("ffprobe", output)
+        render_vertical.validate_rendered_media(
+            output_probe, plan["output_width"], plan["output_height"],
+            mapped_duration, plan["source_fps"], True,
+        )
+
+
 def check_project_candidate_binding():
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
@@ -543,19 +663,23 @@ def check_documented_review_workflow():
 
 
 def main():
+    check_boundary_release_guard()
     check_exact_excerpt()
     check_program_transcript()
     check_delegated_reviews()
     check_canonical_plan_and_extraction_command()
     check_media_integration()
+    check_direct_vertical_rendering()
     check_project_candidate_binding()
     check_workflow_ui()
     check_documented_review_workflow()
+    print("[shorts-protocol] boundary release guard passed")
     print("[shorts-protocol] exact word excerpt passed")
     print("[shorts-protocol] program transcript passed")
     print("[shorts-protocol] delegated reviews passed")
     print("[shorts-protocol] canonical plan and seeked extraction passed")
     print("[shorts-protocol] horizontal and vertical media integration passed")
+    print("[shorts-protocol] direct-source vertical rendering passed")
     print("[shorts-protocol] project candidate bindings passed")
     print("[shorts-protocol] documented review workflow passed")
 
