@@ -4,45 +4,28 @@
   <strong>The open skill stack for agentic video editing.</strong>
 </p>
 
-## See it in action
+agent-cut turns video editing into an inspectable, code-driven workflow. The agent proposes and records editing decisions as readable files; you review the evidence, approve the work, and then render the final videos.
 
-```text
-You: Understand this footage, propose the edits, and show me something
-     I can review before rendering the final videos.
+## Demos
 
-Agent:
-     ✓ Probed the source media
-     ✓ Generated a word-level transcript
-     ✓ Wrote readable editing decisions
-     ✓ Created stills, contact sheets, and short previews
-     ✓ Rendered the approved main delivery
-     ✓ Selected and extracted short-form moments
-     ✓ Reframed the approved shorts for vertical delivery
-     ✓ Added captions and content cards to the vertical shorts
-     ✓ Verified the final outputs
-```
+### Raw podcast edit
 
-agent-cut turns video editing into an inspectable, code-driven workflow.
-
-The agent proposes and records editing decisions. You review the evidence, approve the work, and then render the final videos.
-
-### Complete long-form workflow
-
-A complete agent-driven editing workflow using an approximately two-hour horizontal video.
-
-**Source footage:** [Watch the original video on YouTube](https://www.youtube.com/watch?v=tnBQmEqBCY0&t=67s)
+The agent studied the footage, cut a tighter edit, then added captions and content cards with graphic motion.
 
 [![Watch the complete agent-cut workflow](https://img.youtube.com/vi/YVmCi59aBPY/maxresdefault.jpg)](https://youtu.be/YVmCi59aBPY)
 
-The final cut was created with `//video-rough-cut`, `//video-add-captions`, and `//video-add-content-cards`.
+*Click to view on YouTube.*
 
-### Long-form video to vertical shorts
+**Original video:** [Elon Musk : How to Build the Future](https://www.youtube.com/watch?v=tnBQmEqBCY0&t=67s)
 
-agent-cut first finds and extracts self-contained short-form moments from the long-form program.
+**Prompt:**
+```text
+For [video-path], use /video-understand, /video-rough-cut, /video-add-captions, and /video-add-content-cards.
+```
 
-The approved horizontal shorts are then reframed for vertical delivery. Captions and content cards are added only after the vertical versions have been created.
+### 2h video to shorts
 
-**Source footage:** [Watch the original video on YouTube](https://www.youtube.com/watch?v=wSp6AiNIrsY)
+The agent found self-contained moments in the long-form program, extracted them as horizontal shorts, reframed the approved picks for vertical delivery, then added captions and content cards.
 
 <table>
   <tr>
@@ -75,59 +58,37 @@ The approved horizontal shorts are then reframed for vertical delivery. Captions
   </tr>
 </table>
 
-Each short follows the same reviewable workflow:
+**Original video:** [Jensen Huang: NVIDIA GTC Taipei 2026 Keynote](https://www.youtube.com/watch?v=wSp6AiNIrsY)
 
+**Prompt:**
 ```text
-approved base program
-        |
-        v
-select short-form moment
-        |
-        v
-extract horizontal short
-        |
-        v
-reframe for vertical delivery
-        |
-        v
-add captions
-        |
-        v
-add content cards
-        |
-        v
-verify final vertical short
+For [video-path], use /video-understand, /video-to-shorts, /video-add-captions, /video-add-content-cards.
 ```
 
-### Original vs. color graded
+### Color grading
 
-This side-by-side demo shows the original footage and the selected color grade on the same timeline.
-
-**Source footage:** [Watch the original video on YouTube](https://www.youtube.com/watch?v=BBJtM_s0HKE)
+The agent assessed the footage, generated named looks, then rendered a side-by-side comparison of the original and the selected grade on the same timeline.
 
 [![Watch the original vs. color-graded comparison](https://img.youtube.com/vi/dF2vhhrf5lI/maxresdefault.jpg)](https://youtu.be/dF2vhhrf5lI)
 
-The comparison contains two synchronized 16:9 views: the original footage on one side and the graded result on the other.
+*Click to view on YouTube.*
+
+**Original video:** [DJI MAVIC PRO 2 Ungraded Footage to practice grading](https://www.youtube.com/watch?v=BBJtM_s0HKE)
+
+**Prompt:**
+```text
+For [video-path], use /video-color-grade, and /video-edit-compare.
+```
 
 ## Why agent-cut?
 
-agent-cut aims to make video editing as simple as possible.
+Timeline editors such as Premiere Pro and CapCut are powerful but complex and time-consuming. agent-cut takes a different approach: it uses the coding ability of AI models so editing tasks can be handled by agents, much like software development. Instead of clicking through timelines, you let agents inspect media, write edit plans, generate review artifacts, run renders, and refine iteratively.
 
-Timeline editors such as Premiere Pro and CapCut are powerful, but they can also be complex and time-consuming. agent-cut takes a different approach: it uses the coding ability of AI models so that editing tasks can be handled by agents, much like software development.
-
-Instead of clicking through complex timelines, humans can let agents inspect and search media, write edit plans, generate review artifacts, run renders, and refine the result iteratively.
-
-- **Make video editing agent-friendly.** Agents can trim, retime, crop, color grade, caption, add graphics, extract shorts, and export videos through code instead of manual timeline clicks.
-
-- **Let agents understand raw media.** agent-cut provides reusable tools for probing media, generating word-level transcripts, analyzing speech, finding key moments, and identifying material that may need to be removed.
-
-- **Keep editing decisions readable.** Cuts, grades, captions, cards, and shorts are represented by inspectable JSON and Markdown artifacts that can be reviewed, diffed, revised, and rendered again.
-
-- **Bring polished motion into the workflow.** HyperFrames and code-based renderers let agents create titles, lower thirds, statistics, captions, overlays, and motion graphics within the same workflow.
-
+- **Agent-friendly editing.** Agents trim, retime, crop, color grade, caption, add graphics, extract shorts, and export through code instead of manual clicks — working from reusable tools for probing media, transcribing, analyzing speech, and finding key moments.
+- **Readable decisions.** Cuts, grades, captions, cards, and shorts are inspectable JSON and Markdown that can be reviewed, diffed, revised, and rendered again.
+- **Polished motion.** HyperFrames and code-based renderers create titles, lower thirds, statistics, captions, overlays, and motion graphics in the same workflow.
 - **Review before delivery.** Agents generate stills, contact sheets, boundary reels, and short previews before committing to an expensive full render.
-
-- **Keep the workflow composable.** Skills can be used independently or combined according to the needs of each project. There is no mandatory global pipeline.
+- **Composable.** Skills work independently or combined. There is no mandatory global pipeline.
 
 ## Quick Start
 
@@ -148,7 +109,7 @@ ffprobe -version
 python -c "import faster_whisper"
 ```
 
-Individual skills may require additional dependencies. Read the skill's `SKILL.md` before running its scripts.
+Individual skills may need additional dependencies — read the skill's `SKILL.md` before running its scripts.
 
 ### 3. Initialize a video project
 
@@ -163,7 +124,7 @@ python "$Repo\skills\video-understand\scripts\init_project.py" `
 Set-Location $Project
 ```
 
-This creates the human-facing `input/`, `review/`, and `final/` directories, together with the machine-facing project manifest, timeline, evidence, and cache files under `work/`.
+This creates the human-facing `input/`, `review/`, and `final/` directories, plus the machine-facing manifest, timeline, evidence, and cache files under `work/`.
 
 ### 4. Build the shared evidence layer
 
@@ -242,13 +203,11 @@ python "$Repo\skills\video-edit-compare\scripts\make_compare.py" `
 
 ## Skills
 
-Each directory under `skills/` is a self-contained agent skill.
-
-Its `SKILL.md` is both the agent playbook and the specification for that skill.
+Each directory under `skills/` is a self-contained agent skill. Its `SKILL.md` is both the agent playbook and the specification for that skill. Skills are optional and composable — a project uses only the operations it needs.
 
 | Skill | Purpose |
 |---|---|
-| `video-understand` | Probe media, generate a word-level transcript, analyze speech, and build reusable evidence for downstream editing skills. |
+| `video-understand` | Probe media, generate a word-level transcript, analyze speech, and build reusable evidence for downstream skills. |
 | `video-rough-cut` | Create reviewed keep/drop decisions, generate the canonical timeline, render a compact first cut, and verify its boundaries. |
 | `video-color-grade` | Assess footage, generate named looks, review the alternatives, record a selection, and bake or apply a portable LUT. |
 | `video-add-captions` | Render preset-driven, word-timed captions with optional karaoke highlighting. |
@@ -256,21 +215,9 @@ Its `SKILL.md` is both the agent playbook and the specification for that skill.
 | `video-to-shorts` | Find and extract approved horizontal shorts, then optionally create reviewed 9:16 vertical deliveries. |
 | `video-edit-compare` | Compare the original source with the actual final delivery on the original source clock. |
 
-Skills are optional and composable.
-
-A project can:
-
-- analyze a video without editing it;
-- add captions without creating a rough cut;
-- color grade a full-length video;
-- combine a rough cut, grade, captions, and content cards;
-- create horizontal shorts without producing vertical versions;
-- create vertical shorts and package them with their own captions and content cards;
-- compare the original source against the actual final delivery.
-
 ## How it works
 
-agent-cut separates the reusable base edit from the final packaging applied to each delivery.
+agent-cut separates the reusable base edit from the packaging applied to each delivery. Every operation is optional: a project can analyze and grade without a rough cut, caption without cards, produce only horizontal shorts, or add captions and cards to vertical shorts after reframing. Creating or revising shorts never forces the main delivery to re-render.
 
 ```text
 input/original-video.mp4
@@ -313,93 +260,27 @@ input/original-video.mp4
                                    final vertical shorts
 ```
 
-Every operation is optional.
+1. **Understand the source once.** `video-understand` builds reusable evidence — media metadata, a word-level transcript, objective speech analysis, and evidence-backed semantic understanding. Downstream skills consume the same evidence instead of re-interpreting the source.
+2. **Create an optional base edit.** Apply a rough cut, color grade, both, or neither. `video-rough-cut` is used only when content needs to be removed, shortened, or retimed. The result is an approved base program.
+3. **Package the main delivery.** The main video can optionally receive captions and then content cards, in that order.
+4. **Create derivative shorts.** Shorts start from the approved base program, not from a version that already carries the main delivery's captions and cards — so each short uses caption placement, card timing, and layouts designed for the vertical frame. Order: select moments → extract horizontal → reframe vertical → captions → content cards → verify.
+5. **Review before rendering.** Each operation produces focused artifacts (stills, contact sheets, candidate summaries, timeline maps, boundary reels, previews) for review before the next step.
+6. **Render and verify.** Approved operations render in one coordinated pass, and results are checked against the plans. Success is never declared from JSON or logs alone — final videos must be visually or mechanically verified.
 
-For example:
+### One coordinated final render
 
-- a project can analyze and color grade a video without creating a rough cut;
-- a project can add captions without adding content cards;
-- a project can produce only horizontal shorts;
-- a project can turn approved horizontal shorts into vertical videos;
-- vertical shorts can receive their own captions and content cards after reframing;
-- creating or revising shorts does not need to change the final main delivery.
-
-### 1. Understand the source once
-
-`video-understand` creates reusable evidence for the project:
-
-- media metadata;
-- a word-level transcript;
-- objective speech analysis;
-- evidence-backed semantic understanding.
-
-Downstream skills consume the same evidence instead of independently interpreting the source every time.
-
-### 2. Create an optional base edit
-
-The project may apply a rough cut, color grade, both, or neither.
-
-`video-rough-cut` is used only when the source needs content removed, shortened, or retimed. It is not a mandatory step for every long-form video.
-
-The result is an approved base program that can be used by the main delivery and derivative workflows.
-
-### 3. Package the main delivery
-
-The main video can optionally receive:
-
-1. captions;
-2. content cards.
-
-When both are used, captions are prepared first and content cards are added afterward.
-
-### 4. Create derivative shorts
-
-The shorts workflow starts from the approved base program rather than from a version that already contains the main delivery's captions and content cards.
-
-The order is:
-
-```text
-select moments
-→ extract horizontal shorts
-→ create vertical versions
-→ add captions
-→ add content cards
-→ verify final shorts
-```
-
-This allows each short to use caption placement, card timing, and graphic layouts designed specifically for the vertical frame.
-
-### 5. Review before rendering
-
-Each operation produces focused review artifacts before the final delivery:
-
-- still images;
-- contact sheets;
-- candidate summaries;
-- timeline maps;
-- boundary reels;
-- short preview videos.
-
-The user or an explicitly delegated agent reviews these artifacts before approving the next step.
-
-### 6. Render and verify
-
-Approved operations are rendered, and the resulting media is checked against the plans and review evidence.
-
-The workflow does not declare success based only on generated JSON or logs. Final videos must also be visually or mechanically verified.
+Approved skills do not repeatedly export full-length videos. Each contributes only what it owns — `video-rough-cut` timing and speed, `video-color-grade` color instructions, `video-add-captions` the caption overlay, `video-add-content-cards` the graphics. agent-cut validates dependencies, combines the contributions into one render plan, and produces the main delivery in a single pass. Shorts remain separate derivative deliveries, prepared and verified independently.
 
 ## Project Model
 
-agent-cut does not enforce one fixed global editing pipeline.
-
-Skills declare their dependencies and contributions, and projects use only the operations they need.
+agent-cut does not enforce one fixed global pipeline. Skills declare their dependencies and contributions, and projects use only the operations they need. Only directories for selected operations need to exist.
 
 ```text
 my-video-project/
 |-- START-HERE.md
-|-- input/
+|-- input/                     # original user-provided media
 |   `-- original-video.mp4
-|-- review/
+|-- review/                    # summaries, stills, contact sheets, previews
 |   |-- video-understanding/
 |   |-- rough-cut/
 |   |-- color-grade/
@@ -407,12 +288,12 @@ my-video-project/
 |   |-- content-cards/
 |   |-- shorts/
 |   `-- edit-compare/
-|-- final/
+|-- final/                     # main delivery and derivative shorts
 |   |-- final-video.mp4
 |   `-- shorts/
 |       |-- short-001-horizontal.mp4
 |       `-- short-001-vertical.mp4
-`-- work/
+`-- work/                      # manifests, plans, outputs, evidence
     |-- project.json
     |-- timeline.json
     |-- understand/
@@ -423,157 +304,43 @@ my-video-project/
     |-- shorts/
     |-- edit-compare/
     |-- render/
-    `-- cache/
+    `-- cache/                 # disposable, regenerable files
 ```
 
-Only directories for selected operations need to exist.
+Durable editing decisions and approval records must never live only in `work/cache/`.
 
-Durable decisions and review records remain outside `work/cache/`.
-
-### Shared manifest
-
-`work/project.json` is the shared project manifest.
-
-It records:
-
-- available sequences;
-- active operations and dependencies;
-- operation status;
-- integer revision numbers;
-- `based_on` revision checks;
-- review outputs;
-- render contributions;
-- the final render path and status.
-
-Revision checks prevent an operation from silently rendering against stale upstream decisions.
-
-### Canonical timeline
-
-`work/timeline.json` is the canonical source-to-program mapping.
-
-Time values use seconds, and ranges are half-open:
-
-```text
-[start_s, end_s)
-```
-
-The V1 timeline model intentionally stays small and inspectable. It supports chronological clips from one source with linear positive speed.
-
-It does not require OpenTimelineIO.
-
-### Human-facing and machine-facing files
-
-- `input/` contains the original user-provided media.
-- `review/` contains summaries, stills, contact sheets, and previews.
-- `final/` contains the main delivery and derivative shorts.
-- `work/` contains manifests, plans, operation outputs, and machine-facing evidence.
-- `work/cache/` contains disposable files that can be regenerated.
-- Durable editing decisions and approval records must not live only in the cache.
-
-### Main delivery and derivatives
-
-The main sequence produces:
-
-```text
-final/final-video.mp4
-```
-
-Shorts are separate derivative deliveries:
-
-```text
-final/shorts/
-```
-
-Creating, reframing, captioning, or packaging a short does not need to change or re-render the main delivery.
-
-## One coordinated final render
-
-Approved skills do not repeatedly export separate full-length videos.
-
-Instead, each skill contributes only the instructions or assets it owns:
-
-- `video-rough-cut` contributes timing and speed decisions;
-- `video-color-grade` contributes color-processing instructions;
-- `video-add-captions` contributes the caption overlay;
-- `video-add-content-cards` contributes titles, lower thirds, statistics, and other graphics.
-
-agent-cut validates their dependencies, combines the approved contributions into one render plan, and produces the main delivery in one coordinated render.
-
-This avoids repeatedly re-encoding the complete video after every editing operation.
-
-Shorts remain separate derivative deliveries. Their extraction, vertical framing, captions, and content cards are prepared and verified independently from the main delivery.
+- **`work/project.json`** is the shared manifest: available sequences, active operations and dependencies, operation status, integer revision numbers, `based_on` revision checks, review outputs, render contributions, and the final render path and status. Revision checks prevent an operation from silently rendering against stale upstream decisions.
+- **`work/timeline.json`** is the canonical source-to-program mapping. Time values are in seconds and ranges are half-open `[start_s, end_s)`. The V1 model stays small and inspectable — chronological clips from one source with linear positive speed, no OpenTimelineIO required.
 
 ## How we compare
 
 ### vs. OpusClip
 
-[OpusClip](https://www.opus.pro/) is a hosted AI clipping product focused on quickly turning long videos into social-media clips.
+[OpusClip](https://www.opus.pro/) is a hosted AI clipping product focused on quickly turning long videos into social clips, with a limited free tier and paid credit-based plans. agent-cut prioritizes control, inspectability, composability, and repeatability instead:
 
-It provides a limited free tier, while higher processing capacity and commercial workflows use paid credit-based plans.
-
-agent-cut takes a different approach:
-
-- it is an open, code-driven skill stack rather than a hosted clipping service;
-- editing decisions are stored as readable JSON and Markdown artifacts;
-- source media and project files can remain in the user's own environment;
-- users can inspect and revise selected boundaries before rendering;
-- its scope includes understanding, rough cutting, color grading, captions, content cards, shorts, and final comparison—not only long-video-to-short-video conversion;
-- workflows can be extended by changing or adding skills instead of waiting for a hosted service to expose a new option.
-
-OpusClip prioritizes speed and convenience.
-
-agent-cut prioritizes control, inspectability, composability, and repeatability.
+- an open, code-driven skill stack rather than a hosted service;
+- editing decisions stored as readable JSON and Markdown, with media and project files kept in your own environment;
+- selected boundaries can be inspected and revised before rendering;
+- scope covers understanding, rough cutting, color grading, captions, content cards, shorts, and final comparison — not only long-to-short conversion;
+- workflows extend by changing or adding skills, not by waiting for a hosted service.
 
 ### vs. Premiere Pro and CapCut
 
-Premiere Pro and CapCut are visual timeline editors designed primarily for direct human operation.
-
-They provide powerful interfaces, but complex projects often require repeated clicking, timeline navigation, parameter adjustment, and manual export management.
-
-agent-cut represents the edit as readable files and executable operations:
-
-- agents inspect the media;
-- humans or delegated agents make editorial decisions;
-- scripts perform timing and rendering precision;
-- review artifacts make decisions visible before delivery;
-- the project can be revised and rendered again from the same recorded plans.
-
-agent-cut is not trying to reproduce every timeline-editor control.
-
-It is designed to make repeatable video-editing workflows easier for coding agents to understand and execute.
+Premiere Pro and CapCut are visual timeline editors built for direct human operation. They are powerful, but complex projects require repeated clicking, timeline navigation, parameter adjustment, and manual export management. agent-cut instead represents the edit as readable files and executable operations: agents inspect the media, humans or delegated agents make editorial decisions, scripts handle timing and rendering precision, and review artifacts make decisions visible before delivery. It does not try to reproduce every timeline-editor control — it makes repeatable workflows easier for coding agents to execute.
 
 ### vs. one-off coding-agent video workflows
 
-General-purpose AI models can already write scripts, assemble tools, and create custom video workflows for a specific project.
-
-Recent model demonstrations, including [Claude Fable 5](https://www.anthropic.com/claude/fable), show how capable a coding agent can be when it is allowed to inspect assets, generate code, and run media tools.
-
-agent-cut is not a competing AI model.
-
-It is the reusable workflow layer that an AI model or coding agent can operate.
-
-Instead of rebuilding a new one-off pipeline for every video, agent-cut provides:
-
-- reusable skill contracts;
-- shared project and timeline formats;
-- readable editorial plans;
-- explicit review checkpoints;
-- reproducible render instructions;
-- verification requirements;
-- composable operations that can be reused across projects.
-
-A capable model supplies reasoning and execution.
-
-agent-cut supplies the video-editing structure.
+A capable model can already write scripts and assemble custom video workflows for a single project — recent demonstrations like [Claude Fable 5](https://www.anthropic.com/claude/fable) show how much a coding agent can do. agent-cut is not a competing model; it is the reusable workflow layer a model operates. Instead of rebuilding a one-off pipeline per video, it supplies reusable skill contracts, shared project and timeline formats, readable editorial plans, explicit review checkpoints, reproducible render instructions, and verification requirements. The model supplies reasoning and execution; agent-cut supplies the video-editing structure.
 
 ## Roadmap
 
-The roadmap describes planned work. Items in this section should not be interpreted as features that are already available.
+Planned work — these items are not yet available.
 
 - [ ] Publish the complete long-form workflow demo on YouTube.
 - [ ] Publish the four vertical-short demos.
 - [ ] Publish the original-versus-color-graded comparison.
-- [ ] Make the full shorts workflow—from horizontal extraction through vertical captions and content cards—a first-class project operation.
+- [ ] Make the full shorts workflow — horizontal extraction through vertical captions and content cards — a first-class project operation.
 - [ ] Make skills easier to install and update.
 - [ ] Add more reproducible example projects and review artifacts.
 - [ ] Continue expanding the collection of composable video-editing skills.
+
