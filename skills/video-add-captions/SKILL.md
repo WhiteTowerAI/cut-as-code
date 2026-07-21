@@ -46,6 +46,9 @@ work/cache/captions/
 `-- overlay-frames/frame_000001.png ...
 review/05-captions/
 |-- captions.srt
+|-- captions-style-review-<UUID>.html
+|-- captions-style-review.html
+|-- captions-review.html
 |-- preview-early.png
 |-- preview-middle.png
 |-- preview-late.png
@@ -103,8 +106,9 @@ Two honest modes share the same hash-bound state machine:
   with non-empty rationales.
 
 Human commands fail in agent mode and agent commands fail in human mode. Both
-modes require four existing source-backed images before approval. Any source,
-plan, selection, override, or preview change invalidates the old approval.
+modes require four existing source-backed images before approval. A change to the
+source, plan, timeline, style, override, project metadata, review page, or evidence
+invalidates approval; rebuild the affected artifacts and review them again.
 
 ## Canonical Workflow
 
@@ -138,29 +142,91 @@ python "$SkillRoot\scripts\build_captions.py" `
   --max-chars 42 --max-lines 2 --max-dur 6 --gap 0.6
 ```
 
-Start one decision mode. Human mode opens the maintained offline gallery:
+Start one decision mode. For human mode, publish the maintained offline gallery
+into the project review directory without asking the user to locate a file:
 
 ```powershell
-node "$SkillRoot\scripts\caption_interaction.mjs" start `
-  --state $Receipt --source $SourceVideo --captions $Plan
+$StartOutput = node "$SkillRoot\scripts\caption_interaction.mjs" start `
+  --state $Receipt --source $SourceVideo --captions $Plan `
+  --review-dir $Review --no-open true
+$StartOutput | Write-Host
 ```
 
-Print the command output, wait for the user, and pass the response unchanged to
-`select`. Never infer or simulate the response.
+`start` prints the authoritative `captions-style-review-<UUID>.html` project page
+path and the fixed question. `captions-style-review.html` is a non-authoritative
+latest convenience alias only. The Agent must take the UUID path printed after
+`Caption style review:`, assign that exact path to `$StyleReviewPage`, and open it
+with the native command for the host OS:
 
-For explicit delegation:
+Windows PowerShell:
 
 ```powershell
-node "$SkillRoot\scripts\caption_interaction.mjs" start `
+$StyleReviewPage = "<authoritative UUID page path printed after Caption style review:>"
+Start-Process -FilePath (Resolve-Path $StyleReviewPage)
+```
+
+macOS:
+
+```bash
+open "$StyleReviewPage"
+```
+
+Linux:
+
+```bash
+xdg-open "$StyleReviewPage"
+```
+
+If opening fails, diagnose the command or path and retry it. Do not ask the user
+to find the page. Present the opened gallery and the fixed question exactly as
+printed, then **Present + STOP**. Do not continue until the human copies the
+structured summary from the page. It has this form:
+
+```text
+Caption style review
+Review: <UUID from the opened page>
+Decision: select
+Choice: pill-yellow
+```
+
+Pass the user's exact summary unchanged to `select --response`. In PowerShell, a
+single-quoted here-string preserves the lines safely:
+
+```powershell
+$StyleResponse = @'
+Caption style review
+Review: <UUID from the opened page>
+Decision: select
+Choice: pill-yellow
+'@
+node "$SkillRoot\scripts\caption_interaction.mjs" select `
+  --state $Receipt --response $StyleResponse
+```
+
+The block above shows the structure; use the user's returned block, including
+their review UUID and choice. Never infer, normalize, or simulate a human
+response.
+
+For explicit delegation, create a separate Agent-mode receipt. Keep the bound
+gallery, suppress the script's Windows-only auto-open, open the authoritative UUID
+page with the matching native command above, and inspect it before choosing:
+
+```powershell
+$StartOutput = node "$SkillRoot\scripts\caption_interaction.mjs" start `
   --state $Receipt --source $SourceVideo --captions $Plan `
+  --review-dir $Review `
   --decision-mode agent `
   --delegation-note "User delegated caption style and preview approval." `
   --no-open true
+$StartOutput | Write-Host
 
 node "$SkillRoot\scripts\caption_interaction.mjs" agent-select `
   --state $Receipt --choice clean `
   --rationale "Conservative readable treatment preserves the talking-head frame."
 ```
+
+Use `agent-select` only after inspecting the bound gallery and record the real
+rationale. Do not manufacture a human summary or use `select` in Agent mode.
 
 Generate a transparent preview composition. The project contains only local GSAP
 and font files and preserves rational FPS in `project-meta.json`:
@@ -181,11 +247,29 @@ two with Pillow:
 ```powershell
 python "$SkillRoot\scripts\build_caption_review.py" `
   --source $SourceVideo --timeline "$Work\timeline.json" --plan $Plan `
-  --project $PreviewProject --cache "$Cache\review-cache" --out $Review
+  --project $PreviewProject --cache "$Cache\review-cache" --out $Review `
+  --interaction-state $Receipt
 ```
 
-Inspect all four images for readability, safe-area placement, clipping, word
-wrapping, and any unwanted pixels in `preview-no-caption.png`. Record them:
+The builder writes `captions-review.html` with the four source-backed images. The
+Agent must open that page with the native command for the host OS; for example,
+set `$EvidenceReviewPage = "$Review\captions-review.html"` and run one of:
+
+```powershell
+Start-Process -FilePath (Resolve-Path $EvidenceReviewPage)
+```
+
+```bash
+open "$EvidenceReviewPage"
+```
+
+```bash
+xdg-open "$EvidenceReviewPage"
+```
+
+If opening fails, diagnose and retry. Inspect all four actual images for
+readability, safe-area placement, clipping, word wrapping, and unwanted pixels in
+`preview-no-caption.png`. Then bind the page and evidence to the receipt:
 
 ```powershell
 $Evidence = @(
@@ -197,12 +281,54 @@ $Evidence = @(
 
 node "$SkillRoot\scripts\caption_interaction.mjs" preview-ready `
   --state $Receipt --project-meta "$PreviewProject\project-meta.json" `
-  --evidence $Evidence
+  --evidence $Evidence --review-page "$Review\captions-review.html" `
+  --timeline "$Work\timeline.json"
 ```
 
-In human mode, show the images, print the command output, and wait. Use `adjust`
-for requested changes and regenerate all evidence. In delegated mode, inspect the
-pixels and record the decision:
+In human mode, present the opened page and its images, then **Present + STOP**.
+The human copies one of these structured summaries from the page:
+
+```text
+Caption preview review
+Review: <UUID from the opened page>
+Decision: approve
+Evidence: early, middle, late, no-caption
+```
+
+```text
+Caption preview review
+Review: <UUID from the opened page>
+Decision: revise
+Changes: Raise captions 20 pixels.
+```
+
+Pass the returned summary unchanged to `confirm --response` or
+`adjust --response`. Quote the multiline response safely in PowerShell:
+
+```powershell
+$PreviewResponse = @'
+Caption preview review
+Review: <UUID from the opened page>
+Decision: approve
+Evidence: early, middle, late, no-caption
+'@
+node "$SkillRoot\scripts\caption_interaction.mjs" confirm `
+  --state $Receipt --response $PreviewResponse
+```
+
+For a `revise` summary, preserve it in `$PreviewResponse` the same way and run:
+
+```powershell
+node "$SkillRoot\scripts\caption_interaction.mjs" adjust `
+  --state $Receipt --response $PreviewResponse
+```
+
+Apply the requested change, then regenerate the preview project, review page, and
+all evidence before presenting the gate again. Never convert human feedback into
+an Agent decision.
+
+In delegated mode, the Agent must inspect the same `captions-review.html` page and
+all four images before recording its own rationale:
 
 ```powershell
 node "$SkillRoot\scripts\caption_interaction.mjs" agent-confirm `
@@ -302,6 +428,7 @@ overrides that decision.
 
 Without `--timeline`, `build_captions.py` still writes the old cue array.
 `generate_caption_project.mjs` accepts that array with the interaction receipt.
+Standalone exact ID and skip responses are legacy compatibility only.
 `composite_caption_overlay.ps1` accepts an overlay video or `frame_%06d.png`
 directory and writes compatible H.264/yuv420p while copying source audio. Use this
 standalone path only when no active operation changes time; canonical projects use
@@ -331,5 +458,5 @@ Also verify:
 - `captions-summary.md` records the selected style, approval mode/rationale,
   evidence, and validation result.
 
-Do not report success from a generated HTML file alone. Inspect real rendered
-pixels and the final delivery.
+HTML generation alone is not success. Inspect actual pixels and the final delivery
+before reporting completion.

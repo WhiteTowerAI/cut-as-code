@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from preview import write_plan_preview_html, write_plan_preview_md
-from review_gate import candidate_review_paths, sha256_file, validate_candidate_review
+from review_gate import candidate_review_paths, load_json_artifact, sha256_file, validate_candidate_review
 from transcript_utils import load_json, overlap_ratio, transcript_duration, write_json
 
 
@@ -238,6 +238,28 @@ def select_candidates(candidates, transcript_duration_s, args, preserve_input_or
     return selected, rejected
 
 
+def require_explicit_selection_survived(selection_policy, rejected):
+    if selection_policy not in ("explicit_user_selection", "explicit_agent_selection") or not rejected:
+        return
+    details = "; ".join(
+        f"{candidate.get('candidate_id', '<unknown>')}: {', '.join(validation.get('errors') or ['REJECTED'])}"
+        for candidate, validation in rejected
+    )
+    fail(f"explicit candidate selection was rejected by deterministic planning: {details}")
+
+
+def load_planning_transcript(review, requested_path, default_path):
+    if review.get("bound_visual_review"):
+        path, data = load_json_artifact(review.get("artifacts", {}).get("transcript"), "transcript")
+        if requested_path is not None and Path(requested_path).resolve() != path:
+            fail(f"--transcript does not match the receipt-bound transcript: {requested_path} != {path}")
+        return path, data
+    path = Path(requested_path).resolve() if requested_path is not None else Path(default_path)
+    if not path.exists():
+        fail(f"transcript.json not found: {path}")
+    return path, load_json(path)
+
+
 def output_paths(short_id):
     directory = f"work/shorts/{short_id}"
     return {
@@ -405,18 +427,20 @@ def run_plan(args):
     out_dir = Path(args.out).resolve()
     review, candidates_path = validate_candidate_review(out_dir)
     selection_policy = review["decision"]["selection_mode"]
-    transcript_path = Path(args.transcript).resolve() if args.transcript else out_dir / "transcript.json"
+    transcript_path, transcript_data = load_planning_transcript(
+        review, args.transcript, out_dir / "transcript.json"
+    )
     if not candidates_path.exists():
         fail(f"shorts_candidates.json not found: {candidates_path}")
-    if not transcript_path.exists():
-        fail(f"transcript.json not found: {transcript_path}")
-    candidates_data = load_json(candidates_path)
+    candidates_data = (
+        load_json_artifact(review["approved_candidates"], "approved candidates", "shorts-candidates.v2")[1]
+        if review.get("bound_visual_review") else load_json(candidates_path)
+    )
     if candidates_data.get("schema_version") != "shorts-candidates.v2":
         fail("plan.py requires shorts-candidates.v2")
     raw_candidates = candidates_data.get("candidates")
     if not isinstance(raw_candidates, list):
         fail("shorts_candidates.json must contain a candidates array")
-    transcript_data = load_json(transcript_path)
     candidates = [normalize_candidate(item, index, transcript_data) for index, item in enumerate(raw_candidates, 1)]
     selected, rejected = select_candidates(
         candidates,
@@ -424,6 +448,7 @@ def run_plan(args):
         args,
         preserve_input_order=selection_policy in ("explicit_user_selection", "explicit_agent_selection"),
     )
+    require_explicit_selection_survived(selection_policy, rejected)
     plan = build_plan(selected, rejected, candidates_path, candidates_data, transcript_path)
     plan["metadata"]["candidate_selection"] = selection_policy
     plan["metadata"]["delivery_mode"] = review["decision"]["delivery_mode"]

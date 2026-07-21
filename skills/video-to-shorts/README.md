@@ -10,10 +10,10 @@ The canonical workflow is:
 1. Map `work/understand/transcript.json` through `work/timeline.json`.
 2. Inspect transcript and visual context; author complete candidate moments.
 3. Validate word-exact excerpts and six-dimension scores.
-4. Record a hash-bound human or explicitly delegated agent selection.
+4. Review an interactive candidate page and record a hash-bound human or explicitly delegated agent selection.
 5. Write `work/shorts/shorts-plan.json` with dependency revisions and ranges.
 6. Extract seeked keep ranges into `final/shorts/*-horizontal.mp4`.
-7. Optionally author, preview, approve, and render a deterministic 9:16 plan.
+7. Optionally review an interactive vertical page, approve, and render a deterministic 9:16 plan.
 
 Shorts are recorded as a derived `project.json` operation but are not added to
 the main sequence. They never modify or re-render the main delivery.
@@ -22,7 +22,7 @@ Project outputs are separated by purpose:
 
 - durable decisions and transcripts: `work/shorts/`
 - disposable frames and intermediate media: `work/cache/shorts/`
-- review artifacts: `review/06-shorts/`
+- immutable interactive pages and review-ID-scoped evidence, plus flat latest convenience outputs: `review/06-shorts/`
 - delivered media: `final/shorts/`
 
 Vertical strategies are `STATIC_CROP`, `SCENE_CROP`, `LETTERBOX`, and

@@ -11,6 +11,7 @@ from review_gate import (
     answer_vertical_review_agent,
     open_candidate_review,
 )
+from transcript_utils import load_json
 
 
 def response_text(args):
@@ -21,9 +22,12 @@ def response_text(args):
 
 def run_candidate_open(args):
     review_path, question_path = open_candidate_review(
-        args.out, decision_mode=args.decision_mode, delegation_note=args.delegation_note
+        args.out, decision_mode=args.decision_mode, delegation_note=args.delegation_note,
+        review_out=args.review_out,
     )
     print(f"[video-to-shorts] candidate review: {review_path}")
+    if args.review_out:
+        print(f"[video-to-shorts] authoritative page: {load_json(review_path)['artifacts']['candidate_review_page']['path']}")
     print(f"[video-to-shorts] fixed question: {question_path}")
     print("[video-to-shorts] STOP: show the question to the user and end the current turn")
 
@@ -73,6 +77,7 @@ def build_parser():
     candidate_open.add_argument("--out", required=True)
     candidate_open.add_argument("--decision-mode", choices=("human", "agent"), default="human")
     candidate_open.add_argument("--delegation-note")
+    candidate_open.add_argument("--review-out", help="Build and bind an immutable visual candidate review page.")
     candidate_open.set_defaults(func=run_candidate_open)
 
     candidate_answer = subparsers.add_parser("candidate-answer", help="Record and validate the later candidate-review user response.")

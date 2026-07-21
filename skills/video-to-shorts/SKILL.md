@@ -46,7 +46,9 @@ work/shorts/
 |-- transcript_metadata.json
 |-- candidates.json
 |-- shorts-plan.json
-|-- review/candidate_review.json
+|-- review/
+|   |-- candidate_review.json
+|   `-- approved_candidates.json
 `-- short-001/
     |-- transcript.json
     |-- extraction-report.json
@@ -58,11 +60,25 @@ work/shorts/
 work/cache/shorts/                 # disposable frames/sheets/intermediate media
 
 review/06-shorts/
-|-- candidates.html
+|-- candidates-<review-id>.html              # immutable authoritative page
+|-- candidates-<review-id>-question.md
+|-- assets/candidates-<review-id>/            # immutable start/middle/end frames
+|-- candidates.html                           # non-authoritative latest alias
 |-- candidates-summary.md
 |-- short-001-horizontal.jpg
 |-- short-001-vertical-preview.mp4
 |-- short-001-vertical-contact-sheet.jpg
+|-- short-001-vertical-preview-summary.json
+|-- short-001-vertical-preview-probe.json
+|-- <short-id>-vertical-review-<review-id>.html # immutable authoritative page
+|-- <short-id>-vertical-review-<review-id>-question.md
+|-- <short-id>-vertical-review.html             # non-authoritative latest alias
+|-- <short-id>-vertical-review-assets/
+|   `-- <review-id>/                             # immutable authoritative evidence
+|       |-- preview.mp4                          # absent for REVIEW_REQUIRED
+|       |-- contact-sheet.jpg                    # absent for REVIEW_REQUIRED
+|       |-- preview-summary.json
+|       `-- media-probe.json
 `-- shorts-summary.md
 
 final/shorts/
@@ -151,20 +167,63 @@ and `review/06-shorts/candidates.{html,summary.md}`.
 Candidate selection and delivery mode are one hash-bound gate. Delivery is exactly
 `horizontal_only` or `horizontal_and_vertical`.
 
-Human mode:
+Open the bound interactive page in human mode:
 
 ```powershell
-python "$SkillRoot\scripts\interaction.py" candidate-open --out $ShortsWork
+python "$SkillRoot\scripts\interaction.py" candidate-open --out $ShortsWork --review-out $ShortsReview
 ```
 
-Show the generated question, wait, then record the response unchanged with
-`candidate-answer`. Never simulate it.
+The command prints an authoritative review-ID-scoped page. The receipt binds that page, its
+candidate JSON, transcript, source media, fixed question, and every extracted frame
+by SHA-256. `candidates.html` is only a non-authoritative convenience alias to the
+latest page. Open the printed authoritative path with the current OS native command:
+
+```text
+# Windows PowerShell
+Start-Process (Resolve-Path -LiteralPath "<printed-authoritative-page>")
+# macOS
+open "<printed-authoritative-page>"
+# Linux
+xdg-open "<printed-authoritative-page>"
+# Agent: Present the authoritative page and STOP.
+```
+
+If opening fails, retry the native command and report the failure if it still does
+not open. Do not continue after presenting it. The page starts with all candidate
+checkboxes and both delivery choices initially unselected. The user must select 1-5
+candidates and one delivery mode. The bound page never silently selects candidates.
+
+For approval, copy this exact page-generated structured summary unchanged into
+`candidate-answer`:
+
+```text
+Shorts candidate review
+Review: <review-id>
+Candidates: text_visual/cand-001, text_visual/cand-002
+Delivery: horizontal_and_vertical
+```
+
+For revision, copy this exact page-generated structured summary unchanged:
+
+```text
+Shorts candidate review
+Review: <review-id>
+Decision: revise
+Changes: <non-empty requested changes>
+```
+
+Record the later response without rewriting it:
+
+```powershell
+python "$SkillRoot\scripts\interaction.py" candidate-answer `
+  --out $ShortsWork --response-file "<verbatim-summary-file>"
+```
 
 When the user explicitly delegates decisions:
 
 ```powershell
 python "$SkillRoot\scripts\interaction.py" candidate-open `
-  --out $ShortsWork --decision-mode agent `
+  --out $ShortsWork --review-out $ShortsReview --decision-mode agent `
   --delegation-note "User delegated shorts selection and vertical approval."
 
 python "$SkillRoot\scripts\interaction.py" candidate-agent-approve `
@@ -174,9 +233,13 @@ python "$SkillRoot\scripts\interaction.py" candidate-agent-approve `
   --rationale "The selected range has a self-contained hook, explanation, and payoff."
 ```
 
-Agent mode requires explicit candidate references, delivery mode, and rationale. It
-never writes `user_response`. Human commands fail in agent mode and vice versa.
-Regenerated source/candidate/preview artifacts invalidate approval.
+The Agent opens and inspects the same authoritative page, uses explicit candidate
+references, an explicit delivery mode, and a non-empty rationale. It never writes a
+fake human response or `user_response`. Human and Agent modes are mutually exclusive;
+human answer commands fail in Agent mode and Agent approval commands fail in human
+mode. Receipt verification rechecks review, page and media hashes. Regenerated source,
+candidate, transcript, page, question, frame, or approved-candidate artifacts
+invalidate approval.
 
 ## Canonical Plan
 
@@ -268,15 +331,82 @@ python "$SkillRoot\scripts\render_vertical.py" `
   --out $VerticalWork --review-out $ShortsReview --mode preview
 ```
 
-Inspect the complete preview, contact sheet, dimensions, crop safety, strategy
-transitions, audio, and warnings. Human mode records `vertical-answer`. Delegated
-mode records an honest agent decision:
+The command first writes flat latest convenience outputs named
+`<short-id>-vertical-preview.mp4`, `<short-id>-vertical-contact-sheet.jpg`,
+`<short-id>-vertical-preview-summary.json`, and
+`<short-id>-vertical-preview-probe.json`. It then prints the authoritative
+`<short-id>-vertical-review-<review-id>.html` page. The latest
+`<short-id>-vertical-review.html` alias is non-authoritative convenience only.
+
+The authoritative page and receipt bind immutable review-ID-scoped copies under
+`<short-id>-vertical-review-assets/<review-id>/`: `preview.mp4`,
+`contact-sheet.jpg`, `preview-summary.json`, and `media-probe.json`. Later previews
+may replace the flat convenience outputs without changing an earlier receipt.
+`REVIEW_REQUIRED` stores only `preview-summary.json` and `media-probe.json` in its
+scoped directory because no preview video or contact sheet is rendered.
+
+Open the printed authoritative path with the current OS native command:
+
+```text
+# Windows PowerShell
+Start-Process (Resolve-Path -LiteralPath "<printed-authoritative-page>")
+# macOS
+open "<printed-authoritative-page>"
+# Linux
+xdg-open "<printed-authoritative-page>"
+# Agent: Present the authoritative page and STOP.
+```
+
+If opening fails, retry the native command and report the failure if it still does
+not open. Do not continue after presenting it. Inspect the complete preview,
+contact sheet, all segments and crop/fit decisions, media probe, and every warning. The receipt hashes
+the page, plan, source, preview, contact sheet, preview summary, probe, and fixed
+question.
+
+For human review, copy the page's exact structured summary unchanged into
+`vertical-answer`. The three possible summaries are:
+
+```text
+Shorts vertical review
+Short: <short-id>
+Review: <review-id>
+Decision: approve
+```
+
+```text
+Shorts vertical review
+Short: <short-id>
+Review: <review-id>
+Decision: revise
+Changes: <non-empty requested changes>
+```
+
+```text
+Shorts vertical review
+Short: <short-id>
+Review: <review-id>
+Decision: skip
+```
+
+```powershell
+python "$SkillRoot\scripts\interaction.py" vertical-answer `
+  --out $VerticalWork --response-file "<verbatim-summary-file>"
+```
+
+Delegated mode uses the same page and records an honest Agent decision with a
+non-empty rationale:
 
 ```powershell
 python "$SkillRoot\scripts\interaction.py" vertical-agent-approve `
   --out $VerticalWork `
   --rationale "All sampled scenes preserve the subject and essential information."
 ```
+
+`REVIEW_REQUIRED` offers only `revise` or `skip`; Agent approval is blocked. A newer
+candidate review invalidates an older vertical receipt. Final vertical rendering is
+allowed only after approval. Only approved, hash-matching review media and plans can
+reach final rendering; revision and skip
+never produce a final vertical file.
 
 Formal render revalidates every approved artifact:
 
@@ -326,6 +456,8 @@ the DAG and files; shorts remain outside the main render plan.
 Without `--project-root`, candidates and `shorts-plan.v2` keep their established
 standalone paths and input-relative time. The extractor accepts both plan shapes.
 Legacy `short_XX/source.mp4` vertical workflows and human review commands remain valid.
+Only the legacy unbound text review may use the default top five candidates; the
+bound interactive page always requires explicit selection.
 Standalone fallback transcription uses the canonical `video-understand` transcriber
 and a project-local model cache.
 
@@ -352,5 +484,5 @@ For every delivered short verify:
   under `work/cache/`;
 - `shorts-summary.md` records outputs, decisions, warnings, and checks.
 
-Do not report success from JSON validation alone. Watch the horizontal and vertical
-outputs and inspect their review images/contact sheets.
+Page generation or JSON validation alone is not success. Watch the horizontal and
+vertical outputs and inspect their review images/contact sheets.

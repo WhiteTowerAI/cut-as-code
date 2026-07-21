@@ -225,7 +225,7 @@ def check_delegated_caption_review():
         evidence = []
         for index in range(4):
             path = root / f"preview-{index}.png"
-            path.write_bytes(b"png")
+            Image.new("RGB", (16, 9), (index * 20, 40, 60)).save(path)
             evidence.append(str(path))
         project_meta = root / "project-meta.json"
         project_meta.write_text(
@@ -248,6 +248,7 @@ def check_delegated_caption_review():
         assert rejected.returncode != 0
         assert "agent-confirm" in rejected.stderr
 
+        original_evidence = Path(evidence[0]).read_bytes()
         Path(evidence[0]).write_bytes(b"changed")
         rejected = run(
             "agent-confirm", "--state", state,
@@ -255,7 +256,7 @@ def check_delegated_caption_review():
         )
         assert rejected.returncode != 0
         assert "Preview evidence" in rejected.stderr
-        Path(evidence[0]).write_bytes(b"png")
+        Path(evidence[0]).write_bytes(original_evidence)
 
         run(
             "agent-confirm", "--state", state,
@@ -288,6 +289,7 @@ def check_delegated_caption_review():
         summary.write_bytes(
             b"# Caption Review\r\n\r\n## Approval\r\n\r\n- Style: `stale`\r\n"
         )
+        original_second_evidence = Path(evidence[1]).read_bytes()
         Path(evidence[1]).write_bytes(b"changed")
         rejected = run_generator(
             "--video", source,
@@ -300,7 +302,7 @@ def check_delegated_caption_review():
         )
         assert rejected.returncode != 0
         assert "Preview evidence" in rejected.stderr
-        Path(evidence[1]).write_bytes(b"png")
+        Path(evidence[1]).write_bytes(original_second_evidence)
 
         run_generator(
             "--video", source,
