@@ -13,6 +13,10 @@ on:
       - ".github/workflows/clawhub-publish.yml"
   workflow_dispatch:
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   dry-run:
     if: github.event_name == 'pull_request'
