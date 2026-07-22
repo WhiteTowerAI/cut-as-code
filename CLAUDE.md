@@ -25,7 +25,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-agent-cut is **a stack of agentic video-editing skills**, not an application. Each
+cut-as-code is **a stack of agentic video-editing skills**, not an application. Each
 directory under `skills/<name>/` is a self-contained skill: a `SKILL.md` (the agent
 playbook — read it first), plus `scripts/`, `examples/`, and `reference/`. There is no
 root build, package manifest, lint config, or aggregate test suite. Scripts and skill-local

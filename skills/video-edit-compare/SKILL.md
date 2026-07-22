@@ -1,6 +1,6 @@
 ---
 name: video-edit-compare
-description: Use when a completed Open-Recut delivery needs a strict side-by-side review against its original source, including cuts, varispeed, color grade, and graphics.
+description: Use when a completed cut-as-code delivery needs a strict side-by-side review against its original source, including cuts, varispeed, color grade, and graphics.
 ---
 
 # Video Edit Compare

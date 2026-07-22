@@ -1,10 +1,10 @@
-<h1 align="center">agent-cut</h1>
+<h1 align="center">cut-as-code</h1>
 
 <p align="center">
   <strong>The open skill stack for agentic video editing.</strong>
 </p>
 
-**Agent-cut** turns video editing into an inspectable, code-driven workflow you can drive with AI coding agents like Claude Code, Codex, and OpenClaw. The agent proposes and records editing decisions as readable files; you review them in browser pages and template galleries, approve the work, and then render the final videos — all free, open source (MIT), and with nothing uploaded to a cloud service.
+**Cut-as-code** turns video editing into an inspectable, code-driven workflow you can drive with AI coding agents like Claude Code, Codex, and OpenClaw. The agent proposes and records editing decisions as readable files; you review them in browser pages and template galleries, approve the work, and then render the final videos — all free, open source (MIT), and with nothing uploaded to a cloud service.
 
 - ✂️ **Cut** — reviewed keep/drop decisions and a compact first cut.
 - 🎨 **Color grade** — candidate looks to review, then a baked LUT.
@@ -60,7 +60,7 @@ Original video: [Jensen Huang: NVIDIA GTC Taipei 2026 Keynote](https://www.youtu
 > **Agent:** Displays a few captions and content cards candidates for your review, then delivers the final edit.
 
 <p align="center">
-  <a href="https://youtu.be/YVmCi59aBPY"><img src="https://img.youtube.com/vi/YVmCi59aBPY/maxresdefault.jpg" alt="Watch the complete agent-cut workflow" width="480"></a>
+  <a href="https://youtu.be/YVmCi59aBPY"><img src="https://img.youtube.com/vi/YVmCi59aBPY/maxresdefault.jpg" alt="Watch the complete cut-as-code workflow" width="480"></a>
 </p>
 
 <p align="center">
@@ -103,7 +103,7 @@ Each directory under `skills/` is a self-contained agent skill. Its `SKILL.md` i
 Install the skills into your agent:
 
 ```bash
-npx skills add WhiteTowerAI/agent-cut
+npx skills add WhiteTowerAI/cut-as-code
 ```
 
 Then with a prompt, point your agent at a video and name the skills you want:

@@ -1,6 +1,6 @@
 ---
 name: video-color-grade
-description: Use when footage needs color correction, white-balance or exposure repair, Log-to-Rec.709 conversion, named creative looks, skin-tone review, or a portable .cube LUT for an Open-Recut delivery.
+description: Use when footage needs color correction, white-balance or exposure repair, Log-to-Rec.709 conversion, named creative looks, skin-tone review, or a portable .cube LUT for a cut-as-code delivery.
 ---
 
 # Video Color Grade (assess → correct → looks → choose → LUT + apply)
