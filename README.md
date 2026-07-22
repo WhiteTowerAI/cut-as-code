@@ -10,11 +10,11 @@
 - 🎨 **Color grade** — candidate looks to review, then a baked LUT.
 - 💬 **Captions** — word-timed, preset styles with optional karaoke.
 - 🃏 **Graphic motion cards** — titles, lower thirds, stats, quotes, and calls to action.
-- 📱 **To shorts** — extract moments and reframe them for 9:16 vertical.
+- 📱 **To TikTok/YouTube shorts** — extract moments and reframe them for 9:16 vertical.
 
 ## Demos
 
-### 1. 2h video to shorts
+### 1. 2h video to TikTok/YouTube shorts
 
 > **Prompt:** For [video-path], use /video-understand, /video-to-shorts, /video-add-captions, and /video-add-content-cards.
 >
