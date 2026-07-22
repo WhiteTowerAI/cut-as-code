@@ -9,7 +9,9 @@ docs/
 tests/
 
 .claude/worktrees/
+.worktree/
+.vscode/
 # HyperFrames preview cache + regenerable self-check stills/gallery
 .hyperframes/
-snapshots/
-gallery.html
+# snapshots/
+# gallery.html

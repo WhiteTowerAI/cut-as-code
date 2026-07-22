@@ -25,12 +25,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-Open-Recut is **a stack of agentic video-editing skills**, not an application. Each
+agent-cut is **a stack of agentic video-editing skills**, not an application. Each
 directory under `skills/<name>/` is a self-contained skill: a `SKILL.md` (the agent
 playbook — read it first), plus `scripts/`, `examples/`, and `reference/`. There is no
 root build, package manifest, lint config, or aggregate test suite. Scripts and skill-local
 checks run ad hoc. When you change a skill, the SKILL.md *is* the spec; keep it and its
 scripts in sync.
+
+Each `SKILL.md` starts with YAML frontmatter (`name:`, `description:`) — the `name` is the
+slash-command trigger for that skill.
 
 ## Skills
 
@@ -87,6 +90,12 @@ scripts in sync.
 ## Architecture that spans skills
 
 These conventions are shared and load-bearing — match them in any new skill:
+
+- **`projectlib.py` is the shared runtime.** `skills/video-understand/scripts/projectlib.py`
+  is imported directly (no package install) by every multi-skill script. It owns: project JSON
+  validation, revision/staleness checks, `map_transcript_to_timeline`, `build_render_plan`,
+  and durable `write_json`. Any new cross-skill script imports it by putting it on `sys.path`
+  or running from a directory where it's co-located.
 
 - **The transcript is the shared interchange format.** `skills/video-understand/scripts/transcribe.py`
   is the canonical transcriber (faster-whisper, CPU/int8, VAD, word-level). It emits
