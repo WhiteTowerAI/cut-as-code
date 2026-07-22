@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check project-protocol precision retained by the rough-cut compiler."""
+"""Check project-protocol precision retained by the cut compiler."""
 
 import json
 from pathlib import Path
@@ -71,14 +71,14 @@ def check_source_duration_precision():
         result = json.loads(output_path.read_text(encoding="utf-8"))
 
     assert result["source_duration_s"] == source_duration, (
-        "rough-cut compiler rounded source duration: "
+        "cut compiler rounded source duration: "
         f"expected {source_duration}, got {result['source_duration_s']}"
     )
 
 
 def main():
     check_source_duration_precision()
-    print("rough-cut project protocol checks passed")
+    print("cut project protocol checks passed")
 
 
 if __name__ == "__main__":

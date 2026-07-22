@@ -55,7 +55,7 @@ Original video: [Jensen Huang: NVIDIA GTC Taipei 2026 Keynote](https://www.youtu
 
 ### 2. Cut, caption & card an interview
 
-> **Prompt:** For [video-path], use /video-understand, /video-rough-cut, /video-add-captions, and /video-add-content-cards.
+> **Prompt:** For [video-path], use /video-understand, /video-cut, /video-add-captions, and /video-add-content-cards.
 >
 > **Agent:** Displays a few captions and content cards candidates for your review, then delivers the final edit.
 
@@ -91,7 +91,7 @@ Each directory under `skills/` is a self-contained agent skill. Its `SKILL.md` i
 | Skill | Purpose |
 |---|---|
 | `/video-understand` | Probe media, generate a word-level transcript, analyze speech, and build reusable evidence for downstream skills. |
-| `/video-rough-cut` | Create reviewed keep/drop decisions, generate the canonical timeline, render a compact first cut, and verify its boundaries. |
+| `/video-cut` | Create reviewed keep/drop decisions, generate the canonical timeline, render a compact first cut, and verify its boundaries. |
 | `/video-color-grade` | Assess footage, generate named looks, review the alternatives, record a selection, and bake or apply a portable LUT. |
 | `/video-add-captions` | Render preset-driven, word-timed captions with optional karaoke highlighting. |
 | `/video-add-content-cards` | Add selective transcript-timed titles, lower thirds, statistics, lists, quotes, chapter cards, and calls to action. |
@@ -108,7 +108,7 @@ npx skills add WhiteTowerAI/cut-as-code
 
 Then with a prompt, point your agent at a video and name the skills you want:
 
-> For [video-path], use /video-understand, /video-rough-cut, /video-add-captions, and /video-add-content-cards.
+> For [video-path], use /video-understand, /video-cut, /video-add-captions, and /video-add-content-cards.
 
 ## Project Layout
 
@@ -119,7 +119,7 @@ my-video-project/
 |   `-- original-video.mp4
 |-- review/                       # summaries, stills, contact sheets, previews
 |   |-- 00-video-understanding/
-|   |-- 01-rough-cut/
+|   |-- 01-cut/
 |   |-- 02-color-grade/
 |   |-- 03-content-cards/
 |   |-- 04-edit-compare/
@@ -134,7 +134,7 @@ my-video-project/
     |-- project.json
     |-- timeline.json
     |-- understand/
-    |-- rough-cut/
+    |-- cut/
     |-- color-grade/
     |-- content-cards/
     |-- edit-compare/

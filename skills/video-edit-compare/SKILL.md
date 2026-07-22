@@ -19,7 +19,7 @@ Require `ffmpeg`/`ffprobe` on PATH and Python with `Pillow`. Check them before p
 - `input/original-video.mp4`: original source
 - `final/final-video.mp4`: actual delivery after all selected edits
 
-Do not compare against a rough-cut plan or an intermediate render. The final pixels are required so the review includes grade and cards.
+Do not compare against a cut plan or an intermediate render. The final pixels are required so the review includes grade and cards.
 
 ## Render
 

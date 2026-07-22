@@ -19,7 +19,7 @@ This skill owns caption grouping, style selection, review, and the transparent
 caption track. It does not transcribe, cut, retime, grade, reframe, or choose the
 delivery audio policy.
 
-Use `video-understand` first. If a rough cut exists, caption the active program
+Use `video-understand` first. If a cut exists, caption the active program
 timeline; do not treat source transcript seconds as program seconds.
 
 ## Protocol Inputs
@@ -380,7 +380,7 @@ The command verifies that the frozen runtime hashes still match.
 ## Project Registration
 
 Add or revise one `captions` operation in `work/project.json`. Depend on
-`understanding`; also depend on the active `rough-cut` operation when it exists.
+`understanding`; also depend on the active `cut` operation when it exists.
 `based_on` must equal the current dependency revisions.
 
 ```json
@@ -388,8 +388,8 @@ Add or revise one `captions` operation in `work/project.json`. Depend on
   "id": "captions",
   "skill": "video-add-captions",
   "revision": 1,
-  "depends_on": ["understanding", "rough-cut"],
-  "based_on": {"understanding": 1, "rough-cut": 1},
+  "depends_on": ["understanding", "cut"],
+  "based_on": {"understanding": 1, "cut": 1},
   "status": "verified",
   "plan": "captions/captions-plan.json",
   "outputs": ["cache/captions/overlay-frames"],
