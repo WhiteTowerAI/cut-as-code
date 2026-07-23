@@ -1,6 +1,7 @@
 """Focused B-roll plan and review contract tests."""
 
 import copy
+import json
 import sys
 import tempfile
 import unittest
@@ -11,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "scripts"), str(ROOT.parent / "video-understand" / "scripts")]
 import broll_plan
 import projectlib
+import pexels
 
 
 class BrollPlanTests(unittest.TestCase):
@@ -331,6 +333,60 @@ class BrollPlanTests(unittest.TestCase):
             project = self._registration_project(); project["operations"][0]["revision"] = revision
             with self.subTest(revision=revision):
                 with self.assertRaisesRegex(ValueError, "positive integer"): broll_plan.active_dependencies(project)
+
+
+class AcquisitionTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.cache = Path(self.temp.name) / "work/cache/b-roll/candidates"
+        self.cache.mkdir(parents=True)
+
+    def tearDown(self): self.temp.cleanup()
+
+    def test_validate_url_accepts_only_exact_https_hosts(self):
+        self.assertEqual("https://videos.pexels.com/a.mp4", pexels.validate_url("https://videos.pexels.com/a.mp4", {"videos.pexels.com"}))
+        for value in ("http://videos.pexels.com/a", "https://user@videos.pexels.com/a", "https://videos.pexels.com:444/a", "https://evil.videos.pexels.com/a"):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError): pexels.validate_url(value, {"videos.pexels.com"})
+
+    def test_search_keeps_best_valid_file_and_never_exposes_key(self):
+        payload = {"videos": [{"id": 7, "url": "https://www.pexels.com/video/7/", "user": {"name": "Maker"}, "duration": 4, "width": 1920, "height": 1080, "video_files": [{"id": 1, "link": "https://videos.pexels.com/one.mp4", "width": 640, "height": 360}, {"id": 2, "link": "https://videos.pexels.com/two.mp4", "width": 1920, "height": 1080}]}]}
+        class Response:
+            def read(self): return json.dumps(payload).encode()
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+        requests = []
+        def opener(request, timeout=None): requests.append(request); return Response()
+        records = pexels.search_videos("factory & safety", api_key="secret-key", opener=opener)
+        self.assertEqual(1, len(records)); self.assertEqual(2, records[0]["file_id"])
+        self.assertIn("factory+%26+safety", requests[0].full_url); self.assertEqual("secret-key", requests[0].get_header("Authorization"))
+        self.assertNotIn("secret-key", json.dumps(records))
+
+    def test_download_resumes_and_publishes_only_after_probe(self):
+        target = self.cache / "clip.mp4"; target.with_suffix(".mp4.part").write_bytes(b"old")
+        class Response:
+            status = 206
+            headers = {"Content-Length": "3", "Content-Range": "bytes 3-5/6"}
+            def geturl(self): return "https://videos.pexels.com/clip.mp4"
+            def read(self, size):
+                value, self.read = b"new", lambda size: b""
+                return value
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+        requests = []
+        def opener(request, timeout=None): requests.append(request); return Response()
+        candidate = {"id": "7-2", "download_url": "https://videos.pexels.com/clip.mp4", "provider_id": 7, "file_id": 2, "provenance": {"source_type": "pexels", "creator": "Maker", "license": "Pexels License", "retrieval_time": "2026-07-23T00:00:00Z", "source_url": "https://www.pexels.com/video/7/"}}
+        with mock.patch.object(pexels, "probe_media", return_value={"duration_s": 1.0, "width": 2, "height": 2}):
+            result = pexels.download_candidate(candidate, target, opener=opener)
+        self.assertEqual(b"oldnew", target.read_bytes()); self.assertEqual("bytes=3-", requests[0].get_header("Range")); self.assertEqual(target, result["path"])
+
+    def test_import_local_requires_cache_containment_and_leaves_source_unchanged(self):
+        source = Path(self.temp.name) / "source.mp4"; source.write_bytes(b"source")
+        provenance = {"source_type": "local", "creator": "me", "license": "owned", "retrieval_time": "2026-07-23T00:00:00Z", "original_path": str(source)}
+        with mock.patch.object(pexels, "probe_media", return_value={"duration_s": 1.0, "width": 2, "height": 2}):
+            result = pexels.import_local(source, self.cache / "copy.mp4", provenance)
+        self.assertEqual(b"source", source.read_bytes()); self.assertEqual(b"source", result["path"].read_bytes())
+        with self.assertRaises(ValueError): pexels.import_local(source, Path(self.temp.name) / "escape.mp4", provenance)
 
 
 if __name__ == "__main__": unittest.main()
