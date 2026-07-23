@@ -31,6 +31,9 @@ def candidate_manifest(plan):
 
 def review_subject(plan):
     value = copy.deepcopy(plan)
+    receipt = value.get("review")
+    receipt_ids = receipt.get("decision_skipped_shot_ids", []) if isinstance(receipt, dict) and receipt.get("status") == "approved" else []
+    decision_skipped_ids = set(receipt_ids) if isinstance(receipt_ids, list) and all(isinstance(shot_id, str) for shot_id in receipt_ids) else set()
 
     def clean(item):
         if isinstance(item, dict):
@@ -45,6 +48,8 @@ def review_subject(plan):
     clean(value)
     for shot in value.get("shots", []):
         if isinstance(shot, dict) and shot.get("status") in {"planned", "candidates_ready", "selected", "normalized", "verified"}:
+            shot["status"] = "reviewable"
+        elif isinstance(shot, dict) and shot.get("status") == "skipped" and shot.get("id") in decision_skipped_ids:
             shot["status"] = "reviewable"
     return value
 
@@ -71,6 +76,10 @@ def _review_errors(plan, shots):
         errors.append("decision and review authority do not match")
     if mode == "human" and (decision.get("explicit_user_action") is not True or review.get("explicit_user_action") is not True):
         errors.append("human review requires explicit_user_action true")
+    decision_skipped_ids = review.get("decision_skipped_shot_ids")
+    shot_statuses = {shot.get("id"): shot.get("status") for shot in shots if isinstance(shot, dict)}
+    if not isinstance(decision_skipped_ids, list) or any(not isinstance(shot_id, str) for shot_id in decision_skipped_ids) or decision_skipped_ids != sorted(set(decision_skipped_ids)) or any(shot_statuses.get(shot_id) != "skipped" for shot_id in decision_skipped_ids):
+        errors.append("decision_skipped_shot_ids must be sorted unique current skipped shot ids")
     if review.get("plan_sha256") != canonical_sha256(review_subject(plan)):
         errors.append("review plan SHA-256 does not match")
     candidates_valid = all(
@@ -469,10 +478,14 @@ def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None)
     if missing: raise ValueError("review is missing shots: " + ", ".join(missing))
     result_shots = {shot["id"]: shot for shot in result["shots"]}
     selected_hashes = []
+    decision_skipped_ids = []
     for entry in entries:
         shot, decision = result_shots[entry["id"]], entry.get("decision")
         if decision not in {"select", "skip"}: raise ValueError(f"{shot['id']} decision must be select or skip")
-        if decision == "skip": shot["selected"], shot["status"] = None, "skipped"; continue
+        if decision == "skip":
+            if shot.get("status") != "skipped": decision_skipped_ids.append(shot["id"])
+            shot["selected"], shot["status"] = None, "skipped"
+            continue
         candidate = next((item for item in shot.get("candidates", []) if item.get("id") == entry.get("candidate_id")), None)
         if not candidate: raise ValueError(f"{shot['id']} selected candidate does not belong to shot")
         option = "source_trim" if candidate.get("media_type") == "video" else "ken_burns"
@@ -480,7 +493,7 @@ def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None)
         shot["selected"], shot["status"] = {"candidate_id": candidate["id"], option: copy.deepcopy(entry[option])}, "selected"; selected_hashes.append(candidate["sha256"])
     result["decision"] = {"mode": mode, "actor": actor, "rationale": rationale}
     if mode == "human": result["decision"]["explicit_user_action"] = True
-    result["review"] = {"status": "approved", "review_id": review["review_id"], "mode": mode, "actor": actor, "rationale": rationale, **expected_bindings, "selected_asset_sha256": sorted(set(selected_hashes))}
+    result["review"] = {"status": "approved", "review_id": review["review_id"], "mode": mode, "actor": actor, "rationale": rationale, **expected_bindings, "decision_skipped_shot_ids": sorted(set(decision_skipped_ids)), "selected_asset_sha256": sorted(set(selected_hashes))}
     if mode == "human": result["review"]["explicit_user_action"] = True
     if interaction_path:
         target = Path(interaction_path); target.parent.mkdir(parents=True, exist_ok=True)
