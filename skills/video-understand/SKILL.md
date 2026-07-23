@@ -7,6 +7,10 @@ description: Use when a video project needs reusable media metadata, word-level 
 
 Build the shared evidence layer once. Keep observations in source time and leave editorial decisions to downstream skills.
 
+This skill is a prerequisite for `/video-cut`, `/video-to-shorts`,
+`/video-add-captions`, and `/video-add-content-cards`. Run it first so those skills
+consume the same validated evidence and timeline.
+
 ## Dependencies
 
 Require `ffmpeg`/`ffprobe`, Python, and `faster-whisper` for transcription. Check them before processing media.

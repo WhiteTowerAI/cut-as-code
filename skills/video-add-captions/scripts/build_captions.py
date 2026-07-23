@@ -1,7 +1,7 @@
 """Build readable caption cues or a canonical caption plan from word timing.
 
 Reads a word-level transcript (the work/transcript.json produced by the
-video-rough-cut skill's transcribe.py) and groups words into caption cues —
+video-cut skill's transcribe.py) and groups words into caption cues —
 broken on sentence punctuation, a max line budget, a max duration, and speech
 gaps — while keeping per-word timings so any renderer can highlight the current
 word (karaoke).

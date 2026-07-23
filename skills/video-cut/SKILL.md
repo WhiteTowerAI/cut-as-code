@@ -1,5 +1,5 @@
 ---
-name: video-rough-cut
+name: video-cut
 description: >
   End-to-end turn an unedited long-form talking-head / vlog / podcast video into a
   compact "first cut" (rough cut). Use when asked to edit/剪辑 a raw YouTube (or
@@ -11,7 +11,7 @@ description: >
   "把这条原片剪短", "cut down this video".
 ---
 
-# Video Rough Cut
+# Video Cut
 
 Turn one unedited long video into a compact, watchable **first cut** — decisive,
 content-aware, and self-verified. Human (you, the model) makes the *editorial*
@@ -23,9 +23,14 @@ alignment, dead-air reclaim, memory-safe render, self-check).
 - The ask is "halve it", "cut the boring parts", "make a first/rough cut".
 - NOT for: word-by-word filler micro-surgery, multi-cam B-roll assembly, color/audio
   polish — those are a later P1/P2 polish pass. This skill is P0: validate the
-  diagnosis + produce a solid rough cut.
+  diagnosis + produce a solid cut.
 
 ## Dependencies
+`/video-understand` is a prerequisite. Run it first and use its validated media,
+transcript, analysis, and timeline instead of recreating them in this skill.
+Before starting, verify that it is installed. If it is not, warn the user that
+this prerequisite is missing and stop before processing media.
+
 Activate any environment that has these (do NOT assume a specific conda env name):
 - `yt-dlp` (download), `ffmpeg`/`ffprobe` (cut/render/probe) on PATH
 - Python with `faster-whisper` (CPU works: `device=cpu, compute_type=int8`)
@@ -36,12 +41,12 @@ Check first: `yt-dlp --version`, `ffmpeg -version`, `python -c "import faster_wh
 Use these durable project files:
 
 ```text
-work/rough-cut/edit-plan.json    # hand-authored keep/drop decisions only
+work/cut/edit-plan.json          # hand-authored keep/drop decisions only
 work/timeline.json               # generated precision ranges + source/program mapping
-review/01-rough-cut/cut-summary.md
-review/01-rough-cut/timeline-map.png
-review/01-rough-cut/boundary-review.mp4
-review/01-rough-cut/full-proxy.mp4  # optional whole-program pacing review
+review/01-cut/cut-summary.md
+review/01-cut/timeline-map.png
+review/01-cut/boundary-review.mp4
+review/01-cut/full-proxy.mp4  # optional whole-program pacing review
 ```
 
 Each canonical decision has a stable `id`, `action` (`keep` or `drop`), `start_s`,
@@ -59,8 +64,8 @@ The existing precision scripts accept the canonical plan. Expand word-safe bound
 optionally assign linear varispeed, then generate the shared timeline:
 
 ```powershell
-python skills/video-rough-cut/scripts/build_edit.py work/rough-cut/edit-plan.json work/understand/transcript.json work/cache/edit-final.json
-python skills/video-rough-cut/scripts/assign_speed.py work/cache/edit-final.json work/understand/transcript.json
+python skills/video-cut/scripts/build_edit.py work/cut/edit-plan.json work/understand/transcript.json work/cache/edit-final.json
+python skills/video-cut/scripts/assign_speed.py work/cache/edit-final.json work/understand/transcript.json
 python skills/video-understand/scripts/build_timeline.py work/cache/edit-final.json work/timeline.json --fps-num SOURCE_FPS_NUM --fps-den SOURCE_FPS_DEN
 ```
 
@@ -206,7 +211,7 @@ python scripts/cut_render.py    work/edit_final.json   work/source.mp4 first_cut
 ### 6. Self-check — do not declare done until this passes
 ```
 # protocol precision regression check (run from the repository root)
-python skills/video-rough-cut/scripts/check_project_protocol.py
+python skills/video-cut/scripts/check_project_protocol.py
 # re-transcribe the finished cut
 ffmpeg -y -i first_cut.mp4 -ac 1 -ar 16000 work/selfcheck/cut_audio16k.wav
 python scripts/transcribe.py work/selfcheck/cut_audio16k.wav work/selfcheck/cut_transcript

@@ -295,15 +295,15 @@ def validate_project(project, project_root, check_files=True, check_media=False)
                             errors.append(f"invalid timeline file: {exc}")
                         else:
                             decision_ids = None
-                            rough = nodes.get("rough-cut")
-                            if rough and rough.get("plan"):
-                                rough_path = resolve_project_path(project_root, rough["plan"])
-                                if rough_path.is_file():
-                                    rough_plan = load_json(rough_path)
-                                    if "decisions" in rough_plan:
+                            cut = nodes.get("cut")
+                            if cut and cut.get("plan"):
+                                cut_path = resolve_project_path(project_root, cut["plan"])
+                                if cut_path.is_file():
+                                    cut_plan = load_json(cut_path)
+                                    if "decisions" in cut_plan:
                                         decision_ids = {
                                             decision.get("id")
-                                            for decision in rough_plan["decisions"]
+                                            for decision in cut_plan["decisions"]
                                             if decision.get("action") == "keep"
                                         }
                             errors.extend(validate_timeline(timeline, decision_ids=decision_ids))

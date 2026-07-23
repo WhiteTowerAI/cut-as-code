@@ -5,6 +5,8 @@ horizontal and optional vertical derivatives. Project mode consumes the shared
 source transcript and `timeline.json`, so every candidate uses the same program
 clock as `final/final-video.mp4` and retains source traceability.
 
+`/video-understand` is a prerequisite.
+
 The canonical workflow is:
 
 1. Map `work/understand/transcript.json` through `work/timeline.json`.

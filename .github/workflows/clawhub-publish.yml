@@ -1,0 +1,37 @@
+name: Publish skills to ClawHub
+
+on:
+  pull_request:
+    paths:
+      - "skills/**"
+      - ".github/workflows/clawhub-publish.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "skills/**"
+      - ".github/workflows/clawhub-publish.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  dry-run:
+    if: github.event_name == 'pull_request'
+    uses: openclaw/clawhub/.github/workflows/skill-publish.yml@a230d962db64019462c2c8ee400755eb92169908
+    with:
+      root: skills
+      owner: whitetowerai
+      dry_run: true
+
+  publish:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    uses: openclaw/clawhub/.github/workflows/skill-publish.yml@a230d962db64019462c2c8ee400755eb92169908
+    with:
+      root: skills
+      owner: whitetowerai
+      dry_run: false
+    secrets:
+      clawhub_token: ${{ secrets.CLAWHUB_TOKEN }}

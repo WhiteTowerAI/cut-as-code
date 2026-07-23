@@ -328,7 +328,7 @@ def check_dependency_revision_coverage():
             "target": {"sequence": "main", "scope": "evidence"}, "effects": effects,
         },
         {
-            "id": "rough-cut", "skill": "video-rough-cut", "revision": 1,
+            "id": "cut", "skill": "video-cut", "revision": 1,
             "depends_on": ["understanding"], "based_on": {"understanding": 1},
             "status": "verified", "target": {"sequence": "main", "scope": "timeline"},
             "effects": effects,
@@ -350,9 +350,9 @@ def check_dependency_revision_coverage():
     errors = projectlib.validate_project(project, Path("."), check_files=False)
     assert "captions based_on missing revision for dependency: understanding" in errors
 
-    operations[2]["based_on"] = {"understanding": 1, "rough-cut": 1}
+    operations[2]["based_on"] = {"understanding": 1, "cut": 1}
     errors = projectlib.validate_project(project, Path("."), check_files=False)
-    assert "captions based_on has unexpected dependency: rough-cut" in errors
+    assert "captions based_on has unexpected dependency: cut" in errors
 
     operations[2]["based_on"] = {"understanding": 1}
     project["reviews"] = [{

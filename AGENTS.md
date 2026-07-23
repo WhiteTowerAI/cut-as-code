@@ -40,7 +40,7 @@ slash-command trigger for that skill.
 | Skill | Job | Stack |
 |---|---|---|
 | `video-understand` | Shared media probe, word-level transcript, objective analysis, and evidence-backed semantic understanding | Python · ffprobe · faster-whisper |
-| `video-rough-cut` | Raw long video → compact first cut (download, transcribe, diagnose, hand-written JSON cut plan, varispeed, render, self-check) | Python · yt-dlp · ffmpeg · faster-whisper |
+| `video-cut` | Raw long video → compact first cut (download, transcribe, diagnose, hand-written JSON cut plan, varispeed, render, self-check) | Python · yt-dlp · ffmpeg · faster-whisper |
 | `video-edit-compare` | Original versus actual final pixels projected onto the source clock | Python · ffmpeg · Pillow |
 | `video-color-grade` | Assess footage → corrective base + named looks → human picks → bake `.cube` LUT + apply | Python · ffmpeg · numpy · Pillow |
 | `video-add-captions` | Preset-driven, word-timed captions with optional karaoke | HyperFrames · ffmpeg |
@@ -50,7 +50,7 @@ slash-command trigger for that skill.
 ## Shared project protocol V1
 
 - Skills are optional and composable; there is no fixed global pipeline. A project can run
-  cards directly or rough cut → color grade → cards.
+  cards directly or cut → color grade → cards.
 - `work/project.json` is the only shared manifest. It records operation dependencies,
   statuses, render contributions, integer `revision` values, and `based_on` checks.
 - `work/timeline.json` is the custom one-source, chronological source-to-program mapping.
@@ -61,7 +61,7 @@ slash-command trigger for that skill.
   pixel, geometry, audio, or added-track changes.
 - Render contribution kinds are `timeline-transform`, `video-filter`, `audio-filter`,
   `overlay`, `precomputed-asset`, and `output-constraint`.
-- Domain decisions remain in `work/rough-cut/edit-plan.json`,
+- Domain decisions remain in `work/cut/edit-plan.json`,
   `work/color-grade/grade-plan.json`, `work/content-cards/cards-plan.json`,
   `work/captions/captions-plan.json`, and `work/shorts/shorts-plan.json`.
 - Caption cues use program time mapped from the canonical source transcript through

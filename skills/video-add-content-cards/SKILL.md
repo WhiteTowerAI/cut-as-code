@@ -9,16 +9,21 @@ Turn approved semantic moments into one coherent HyperFrames graphics overlay. U
 
 ## Dependencies
 
+`/video-understand` is a prerequisite. Run it first so cards use validated
+semantic evidence and the canonical timeline.
+Before starting, verify that it is installed. If it is not, warn the user that
+this prerequisite is missing and stop before processing media.
+
 Require `ffmpeg` on PATH, Python, and Node.js >= 22 (for `npx hyperframes`, fetched on demand). `hyperframes render`/`snapshot` drives a headless Chrome — it manages its own `chrome-headless-shell`, and falls back to a system Chrome (set `CHROME` to override) when the cached one is unusable. Check these before processing media.
 
 ## Inputs
 
 - `work/project.json`: operation revisions and dependencies
 - `work/understand/understanding.json`: reviewed semantic moments and evidence
-- `work/timeline.json`: source-to-program mapping, or an identity timeline when no rough cut exists
+- `work/timeline.json`: source-to-program mapping, or an identity timeline when no cut exists
 - optional selected color-grade revision when contrast or palette is judged against that look
 
-The skill is valid without rough cut or color grade. Declare only dependencies actually consumed and record their current revisions in `based_on`.
+The skill is valid without a cut or color grade. Declare only dependencies actually consumed and record their current revisions in `based_on`.
 
 ## Working Files
 
@@ -107,7 +112,7 @@ python skills/video-add-content-cards/scripts/build_cards_plan.py `
   --notes "Keep product names verbatim"
 ```
 
-The script maps kept semantic moments into program time and omits moments removed by rough cut. It preserves source ranges and evidence references, clamps duration to the containing clip, and marks copy/placement/visual treatment as `draft`.
+The script maps kept semantic moments into program time and omits moments removed by the cut. It preserves source ranges and evidence references, clamps duration to the containing clip, and marks copy/placement/visual treatment as `draft`.
 The confirmed interview is stored as `brief` in `cards-plan.json`. Repeat
 `--must-include-type` for multiple values; omit flags that do not apply. Older optional brief
 fields remain accepted for compatibility but are not part of the normal interview.

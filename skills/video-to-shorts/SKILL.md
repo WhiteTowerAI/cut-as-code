@@ -11,6 +11,11 @@ description: >
 
 ## Dependencies
 
+`/video-understand` is a prerequisite. Run it first so shorts use the validated
+source transcript and canonical timeline.
+Before starting, verify that it is installed. If it is not, warn the user that
+this prerequisite is missing and stop before processing media.
+
 Require `ffmpeg`/`ffprobe` on PATH and Python with `Pillow`. Check them before processing media.
 
 ## Scope

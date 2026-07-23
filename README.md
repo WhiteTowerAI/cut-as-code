@@ -10,11 +10,11 @@
 - 🎨 **Color grade** — candidate looks to review, then a baked LUT.
 - 💬 **Captions** — word-timed, preset styles with optional karaoke.
 - 🃏 **Graphic motion cards** — titles, lower thirds, stats, quotes, and calls to action.
-- 📱 **To shorts** — extract moments and reframe them for 9:16 vertical.
+- 📱 **To TikTok/YouTube shorts** — extract moments and reframe them for 9:16 vertical.
 
 ## Demos
 
-### 1. 2h video to shorts
+### 1. 2h video to TikTok/YouTube shorts
 
 > **Prompt:** For [video-path], use /video-understand, /video-to-shorts, /video-add-captions, and /video-add-content-cards.
 >
@@ -53,9 +53,9 @@
 
 Original video: [Jensen Huang: NVIDIA GTC Taipei 2026 Keynote](https://www.youtube.com/watch?v=wSp6AiNIrsY)
 
-### 2. Cut, caption & card an interview
+### 2. Cut, caption & add graphics to a raw interview
 
-> **Prompt:** For [video-path], use /video-understand, /video-rough-cut, /video-add-captions, and /video-add-content-cards.
+> **Prompt:** For [video-path], use /video-understand, /video-cut, /video-add-captions, and /video-add-content-cards.
 >
 > **Agent:** Displays a few captions and content cards candidates for your review, then delivers the final edit.
 
@@ -91,7 +91,7 @@ Each directory under `skills/` is a self-contained agent skill. Its `SKILL.md` i
 | Skill | Purpose |
 |---|---|
 | `/video-understand` | Probe media, generate a word-level transcript, analyze speech, and build reusable evidence for downstream skills. |
-| `/video-rough-cut` | Create reviewed keep/drop decisions, generate the canonical timeline, render a compact first cut, and verify its boundaries. |
+| `/video-cut` | Create reviewed keep/drop decisions, generate the canonical timeline, render a compact first cut, and verify its boundaries. |
 | `/video-color-grade` | Assess footage, generate named looks, review the alternatives, record a selection, and bake or apply a portable LUT. |
 | `/video-add-captions` | Render preset-driven, word-timed captions with optional karaoke highlighting. |
 | `/video-add-content-cards` | Add selective transcript-timed titles, lower thirds, statistics, lists, quotes, chapter cards, and calls to action. |
@@ -106,9 +106,20 @@ Install the skills into your agent:
 npx skills add WhiteTowerAI/cut-as-code
 ```
 
-Then with a prompt, point your agent at a video and name the skills you want:
+Or install them individually from ClawHub:
 
-> For [video-path], use /video-understand, /video-rough-cut, /video-add-captions, and /video-add-content-cards.
+```bash
+npm install -g clawhub
+clawhub install @whitetowerai/<skill-name>
+```
+
+Then point your agent at a video with prompts such as:
+
+> For [video-path], use /video-understand, /video-cut, /video-add-captions, and then /video-add-content-cards.
+
+Note: `/video-understand` is a **prerequisite** for `/video-cut`, `/video-to-shorts`,
+`/video-add-captions`, and `/video-add-content-cards`. Run it first so downstream
+skills share the same media metadata, transcript, analysis, and timeline.
 
 ## Project Layout
 
@@ -119,7 +130,7 @@ my-video-project/
 |   `-- original-video.mp4
 |-- review/                       # summaries, stills, contact sheets, previews
 |   |-- 00-video-understanding/
-|   |-- 01-rough-cut/
+|   |-- 01-cut/
 |   |-- 02-color-grade/
 |   |-- 03-content-cards/
 |   |-- 04-edit-compare/
@@ -134,7 +145,7 @@ my-video-project/
     |-- project.json
     |-- timeline.json
     |-- understand/
-    |-- rough-cut/
+    |-- cut/
     |-- color-grade/
     |-- content-cards/
     |-- edit-compare/

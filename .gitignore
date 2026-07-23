@@ -6,7 +6,7 @@ __pycache__/
 
 work/
 docs/
-tests/
+/tests/
 
 .claude/worktrees/
 .worktree/
