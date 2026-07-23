@@ -129,7 +129,7 @@ def _review_errors(plan, shots):
     if review.get("status") != "approved": errors.append("review status must be approved")
     if not isinstance(review.get("review_id"), str) or not review["review_id"].strip(): errors.append("review_id is required")
     mode, actor, rationale = decision.get("mode"), decision.get("actor"), decision.get("rationale")
-    if mode not in {"human", "agent"}: errors.append("review mode must be human or agent")
+    if mode not in ("human", "agent"): errors.append("review mode must be human or agent")
     if not isinstance(actor, str) or not actor.strip(): errors.append("review actor is required")
     if not isinstance(rationale, str) or not rationale.strip(): errors.append("review rationale is required")
     if any(review.get(key) != decision.get(key) for key in ("mode", "actor", "rationale")):
@@ -165,7 +165,11 @@ def _review_errors(plan, shots):
         if isinstance(candidate, dict) and isinstance(candidate.get("sha256"), str): selected_hashes.append(candidate["sha256"])
     if review.get("selected_asset_sha256") != sorted(set(selected_hashes)):
         errors.append("review selected asset hashes do not match")
-    if review.get("review_video_sha256") != plan.get("input_hashes", {}).get("review_video_sha256"):
+    input_hashes = plan.get("input_hashes")
+    if not isinstance(input_hashes, dict):
+        errors.append("plan input_hashes must be an object")
+        input_hashes = {}
+    if review.get("review_video_sha256") != input_hashes.get("review_video_sha256"):
         errors.append("review video SHA-256 does not match")
     return errors
 
@@ -189,8 +193,9 @@ def _mapped_words(transcript, timeline):
     for segment in mapped.get("segments", []):
         for word in segment.get("words", []):
             source, program = _range(word.get("source_range")), _range(word.get("program_range"))
-            if source and program:
-                result.add((word.get("word"), source, program))
+            text = word.get("word")
+            if isinstance(text, str) and source and program:
+                result.add((text, source, program))
     return result
 
 
@@ -210,7 +215,7 @@ def _candidate_errors(shot_id, candidate):
     if not isinstance(candidate.get("sha256"), str) or len(candidate["sha256"]) != 64 or any(char not in "0123456789abcdefABCDEF" for char in candidate["sha256"]):
         errors.append(f"{shot_id} candidate {candidate_id} SHA-256 is required")
     provenance = candidate.get("provenance")
-    if not isinstance(provenance, dict) or provenance.get("source_type") not in {"local", "pexels", "external-generated"}:
+    if not isinstance(provenance, dict) or provenance.get("source_type") not in ("local", "pexels", "external-generated"):
         errors.append(f"{shot_id} candidate {candidate_id} provenance is invalid")
     elif (not all(isinstance(provenance.get(key), str) and provenance[key].strip() for key in ("creator", "license", "retrieval_time")) or not any(isinstance(provenance.get(key), str) and provenance[key].strip() for key in ("source_url", "original_path"))):
         errors.append(f"{shot_id} candidate {candidate_id} provenance is incomplete")
@@ -431,7 +436,8 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
                     errors.append(f"{shot_id} transcript evidence word is not mapped from transcript")
                     continue
                 source, mapped_program = _range(word.get("source_range")), _range(word.get("program_range"))
-                if not source or not mapped_program or (word.get("word"), source, mapped_program) not in mapped:
+                text = word.get("word")
+                if not isinstance(text, str) or not source or not mapped_program or (text, source, mapped_program) not in mapped:
                     errors.append(f"{shot_id} transcript evidence word is not mapped from transcript")
         queries = shot.get("queries", [])
         if not isinstance(queries, list) or not 2 <= len(queries) <= 3 or any(not isinstance(query, str) or not query.strip() for query in queries): errors.append(f"{shot_id} queries must contain 2-3 nonblank strings")
@@ -518,7 +524,7 @@ def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None)
             if candidate_errors: raise ValueError("; ".join(candidate_errors))
     for entry in entries:
         if not isinstance(entry, dict): raise ValueError("review shot must be an object")
-    if mode not in {"human", "agent"}: raise ValueError("mode must be human or agent")
+    if mode not in ("human", "agent"): raise ValueError("mode must be human or agent")
     if not isinstance(actor, str) or not actor.strip(): raise ValueError("actor is required")
     if not isinstance(rationale, str) or not rationale.strip(): raise ValueError("rationale is required")
     rationale = rationale.strip()
@@ -556,7 +562,7 @@ def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None)
     decision_skipped_ids = []
     for shot in result["shots"]:
         entry, decision = entries_by_id[shot["id"]], entries_by_id[shot["id"]].get("decision")
-        if decision not in {"select", "skip"}: raise ValueError(f"{shot['id']} decision must be select or skip")
+        if decision not in ("select", "skip"): raise ValueError(f"{shot['id']} decision must be select or skip")
         if decision == "skip":
             if shot.get("status") != "skipped": decision_skipped_ids.append(shot["id"])
             shot["selected"], shot["status"] = None, "skipped"

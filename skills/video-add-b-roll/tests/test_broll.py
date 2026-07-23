@@ -259,6 +259,48 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
                 self.assertIn(expected_error, errors)
                 self.assertIn("review decision manifest cannot be reconstructed", errors)
 
+    def test_approved_plan_with_unhashable_values_returns_errors(self):
+        approved = broll_plan.apply_review(self.plan, self.review(), mode="agent", actor="agent", rationale="Relevant footage.")
+        cases = [
+            ("input hashes none", "plan", ("input_hashes",), None, "plan input_hashes must be an object"),
+            ("input hashes list", "plan", ("input_hashes",), [], "plan input_hashes must be an object"),
+            ("input hashes scalar", "plan", ("input_hashes",), 3, "plan input_hashes must be an object"),
+            ("decision mode list", "plan", ("decision", "mode"), [], "review mode must be human or agent"),
+            ("decision mode object", "plan", ("decision", "mode"), {}, "review mode must be human or agent"),
+            ("media type list", "plan", ("shots", 0, "candidates", 0, "media_type"), [], "shot candidate asset media_type is invalid"),
+            ("media type object", "plan", ("shots", 0, "candidates", 0, "media_type"), {}, "shot candidate asset media_type is invalid"),
+            ("source type list", "plan", ("shots", 0, "candidates", 0, "provenance", "source_type"), [], "shot candidate asset provenance is invalid"),
+            ("source type object", "plan", ("shots", 0, "candidates", 0, "provenance", "source_type"), {}, "shot candidate asset provenance is invalid"),
+            ("status list", "plan", ("shots", 0, "status"), [], "shot status is invalid"),
+            ("status object", "plan", ("shots", 0, "status"), {}, "shot status is invalid"),
+            ("evidence word list", "plan", ("shots", 0, "transcript_evidence", "words", 0, "word"), [], "shot transcript evidence word is not mapped from transcript"),
+            ("evidence word object", "plan", ("shots", 0, "transcript_evidence", "words", 0, "word"), {}, "shot transcript evidence word is not mapped from transcript"),
+            ("transcript word list", "transcript", ("segments", 0, "words", 0, "word"), [], "shot transcript evidence word is not mapped from transcript"),
+            ("transcript word object", "transcript", ("segments", 0, "words", 0, "word"), {}, "shot transcript evidence word is not mapped from transcript"),
+        ]
+        for name, target_name, path, value, expected_error in cases:
+            malformed, transcript = copy.deepcopy(approved), copy.deepcopy(self.transcript)
+            target = malformed if target_name == "plan" else transcript
+            for key in path[:-1]:
+                target = target[key]
+            target[path[-1]] = copy.deepcopy(value)
+            with self.subTest(name=name):
+                errors = broll_plan.validate_plan(malformed, self.timeline, transcript)
+                self.assertTrue(errors)
+                self.assertIn(expected_error, errors)
+
+    def test_apply_review_rejects_unhashable_mode_and_entry_decision_with_value_error(self):
+        for mode in ([], {}):
+            with self.subTest(field="mode", value=mode):
+                with self.assertRaisesRegex(ValueError, "mode must be human or agent"):
+                    broll_plan.apply_review(self.plan, self.review(), mode=mode, actor="agent", rationale="Relevant footage.")
+        for decision in ([], {}):
+            review = self.review()
+            review["shots"][0]["decision"] = decision
+            with self.subTest(field="decision", value=decision):
+                with self.assertRaisesRegex(ValueError, "decision must be select or skip"):
+                    broll_plan.apply_review(self.plan, review, mode="agent", actor="agent", rationale="Relevant footage.")
+
     def test_validate_plan_catches_stale_revisions_and_real_input_hashes(self):
         self.assertEqual([], broll_plan.validate_plan(self.plan, self.timeline, self.transcript, project=self.project, project_root=self.root))
         project = copy.deepcopy(self.project); project["operations"][1]["revision"] = 3
