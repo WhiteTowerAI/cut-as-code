@@ -222,9 +222,12 @@ def _range(value):
     if not isinstance(value, dict):
         return None
     try:
-        start, end = float(value["start_s"]), float(value["end_s"])
-    except (KeyError, TypeError, ValueError):
+        start_value, end_value = value["start_s"], value["end_s"]
+    except KeyError:
         return None
+    if any(not isinstance(item, (int, float)) or isinstance(item, bool) for item in (start_value, end_value)):
+        return None
+    start, end = float(start_value), float(end_value)
     return (start, end) if math.isfinite(start) and math.isfinite(end) else None
 
 

@@ -142,6 +142,26 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "shot select requires a valid source_trim"):
                     broll_plan.apply_review(plan, review, mode="agent", actor="agent", rationale="Relevant footage.")
 
+    def test_apply_review_rejects_boolean_and_string_trim_endpoints(self):
+        trims = [
+            {"start_s": False, "end_s": 1},
+            {"start_s": True, "end_s": 2},
+            {"start_s": 0, "end_s": True},
+            {"start_s": False, "end_s": True},
+            {"start_s": True, "end_s": True},
+            {"start_s": 0, "end_s": False},
+            {"start_s": "0", "end_s": 1},
+            {"start_s": 0, "end_s": "1"},
+            {"start_s": "0", "end_s": "1"},
+            {"start_s": False, "end_s": "1"},
+            {"start_s": "0", "end_s": True},
+        ]
+        for trim in trims:
+            review = self.review_for(self.plan, [{"id": "shot", "decision": "select", "candidate_id": "asset", "source_trim": trim}])
+            with self.subTest(trim=trim):
+                with self.assertRaisesRegex(ValueError, "shot select requires a valid source_trim"):
+                    broll_plan.apply_review(self.plan, review, mode="agent", actor="agent", rationale="Relevant footage.")
+
     def test_apply_review_rejects_invalid_image_motion_without_null_decisions(self):
         missing = object()
         for value in (missing, None, [], {}, {"direction": None}, {"direction": []}, {"direction": "spin"}):
@@ -618,6 +638,53 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         self.assertIn("shot selected video requires a valid source_trim", broll_plan.validate_plan(plan, self.timeline, self.transcript))
         plan = copy.deepcopy(self.plan); plan["shots"][0]["candidates"][0]["media_type"] = "image"; plan["shots"][0].update({"status": "verified", "selected": {"candidate_id": "asset", "ken_burns": {}}})
         self.assertIn("shot verified image requires a non-empty ken_burns", broll_plan.validate_plan(plan, self.timeline, self.transcript))
+
+    def test_persisted_ranges_reject_boolean_and_string_endpoints(self):
+        cases = [
+            (("shots", 0, "program_range", "start_s"), True, "shot program range is outside timeline"),
+            (("shots", 0, "program_range", "start_s"), "1", "shot program range is outside timeline"),
+            (("shots", 0, "program_range", "end_s"), True, "shot program range is outside timeline"),
+            (("shots", 0, "program_range", "end_s"), "2", "shot program range is outside timeline"),
+            (("shots", 0, "source_ranges", 0, "start_s"), True, "shot source range is outside timeline"),
+            (("shots", 0, "source_ranges", 0, "start_s"), "1", "shot source range is outside timeline"),
+            (("shots", 0, "source_ranges", 0, "end_s"), True, "shot source range is outside timeline"),
+            (("shots", 0, "source_ranges", 0, "end_s"), "2", "shot source range is outside timeline"),
+            (("shots", 0, "transcript_evidence", "words", 0, "source_range", "start_s"), True, "shot transcript evidence word is not mapped from transcript"),
+            (("shots", 0, "transcript_evidence", "words", 0, "source_range", "start_s"), "1", "shot transcript evidence word is not mapped from transcript"),
+            (("shots", 0, "transcript_evidence", "words", 0, "source_range", "end_s"), True, "shot transcript evidence word is not mapped from transcript"),
+            (("shots", 0, "transcript_evidence", "words", 0, "source_range", "end_s"), "2", "shot transcript evidence word is not mapped from transcript"),
+            (("shots", 0, "transcript_evidence", "words", 0, "program_range", "start_s"), True, "shot transcript evidence word is not mapped from transcript"),
+            (("shots", 0, "transcript_evidence", "words", 0, "program_range", "start_s"), "1", "shot transcript evidence word is not mapped from transcript"),
+            (("shots", 0, "transcript_evidence", "words", 0, "program_range", "end_s"), True, "shot transcript evidence word is not mapped from transcript"),
+            (("shots", 0, "transcript_evidence", "words", 0, "program_range", "end_s"), "2", "shot transcript evidence word is not mapped from transcript"),
+        ]
+        for path, value, message in cases:
+            plan = copy.deepcopy(self.plan)
+            target = plan
+            for key in path[:-1]:
+                target = target[key]
+            target[path[-1]] = value
+            with self.subTest(path=path, value=value):
+                self.assertIn(message, broll_plan.validate_plan(plan, self.timeline, self.transcript))
+
+        approved = broll_plan.apply_review(self.plan, self.review(), mode="agent", actor="agent", rationale="Relevant footage.")
+        for trim in (
+            {"start_s": False, "end_s": 1},
+            {"start_s": "0", "end_s": 1},
+            {"start_s": 0, "end_s": True},
+            {"start_s": 0, "end_s": "1"},
+            {"start_s": False, "end_s": True},
+            {"start_s": "0", "end_s": "1"},
+        ):
+            plan = copy.deepcopy(approved)
+            plan["shots"][0]["selected"]["source_trim"] = trim
+            with self.subTest(persisted_trim=trim):
+                self.assertIn("shot selected video requires a valid source_trim", broll_plan.validate_plan(plan, self.timeline, self.transcript))
+
+        valid = copy.deepcopy(self.plan)
+        valid["shots"][0]["program_range"] = {"start_s": 1, "end_s": 2.0}
+        valid["shots"][0]["source_ranges"][0].update({"start_s": 1.0, "end_s": 2})
+        self.assertEqual([], broll_plan.validate_plan(valid, self.timeline, self.transcript))
 
     def test_review_receipt_integrity_and_human_authority_are_validated(self):
         approved = broll_plan.apply_review(self.plan, self.review(), mode="agent", actor="agent", rationale="Relevant footage.")
