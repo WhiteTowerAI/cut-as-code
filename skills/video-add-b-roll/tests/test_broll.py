@@ -372,7 +372,8 @@ class BrollReviewPageTests(BrollPlanTests):
         self.assertNotRegex(html, r"(?:src|href)=['\"]https?://")
         payload = json.loads(base64.b64decode(build_review_page.PAYLOAD_RE.search(html).group(1)))
         self.assertEqual(review_id, payload["review_id"])
-        self.assertEqual("assets/frame-001.jpg", payload["shots"][0]["source_frame"]["path"])
+        self.assertEqual(f"b-roll-review-{review_id}-assets/frame-001.jpg", payload["shots"][0]["source_frame"]["path"])
+        self.assertTrue((page.parent / payload["shots"][0]["source_frame"]["path"]).is_file())
         self.assertEqual("../../work/cache/b-roll/factory.mp4", payload["shots"][0]["candidates"][0]["path"])
         self.assertIn("type=\"radio\"", html)
         self.assertIn("textarea", html)
@@ -380,6 +381,28 @@ class BrollReviewPageTests(BrollPlanTests):
         self.assertIn("explicit_user_action", html)
         with self.assertRaises(FileExistsError):
             build_review_page.build_review_page(self.plan, self.timeline, self.transcript, self.video, self.review_dir, project_root=self.root, review_id=review_id)
+
+    def test_build_review_page_keeps_prior_publication_when_a_second_uuid_is_published(self):
+        first = "123e4567-e89b-12d3-a456-426614174001"
+        second = "123e4567-e89b-12d3-a456-426614174002"
+        with mock.patch.object(build_review_page, "_extract_frame", side_effect=self._frame):
+            original = build_review_page.build_review_page(self.plan, self.timeline, self.transcript, self.video, self.review_dir, project_root=self.root, review_id=first)
+            previous_bytes = original["page"].read_bytes()
+            next_review = build_review_page.build_review_page(self.plan, self.timeline, self.transcript, self.video, self.review_dir, project_root=self.root, review_id=second)
+        self.assertEqual(previous_bytes, original["page"].read_bytes())
+        self.assertNotEqual(original["assets_dir"], next_review["assets_dir"])
+
+    def test_review_jpeg_requires_exact_review_width(self):
+        wrong = self.root / "wrong.jpg"
+        Image.new("RGB", (959, 540), "white").save(wrong, "JPEG")
+        with self.assertRaisesRegex(ValueError, "valid JPEG"):
+            build_review_page._validate_jpeg(wrong)
+
+    def test_template_blocks_invalid_selected_media_controls(self):
+        template = build_review_page.TEMPLATE_PATH.read_text(encoding="utf-8")
+        self.assertNotIn("路", template)
+        for text in ("Number.isFinite(start)", "end>start", "end>duration", "ken_burns", "Select a Ken Burns direction", "Invalid video trim"):
+            self.assertIn(text, template)
 
     def test_build_review_page_rejects_invalid_or_escaping_input_without_publication(self):
         invalid = copy.deepcopy(self.plan)

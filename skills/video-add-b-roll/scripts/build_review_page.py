@@ -41,7 +41,7 @@ def _extract_frame(video, time_s, output):
 def _validate_jpeg(path):
     try:
         with Image.open(path) as image:
-            if image.format != "JPEG" or image.width <= 0 or image.height <= 0:
+            if image.format != "JPEG" or image.width != 960 or image.height <= 0:
                 raise ValueError("review frame is not a valid JPEG")
     except (OSError, ValueError) as error:
         raise ValueError("review frame is not a valid JPEG") from error
@@ -65,8 +65,8 @@ def _payload(plan, timeline, root, assets_dir):
             path = broll_plan._candidate_path(root, candidate["cache_path"])
             if path is None or not path.is_file():
                 raise ValueError(f"{shot['id']} candidate path escapes project root")
-            candidates.append({"id": candidate["id"], "media_type": candidate["media_type"], "path": os.path.relpath(path, assets_dir.parent).replace("\\", "/"), "sha256": candidate["sha256"], "duration_s": candidate.get("duration_s") or candidate.get("probe", {}).get("duration_s"), "provenance": candidate["provenance"]})
-        payload_shots.append({"id": shot["id"], "program_range": shot["program_range"], "source_ranges": shot["source_ranges"], "transcript_evidence": shot["transcript_evidence"], "editorial_reason": shot["editorial_reason"], "visual_intent": shot["visual_intent"], "queries": shot["queries"], "source_frame": {"path": f"assets/{frame.name}", "sha256": None}, "candidates": candidates})
+            candidates.append({"id": candidate["id"], "media_type": candidate["media_type"], "path": os.path.relpath(path, assets_dir.parent).replace("\\", "/"), "sha256": candidate["sha256"], "duration_s": candidate.get("duration_s") or candidate.get("probe", {}).get("duration_s") or float(shot["program_range"]["end_s"]) - float(shot["program_range"]["start_s"]), "provenance": candidate["provenance"]})
+        payload_shots.append({"id": shot["id"], "program_range": shot["program_range"], "source_ranges": shot["source_ranges"], "transcript_evidence": shot["transcript_evidence"], "editorial_reason": shot["editorial_reason"], "visual_intent": shot["visual_intent"], "queries": shot["queries"], "source_frame": {"path": f"{assets_dir.name}/{frame.name}", "sha256": None}, "candidates": candidates})
     return payload_shots
 
 
@@ -117,10 +117,10 @@ def build_review_page(plan, timeline, transcript, video, output_dir, *, project_
                 shot["source_frame"]["sha256"] = _hash(frame)
             subject_hash = broll_plan.canonical_sha256(broll_plan.review_subject(plan))
             payload = {"review_id": identifier, "plan_sha256": subject_hash, "plan_subject_sha256": subject_hash, "candidate_manifest_sha256": broll_plan.canonical_sha256(broll_plan.candidate_manifest(plan)), "decision_modes": ["human", "agent"], "shots": shots}
-            document = template.replace(PAYLOAD_MARKER, base64.b64encode(json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")).decode("ascii"))
+            document = template.replace(PAYLOAD_MARKER, base64.b64encode(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")).decode("ascii"))
             staged_page = stage / page.name
             staged_page.write_text(document, encoding="utf-8")
-            output_dir.mkdir()
+            output_dir.mkdir(parents=True, exist_ok=True)
             os.replace(staged_assets, assets_dir)
             os.replace(staged_page, page)
     except Exception:
