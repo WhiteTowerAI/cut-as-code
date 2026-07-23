@@ -3,6 +3,7 @@
 import copy
 import hashlib
 import json
+import math
 import os
 import sys
 import tempfile
@@ -46,10 +47,13 @@ def review_subject(plan):
 
 
 def _range(value):
+    if not isinstance(value, dict):
+        return None
     try:
-        return float(value["start_s"]), float(value["end_s"])
+        start, end = float(value["start_s"]), float(value["end_s"])
     except (KeyError, TypeError, ValueError):
         return None
+    return (start, end) if math.isfinite(start) and math.isfinite(end) else None
 
 
 def _mapped_words(transcript, timeline):
@@ -62,12 +66,14 @@ def _mapped_words(transcript, timeline):
         for word in segment.get("words", []):
             source, program = _range(word.get("source_range")), _range(word.get("program_range"))
             if source and program:
-                result.add((str(word.get("word", "")).strip(), source, program))
+                result.add((word.get("word"), source, program))
     return result
 
 
 def _candidate_errors(shot_id, candidate):
     errors = []
+    if not isinstance(candidate, dict):
+        return [f"{shot_id} candidate must be an object"]
     candidate_id = candidate.get("id")
     if not isinstance(candidate_id, str) or not candidate_id.strip():
         errors.append(f"{shot_id} candidate id is required")
@@ -75,17 +81,19 @@ def _candidate_errors(shot_id, candidate):
         errors.append(f"{shot_id} candidate {candidate_id} media_type is invalid")
     if not isinstance(candidate.get("cache_path"), str) or not candidate["cache_path"].strip():
         errors.append(f"{shot_id} candidate {candidate_id} cache_path is required")
-    if not isinstance(candidate.get("sha256"), str) or len(candidate["sha256"]) != 64:
+    if not isinstance(candidate.get("sha256"), str) or len(candidate["sha256"]) != 64 or any(char not in "0123456789abcdefABCDEF" for char in candidate["sha256"]):
         errors.append(f"{shot_id} candidate {candidate_id} SHA-256 is required")
     provenance = candidate.get("provenance")
     if not isinstance(provenance, dict) or provenance.get("source_type") not in {"local", "pexels", "external-generated"}:
         errors.append(f"{shot_id} candidate {candidate_id} provenance is invalid")
-    elif not all(isinstance(provenance.get(key), str) and provenance[key].strip() for key in ("creator", "license", "retrieval_time")) or not (provenance.get("source_url") or provenance.get("original_path")):
+    elif (not all(isinstance(provenance.get(key), str) and provenance[key].strip() for key in ("creator", "license", "retrieval_time")) or not any(isinstance(provenance.get(key), str) and provenance[key].strip() for key in ("source_url", "original_path"))):
         errors.append(f"{shot_id} candidate {candidate_id} provenance is incomplete")
     return errors
 
 
 def _candidate_path(root, value):
+    if not isinstance(value, str):
+        return None
     raw = Path(value)
     if raw.is_absolute() or ".." in raw.parts:
         return None
@@ -108,13 +116,18 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
     try:
         if float(plan.get("program_duration_s")) != float(timeline.get("program_duration_s")): errors.append("plan program_duration_s does not match timeline")
     except (TypeError, ValueError): errors.append("plan program_duration_s is required")
-    if plan.get("brief", {}).get("density") != "selective": errors.append("brief density must be selective")
+    brief = plan.get("brief")
+    if not isinstance(brief, dict): errors.append("brief must be an object")
+    elif brief.get("density") != "selective": errors.append("brief density must be selective")
     duration = float(timeline.get("program_duration_s", 0) or 0)
     mapped = _mapped_words(transcript, timeline)
     seen_shots, ranges, candidate_ids = set(), [], set()
     shots = plan.get("shots", [])
     if not isinstance(shots, list): return errors + ["shots must be a list"]
     for shot in shots:
+        if not isinstance(shot, dict):
+            errors.append("shot must be an object")
+            continue
         shot_id = shot.get("id")
         if not isinstance(shot_id, str) or not shot_id.strip(): errors.append("shot id is required"); shot_id = "<missing>"
         elif shot_id in seen_shots: errors.append(f"duplicate shot id: {shot_id}")
@@ -123,12 +136,22 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
         if not program or program[0] < 0 or program[1] <= program[0] or program[1] > duration:
             errors.append(f"{shot_id} program range is outside timeline")
         else: ranges.append((program[0], program[1], shot_id))
-        words = shot.get("transcript_evidence", {}).get("words", [])
+        source_ranges = shot.get("source_ranges", [])
+        if not isinstance(source_ranges, list): errors.append(f"{shot_id} source_ranges must be a list")
+        elif any(not isinstance(item, dict) or not _range(item) for item in source_ranges): errors.append(f"{shot_id} source range is invalid")
+        evidence = shot.get("transcript_evidence")
+        if not isinstance(evidence, dict):
+            errors.append(f"{shot_id} transcript evidence must be an object")
+            evidence = {}
+        words = evidence.get("words", [])
         if not isinstance(words, list): errors.append(f"{shot_id} transcript evidence words must be a list")
         else:
             for word in words:
+                if not isinstance(word, dict):
+                    errors.append(f"{shot_id} transcript evidence word is not mapped from transcript")
+                    continue
                 source, mapped_program = _range(word.get("source_range")), _range(word.get("program_range"))
-                if not source or not mapped_program or (str(word.get("word", "")).strip(), source, mapped_program) not in mapped:
+                if not source or not mapped_program or (word.get("word"), source, mapped_program) not in mapped:
                     errors.append(f"{shot_id} transcript evidence word is not mapped from transcript")
         queries = shot.get("queries", [])
         if not isinstance(queries, list) or not 2 <= len(queries) <= 3 or any(not isinstance(query, str) or not query.strip() for query in queries): errors.append(f"{shot_id} queries must contain 2-3 nonblank strings")
@@ -136,7 +159,9 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
         if not isinstance(candidates, list): errors.append(f"{shot_id} candidates must be a list"); candidates = []
         local_ids = set()
         for candidate in candidates:
-            errors.extend(_candidate_errors(shot_id, candidate)); candidate_id = candidate.get("id")
+            errors.extend(_candidate_errors(shot_id, candidate))
+            if not isinstance(candidate, dict): continue
+            candidate_id = candidate.get("id") if isinstance(candidate.get("id"), str) else "<missing>"
             if candidate_id in local_ids or candidate_id in candidate_ids: errors.append(f"duplicate candidate id: {candidate_id}")
             local_ids.add(candidate_id); candidate_ids.add(candidate_id)
             if verify_files and project_root:
@@ -146,23 +171,36 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
                 elif not path.is_file(): errors.append(f"{prefix} file is missing")
                 elif candidate.get("sha256") != sha256_file(path): errors.append(f"{prefix} SHA-256 is stale")
         selected, status = shot.get("selected"), shot.get("status")
-        if status == "selected" and (not isinstance(selected, dict) or selected.get("candidate_id") not in local_ids): errors.append(f"{shot_id} selected candidate does not belong to shot")
-        if status == "skipped" and selected is not None: errors.append(f"{shot_id} skipped shot must not select a candidate")
+        if status not in {"planned", "candidates_ready", "selected", "normalized", "verified", "skipped"}: errors.append(f"{shot_id} status is invalid")
+        elif status in {"planned", "candidates_ready", "skipped"} and selected is not None: errors.append(f"{shot_id} {status} shot must not select a candidate")
+        elif status in {"selected", "normalized", "verified"} and not isinstance(selected, dict): errors.append(f"{shot_id} {status} shot requires a selection")
+        elif status in {"selected", "normalized", "verified"} and selected.get("candidate_id") not in local_ids: errors.append(f"{shot_id} selected candidate does not belong to shot")
     for start, end, shot_id in sorted(ranges):
         for previous_start, previous_end, previous_id in ranges:
             if previous_id != shot_id and previous_start < end and start < previous_end:
                 errors.append(f"{shot_id} program range overlaps {previous_id}"); break
     if project is not None:
-        operations = {item.get("id"): item for item in project.get("operations", [])}
+        operations = {item.get("id"): item for item in project.get("operations", []) if isinstance(item, dict)} if isinstance(project, dict) else {}
         dependencies, based_on = plan.get("dependencies", []), plan.get("based_on", {})
+        if not isinstance(dependencies, list): errors.append("dependencies must be a list"); dependencies = []
+        elif any(not isinstance(item, str) or not item.strip() for item in dependencies): errors.append("dependencies must contain nonblank strings"); dependencies = [item for item in dependencies if isinstance(item, str) and item.strip()]
+        if not isinstance(based_on, dict): errors.append("based_on must be an object"); based_on = {}
+        active = project.get("active_sequence") if isinstance(project, dict) else None
+        sequence = project.get("sequences", {}).get(active, {}) if isinstance(project, dict) and isinstance(project.get("sequences"), dict) else {}
+        active_ids = sequence.get("operations", []) if isinstance(sequence, dict) else []
+        required = (["understanding"] if "understanding" in operations else ["understand"] if "understand" in operations and "understand" in dependencies else [])
+        required += [operation_id for operation_id in ("cut", "color-grade") if operation_id in active_ids and operation_id in operations]
+        if set(dependencies) != set(required): errors.append("plan dependencies do not match current dependencies")
         if set(dependencies) != set(based_on): errors.append("based_on does not match dependencies")
         for dependency in dependencies:
             current = operations.get(dependency, {}).get("revision")
             if current != based_on.get(dependency): errors.append(f"based_on {dependency} revision is stale: expected {based_on.get(dependency)}, current {current}")
+    if verify_files and not project_root: errors.append("verify_files requires project_root")
     if project_root:
         hashes = plan.get("input_hashes", {})
         for key, path in (("transcript_sha256", Path(project_root) / "work/understand/transcript.json"), ("timeline_sha256", Path(project_root) / "work/timeline.json")):
-            if path.is_file() and hashes.get(key) != sha256_file(path): errors.append(f"{key.split('_')[0]} SHA-256 is stale")
+            if not path.is_file(): errors.append(f"{key.split('_')[0]} file is missing")
+            elif not isinstance(hashes, dict) or hashes.get(key) != sha256_file(path): errors.append(f"{key.split('_')[0]} SHA-256 is stale")
     return errors
 
 

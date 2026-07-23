@@ -28,8 +28,8 @@ class BrollPlanTests(unittest.TestCase):
         asset.write_bytes(b"asset")
         mapped = projectlib.map_transcript_to_timeline(self.transcript, self.timeline)["segments"][0]["words"][0]
         candidate = {"id": "asset", "media_type": "video", "cache_path": "cache/b-roll/factory.mp4", "sha256": broll_plan.sha256_file(asset), "provenance": {"source_type": "local", "creator": "me", "license": "owned", "retrieval_time": "2026-07-23T00:00:00Z", "original_path": "input/factory.mp4"}}
-        self.plan = {"schema_version": 1, "timeline_id": "main", "timebase": "program", "program_duration_s": 10.0, "dependencies": ["understand", "cut"], "based_on": {"understand": 1, "cut": 2}, "input_hashes": {"transcript_sha256": broll_plan.sha256_file(self.transcript_path), "timeline_sha256": broll_plan.sha256_file(self.timeline_path)}, "brief": {"density": "selective"}, "decision": None, "review": None, "shots": [{"id": "shot", "program_range": {"start_s": 1.0, "end_s": 2.0}, "source_ranges": [{"clip_id": "one", "start_s": 1.0, "end_s": 2.0}], "transcript_evidence": {"words": [mapped]}, "editorial_reason": "Supports the statement.", "visual_intent": "Factory work.", "queries": ["factory assembly", "manufacturing line"], "candidates": [candidate], "selected": None, "status": "candidates_ready"}]}
-        self.project = {"operations": [{"id": "understand", "revision": 1}, {"id": "cut", "revision": 2}]}
+        self.plan = {"schema_version": 1, "timeline_id": "main", "timebase": "program", "program_duration_s": 10.0, "dependencies": ["understanding", "cut", "color-grade"], "based_on": {"understanding": 1, "cut": 2, "color-grade": 3}, "input_hashes": {"transcript_sha256": broll_plan.sha256_file(self.transcript_path), "timeline_sha256": broll_plan.sha256_file(self.timeline_path)}, "brief": {"density": "selective"}, "decision": None, "review": None, "shots": [{"id": "shot", "program_range": {"start_s": 1.0, "end_s": 2.0}, "source_ranges": [{"clip_id": "one", "start_s": 1.0, "end_s": 2.0}], "transcript_evidence": {"words": [mapped]}, "editorial_reason": "Supports the statement.", "visual_intent": "Factory work.", "queries": ["factory assembly", "manufacturing line"], "candidates": [candidate], "selected": None, "status": "candidates_ready"}]}
+        self.project = {"active_sequence": "main", "sequences": {"main": {"operations": ["cut", "color-grade"]}}, "operations": [{"id": "understanding", "revision": 1}, {"id": "cut", "revision": 2}, {"id": "color-grade", "revision": 3}]}
 
     def tearDown(self): self.temp.cleanup()
 
@@ -78,6 +78,42 @@ class BrollPlanTests(unittest.TestCase):
             plan = copy.deepcopy(self.plan); plan["shots"][0]["candidates"][0]["cache_path"] = path
             if digest: plan["shots"][0]["candidates"][0]["sha256"] = digest
             self.assertTrue(any(message in error for error in broll_plan.validate_plan(plan, self.timeline, self.transcript, project_root=self.root, verify_files=True)))
+
+    def test_malformed_nested_values_return_precise_errors_without_raising(self):
+        for key, value, message in (("brief", [], "brief must be an object"), ("shots", [None], "shot must be an object"), ("evidence", None, "shot transcript evidence must be an object"), ("candidate", None, "shot candidate must be an object"), ("provenance", None, "shot candidate asset provenance is invalid")):
+            with self.subTest(key=key):
+                plan = copy.deepcopy(self.plan)
+                if key == "brief": plan["brief"] = value
+                elif key == "shots": plan["shots"] = value
+                elif key == "evidence": plan["shots"][0]["transcript_evidence"] = value
+                elif key == "candidate": plan["shots"][0]["candidates"] = [value]
+                else: plan["shots"][0]["candidates"][0]["provenance"] = value
+                self.assertIn(message, broll_plan.validate_plan(plan, self.timeline, self.transcript))
+
+    def test_validation_rejects_nonfinite_timings_exact_words_and_bad_provenance(self):
+        for value in (float("nan"), float("inf")):
+            plan = copy.deepcopy(self.plan); plan["shots"][0]["program_range"]["start_s"] = value
+            self.assertIn("shot program range is outside timeline", broll_plan.validate_plan(plan, self.timeline, self.transcript))
+        plan = copy.deepcopy(self.plan); plan["shots"][0]["transcript_evidence"]["words"][0]["word"] = " factory"
+        self.assertIn("shot transcript evidence word is not mapped from transcript", broll_plan.validate_plan(plan, self.timeline, self.transcript))
+        plan = copy.deepcopy(self.plan); candidate = plan["shots"][0]["candidates"][0]; candidate["sha256"] = "g" * 64; candidate["provenance"]["original_path"] = 3
+        errors = broll_plan.validate_plan(plan, self.timeline, self.transcript)
+        self.assertIn("shot candidate asset SHA-256 is required", errors); self.assertIn("shot candidate asset provenance is incomplete", errors)
+
+    def test_lifecycles_and_current_dependency_set_are_enforced(self):
+        plan = copy.deepcopy(self.plan); plan["shots"][0].update({"status": "selected", "selected": None})
+        self.assertIn("shot selected shot requires a selection", broll_plan.validate_plan(plan, self.timeline, self.transcript))
+        plan = copy.deepcopy(self.plan); plan["shots"][0].update({"status": "planned", "selected": {"candidate_id": "asset"}})
+        self.assertIn("shot planned shot must not select a candidate", broll_plan.validate_plan(plan, self.timeline, self.transcript))
+        plan = copy.deepcopy(self.plan); plan["dependencies"] = ["understanding", "cut"]
+        self.assertIn("plan dependencies do not match current dependencies", broll_plan.validate_plan(plan, self.timeline, self.transcript, project=self.project, project_root=self.root))
+
+    def test_root_inputs_must_exist_and_verify_files_requires_root(self):
+        self.assertIn("verify_files requires project_root", broll_plan.validate_plan(self.plan, self.timeline, self.transcript, verify_files=True))
+        self.transcript_path.unlink()
+        self.assertIn("transcript file is missing", broll_plan.validate_plan(self.plan, self.timeline, self.transcript, project_root=self.root))
+        self.timeline_path.unlink()
+        self.assertIn("timeline file is missing", broll_plan.validate_plan(self.plan, self.timeline, self.transcript, project_root=self.root))
 
 
 if __name__ == "__main__": unittest.main()
