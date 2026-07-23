@@ -71,20 +71,18 @@ def _destination(value):
 def _source(candidate, root):
     if not isinstance(candidate, dict):
         raise ValueError("candidate must be an object")
-    value = candidate.get("path") or candidate.get("cache_path")
-    if not isinstance(value, (str, os.PathLike)):
-        raise ValueError("candidate path is required")
-    raw = Path(value)
-    source = raw.resolve() if raw.is_absolute() else broll_plan._candidate_path(root, str(raw))
+    value = candidate.get("cache_path")
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("candidate cache_path is required")
+    source = broll_plan._candidate_path(root, value)
     if source is None:
         raise ValueError("candidate path escapes project root")
-    try:
-        source.relative_to(root)
-    except ValueError as exc:
-        raise ValueError("candidate path escapes project root") from exc
     if not source.is_file():
         raise ValueError("candidate file is missing")
-    return source
+    digest = broll_plan.sha256_file(source)
+    if candidate.get("sha256") not in (None, digest):
+        raise ValueError("candidate SHA-256 is stale")
+    return source, digest
 
 
 def _grade(lut, root):
@@ -143,10 +141,9 @@ def _probe(path):
 
 
 def _check_probe(probe, width, height, num, den, duration):
-    expected_fps = {"num": num, "den": den}
     if (probe["width"], probe["height"]) != (width, height):
         raise ValueError("normalized dimensions do not match timeline")
-    if probe["fps"] != expected_fps:
+    if Fraction(probe["fps"]["num"], probe["fps"]["den"]) != Fraction(num, den):
         raise ValueError("normalized fps does not match timeline")
     if probe["sar"] != "1:1" or probe["codec"] != "h264" or probe["pix_fmt"] != "yuv420p":
         raise ValueError("normalized video format is invalid")
@@ -196,7 +193,7 @@ def normalize_shot(candidate, shot, timeline, destination, *, lut=None):
     try:
         width, height, num, den = _timeline_spec(timeline)
         duration = _shot_duration(shot, timeline)
-        source = _source(candidate, root)
+        source, source_digest = _source(candidate, root)
         lut_path, grade_hashes = _grade(lut, root)
         media_type, option = _selection(candidate, shot, duration, num, den)
         common = [
@@ -228,6 +225,7 @@ def normalize_shot(candidate, shot, timeline, destination, *, lut=None):
         return {
             "path": target,
             "source_path": candidate.get("cache_path"),
+            "source_sha256": source_digest,
             "sha256": digest,
             "probe": probe,
             **grade_hashes,
@@ -238,8 +236,30 @@ def normalize_shot(candidate, shot, timeline, destination, *, lut=None):
         raise
 
 
+def _validate_normalized(record, candidate, shot, timeline, output, root, grade_hashes):
+    if not isinstance(record, dict):
+        raise ValueError("normalized record is required")
+    expected_path = output.relative_to(root / "work").as_posix()
+    if record.get("path") != expected_path or not output.is_file():
+        raise ValueError("normalized output path is stale")
+    _, source_digest = _source(candidate, root)
+    if record.get("source_path") != candidate.get("cache_path") or record.get("source_sha256") != source_digest:
+        raise ValueError("normalized source identity is stale")
+    if record.get("sha256") != broll_plan.sha256_file(output):
+        raise ValueError("normalized output SHA-256 is stale")
+    for key in ("grade_plan_sha256", "selected_lut_sha256"):
+        if (key in record or key in grade_hashes) and record.get(key) != grade_hashes.get(key):
+            raise ValueError("normalized grade identity is stale")
+    width, height, num, den = _timeline_spec(timeline)
+    probe = _probe(output)
+    _check_probe(probe, width, height, num, den, _shot_duration(shot, timeline))
+    if record.get("probe") != probe:
+        raise ValueError("normalized probe is stale")
+    subprocess.run(["ffmpeg", "-v", "error", "-i", str(output), "-map", "0:v:0", "-f", "null", "-"], check=True, capture_output=True)
+
+
 def normalize_plan(plan_path, timeline_path, project_root, *, lut=None):
-    """Normalize each selected shot and durably persist its lifecycle record."""
+    """Validate, resume, and durably normalize each selected shot."""
     root = Path(project_root).resolve()
     plan_path, timeline_path = Path(plan_path).resolve(), Path(timeline_path).resolve()
     for label, path in (("plan", plan_path), ("timeline", timeline_path)):
@@ -247,19 +267,39 @@ def normalize_plan(plan_path, timeline_path, project_root, *, lut=None):
             path.relative_to(root)
         except ValueError as exc:
             raise ValueError(f"{label} path escapes project root") from exc
-    plan, timeline = projectlib.load_json(plan_path), projectlib.load_json(timeline_path)
+    try:
+        plan = projectlib.load_json(plan_path)
+        timeline = projectlib.load_json(timeline_path)
+        transcript = projectlib.load_json(root / "work/understand/transcript.json")
+        project = projectlib.load_json(root / "work/project.json")
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("canonical project inputs are missing or invalid") from exc
     if not isinstance(plan, dict) or not isinstance(plan.get("shots"), list):
         raise ValueError("plan shots must be a list")
-    if plan.get("timeline_id") != timeline.get("timeline_id"):
-        raise ValueError("plan timeline_id does not match timeline")
+    if plan.get("review_status") != "approved":
+        raise ValueError("review_status must be approved")
+    errors = broll_plan.validate_plan(
+        plan, timeline, transcript, project=project, project_root=root, verify_files=True
+    )
+    if errors:
+        raise ValueError("invalid B-roll plan: " + "; ".join(errors))
+    dependencies = broll_plan.active_dependencies(project)
+    graded = "color-grade" in dependencies
+    if graded and lut is None:
+        raise ValueError("selected LUT is required for active color-grade")
+    if not graded and lut is not None:
+        raise ValueError("selected LUT requires active color-grade")
+    lut_path, grade_hashes = _grade(lut, root) if graded else (None, {})
+    input_hashes = plan.get("input_hashes", {})
+    for key, digest in grade_hashes.items():
+        if input_hashes.get(key) != digest:
+            raise ValueError(f"{key} is stale")
     result = copy.deepcopy(plan)
     for index, shot in enumerate(result["shots"], 1):
         if not isinstance(shot, dict):
             raise ValueError("plan shots must be objects")
         if shot.get("status") == "skipped":
             continue
-        if shot.get("status") != "selected":
-            raise ValueError("normalize_plan requires selected or skipped shots")
         selected, candidates = shot.get("selected"), shot.get("candidates")
         if not isinstance(selected, dict) or not isinstance(candidates, list):
             raise ValueError("selected shot is invalid")
@@ -267,13 +307,19 @@ def normalize_plan(plan_path, timeline_path, project_root, *, lut=None):
         if candidate is None:
             raise ValueError("selected candidate does not belong to shot")
         output = root / f"work/cache/b-roll/normalized/broll-{index:03d}.mp4"
-        record = normalize_shot(candidate, shot, timeline, output, lut=lut)
-        expected_hashes = plan.get("input_hashes") if isinstance(plan.get("input_hashes"), dict) else {}
-        for key in ("grade_plan_sha256", "selected_lut_sha256"):
-            if lut is not None and expected_hashes.get(key) not in (None, record.get(key)):
-                output.unlink(missing_ok=True)
-                raise ValueError(f"{key} is stale")
+        if shot.get("status") == "normalized":
+            _validate_normalized(shot.get("normalized"), candidate, shot, timeline, output, root, grade_hashes)
+            continue
+        if shot.get("status") != "selected":
+            raise ValueError("normalize_plan requires selected, normalized, or skipped shots")
+        record = normalize_shot(candidate, shot, timeline, output, lut=lut_path)
         record["path"] = output.relative_to(root / "work").as_posix()
         shot["normalized"], shot["status"] = record, "normalized"
-    projectlib.write_json(plan_path, result)
+        errors = broll_plan.validate_plan(
+            result, timeline, transcript, project=project, project_root=root, verify_files=True
+        )
+        if errors:
+            output.unlink(missing_ok=True)
+            raise ValueError("invalid normalized plan: " + "; ".join(errors))
+        projectlib.write_json(plan_path, result)
     return result

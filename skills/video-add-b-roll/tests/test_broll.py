@@ -1906,23 +1906,56 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
         self.assertFalse(self.review_dir.exists())
 
 
-class NormalizeAndCheckTests(unittest.TestCase):
+class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
-        self.root = Path(self.temp.name)
+        _BrollFixture.setUp(self)
         self.candidates = self.root / "work/cache/b-roll/candidates"
         self.candidates.mkdir(parents=True)
         self.output = self.root / "work/cache/b-roll/normalized/broll-001.mp4"
-        self.timeline = {
-            "schema_version": 1,
-            "timeline_id": "main",
-            "program_duration_s": 1.0,
-            "width": 96,
-            "height": 54,
-            "fps": {"num": 30000, "den": 1001},
-        }
+        self.timeline.update({"width": 96, "height": 54, "fps": {"num": 30000, "den": 1001}})
+        projectlib.write_json(self.timeline_path, self.timeline)
+        self.selected_lut_path.write_text(
+            'TITLE "Identity"\nLUT_3D_SIZE 2\nDOMAIN_MIN 0 0 0\nDOMAIN_MAX 1 1 1\n'
+            "0 0 0\n0 0 1\n0 1 0\n0 1 1\n1 0 0\n1 0 1\n1 1 0\n1 1 1\n",
+            encoding="ascii",
+        )
+        source = self._video()
+        candidate = self.plan["shots"][0]["candidates"][0]
+        candidate.update({
+            "cache_path": source.relative_to(self.root / "work").as_posix(),
+            "sha256": broll_plan.sha256_file(source), "bytes": source.stat().st_size,
+            "duration_s": 2.0, "probe": {"duration_s": 2.0, "width": 128, "height": 96},
+        })
+        self.plan["input_hashes"].update({
+            "timeline_sha256": broll_plan.sha256_file(self.timeline_path),
+            "grade_plan_sha256": broll_plan.sha256_file(self.grade_plan_path),
+            "selected_lut_sha256": broll_plan.sha256_file(self.selected_lut_path),
+        })
+        self.base_plan = copy.deepcopy(self.plan)
+        self.plan = self._approve(self.base_plan)
+        self.plan_path = self.root / "work/b-roll/broll-plan.json"
+        projectlib.write_json(self.plan_path, self.plan)
 
-    def tearDown(self): self.temp.cleanup()
+    def _approve(self, plan):
+        decisions = [
+            {"id": shot["id"], "decision": "select", "candidate_id": shot["candidates"][0]["id"], "source_trim": {"start_s": 0.25, "end_s": 1.25}}
+            for shot in plan["shots"]
+        ]
+        return broll_plan.apply_review(
+            plan, self.review_for(plan, decisions), mode="agent", actor="agent", rationale="Relevant footage."
+        )
+
+    def _two_shot_plan(self):
+        plan = copy.deepcopy(self.base_plan)
+        second = copy.deepcopy(plan["shots"][0])
+        second.update({
+            "id": "second", "program_range": {"start_s": 2, "end_s": 3},
+            "source_ranges": [{"clip_id": "one", "start_s": 2, "end_s": 3}],
+            "transcript_evidence": {"words": [self.mapped_words[1]]},
+        })
+        second["candidates"][0]["id"] = "asset-2"
+        plan["shots"].append(second)
+        return self._approve(plan)
 
     def _video(self, name="source.mp4"):
         path = self.candidates / name
@@ -1959,14 +1992,14 @@ class NormalizeAndCheckTests(unittest.TestCase):
         self.assertFalse(record["probe"]["has_audio"])
         self.assertAlmostEqual(1.0, record["probe"]["duration_s"], delta=1001 / 30000)
 
-        plan_path = self.root / "work/b-roll/broll-plan.json"
-        timeline_path = self.root / "work/timeline.json"
-        projectlib.write_json(plan_path, {"schema_version": 1, "timeline_id": "main", "shots": [shot]})
-        projectlib.write_json(timeline_path, self.timeline)
-        updated = normalize_broll.normalize_plan(plan_path, timeline_path, self.root)
+        updated = normalize_broll.normalize_plan(self.plan_path, self.timeline_path, self.root, lut=self.selected_lut_path)
         self.assertEqual("normalized", updated["shots"][0]["status"])
         self.assertEqual("cache/b-roll/normalized/broll-001.mp4", updated["shots"][0]["normalized"]["path"])
-        self.assertEqual(updated, projectlib.load_json(plan_path))
+        self.assertEqual(
+            {key: self.plan["input_hashes"][key] for key in ("grade_plan_sha256", "selected_lut_sha256")},
+            {key: updated["shots"][0]["normalized"][key] for key in ("grade_plan_sha256", "selected_lut_sha256")},
+        )
+        self.assertEqual(updated, projectlib.load_json(self.plan_path))
 
     def test_explicit_still_uses_ken_burns_but_no_implicit_fallback(self):
         source = self.candidates / "still.png"
@@ -2002,7 +2035,7 @@ class NormalizeAndCheckTests(unittest.TestCase):
     def test_active_lut_is_applied_by_basename_from_lut_cwd(self):
         candidate, shot = self._video_shot(self._video("graded-source.mp4"))
         lut = self.root / "final/look.cube"
-        lut.parent.mkdir(parents=True)
+        lut.parent.mkdir(parents=True, exist_ok=True)
         lut.write_text(
             'TITLE "Identity"\nLUT_3D_SIZE 2\nDOMAIN_MIN 0 0 0\nDOMAIN_MAX 1 1 1\n'
             "0 0 0\n0 0 1\n0 1 0\n0 1 1\n1 0 0\n1 0 1\n1 1 0\n1 1 1\n",
@@ -2025,6 +2058,136 @@ class NormalizeAndCheckTests(unittest.TestCase):
         self.assertEqual(lut.parent.resolve(), Path(cwd).resolve())
         self.assertEqual(broll_plan.sha256_file(grade_plan), record["grade_plan_sha256"])
         self.assertEqual(broll_plan.sha256_file(lut), record["selected_lut_sha256"])
+
+    def test_resume_persists_each_shot_and_reuses_only_valid_normalized_output(self):
+        projectlib.write_json(self.plan_path, self._two_shot_plan())
+        real_normalize = normalize_broll.normalize_shot
+        calls = []
+
+        def fail_second(candidate, *args, **kwargs):
+            calls.append(candidate["id"])
+            if candidate["id"] == "asset-2":
+                raise RuntimeError("later shot failed")
+            return real_normalize(candidate, *args, **kwargs)
+
+        with mock.patch.object(normalize_broll, "normalize_shot", side_effect=fail_second):
+            with self.assertRaisesRegex(RuntimeError, "later shot failed"):
+                normalize_broll.normalize_plan(self.plan_path, self.timeline_path, self.root, lut=self.selected_lut_path)
+        persisted = projectlib.load_json(self.plan_path)
+        self.assertEqual(["normalized", "selected"], [shot["status"] for shot in persisted["shots"]])
+        self.assertEqual([], broll_plan.validate_plan(
+            persisted, self.timeline, self.transcript, project=self.project, project_root=self.root, verify_files=True
+        ))
+        first_output = self.output.read_bytes()
+
+        stale = copy.deepcopy(persisted)
+        stale["shots"][0]["normalized"]["sha256"] = "0" * 64
+        projectlib.write_json(self.plan_path, stale)
+        with mock.patch.object(normalize_broll, "normalize_shot", wraps=real_normalize) as render:
+            with self.assertRaisesRegex(ValueError, "normalized.*SHA-256"):
+                normalize_broll.normalize_plan(self.plan_path, self.timeline_path, self.root, lut=self.selected_lut_path)
+            render.assert_not_called()
+        self.assertEqual(first_output, self.output.read_bytes())
+
+        projectlib.write_json(self.plan_path, persisted)
+        with mock.patch.object(normalize_broll, "normalize_shot", wraps=real_normalize) as render:
+            updated = normalize_broll.normalize_plan(self.plan_path, self.timeline_path, self.root, lut=self.selected_lut_path)
+        self.assertEqual(1, render.call_count)
+        self.assertEqual("asset-2", render.call_args.args[0]["id"])
+        self.assertEqual(first_output, self.output.read_bytes())
+        self.assertEqual(["normalized", "normalized"], [shot["status"] for shot in updated["shots"]])
+
+    def test_plan_rejects_unapproved_tampered_and_stale_canonical_inputs(self):
+        original = {
+            "plan": copy.deepcopy(self.plan), "timeline": copy.deepcopy(self.timeline),
+            "transcript": copy.deepcopy(self.transcript), "project": copy.deepcopy(self.project),
+            "source": (self.candidates / "source.mp4").read_bytes(),
+        }
+        cases = []
+        cases.append(("unapproved", copy.deepcopy(self.base_plan), None, "review_status must be approved"))
+        tampered = copy.deepcopy(self.plan)
+        tampered["shots"][0]["selected"]["source_trim"]["start_s"] = 0.5
+        cases.append(("review", tampered, None, "review decisions do not match"))
+        transcript = copy.deepcopy(self.transcript); transcript["extra"] = True
+        cases.append(("transcript", copy.deepcopy(self.plan), (self.transcript_path, transcript), "transcript SHA-256 is stale"))
+        timeline = copy.deepcopy(self.timeline); timeline["fps"] = {"num": 24, "den": 1}
+        cases.append(("timeline", copy.deepcopy(self.plan), (self.timeline_path, timeline), "timeline SHA-256 is stale"))
+        project = copy.deepcopy(self.project); next(item for item in project["operations"] if item["id"] == "cut")["revision"] = 99
+        cases.append(("dependency", copy.deepcopy(self.plan), (self.project_path, project), "based_on cut revision is stale"))
+        cases.append(("candidate", copy.deepcopy(self.plan), (self.candidates / "source.mp4", original["source"] + b"changed"), "candidate asset SHA-256 is stale"))
+
+        for name, plan, mutation, message in cases:
+            with self.subTest(name=name):
+                projectlib.write_json(self.plan_path, plan)
+                projectlib.write_json(self.timeline_path, original["timeline"])
+                projectlib.write_json(self.transcript_path, original["transcript"])
+                projectlib.write_json(self.project_path, original["project"])
+                (self.candidates / "source.mp4").write_bytes(original["source"])
+                self.output.unlink(missing_ok=True)
+                if mutation:
+                    path, value = mutation
+                    projectlib.write_json(path, value) if isinstance(value, dict) else path.write_bytes(value)
+                with self.assertRaisesRegex(ValueError, message):
+                    normalize_broll.normalize_plan(self.plan_path, self.timeline_path, self.root, lut=self.selected_lut_path)
+                self.assertFalse(self.output.exists())
+
+    def test_plan_uses_reviewed_cache_path_not_candidate_path(self):
+        reviewed = self.candidates / "reviewed.mp4"
+        alternate = self.candidates / "alternate.mp4"
+        for path, color in ((reviewed, "blue"), (alternate, "red")):
+            subprocess.run([
+                "ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i",
+                f"color={color}:size=128x96:rate=24", "-t", "2", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(path),
+            ], check=True, capture_output=True)
+        plan = copy.deepcopy(self.base_plan)
+        candidate = plan["shots"][0]["candidates"][0]
+        candidate.update({
+            "cache_path": reviewed.relative_to(self.root / "work").as_posix(),
+            "path": alternate.relative_to(self.root / "work").as_posix(),
+            "sha256": broll_plan.sha256_file(reviewed), "bytes": reviewed.stat().st_size,
+        })
+        projectlib.write_json(self.plan_path, self._approve(plan))
+        calls, real_run = [], subprocess.run
+
+        def capture(command, *args, **kwargs):
+            calls.append(command)
+            return real_run(command, *args, **kwargs)
+
+        with mock.patch.object(normalize_broll.subprocess, "run", side_effect=capture):
+            updated = normalize_broll.normalize_plan(self.plan_path, self.timeline_path, self.root, lut=self.selected_lut_path)
+        record = updated["shots"][0]["normalized"]
+        command = next(command for command in calls if command[0] == "ffmpeg" and "-vf" in command)
+        self.assertEqual(reviewed.resolve(), Path(command[command.index("-i") + 1]).resolve())
+        self.assertEqual(candidate["cache_path"], record["source_path"])
+        self.assertEqual(candidate["sha256"], record.get("source_sha256"))
+
+    def test_plan_requires_active_grade_and_omits_hashes_without_grade(self):
+        with mock.patch.object(normalize_broll, "normalize_shot", wraps=normalize_broll.normalize_shot) as render:
+            with self.assertRaisesRegex(ValueError, "selected LUT is required"):
+                normalize_broll.normalize_plan(self.plan_path, self.timeline_path, self.root)
+            render.assert_not_called()
+        self.assertFalse(self.output.exists())
+
+        plan = copy.deepcopy(self.base_plan)
+        plan["dependencies"] = ["understanding", "cut"]
+        plan["based_on"].pop("color-grade")
+        plan["input_hashes"].pop("grade_plan_sha256")
+        plan["input_hashes"].pop("selected_lut_sha256")
+        project = copy.deepcopy(self.project)
+        project["sequences"]["main"]["operations"] = ["cut"]
+        projectlib.write_json(self.project_path, project)
+        projectlib.write_json(self.plan_path, self._approve(plan))
+        updated = normalize_broll.normalize_plan(self.plan_path, self.timeline_path, self.root)
+        record = updated["shots"][0]["normalized"]
+        self.assertNotIn("grade_plan_sha256", record)
+        self.assertNotIn("selected_lut_sha256", record)
+
+    def test_equivalent_unreduced_timeline_fps_is_accepted(self):
+        timeline = copy.deepcopy(self.timeline)
+        timeline["fps"] = {"num": 60000, "den": 2002}
+        candidate, shot = self._video_shot(self.candidates / "source.mp4")
+        record = normalize_broll.normalize_shot(candidate, shot, timeline, self.output)
+        self.assertEqual({"num": 30000, "den": 1001}, record["probe"]["fps"])
 
 
 class AcquisitionTests(unittest.TestCase):
