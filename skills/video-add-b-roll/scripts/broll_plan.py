@@ -167,8 +167,8 @@ def _project_parts(project):
         operation_id, revision = item.get("id"), item.get("revision")
         if not isinstance(operation_id, str) or not operation_id.strip() or operation_id in nodes:
             raise ValueError("project operation ids must be unique nonblank strings")
-        if not isinstance(revision, int) or isinstance(revision, bool):
-            raise ValueError(f"project operation {operation_id} revision must be an integer")
+        if not isinstance(revision, int) or isinstance(revision, bool) or revision <= 0:
+            raise ValueError(f"project operation {operation_id} revision must be a positive integer")
         nodes[operation_id] = item
     if any(not isinstance(item, str) or not item.strip() for item in sequence["operations"]):
         raise ValueError("project active sequence operation ids must be nonblank strings")
@@ -245,6 +245,11 @@ def register_operation(project, plan, *, plan_path="b-roll/broll-plan.json", rep
             value["operations"] = cleaned
     sequence, nodes = _project_parts(result)
     dependencies = active_dependencies(result)
+    expected_based_on = {item: nodes[item]["revision"] for item in dependencies}
+    if not isinstance(plan, dict) or plan.get("dependencies") != dependencies:
+        raise ValueError("plan dependencies do not match current dependencies")
+    if plan.get("based_on") != expected_based_on:
+        raise ValueError("plan based_on does not match current revisions")
     overlays = _verified_overlays(plan)
     if not overlays:
         if removed:
@@ -253,7 +258,7 @@ def register_operation(project, plan, *, plan_path="b-roll/broll-plan.json", rep
     revision = max((item.get("revision", 0) for item in old), default=0) + 1
     operation = {
         "id": "b-roll", "skill": "video-add-b-roll", "revision": revision,
-        "depends_on": dependencies, "based_on": {item: nodes[item]["revision"] for item in dependencies},
+        "depends_on": dependencies, "based_on": copy.deepcopy(expected_based_on),
         "status": "verified", "plan": plan_path, "outputs": [item["asset"] for item in overlays],
         "target": {"sequence": result["active_sequence"], "scope": "b-roll"},
         "effects": {"changes_timeline": False, "changes_geometry": False, "changes_video_pixels": True, "changes_audio": False, "adds_track": "b-roll"},

@@ -215,8 +215,12 @@ class BrollPlanTests(unittest.TestCase):
                 broll_plan.apply_review(self.plan, self.review(), mode="agent", actor="agent", rationale="reason", interaction_path=self.root / "receipt.json")
         self.assertEqual(before, set(self.root.iterdir()))
 
-    def _registered_plan(self, *ranges):
+    def _registered_plan(self, *ranges, dependencies=None):
         plan = copy.deepcopy(self.plan)
+        if dependencies is not None:
+            plan["dependencies"] = dependencies
+            revisions = {"understanding": 1, "cut": 2, "color-grade": 3}
+            plan["based_on"] = {item: revisions[item] for item in dependencies}
         original = plan["shots"][0]
         plan["shots"] = []
         for index, (start, end) in enumerate(ranges, 1):
@@ -269,7 +273,7 @@ class BrollPlanTests(unittest.TestCase):
 
     def test_register_operation_requires_verified_approved_normalized_shots_and_orders_overlays(self):
         project = self._registration_project(["cut", "unknown", "content-cards", "captions"])
-        result = broll_plan.register_operation(project, self._registered_plan((2, 3), (4, 5)))
+        result = broll_plan.register_operation(project, self._registered_plan((2, 3), (4, 5), dependencies=["understanding", "cut"]))
         self.assertEqual(["cut", "b-roll", "unknown", "content-cards", "captions"], result["sequences"]["main"]["operations"])
         self.assertEqual(["cache/b-roll/normalized/broll-001.mp4", "cache/b-roll/normalized/broll-002.mp4"], [item["asset"] for item in next(item for item in result["operations"] if item["id"] == "b-roll")["render"]])
         for change in (("status", "selected"), ("normalized", {"path": "../bad.mp4", "sha256": "a" * 64}), ("review.status", "draft")):
@@ -282,7 +286,7 @@ class BrollPlanTests(unittest.TestCase):
     def test_register_operation_removes_old_registration_for_no_selected_shots(self):
         project = self._registration_project(["cut", "b-roll", "b-roll", "captions"])
         project["operations"].extend([{"id": "b-roll", "revision": 7}, {"id": "b-roll", "revision": 6}])
-        plan = self._registered_plan((2, 3)); plan["shots"][0].update({"status": "skipped", "selected": None})
+        plan = self._registered_plan((2, 3), dependencies=["understanding", "cut"]); plan["shots"][0].update({"status": "skipped", "selected": None})
         result = broll_plan.register_operation(project, plan)
         self.assertNotIn("b-roll", result["sequences"]["main"]["operations"])
         self.assertFalse(any(item.get("id") == "b-roll" for item in result["operations"]))
@@ -291,14 +295,14 @@ class BrollPlanTests(unittest.TestCase):
     def test_zero_selection_cleans_stale_broll_ids_from_every_sequence(self):
         project = self._registration_project(["cut", "captions"])
         project["sequences"]["alternate"] = {"operations": ["captions", "b-roll", "b-roll", "unknown"]}
-        plan = self._registered_plan((2, 3)); plan["shots"][0].update({"status": "skipped", "selected": None})
+        plan = self._registered_plan((2, 3), dependencies=["understanding", "cut"]); plan["shots"][0].update({"status": "skipped", "selected": None})
         result = broll_plan.register_operation(project, plan)
         self.assertEqual(["captions", "unknown"], result["sequences"]["alternate"]["operations"])
         self.assertEqual("draft", result["render"]["status"])
 
     def test_zero_selection_without_stale_broll_leaves_render_status(self):
         project = self._registration_project(["cut", "captions"])
-        plan = self._registered_plan((2, 3)); plan["shots"][0].update({"status": "skipped", "selected": None})
+        plan = self._registered_plan((2, 3), dependencies=["understanding", "cut"]); plan["shots"][0].update({"status": "skipped", "selected": None})
         result = broll_plan.register_operation(project, plan)
         self.assertEqual("verified", result["render"]["status"])
 
@@ -309,6 +313,24 @@ class BrollPlanTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "registered shot id"): broll_plan.register_operation(self._registration_project(), plan)
         plan = self._registered_plan((2, 3), (4, 5)); plan["shots"][1]["id"] = plan["shots"][0]["id"]
         with self.assertRaisesRegex(ValueError, "duplicate registered shot id"): broll_plan.register_operation(self._registration_project(), plan)
+
+    def test_register_operation_rejects_stale_or_mismatched_plan_dependencies(self):
+        cases = [
+            ({"dependencies": ["understanding", "cut"]}, "plan dependencies"),
+            ({"dependencies": ["understanding", "cut", "color-grade", "captions"]}, "plan dependencies"),
+            ({"based_on": {"understanding": 1, "cut": 2, "color-grade": 2}}, "plan based_on"),
+            ({"based_on": {"understanding": 1, "cut": 2}}, "plan based_on"),
+        ]
+        for change, message in cases:
+            plan = self._registered_plan((2, 3)); plan.update(change)
+            with self.subTest(change=change):
+                with self.assertRaisesRegex(ValueError, message): broll_plan.register_operation(self._registration_project(), plan)
+
+    def test_active_dependencies_requires_positive_integer_revisions(self):
+        for revision in (True, 0, -1, 1.5, "1"):
+            project = self._registration_project(); project["operations"][0]["revision"] = revision
+            with self.subTest(revision=revision):
+                with self.assertRaisesRegex(ValueError, "positive integer"): broll_plan.active_dependencies(project)
 
 
 if __name__ == "__main__": unittest.main()
