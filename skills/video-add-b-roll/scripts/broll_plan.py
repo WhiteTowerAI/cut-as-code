@@ -58,7 +58,7 @@ def _strict_finite_number(value):
 
 def _positive_duration(value):
     duration = _strict_finite_number(value)
-    return duration if duration is not _INVALID_NUMBER and duration > 0 else _INVALID_NUMBER
+    return duration if duration is not _INVALID_NUMBER and duration > 0 else None
 
 
 def _valid_source_trim(value, candidate):
@@ -71,7 +71,7 @@ def _valid_source_trim(value, candidate):
     probe = candidate.get("probe")
     if isinstance(probe, dict) and "duration_s" in probe:
         durations.append(_positive_duration(probe["duration_s"]))
-    return all(duration is not _INVALID_NUMBER and trim[1] <= duration for duration in durations)
+    return all(duration is not None and trim[1] <= duration for duration in durations)
 
 
 def _valid_ken_burns(value):
@@ -314,6 +314,14 @@ def _candidate_errors(shot_id, candidate):
         errors.append(f"{shot_id} candidate {candidate_id} cache_path is required")
     if not isinstance(candidate.get("sha256"), str) or len(candidate["sha256"]) != 64 or any(char not in "0123456789abcdefABCDEF" for char in candidate["sha256"]):
         errors.append(f"{shot_id} candidate {candidate_id} SHA-256 is required")
+    if "duration_s" in candidate and _positive_duration(candidate["duration_s"]) is None:
+        errors.append(f"{shot_id} candidate {candidate_id} duration_s must be a finite positive number")
+    if "probe" in candidate:
+        probe = candidate["probe"]
+        if not isinstance(probe, dict):
+            errors.append(f"{shot_id} candidate {candidate_id} probe must be an object")
+        elif "duration_s" in probe and _positive_duration(probe["duration_s"]) is None:
+            errors.append(f"{shot_id} candidate {candidate_id} probe.duration_s must be a finite positive number")
     provenance = candidate.get("provenance")
     if not isinstance(provenance, dict) or provenance.get("source_type") not in ("local", "pexels", "external-generated"):
         errors.append(f"{shot_id} candidate {candidate_id} provenance is invalid")

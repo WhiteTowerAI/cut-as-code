@@ -5,6 +5,7 @@ import base64
 import contextlib
 import io
 import json
+import math
 import os
 import sys
 import tempfile
@@ -208,6 +209,58 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
                 persisted["shots"][0].update({"status": "selected", "selected": {"candidate_id": "asset", "source_trim": {"start_s": 0, "end_s": 1}}})
                 with self.subTest(action="validate", location=location, name=name):
                     self.assertIn("shot selected video requires a valid source_trim", broll_plan.validate_plan(persisted, self.timeline, self.transcript))
+
+    def test_candidate_durations_are_validated_before_review(self):
+        huge = 10 ** 10000
+        invalid = [
+            ("true", True),
+            ("false", False),
+            ("numeric string", "2"),
+            ("zero", 0),
+            ("negative", -1),
+            ("nan", float("nan")),
+            ("infinity", float("inf")),
+            ("negative infinity", float("-inf")),
+            ("huge positive", huge),
+            ("huge negative", -huge),
+        ]
+        for location in ("duration_s", "probe.duration_s"):
+            for name, value in invalid:
+                plan = copy.deepcopy(self.plan)
+                candidate = plan["shots"][0]["candidates"][0]
+                if location == "duration_s":
+                    candidate["duration_s"] = value
+                else:
+                    candidate["probe"] = {"duration_s": value}
+                with self.subTest(location=location, value=name):
+                    self.assertIn(
+                        f"shot candidate asset {location} must be a finite positive number",
+                        broll_plan.validate_plan(plan, self.timeline, self.transcript),
+                    )
+
+        for value in (None, [], "probe", 1, 1.0, True):
+            plan = copy.deepcopy(self.plan)
+            plan["shots"][0]["candidates"][0]["probe"] = value
+            with self.subTest(probe=repr(value)):
+                self.assertIn(
+                    "shot candidate asset probe must be an object",
+                    broll_plan.validate_plan(plan, self.timeline, self.transcript),
+                )
+
+    def test_candidate_durations_allow_missing_and_positive_numbers(self):
+        variants = [
+            {},
+            {"duration_s": 1},
+            {"duration_s": 1.5},
+            {"probe": {}},
+            {"probe": {"duration_s": 1}},
+            {"probe": {"duration_s": 1.5}},
+        ]
+        for variant in variants:
+            plan = copy.deepcopy(self.plan)
+            plan["shots"][0]["candidates"][0].update(variant)
+            with self.subTest(variant=variant):
+                self.assertEqual([], broll_plan.validate_plan(plan, self.timeline, self.transcript))
 
     def test_apply_review_rejects_invalid_image_motion_without_null_decisions(self):
         missing = object()
@@ -1190,6 +1243,66 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
                 with self.assertRaisesRegex((ValueError, FileNotFoundError), message):
                     build_review_page.build_review_page(plan, self.timeline, self.transcript, video, self.review_dir, project_root=self.root)
                 extract.assert_not_called()
+
+    def test_build_review_page_rejects_invalid_candidate_duration_before_publication(self):
+        review_id = "123e4567-e89b-12d3-a456-426614174006"
+        plan = copy.deepcopy(self.plan)
+        plan["shots"][0]["candidates"][0]["duration_s"] = 0
+        self.review_dir.mkdir(parents=True)
+        alias = self.review_dir / "b-roll-review.html"
+        alias.write_bytes(b"prior alias")
+        with mock.patch.object(build_review_page, "_extract_frame") as extract:
+            with self.assertRaisesRegex(ValueError, "duration_s"):
+                build_review_page.build_review_page(
+                    plan, self.timeline, self.transcript, self.video, self.review_dir,
+                    project_root=self.root, review_id=review_id,
+                )
+        extract.assert_not_called()
+        self.assertEqual(b"prior alias", alias.read_bytes())
+        self.assertFalse((self.review_dir / f"b-roll-review-{review_id}.html").exists())
+        self.assertFalse((self.review_dir / f"b-roll-review-{review_id}-assets").exists())
+
+    def test_payload_candidate_duration_is_always_a_positive_finite_number(self):
+        variants = [
+            {},
+            {"duration_s": 2},
+            {"duration_s": 2.5},
+            {"probe": {"duration_s": 3}},
+            {"probe": {"duration_s": 3.5}},
+        ]
+        for index, variant in enumerate(variants, 10):
+            plan = copy.deepcopy(self.plan)
+            plan["shots"][0]["candidates"][0].update(variant)
+            review_id = f"123e4567-e89b-12d3-a456-4266141740{index}"
+            with self.subTest(variant=variant), mock.patch.object(build_review_page, "_extract_frame", side_effect=self._frame):
+                result = build_review_page.build_review_page(
+                    plan, self.timeline, self.transcript, self.video, self.review_dir,
+                    project_root=self.root, review_id=review_id,
+                )
+            encoded = build_review_page.PAYLOAD_RE.search(result["page"].read_text(encoding="utf-8")).group(1)
+            payload = json.loads(base64.b64decode(encoded))
+            duration = payload["shots"][0]["candidates"][0]["duration_s"]
+            self.assertIsInstance(duration, (int, float))
+            self.assertNotIsInstance(duration, bool)
+            self.assertTrue(math.isfinite(duration))
+            self.assertGreater(duration, 0)
+
+    def test_payload_nan_rolls_back_publication_and_preserves_alias(self):
+        review_id = "123e4567-e89b-12d3-a456-426614174007"
+        plan = copy.deepcopy(self.plan)
+        plan["shots"][0]["candidates"][0]["provenance"]["metadata"] = {"score": float("nan")}
+        self.review_dir.mkdir(parents=True)
+        alias = self.review_dir / "b-roll-review.html"
+        alias.write_bytes(b"prior alias")
+        with mock.patch.object(build_review_page, "_extract_frame", side_effect=self._frame):
+            with self.assertRaisesRegex(ValueError, "JSON compliant"):
+                build_review_page.build_review_page(
+                    plan, self.timeline, self.transcript, self.video, self.review_dir,
+                    project_root=self.root, review_id=review_id,
+                )
+        self.assertEqual(b"prior alias", alias.read_bytes())
+        self.assertFalse((self.review_dir / f"b-roll-review-{review_id}.html").exists())
+        self.assertFalse((self.review_dir / f"b-roll-review-{review_id}-assets").exists())
 
     def test_probe_video_requires_video_stream_and_positive_finite_duration(self):
         for payload in ([], {"streams": "invalid", "format": {"duration": "10"}}, {"streams": [], "format": {"duration": "10"}}, {"streams": [{"index": 0}], "format": {"duration": "nan"}}, {"streams": [{"index": 0}], "format": {"duration": "0"}}):

@@ -86,7 +86,15 @@ def _payload(plan, root, assets_dir):
             suffix = path.suffix.lower() if re.fullmatch(r"\.[a-zA-Z0-9]{1,8}", path.suffix) else ""
             basename = f"candidate-{shot_index:03d}-{candidate_index:03d}{suffix}"
             candidate_specs.append((path, basename, candidate["sha256"]))
-            candidates.append({"id": candidate["id"], "media_type": candidate["media_type"], "path": f"{assets_dir.name}/{basename}", "sha256": candidate["sha256"], "duration_s": candidate.get("duration_s") or candidate.get("probe", {}).get("duration_s") or float(shot["program_range"]["end_s"]) - float(shot["program_range"]["start_s"]), "provenance": candidate["provenance"]})
+            duration = broll_plan._positive_duration(candidate.get("duration_s"))
+            probe = candidate.get("probe")
+            if duration is None and isinstance(probe, dict):
+                duration = broll_plan._positive_duration(probe.get("duration_s"))
+            if duration is None:
+                duration = broll_plan._positive_duration(float(shot["program_range"]["end_s"]) - float(shot["program_range"]["start_s"]))
+            if duration is None:
+                raise ValueError(f"{shot['id']} candidate {candidate['id']} has no valid review duration")
+            candidates.append({"id": candidate["id"], "media_type": candidate["media_type"], "path": f"{assets_dir.name}/{basename}", "sha256": candidate["sha256"], "duration_s": duration, "provenance": candidate["provenance"]})
         payload_shots.append({"id": shot["id"], "program_range": shot["program_range"], "source_ranges": shot["source_ranges"], "transcript_evidence": shot["transcript_evidence"], "editorial_reason": shot["editorial_reason"], "visual_intent": shot["visual_intent"], "queries": shot["queries"], "source_frame": {"path": f"{assets_dir.name}/{frame.name}", "sha256": None}, "candidates": candidates})
     return payload_shots, candidate_specs, pre_skipped_ids
 
@@ -156,7 +164,7 @@ def build_review_page(plan, timeline, transcript, video, output_dir, *, project_
                 shot["source_frame"]["sha256"] = _hash(frame)
             subject_hash = broll_plan.canonical_sha256(broll_plan.review_subject(plan))
             payload = {"review_id": identifier, "plan_sha256": subject_hash, "plan_subject_sha256": subject_hash, "candidate_manifest_sha256": broll_plan.canonical_sha256(broll_plan.candidate_manifest(plan)), "review_video_sha256": expected_video_hash, "decision_modes": ["human", "agent"], "pre_skipped_ids": pre_skipped_ids, "shots": shots}
-            document = template.replace(PAYLOAD_MARKER, base64.b64encode(json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode("utf-8")).decode("ascii"))
+            document = template.replace(PAYLOAD_MARKER, base64.b64encode(json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")).decode("ascii"))
             staged_page = stage / page.name
             staged_page.write_text(document, encoding="utf-8")
             output_dir.mkdir(parents=True, exist_ok=True)
