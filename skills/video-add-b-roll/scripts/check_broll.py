@@ -19,6 +19,10 @@ import broll_plan
 import normalize_broll
 
 
+OWNED_ARTIFACTS = (Path("stills"), Path("contact-sheet.jpg"), Path("boundary-reel.mp4"),
+                   Path("b-roll-summary.md"))
+
+
 def _inside(path, parent, label):
     path, parent = Path(path).resolve(), Path(parent).resolve()
     try:
@@ -271,47 +275,169 @@ def _ignore_remove(path):
         pass
 
 
+def _transaction_dir(review_dir):
+    return review_dir.parent / f".{review_dir.name}.check.transaction"
+
+
+def _stage_dir(review_dir):
+    return review_dir.parent / f".{review_dir.name}.check.part"
+
+
+def _restore_backup(source, target):
+    part = target.parent / f".{target.name}.restore.part"
+    _ignore_remove(part)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if source.is_dir():
+        shutil.copytree(source, part)
+    else:
+        shutil.copy2(source, part)
+    if target.exists():
+        _remove(target)
+    os.replace(part, target)
+
+
+def _finish_transaction(transaction):
+    marker, errors = transaction / "marker.json", []
+    for child in transaction.iterdir():
+        if child != marker:
+            try:
+                _remove(child)
+            except Exception as exc:
+                errors.append(f"{child.name}: {exc}")
+    if errors:
+        raise OSError("; ".join(errors))
+    marker.unlink()
+    transaction.rmdir()
+
+
+def _recover_transaction(review_dir, plan_path):
+    transaction = _transaction_dir(review_dir)
+    if not transaction.exists():
+        return
+    marker_path = transaction / "marker.json"
+    plan_part = plan_path.with_suffix(".part.json")
+    if not marker_path.is_file():
+        try:
+            _remove(_stage_dir(review_dir))
+            _remove(transaction)
+        except OSError as exc:
+            raise ValueError(f"B-roll publication recovery failed: {exc}") from exc
+        _ignore_remove(plan_part)
+        return
+    try:
+        marker = projectlib.load_json(marker_path)
+        entries = marker["entries"]
+        expected = [path.as_posix() for path in OWNED_ARTIFACTS]
+        if (marker.get("schema_version") != 1
+                or not isinstance(marker.get("old_plan_sha256"), str)
+                or not re.fullmatch(r"[0-9a-f]{64}", marker["old_plan_sha256"])
+                or not isinstance(marker.get("new_plan_sha256"), str)
+                or not re.fullmatch(r"[0-9a-f]{64}", marker["new_plan_sha256"])
+                or not isinstance(marker.get("review_dir_existed"), bool)
+                or not isinstance(entries, list)
+                or [entry.get("path") for entry in entries if isinstance(entry, dict)] != expected
+                or any(not isinstance(entry, dict) or not isinstance(entry.get("old_existed"), bool)
+                       for entry in entries)):
+            raise ValueError("transaction marker is invalid")
+    except (OSError, KeyError, TypeError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+        raise ValueError(f"B-roll publication recovery failed: {exc}") from exc
+    identity_error = None
+    try:
+        current = broll_plan.sha256_file(plan_path)
+    except OSError as exc:
+        current, identity_error = None, f"canonical plan is unreadable: {exc}"
+    if current == marker["new_plan_sha256"]:
+        try:
+            _remove(_stage_dir(review_dir))
+            _finish_transaction(transaction)
+        except OSError as exc:
+            raise ValueError(f"B-roll publication recovery failed: {exc}") from exc
+        _ignore_remove(plan_part)
+        return
+
+    errors = []
+    old_dir = transaction / "old"
+    for entry in entries:
+        relative = Path(entry["path"])
+        target, backup = review_dir / relative, old_dir / relative
+        try:
+            if entry["old_existed"]:
+                if backup.exists():
+                    _restore_backup(backup, target)
+                elif not target.exists():
+                    raise OSError("original and backup are both missing")
+            elif target.exists():
+                _remove(target)
+        except Exception as exc:
+            errors.append(f"{entry['path']}: {exc}")
+    if current != marker["old_plan_sha256"]:
+        errors.insert(0, identity_error or "canonical plan matches neither transaction identity")
+    if errors:
+        raise ValueError("B-roll publication recovery failed: " + "; ".join(errors))
+    try:
+        if not marker["review_dir_existed"] and review_dir.exists() and not any(review_dir.iterdir()):
+            review_dir.rmdir()
+        _remove(_stage_dir(review_dir))
+        _finish_transaction(transaction)
+    except OSError as exc:
+        raise ValueError(f"B-roll publication recovery failed: {exc}") from exc
+    _ignore_remove(plan_part)
+
+
 def _commit(stage, review_dir, plan_path, result):
-    owned = [Path("stills"), Path("contact-sheet.jpg"), Path("boundary-reel.mp4"), Path("b-roll-summary.md")]
-    backup = review_dir.parent / f".{review_dir.name}.check.backup"
+    transaction = _transaction_dir(review_dir)
     plan_part = plan_path.with_suffix(".part.json")
     review_existed = review_dir.exists()
-    moved, published = [], []
-    _remove(backup)
-    backup.mkdir(parents=True)
+    _recover_transaction(review_dir, plan_path)
     try:
+        old_plan_sha256 = broll_plan.sha256_file(plan_path)
+        projectlib.write_json(plan_part, result)
+        marker = {
+            "schema_version": 1,
+            "old_plan_sha256": old_plan_sha256,
+            "new_plan_sha256": broll_plan.sha256_file(plan_part),
+            "review_dir_existed": review_existed,
+            "entries": [{"path": relative.as_posix(), "old_existed": (review_dir / relative).exists()}
+                        for relative in OWNED_ARTIFACTS],
+        }
+        transaction.mkdir(parents=True)
+        marker_part = transaction / "marker.part.json"
+        projectlib.write_json(marker_part, marker)
+        os.replace(marker_part, transaction / "marker.json")
         review_dir.mkdir(parents=True, exist_ok=True)
-        for relative in owned:
-            target, source, saved = review_dir / relative, stage / relative, backup / relative
+        for entry in marker["entries"]:
+            relative = Path(entry["path"])
+            target, source, saved = review_dir / relative, stage / relative, transaction / "old" / relative
             if target.exists():
                 saved.parent.mkdir(parents=True, exist_ok=True)
                 os.replace(target, saved)
-                moved.append((saved, target))
             if source.exists():
                 target.parent.mkdir(parents=True, exist_ok=True)
                 os.replace(source, target)
-                published.append(target)
-        projectlib.write_json(plan_part, result)
         os.replace(plan_part, plan_path)
-    except BaseException:
-        plan_part.unlink(missing_ok=True)
-        for target in reversed(published):
-            _remove(target)
-        for saved, target in reversed(moved):
-            target.parent.mkdir(parents=True, exist_ok=True)
-            os.replace(saved, target)
-        if not review_existed and review_dir.exists() and not any(review_dir.iterdir()):
-            review_dir.rmdir()
+    except BaseException as original:
+        try:
+            _recover_transaction(review_dir, plan_path)
+        except Exception as recovery:
+            raise recovery from original
         raise
+    else:
+        _recover_transaction(review_dir, plan_path)
     finally:
-        _ignore_remove(stage)
-        _ignore_remove(backup)
+        if not transaction.exists():
+            _ignore_remove(stage)
+            _ignore_remove(plan_part)
 
 
 def verify_plan(plan_path, timeline_path, project_root, video_path, *, review_dir=None):
     """Verify canonical normalized shots, publish review artifacts, and persist pass bindings."""
     root = Path(project_root).resolve()
     plan_path = Path(plan_path).resolve()
+    if plan_path != (root / "work/b-roll/broll-plan.json").resolve():
+        raise ValueError("plan_path must be canonical work/b-roll/broll-plan.json")
+    review_root = _inside(root / "review", root, "review root")
+    destination = _inside(review_dir or review_root / "03-b-roll", review_root, "review_dir")
+    _recover_transaction(destination, plan_path)
     plan, timeline, transcript, project = _load_inputs(plan_path, timeline_path, root)
     if not isinstance(plan, dict) or not isinstance(plan.get("shots"), list):
         raise ValueError("plan shots must be a list")
@@ -325,9 +451,7 @@ def verify_plan(plan_path, timeline_path, project_root, video_path, *, review_di
     grade_hashes = _grade_hashes(plan, project, root)
     selected = _selected_shots(plan, timeline, root, grade_hashes)
     video = _review_video(plan, timeline, root, video_path)
-    review_root = _inside(root / "review", root, "review root")
-    destination = _inside(review_dir or review_root / "03-b-roll", review_root, "review_dir")
-    stage = destination.parent / f".{destination.name}.check.part"
+    stage = _stage_dir(destination)
     _remove(stage)
     stage.mkdir(parents=True)
     try:
@@ -368,5 +492,6 @@ def verify_plan(plan_path, timeline_path, project_root, video_path, *, review_di
             "boundary_reel": final_reel, "summary": final_summary,
         }
     except BaseException:
-        _remove(stage)
+        if not _transaction_dir(destination).exists():
+            _ignore_remove(stage)
         raise

@@ -1287,6 +1287,50 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
                 if status == "verified":
                     self.assertIn("shot verified verification must pass", errors)
 
+    def test_lifecycle_rejects_stale_normalized_and_verification_fields(self):
+        selected = broll_plan.apply_review(
+            self.plan, self.review(), mode="agent", actor="agent", rationale="Relevant footage."
+        )
+        normalized = copy.deepcopy(selected)
+        normalized["shots"][0].update({
+            "status": "normalized",
+            "normalized": {"path": "cache/b-roll/normalized/shot.mp4", "sha256": "a" * 64},
+        })
+        cases = [
+            (selected, "normalized", {"path": "asset.mp4", "sha256": "a" * 64},
+             "shot selected shot must not carry normalized"),
+            (selected, "verification", {"status": "pass"},
+             "shot selected shot must not carry verification"),
+            (normalized, "verification", {"status": "pass"},
+             "shot normalized shot must not carry verification"),
+        ]
+        skipped = broll_plan.apply_review(
+            self.plan,
+            self.review_for(self.plan, [{"id": "shot", "decision": "skip"}], rationale="No useful footage."),
+            mode="agent", actor="agent", rationale="No useful footage.",
+        )
+        cases.extend([
+            (skipped, "normalized", {"path": "asset.mp4", "sha256": "a" * 64},
+             "shot skipped shot must not carry normalized"),
+            (skipped, "verification", {"status": "pass"},
+             "shot skipped shot must not carry verification"),
+        ])
+        planned = copy.deepcopy(self.plan)
+        planned["shots"][0]["status"] = "planned"
+        for source in (planned, self.plan):
+            status = source["shots"][0]["status"]
+            cases.extend([
+                (source, "normalized", {"path": "asset.mp4", "sha256": "a" * 64},
+                 f"shot {status} shot must not carry normalized"),
+                (source, "verification", {"status": "pass"},
+                 f"shot {status} shot must not carry verification"),
+            ])
+        for source, field, value, message in cases:
+            malformed = copy.deepcopy(source)
+            malformed["shots"][0][field] = value
+            with self.subTest(status=malformed["shots"][0]["status"], field=field):
+                self.assertIn(message, broll_plan.validate_plan(malformed, self.timeline, self.transcript))
+
     def test_registration_requires_approved_receipt_and_passing_verification(self):
         for verification in (None, {}, {"status": "fail"}):
             plan = self._registered_plan((2, 3))
@@ -2002,6 +2046,67 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
             self.plan_path, self.timeline_path, self.root, lut=self.selected_lut_path
         )
 
+    def _seed_review_outputs(self):
+        review_dir = self.root / "review/03-b-roll"
+        (review_dir / "stills").mkdir(parents=True, exist_ok=True)
+        (review_dir / "assets").mkdir(exist_ok=True)
+        expected = {
+            "stills/old.txt": b"old stills",
+            "contact-sheet.jpg": b"old contact",
+            "boundary-reel.mp4": b"old reel",
+            "b-roll-summary.md": b"old summary",
+        }
+        for relative, content in expected.items():
+            (review_dir / relative).write_bytes(content)
+        (review_dir / "index.html").write_text("review page", encoding="utf-8")
+        (review_dir / "assets/review.js").write_text("immutable asset", encoding="utf-8")
+        return review_dir, expected
+
+    def _assert_old_review_outputs(self, review_dir, expected):
+        for relative, content in expected.items():
+            self.assertEqual(content, (review_dir / relative).read_bytes())
+        self.assertEqual("review page", (review_dir / "index.html").read_text(encoding="utf-8"))
+        self.assertEqual("immutable asset", (review_dir / "assets/review.js").read_text(encoding="utf-8"))
+
+    def _crash_verification(self, video, mode):
+        code = """
+import os
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+sys.path.insert(0, sys.argv[2])
+import check_broll
+real_replace = os.replace
+plan, review_dir, mode = Path(sys.argv[3]).resolve(), Path(sys.argv[7]).resolve(), sys.argv[8]
+def crash_after_move(source, target):
+    source, target = Path(source).resolve(), Path(target).resolve()
+    result = real_replace(source, target)
+    if mode == "first-old" and source == review_dir / "stills" and target != review_dir / "stills":
+        os._exit(91)
+    if mode == "all-new" and target == review_dir / "b-roll-summary.md":
+        os._exit(92)
+    if mode == "plan" and target == plan:
+        os._exit(93)
+    return result
+os.replace = crash_after_move
+check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
+"""
+        return subprocess.run([
+            sys.executable, "-c", code, str(ROOT / "scripts"),
+            str(ROOT.parent / "video-understand" / "scripts"),
+            str(self.plan_path), str(self.timeline_path), str(self.root), str(video),
+            str(self.root / "review/03-b-roll"), mode,
+        ], capture_output=True, text=True)
+
+    def _reel_pixel(self, reel, time_s):
+        frame = self.root / f"reel-{time_s}.png"
+        subprocess.run([
+            "ffmpeg", "-y", "-loglevel", "error", "-ss", str(time_s), "-i", str(reel),
+            "-frames:v", "1", str(frame),
+        ], check=True, capture_output=True)
+        with Image.open(frame) as image:
+            return image.convert("RGB").getpixel((image.width // 2, image.height // 2))
+
     def test_normalizes_video_to_dimensions_fps_duration_and_no_audio(self):
         candidate, shot = self._video_shot(self._video())
         record = normalize_broll.normalize_shot(candidate, shot, self.timeline, self.output)
@@ -2504,6 +2609,184 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
         self.assertIsNone(rerun_artifacts["boundary_reel"])
         self.assertEqual("review page", (review_dir / "index.html").read_text(encoding="utf-8"))
         self.assertEqual("asset", (review_dir / "assets/review.js").read_text(encoding="utf-8"))
+
+    def test_checker_recovers_crash_after_old_artifact_move_before_validation(self):
+        video, _ = self._normalized_for_check()
+        review_dir, expected = self._seed_review_outputs()
+
+        crashed = self._crash_verification(video, "first-old")
+
+        self.assertEqual(91, crashed.returncode, crashed.stderr)
+        self.assertFalse((review_dir / "stills").exists())
+        transaction = self.root / "review/.03-b-roll.check.transaction"
+        marker = projectlib.load_json(transaction / "marker.json")
+        self.assertEqual(1, marker["schema_version"])
+        self.assertEqual(broll_plan.sha256_file(self.plan_path), marker["old_plan_sha256"])
+        self.assertNotEqual(marker["old_plan_sha256"], marker["new_plan_sha256"])
+        self.assertEqual(
+            {"stills": True, "contact-sheet.jpg": True, "boundary-reel.mp4": True,
+             "b-roll-summary.md": True},
+            {entry["path"]: entry["old_existed"] for entry in marker["entries"]},
+        )
+
+        with self.assertRaisesRegex(ValueError, "review video is missing"):
+            check_broll.verify_plan(
+                self.plan_path, self.timeline_path, self.root, self.root / "missing.mp4"
+            )
+        self._assert_old_review_outputs(review_dir, expected)
+        self.assertFalse(transaction.exists())
+        self.assertFalse((self.root / "review/.03-b-roll.check.part").exists())
+
+    def test_checker_attempts_all_restores_and_preserves_failed_transaction(self):
+        video, _ = self._normalized_for_check()
+        review_dir, expected = self._seed_review_outputs()
+        crashed = self._crash_verification(video, "all-new")
+        self.assertEqual(92, crashed.returncode, crashed.stderr)
+        transaction = self.root / "review/.03-b-roll.check.transaction"
+        old_dir, attempted = transaction / "old", []
+        real_restore = check_broll._restore_backup
+
+        def fail_stills_restore(source, target):
+            source = Path(source)
+            attempted.append(source.relative_to(old_dir).as_posix())
+            if source == old_dir / "stills":
+                raise RuntimeError("restore blocked")
+            return real_restore(source, target)
+
+        with mock.patch.object(check_broll, "_restore_backup", side_effect=fail_stills_restore):
+            with self.assertRaisesRegex(ValueError, "publication recovery failed.*restore blocked"):
+                check_broll.verify_plan(
+                    self.plan_path, self.timeline_path, self.root, self.root / "missing.mp4"
+                )
+        self.assertEqual(
+            {"stills", "contact-sheet.jpg", "boundary-reel.mp4", "b-roll-summary.md"}, set(attempted)
+        )
+        self.assertTrue((transaction / "marker.json").is_file())
+        self.assertTrue(all((old_dir / relative).exists() for relative in expected))
+
+        with self.assertRaisesRegex(ValueError, "review video is missing"):
+            check_broll.verify_plan(
+                self.plan_path, self.timeline_path, self.root, self.root / "missing.mp4"
+            )
+        self._assert_old_review_outputs(review_dir, expected)
+        self.assertFalse(transaction.exists())
+        self.assertFalse((self.root / "review/.03-b-roll.check.part").exists())
+
+    def test_checker_preserves_recovery_when_plan_matches_neither_identity(self):
+        video, _ = self._normalized_for_check()
+        old_plan = self.plan_path.read_bytes()
+        review_dir, expected = self._seed_review_outputs()
+        crashed = self._crash_verification(video, "all-new")
+        self.assertEqual(92, crashed.returncode, crashed.stderr)
+        transaction = self.root / "review/.03-b-roll.check.transaction"
+        self.plan_path.write_bytes(old_plan + b"\n")
+
+        with self.assertRaisesRegex(ValueError, "matches neither transaction identity"):
+            check_broll.verify_plan(
+                self.plan_path, self.timeline_path, self.root, self.root / "missing.mp4"
+            )
+        self._assert_old_review_outputs(review_dir, expected)
+        self.assertTrue((transaction / "marker.json").is_file())
+        self.assertTrue(all((transaction / "old" / relative).exists() for relative in expected))
+
+        self.plan_path.write_bytes(old_plan)
+        with self.assertRaisesRegex(ValueError, "review video is missing"):
+            check_broll.verify_plan(
+                self.plan_path, self.timeline_path, self.root, self.root / "missing.mp4"
+            )
+        self._assert_old_review_outputs(review_dir, expected)
+        self.assertFalse(transaction.exists())
+        self.assertFalse((self.root / "review/.03-b-roll.check.part").exists())
+
+    def test_checker_keeps_committed_artifacts_and_cleans_transaction_after_crash(self):
+        video, _ = self._normalized_for_check()
+        review_dir, _ = self._seed_review_outputs()
+
+        crashed = self._crash_verification(video, "plan")
+
+        self.assertEqual(93, crashed.returncode, crashed.stderr)
+        transaction = self.root / "review/.03-b-roll.check.transaction"
+        self.assertTrue((transaction / "marker.json").is_file())
+        committed = projectlib.load_json(self.plan_path)
+        self.assertEqual("verified", committed["shots"][0]["status"])
+        bindings = committed["shots"][0]["verification"]
+        artifact_hashes = {
+            binding["path"]: binding["sha256"]
+            for binding in (bindings["contact_sheet"], bindings["boundary_reel"], bindings["report"])
+        }
+        artifact_hashes.update(
+            {binding["path"]: binding["sha256"] for binding in bindings["stills"].values()}
+        )
+
+        with self.assertRaisesRegex(ValueError, "review video is missing"):
+            check_broll.verify_plan(
+                self.plan_path, self.timeline_path, self.root, self.root / "missing.mp4"
+            )
+        self.assertFalse(transaction.exists())
+        self.assertFalse((self.root / "review/.03-b-roll.check.part").exists())
+        for relative, digest in artifact_hashes.items():
+            self.assertEqual(digest, broll_plan.sha256_file(self.root / relative))
+        self.assertEqual("review page", (review_dir / "index.html").read_text(encoding="utf-8"))
+        self.assertEqual("immutable asset", (review_dir / "assets/review.js").read_text(encoding="utf-8"))
+
+    def test_fresh_review_clears_verified_lifecycle_before_zero_selected_check(self):
+        video, _ = self._normalized_for_check()
+        verified, _ = check_broll.verify_plan(self.plan_path, self.timeline_path, self.root, video)
+        review_dir = self.root / "review/03-b-roll"
+        (review_dir / "assets").mkdir(exist_ok=True)
+        (review_dir / "index.html").write_text("review page", encoding="utf-8")
+        (review_dir / "assets/review.js").write_text("immutable asset", encoding="utf-8")
+        review = self.review_for(
+            verified, [{"id": "shot", "decision": "skip"}], rationale="No longer useful.",
+            review_id="123e4567-e89b-12d3-a456-426614174099",
+        )
+
+        skipped = broll_plan.apply_review(
+            verified, review, mode="agent", actor="agent", rationale="No longer useful."
+        )
+
+        self.assertEqual("skipped", skipped["shots"][0]["status"])
+        self.assertIsNone(skipped["shots"][0]["selected"])
+        self.assertNotIn("normalized", skipped["shots"][0])
+        self.assertNotIn("verification", skipped["shots"][0])
+        projectlib.write_json(self.plan_path, skipped)
+        checked, artifacts = check_broll.verify_plan(
+            self.plan_path, self.timeline_path, self.root, video
+        )
+        self.assertEqual("skipped", checked["shots"][0]["status"])
+        self.assertEqual([], artifacts["stills"])
+        self.assertIsNone(artifacts["contact_sheet"])
+        self.assertIsNone(artifacts["boundary_reel"])
+        self.assertIn("No B-roll shots were selected", artifacts["summary"].read_text(encoding="utf-8"))
+        self.assertFalse((review_dir / "stills").exists())
+        self.assertFalse((review_dir / "contact-sheet.jpg").exists())
+        self.assertFalse((review_dir / "boundary-reel.mp4").exists())
+        self.assertEqual("review page", (review_dir / "index.html").read_text(encoding="utf-8"))
+        self.assertEqual("immutable asset", (review_dir / "assets/review.js").read_text(encoding="utf-8"))
+        self.assertEqual([], broll_plan.validate_plan(
+            checked, self.timeline, self.transcript,
+            project=self.project, project_root=self.root, verify_files=True,
+        ))
+
+    def test_boundary_reel_samples_base_overlay_base_for_each_shot(self):
+        video = self._review_video()
+        self.base_plan["input_hashes"]["review_video_sha256"] = broll_plan.sha256_file(video)
+        projectlib.write_json(self.plan_path, self._two_shot_plan())
+        normalize_broll.normalize_plan(
+            self.plan_path, self.timeline_path, self.root, lut=self.selected_lut_path
+        )
+        _, artifacts = check_broll.verify_plan(
+            self.plan_path, self.timeline_path, self.root, video
+        )
+
+        pixels = [self._reel_pixel(artifacts["boundary_reel"], time_s)
+                  for time_s in (0.25, 0.75, 1.25, 1.75, 2.25, 2.75, 3.25, 3.75)]
+        for index in (0, 3, 4, 7):
+            self.assertGreater(pixels[index][2], 200)
+            self.assertLess(pixels[index][0], 30)
+            self.assertLess(pixels[index][1], 30)
+        for overlay, base in ((1, 0), (2, 3), (5, 4), (6, 7)):
+            self.assertGreater(max(abs(a - b) for a, b in zip(pixels[overlay], pixels[base])), 40)
 
 
 class AcquisitionTests(unittest.TestCase):

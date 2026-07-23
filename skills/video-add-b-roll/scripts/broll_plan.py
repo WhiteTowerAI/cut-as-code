@@ -683,10 +683,14 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
                     errors.append(f"{shot_id} normalized path is invalid")
                 if not _is_sha256(normalized.get("sha256")):
                     errors.append(f"{shot_id} normalized SHA-256 is invalid")
+        elif "normalized" in shot:
+            errors.append(f"{shot_id} {status} shot must not carry normalized")
         if status == "verified":
             verification = shot.get("verification")
             if not isinstance(verification, dict) or verification.get("status") != "pass":
                 errors.append(f"{shot_id} verified verification must pass")
+        elif "verification" in shot:
+            errors.append(f"{shot_id} {status} shot must not carry verification")
     for start, end, shot_id in sorted(ranges):
         for previous_start, previous_end, previous_id in ranges:
             if previous_id != shot_id and previous_start < end and start < previous_end:
@@ -864,6 +868,8 @@ def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None)
         if decision not in ("select", "skip"): raise ValueError(f"{shot['id']} decision must be select or skip")
         if shot.get("status") == "skipped" and decision != "skip":
             raise ValueError(f"{shot['id']} was already skipped and requires decision skip")
+        shot.pop("normalized", None)
+        shot.pop("verification", None)
         if decision == "skip":
             if shot.get("status") != "skipped": decision_skipped_ids.append(shot["id"])
             shot["selected"], shot["status"] = None, "skipped"
