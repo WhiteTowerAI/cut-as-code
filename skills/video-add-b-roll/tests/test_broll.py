@@ -477,5 +477,50 @@ class AcquisitionTests(unittest.TestCase):
         with self.assertRaises(ValueError): handler.redirect_request(request, None, 302, "found", {}, "https://api.pexels.com/videos/search")
         self.assertEqual("https://videos.pexels.com/next", handler.redirect_request(request, None, 302, "found", {}, "https://videos.pexels.com/next").full_url)
 
+    def test_download_rejects_truncated_200_and_incomplete_or_mismatched_206(self):
+        cases = [
+            ("truncated.mp4", b"", 200, {"Content-Length": "4"}, b"bad"),
+            ("span.mp4", b"old", 206, {"Content-Length": "4", "Content-Range": "bytes 3-5/6"}, b"new"),
+            ("range.mp4", b"old", 206, {"Content-Length": "2", "Content-Range": "bytes 3-4/6"}, b"ne"),
+        ]
+        for name, initial, status, headers, body in cases:
+            with self.subTest(name=name):
+                target = self.cache / name; part = target.with_name(name + ".part")
+                if initial: part.write_bytes(initial)
+                class Response:
+                    def __init__(self): self.status, self.headers, self.body = status, headers, body
+                    def geturl(self): return "https://videos.pexels.com/file.mp4"
+                    def read(self, size): value, self.body = self.body, b""; return value
+                    def __enter__(self): return self
+                    def __exit__(self, *args): pass
+                with mock.patch.object(pexels, "probe_media", return_value={"duration_s": 1, "width": 1, "height": 1}):
+                    with self.assertRaises(ValueError): pexels.download_candidate({"download_url": "https://videos.pexels.com/file.mp4"}, target, opener=lambda request, timeout=None: Response())
+                self.assertFalse(part.exists()); self.assertFalse(target.exists())
+
+    def test_import_local_enforces_limit_and_binds_original_path(self):
+        source = Path(self.temp.name) / "source.mp4"; source.write_bytes(b"source")
+        provenance = {"source_type": "local", "creator": "me", "license": "owned", "retrieval_time": "2026-07-23T00:00:00Z", "original_path": "misleading.mp4"}
+        small = self.cache / "small.mp4"
+        with self.assertRaises(ValueError): pexels.import_local(source, small, provenance, max_bytes=3)
+        self.assertFalse(small.exists()); self.assertFalse(small.with_name("small.mp4.part").exists())
+        with mock.patch.object(pexels, "probe_media", return_value={"duration_s": 1, "width": 1, "height": 1}):
+            record = pexels.import_local(source, self.cache / "copy.mp4", provenance)
+        self.assertEqual(source.resolve().as_posix(), record["provenance"]["original_path"])
+        self.assertEqual("misleading.mp4", provenance["original_path"])
+
+    def test_search_skips_malformed_provider_and_file_ids(self):
+        videos = [
+            {"id": [], "url": "https://www.pexels.com/video/bad/", "duration": 1, "width": 2, "height": 1, "video_files": []},
+            {"id": True, "url": "https://www.pexels.com/video/bad/", "duration": 1, "width": 2, "height": 1, "video_files": []},
+            {"id": 4, "url": "https://www.pexels.com/video/4/", "duration": 1, "width": 2, "height": 1, "video_files": [{"id": {}, "link": "https://videos.pexels.com/bad.mp4", "width": 2, "height": 1}, {"id": 5, "link": "https://videos.pexels.com/good.mp4", "width": 2, "height": 1}]},
+        ]
+        class Response:
+            def geturl(self): return pexels.PEXELS_API
+            def read(self): return json.dumps({"videos": videos}).encode()
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+        records = pexels.search_videos("valid", api_key="k", opener=lambda request, timeout=None: Response())
+        self.assertEqual([(4, 5)], [(item["provider_id"], item["file_id"]) for item in records])
+
 
 if __name__ == "__main__": unittest.main()
