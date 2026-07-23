@@ -2429,6 +2429,82 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
         self.assertFalse((self.root / "review/.03-b-roll.check.part").exists())
         self.assertFalse((self.root / "review/.03-b-roll.check.backup").exists())
 
+    def test_checker_accepts_duration_short_by_one_frame_and_extracts_last_still(self):
+        video, normalized = self._normalized_for_check()
+        subprocess.run([
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-f", "lavfi", "-i", "testsrc2=size=96x54:rate=30000/1001",
+            "-frames:v", "29", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(self.output),
+        ], check=True, capture_output=True)
+        probe = normalize_broll._probe(self.output)
+        difference = 1.0 - probe["duration_s"]
+        self.assertGreater(difference, 0)
+        self.assertLessEqual(difference, 1001 / 30000 + 1e-6)
+        record = normalized["shots"][0]["normalized"]
+        record["sha256"], record["probe"] = broll_plan.sha256_file(self.output), probe
+        projectlib.write_json(self.plan_path, normalized)
+
+        updated, artifacts = check_broll.verify_plan(self.plan_path, self.timeline_path, self.root, video)
+
+        self.assertEqual("verified", updated["shots"][0]["status"])
+        self.assertEqual(3, len(artifacts["stills"]))
+        for path in artifacts["stills"]:
+            with Image.open(path) as image:
+                image.load()
+                self.assertEqual((96, 54), image.size)
+
+    def test_checker_zero_selected_is_durable_noop(self):
+        video = self._review_video()
+        plan = copy.deepcopy(self.base_plan)
+        plan["input_hashes"]["review_video_sha256"] = broll_plan.sha256_file(video)
+        review = self.review_for(plan, [{"id": "shot", "decision": "skip"}], rationale="No useful footage.")
+        plan = broll_plan.apply_review(
+            plan, review, mode="agent", actor="agent", rationale="No useful footage."
+        )
+        projectlib.write_json(self.plan_path, plan)
+        review_dir = self.root / "review/03-b-roll"
+        (review_dir / "stills").mkdir(parents=True)
+        (review_dir / "assets").mkdir()
+        (review_dir / "stills/stale.png").write_bytes(b"stale")
+        (review_dir / "contact-sheet.jpg").write_bytes(b"stale")
+        (review_dir / "boundary-reel.mp4").write_bytes(b"stale")
+        (review_dir / "b-roll-summary.md").write_text("stale", encoding="utf-8")
+        (review_dir / "index.html").write_text("review page", encoding="utf-8")
+        (review_dir / "assets/review.js").write_text("asset", encoding="utf-8")
+
+        updated, artifacts = check_broll.verify_plan(self.plan_path, self.timeline_path, self.root, video)
+
+        self.assertEqual("skipped", updated["shots"][0]["status"])
+        self.assertNotIn("verification", updated["shots"][0])
+        self.assertEqual([], artifacts["stills"])
+        self.assertIsNone(artifacts["contact_sheet"])
+        self.assertIsNone(artifacts["boundary_reel"])
+        self.assertFalse((review_dir / "stills").exists())
+        self.assertFalse((review_dir / "contact-sheet.jpg").exists())
+        self.assertFalse((review_dir / "boundary-reel.mp4").exists())
+        self.assertEqual("review page", (review_dir / "index.html").read_text(encoding="utf-8"))
+        self.assertEqual("asset", (review_dir / "assets/review.js").read_text(encoding="utf-8"))
+        summary = artifacts["summary"]
+        self.assertIn("No B-roll shots were selected", summary.read_text(encoding="utf-8"))
+        self.assertEqual(updated, projectlib.load_json(self.plan_path))
+        self.assertEqual([], broll_plan.validate_plan(
+            updated, self.timeline, self.transcript,
+            project=self.project, project_root=self.root, verify_files=True,
+        ))
+
+        canonical, report = self.plan_path.read_bytes(), summary.read_bytes()
+        rerun, rerun_artifacts = check_broll.verify_plan(
+            self.plan_path, self.timeline_path, self.root, video
+        )
+        self.assertEqual(updated, rerun)
+        self.assertEqual(canonical, self.plan_path.read_bytes())
+        self.assertEqual(report, rerun_artifacts["summary"].read_bytes())
+        self.assertEqual([], rerun_artifacts["stills"])
+        self.assertIsNone(rerun_artifacts["contact_sheet"])
+        self.assertIsNone(rerun_artifacts["boundary_reel"])
+        self.assertEqual("review page", (review_dir / "index.html").read_text(encoding="utf-8"))
+        self.assertEqual("asset", (review_dir / "assets/review.js").read_text(encoding="utf-8"))
+
 
 class AcquisitionTests(unittest.TestCase):
     def setUp(self):

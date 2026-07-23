@@ -124,7 +124,9 @@ def _extract_stills(selected, timeline, stage):
     records = []
     for index, shot, _, video in selected:
         duration = normalize_broll._shot_duration(shot, timeline)
-        times = {"first": 0.0, "middle": duration / 2, "last": max(0, duration - den / num)}
+        actual_duration = shot["normalized"]["probe"]["duration_s"]
+        times = {"first": 0.0, "middle": duration / 2,
+                 "last": max(0, min(duration, actual_duration) - den / num)}
         paths = {}
         for label, time_s in times.items():
             path = still_dir / f"{index:03d}-{_slug(shot.get('id'))}-{label}.png"
