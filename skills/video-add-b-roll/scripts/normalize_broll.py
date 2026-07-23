@@ -271,6 +271,19 @@ def normalize_plan(plan_path, timeline_path, project_root, *, lut=None):
         project = projectlib.load_json(root / "work/project.json")
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ValueError("canonical project inputs are missing or invalid") from exc
+    if isinstance(timeline, dict) and (
+        "width" not in timeline or "height" not in timeline
+    ):
+        try:
+            media = projectlib.load_json(root / "work/understand/media.json")
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            media = {}
+        if not isinstance(media, dict):
+            media = {}
+        timeline = copy.deepcopy(timeline)
+        for field in ("width", "height"):
+            if field not in timeline:
+                timeline[field] = media.get(field)
     if not isinstance(plan, dict) or not isinstance(plan.get("shots"), list):
         raise ValueError("plan shots must be a list")
     if plan.get("review_status") != "approved":

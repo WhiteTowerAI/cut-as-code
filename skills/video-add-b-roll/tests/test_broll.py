@@ -2187,6 +2187,29 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
         )
         self.assertEqual(updated, projectlib.load_json(self.plan_path))
 
+    def test_normalize_plan_derives_missing_geometry_from_canonical_media(self):
+        self.timeline.pop("width")
+        self.timeline.pop("height")
+        projectlib.write_json(self.timeline_path, self.timeline)
+        projectlib.write_json(
+            self.root / "work/understand/media.json", {"width": 96, "height": 54}
+        )
+        plan = copy.deepcopy(self.base_plan)
+        plan["input_hashes"]["timeline_sha256"] = broll_plan.sha256_file(self.timeline_path)
+        projectlib.write_json(self.plan_path, self._approve(plan))
+
+        updated = normalize_broll.normalize_plan(
+            self.plan_path, self.timeline_path, self.root, lut=self.selected_lut_path
+        )
+
+        self.assertEqual((96, 54), (
+            updated["shots"][0]["normalized"]["probe"]["width"],
+            updated["shots"][0]["normalized"]["probe"]["height"],
+        ))
+        self.assertTrue(
+            {"width", "height"}.isdisjoint(projectlib.load_json(self.timeline_path))
+        )
+
     def test_normalize_shot_preserves_existing_target_until_atomic_success(self):
         candidate, shot = self._video_shot(self.candidates / "source.mp4")
         sentinel = b"last-good-normalized-output"
