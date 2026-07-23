@@ -367,8 +367,8 @@ def check_broll_compiler_consistency():
             "timeline_id": "main",
             "timebase": "program",
             "program_duration_s": 6.0,
-            "dependencies": ["understanding", "cut"],
-            "based_on": {"understanding": 1, "cut": 2},
+            "dependencies": ["understanding"],
+            "based_on": {"understanding": 1},
             "input_hashes": {"review_video_sha256": "f" * 64},
             "review_status": "approved",
             "decision": {"mode": "agent", "actor": "compiler-fixture", "rationale": "Both shots support the narration."},
@@ -426,11 +426,12 @@ def check_broll_compiler_consistency():
                     "depends_on": ["understanding"], "based_on": {"understanding": 1},
                     "status": "verified", "outputs": [],
                     "target": {"sequence": "main", "scope": "timeline"}, "effects": effects,
+                    "render": {"kind": "output-constraint"},
                 },
                 {
                     "id": "b-roll", "skill": "video-add-b-roll", "revision": 1,
-                    "depends_on": ["understanding", "cut"],
-                    "based_on": {"understanding": 1, "cut": 2},
+                    "depends_on": ["understanding"],
+                    "based_on": {"understanding": 1},
                     "status": "verified", "plan": "b-roll/broll-plan.json",
                     "outputs": [shot["normalized"]["path"] for shot in shots],
                     "target": {"sequence": "main", "scope": "b-roll"},
@@ -442,6 +443,13 @@ def check_broll_compiler_consistency():
                          "duration_s": shot["program_range"]["end_s"] - shot["program_range"]["start_s"]}
                         for shot in shots
                     ],
+                },
+                {
+                    "id": "color-grade", "skill": "fixture-color-grade", "revision": 3,
+                    "depends_on": ["understanding"], "based_on": {"understanding": 1},
+                    "status": "verified", "outputs": [],
+                    "target": {"sequence": "main", "scope": "color"}, "effects": effects,
+                    "render": {"kind": "output-constraint"},
                 },
             ],
             "render": {
@@ -485,17 +493,20 @@ def check_broll_compiler_consistency():
             ("missing review receipt", "plan", ("review",), None, "review receipt must be approved"),
             ("shot lifecycle", "plan", ("shots", 0, "status"), "normalized", "shot shot-001 must be verified or skipped"),
             ("shot verification", "plan", ("shots", 0, "verification", "status"), "fail", "shot shot-001 verification must pass"),
+            ("missing verification hash", "plan", ("shots", 0, "verification"), {"status": "pass"}, "shot shot-001 verification normalized_sha256 is required"),
+            ("invalid verification hash", "plan", ("shots", 0, "verification", "normalized_sha256"), "bad", "shot shot-001 verification normalized_sha256 is invalid"),
+            ("mismatched verification hash", "plan", ("shots", 0, "verification", "normalized_sha256"), "0" * 64, "shot shot-001 verification normalized_sha256 does not match normalized SHA-256"),
             ("timeline id", "plan", ("timeline_id",), "other", "timeline_id does not match timeline"),
             ("missing plan timeline id", "plan", ("timeline_id",), "", "plan timeline_id must be nonblank"),
             ("program duration", "plan", ("program_duration_s",), 5.0, "program_duration_s does not match timeline"),
             ("finite program duration", "plan", ("program_duration_s",), float("inf"), "program_duration_s must be finite"),
-            ("operation dependency order", "project", ("operations", 2, "depends_on"), ["cut", "understanding"], "operation dependencies do not match plan"),
+            ("operation dependency order", "operation-dependencies", (), ["cut", "understanding"], "operation dependencies do not match plan"),
             ("plan dependency order", "plan", ("dependencies",), ["cut", "understanding"], "plan dependencies do not match operation"),
             ("operation based_on integer", "project", ("operations", 2, "based_on", "understanding"), 1.0, "operation based_on revisions must be positive integers"),
             ("plan based_on integer", "plan", ("based_on", "understanding"), 1.0, "plan based_on revisions must be positive integers"),
             ("operation based_on boolean revision", "project", ("operations", 2, "based_on", "understanding"), True, "operation based_on revisions must be positive integers"),
             ("plan based_on boolean revision", "plan", ("based_on", "understanding"), True, "plan based_on revisions must be positive integers"),
-            ("plan based_on parity", "plan", ("based_on",), {"understanding": 1}, "operation based_on does not match plan"),
+            ("plan based_on parity", "plan", ("based_on",), {}, "operation based_on does not match plan"),
             ("operation target sequence", "project", ("operations", 2, "target", "sequence"), "alternate", "operation target sequence does not match active_sequence"),
             ("operation target scope", "project", ("operations", 2, "target", "scope"), "overlay", "operation target scope must be b-roll"),
             ("unsafe normalized path", "plan", ("shots", 0, "normalized", "path"), "../escape.mp4", "shot shot-001 normalized path"),
@@ -518,6 +529,12 @@ def check_broll_compiler_consistency():
             if target_name == "both-dependencies":
                 current_plan["dependencies"] = replacement
                 current_project["operations"][2]["depends_on"] = replacement
+                based_on = {item: {"understanding": 1, "cut": 2}[item] for item in replacement if isinstance(item, str)}
+                current_plan["based_on"] = based_on
+                current_project["operations"][2]["based_on"] = based_on
+            elif target_name == "operation-dependencies":
+                current_project["operations"][2]["depends_on"] = replacement
+                current_project["operations"][2]["based_on"] = {"understanding": 1, "cut": 2}
             elif not path:
                 current_plan = replacement
             else:
@@ -534,6 +551,27 @@ def check_broll_compiler_consistency():
             else:
                 failures.append(f"{label}: mismatch was accepted")
 
+        dependency_probes = [
+            ("missing understanding", ["b-roll"], ["cut"], {"cut": 2}),
+            ("missing active cut", ["cut", "b-roll"], ["understanding"], {"understanding": 1}),
+            ("missing active color-grade", ["color-grade", "b-roll"], ["understanding"], {"understanding": 1}),
+        ]
+        for label, active_operations, dependencies, based_on in dependency_probes:
+            current_plan = copy.deepcopy(plan)
+            current_project = copy.deepcopy(project)
+            current_project["sequences"]["main"]["operations"] = active_operations
+            current_plan["dependencies"] = dependencies
+            current_plan["based_on"] = based_on
+            current_project["operations"][2]["depends_on"] = dependencies
+            current_project["operations"][2]["based_on"] = based_on
+            try:
+                compile_values(current_plan, current_project, timeline)
+            except ValueError as error:
+                if "operation dependencies do not match active upstream operations" not in str(error):
+                    failures.append(f"{label}: {error}")
+            else:
+                failures.append(f"{label}: mismatch was accepted")
+
         direct_probes = []
         missing_timeline_id = copy.deepcopy(timeline)
         missing_timeline_id["timeline_id"] = ""
@@ -543,8 +581,8 @@ def check_broll_compiler_consistency():
         direct_probes.append(("boolean operation revision", plan, boolean_revision, timeline, "operation revision must be a positive integer"))
         missing_based_on_plan = copy.deepcopy(plan)
         missing_based_on_operation = copy.deepcopy(project["operations"][2])
-        missing_based_on_plan["based_on"] = {"understanding": 1}
-        missing_based_on_operation["based_on"] = {"understanding": 1}
+        missing_based_on_plan["based_on"] = {}
+        missing_based_on_operation["based_on"] = {}
         direct_probes.append(("incomplete based_on mappings", missing_based_on_plan, missing_based_on_operation, timeline, "based_on keys must exactly match dependencies"))
         malformed_dependencies_plan = copy.deepcopy(plan)
         malformed_dependencies_project = copy.deepcopy(project)

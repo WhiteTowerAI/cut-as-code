@@ -784,6 +784,15 @@ def _validate_broll_plan(plan, operation, contributions, timeline, errors):
         verification = shot.get("verification")
         if not isinstance(verification, dict) or verification.get("status") != "pass":
             errors.append(prefix + f"shot {label} verification must pass")
+            verification_digest = None
+        elif "normalized_sha256" not in verification:
+            errors.append(prefix + f"shot {label} verification normalized_sha256 is required")
+            verification_digest = None
+        elif not re.fullmatch(r"[0-9a-fA-F]{64}", str(verification.get("normalized_sha256", ""))):
+            errors.append(prefix + f"shot {label} verification normalized_sha256 is invalid")
+            verification_digest = None
+        else:
+            verification_digest = verification["normalized_sha256"]
 
         program_range = shot.get("program_range")
         start = number(program_range.get("start_s")) if isinstance(program_range, dict) else None
@@ -811,8 +820,14 @@ def _validate_broll_plan(plan, operation, contributions, timeline, errors):
             )
         if not safe_path:
             errors.append(prefix + f"shot {label} normalized path must be safe and project-relative")
-        if not re.fullmatch(r"[0-9a-fA-F]{64}", str(normalized.get("sha256", ""))):
+        normalized_digest = normalized.get("sha256")
+        if not re.fullmatch(r"[0-9a-fA-F]{64}", str(normalized_digest or "")):
             errors.append(prefix + f"shot {label} normalized SHA-256 is invalid")
+        elif verification_digest is not None and verification_digest != normalized_digest:
+            errors.append(
+                prefix + f"shot {label} verification normalized_sha256 "
+                "does not match normalized SHA-256"
+            )
 
     if [item[0] for item in ranges] != sorted(item[0] for item in ranges):
         errors.append(prefix + "selected shots must be chronological")
@@ -960,6 +975,18 @@ def build_render_plan(project, project_root):
                 errors.append(
                     f"{operation_id} B-roll plan mismatch: "
                     "operation target sequence does not match active_sequence"
+                )
+            required_dependencies = [
+                "understanding",
+                *[
+                    dependency for dependency in ("cut", "color-grade")
+                    if dependency in sequence.get("operations", []) and dependency in operations
+                ],
+            ]
+            if operation.get("depends_on") != required_dependencies:
+                errors.append(
+                    f"{operation_id} B-roll plan mismatch: operation dependencies "
+                    "do not match active upstream operations"
                 )
             plan_value = operation.get("plan")
             if not plan_value:
