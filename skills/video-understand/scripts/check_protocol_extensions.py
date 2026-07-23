@@ -476,15 +476,43 @@ def check_broll_compiler_consistency():
             "../cache/b-roll/normalized/broll-002.mp4",
         ]
 
+        def binding(relative, content):
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
+            return {"path": relative, "sha256": hashlib.sha256(content).hexdigest()}
+
+        contact = binding("review/03-b-roll/contact-sheet.jpg", b"contact")
+        boundary = binding("review/03-b-roll/boundary-reel.mp4", b"boundary")
+        summary = binding("review/03-b-roll/b-roll-summary.md", b"summary")
+        final_video = binding("final/final-video.mp4", b"final")
+        comparison = binding(
+            "review/04-edit-compare/original-vs-final-source-time.mp4", b"comparison"
+        )
+        stills = []
+        for shot in shots:
+            shot_stills = {}
+            for position in ("first", "middle", "last"):
+                item = binding(
+                    f"review/03-b-roll/stills/{shot['id']}-{position}.png",
+                    f"{shot['id']}-{position}".encode(),
+                )
+                shot_stills[position] = item
+                stills.append({"shot_id": shot["id"], "position": position, **item})
+            shot["verification"].update({
+                "stills": shot_stills, "contact_sheet": contact,
+                "boundary_reel": boundary, "report": summary,
+            })
+
         receipt_path = root / "work/b-roll/b-roll-visual-review.json"
         report_path = root / "review/03-b-roll/b-roll-visual-review.md"
-        receipt_path.write_bytes(b"completed receipt")
         report_path.write_bytes(b"completed report")
         completed_plan = copy.deepcopy(plan)
         plan_payload = json.dumps(
             completed_plan, sort_keys=True, separators=(",", ":"), ensure_ascii=False
         )
-        completed_plan["visual_review"] = {
+        receipt = {
+            "schema_version": 1,
             "status": "completed",
             "review_id": plan["review"]["review_id"],
             "plan_sha256": hashlib.sha256(plan_payload.encode("utf-8")).hexdigest(),
@@ -496,6 +524,18 @@ def check_broll_compiler_consistency():
                 "jump_cuts": True, "entry_exit_boundaries": True,
                 "grade_match": True,
             },
+            "artifacts": {
+                "stills": stills, "contact_sheet": contact, "boundary_reel": boundary,
+                "machine_summary": summary, "final_video": final_video,
+                "comparison": comparison,
+            },
+        }
+        projectlib.write_json(receipt_path, receipt)
+        completed_plan["visual_review"] = {
+            **{key: receipt[key] for key in (
+                "status", "review_id", "plan_sha256", "mode", "actor",
+                "rationale", "timestamp", "checks",
+            )},
             "receipt": {
                 "path": "work/b-roll/b-roll-visual-review.json",
                 "sha256": hashlib.sha256(receipt_path.read_bytes()).hexdigest(),
@@ -516,6 +556,62 @@ def check_broll_compiler_consistency():
         assert completed_operation["revision"] == project["operations"][2]["revision"]
         assert completed_operation["render"] == project["operations"][2]["render"]
         assert completed_compiled == compiled
+
+        def completed_failure(label, current_plan, current_receipt, expected):
+            projectlib.write_json(receipt_path, current_receipt)
+            current_plan["visual_review"]["receipt"]["sha256"] = hashlib.sha256(
+                receipt_path.read_bytes()
+            ).hexdigest()
+            try:
+                compile_values(current_plan, completed_project, timeline)
+            except ValueError as error:
+                assert expected in str(error), f"{label}: {error}"
+            else:
+                raise AssertionError(f"{label}: mismatch was accepted")
+
+        human_plan, human_receipt = copy.deepcopy(completed_plan), copy.deepcopy(receipt)
+        human_plan["visual_review"]["mode"] = human_receipt["mode"] = "human"
+        completed_failure("forged human", human_plan, human_receipt, "explicit_user_action")
+        blank_plan, blank_receipt = copy.deepcopy(completed_plan), copy.deepcopy(receipt)
+        blank_plan["visual_review"]["actor"] = blank_receipt["actor"] = " "
+        completed_failure("blank actor", blank_plan, blank_receipt, "actor is required")
+        time_plan, time_receipt = copy.deepcopy(completed_plan), copy.deepcopy(receipt)
+        time_plan["visual_review"]["timestamp"] = time_receipt["timestamp"] = "2026-07-24T01:00:00"
+        completed_failure("invalid timestamp", time_plan, time_receipt, "timestamp is invalid")
+        mismatch_receipt = copy.deepcopy(receipt)
+        mismatch_receipt["rationale"] = "Different rationale."
+        completed_failure(
+            "receipt mismatch", copy.deepcopy(completed_plan), mismatch_receipt,
+            "receipt authority does not match",
+        )
+        schema_receipt = copy.deepcopy(receipt)
+        schema_receipt["schema_version"] = 2
+        completed_failure(
+            "receipt schema", copy.deepcopy(completed_plan), schema_receipt,
+            "receipt schema_version must be 1",
+        )
+        status_receipt = copy.deepcopy(receipt)
+        status_receipt["status"] = "draft"
+        completed_failure(
+            "receipt status", copy.deepcopy(completed_plan), status_receipt,
+            "receipt authority does not match",
+        )
+        completed_failure(
+            "non-object receipt", copy.deepcopy(completed_plan), [],
+            "receipt must be an object",
+        )
+        projectlib.write_json(receipt_path, receipt)
+        completed_plan["visual_review"]["receipt"]["sha256"] = hashlib.sha256(
+            receipt_path.read_bytes()
+        ).hexdigest()
+        (root / final_video["path"]).write_bytes(b"stale final")
+        try:
+            compile_values(completed_plan, completed_project, timeline)
+        except ValueError as error:
+            assert "final video SHA-256 is stale" in str(error)
+        else:
+            raise AssertionError("stale final artifact was accepted")
+        (root / final_video["path"]).write_bytes(b"final")
         report_path.write_bytes(b"tampered report")
         try:
             compile_values(completed_plan, completed_project, timeline)

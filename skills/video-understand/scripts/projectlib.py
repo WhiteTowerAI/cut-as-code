@@ -6,6 +6,7 @@ import math
 import os
 import re
 import subprocess
+from datetime import datetime
 from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
 
@@ -31,6 +32,14 @@ def write_json(path, data):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _sha256_file(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def quick_fingerprint(path, duration_s):
@@ -679,6 +688,41 @@ def _validate_broll_plan(plan, operation, contributions, timeline, errors, proje
             )
         )
 
+    def valid_timestamp(value):
+        if not isinstance(value, str):
+            return False
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return False
+        return parsed.tzinfo is not None and parsed.utcoffset() is not None
+
+    def bound_file(binding, label, expected_path=None):
+        valid = (
+            isinstance(binding, dict) and set(binding) == {"path", "sha256"}
+            and re.fullmatch(r"[0-9a-fA-F]{64}", str(binding.get("sha256", "")))
+            and (expected_path is None or binding.get("path") == expected_path)
+        )
+        if not valid:
+            errors.append(prefix + f"{label} binding is invalid")
+            return None
+        if project_root is None:
+            return None
+        root, raw = Path(project_root).resolve(), Path(binding["path"])
+        path = (root / raw).resolve()
+        try:
+            path.relative_to(root)
+        except ValueError:
+            errors.append(prefix + f"{label} path escapes project root")
+            return None
+        if not path.is_file():
+            errors.append(prefix + f"{label} file is missing")
+            return None
+        if _sha256_file(path) != binding["sha256"]:
+            errors.append(prefix + f"{label} SHA-256 is stale")
+            return None
+        return path
+
     if not isinstance(plan, dict):
         errors.append(prefix + "plan must be an object")
         return
@@ -699,6 +743,7 @@ def _validate_broll_plan(plan, operation, contributions, timeline, errors, proje
     if not isinstance(review, dict) or review.get("status") != "approved":
         errors.append(prefix + "review receipt must be approved")
     visual_review = plan.get("visual_review")
+    receipt = None
     required_checks = {
         "semantic_fit", "unwanted_logos_or_text", "jump_cuts",
         "entry_exit_boundaries", "grade_match",
@@ -721,35 +766,48 @@ def _validate_broll_plan(plan, operation, contributions, timeline, errors, proje
         expected_plan_hash = hashlib.sha256(payload.encode("utf-8")).hexdigest()
         if visual_review.get("plan_sha256") != expected_plan_hash:
             errors.append(prefix + "visual review plan SHA-256 does not match")
+        mode = visual_review.get("mode")
+        if mode not in ("human", "agent"):
+            errors.append(prefix + "visual review mode must be human or agent")
+        if not isinstance(visual_review.get("actor"), str) or not visual_review["actor"].strip():
+            errors.append(prefix + "visual review actor is required")
+        if not isinstance(visual_review.get("rationale"), str) or not visual_review["rationale"].strip():
+            errors.append(prefix + "visual review rationale is required")
+        if not valid_timestamp(visual_review.get("timestamp")):
+            errors.append(prefix + "visual review timestamp is invalid")
+        if mode == "human" and visual_review.get("explicit_user_action") is not True:
+            errors.append(prefix + "human visual review requires explicit_user_action true")
         checks = visual_review.get("checks")
         if (not isinstance(checks, dict) or set(checks) != required_checks
                 or any(value is not True for value in checks.values())):
             errors.append(prefix + "all visual checks must be true booleans")
-        for name, expected_path in (
-            ("receipt", "work/b-roll/b-roll-visual-review.json"),
-            ("report", "review/03-b-roll/b-roll-visual-review.md"),
-        ):
-            binding = visual_review.get(name)
-            valid = (
-                isinstance(binding, dict) and binding.get("path") == expected_path
-                and re.fullmatch(r"[0-9a-fA-F]{64}", str(binding.get("sha256", "")))
-            )
-            if not valid:
-                errors.append(prefix + f"visual review {name} binding is invalid")
-                continue
-            if project_root is not None:
-                path = (Path(project_root).resolve() / binding["path"]).resolve()
-                try:
-                    path.relative_to(Path(project_root).resolve())
-                except ValueError:
-                    errors.append(prefix + f"visual review {name} path escapes project root")
-                    continue
-                if not path.is_file():
-                    errors.append(prefix + f"visual review {name} file is missing")
-                else:
-                    digest = hashlib.sha256(path.read_bytes()).hexdigest()
-                    if digest != binding["sha256"]:
-                        errors.append(prefix + f"visual review {name} SHA-256 is stale")
+        receipt_path = bound_file(
+            visual_review.get("receipt"), "visual review receipt",
+            "work/b-roll/b-roll-visual-review.json",
+        )
+        bound_file(
+            visual_review.get("report"), "visual review report",
+            "review/03-b-roll/b-roll-visual-review.md",
+        )
+        if receipt_path is not None:
+            try:
+                receipt = load_json(receipt_path)
+            except (OSError, ValueError, json.JSONDecodeError) as exc:
+                errors.append(prefix + f"visual review receipt is invalid JSON: {exc}")
+            else:
+                if not isinstance(receipt, dict):
+                    errors.append(prefix + "visual review receipt must be an object")
+                    receipt = None
+                elif receipt.get("schema_version") != 1:
+                    errors.append(prefix + "visual review receipt schema_version must be 1")
+                authority = (
+                    "status", "review_id", "plan_sha256", "mode", "actor",
+                    "rationale", "timestamp", "checks",
+                )
+                if (isinstance(receipt, dict)
+                        and (any(receipt.get(key) != visual_review.get(key) for key in authority)
+                             or receipt.get("explicit_user_action") != visual_review.get("explicit_user_action"))):
+                    errors.append(prefix + "visual review receipt authority does not match plan")
         check = operation.get("check")
         expected_report = "../review/03-b-roll/b-roll-visual-review.md"
         if not isinstance(check, dict) or check.get("status") != "pass" or check.get("report") != expected_report:
@@ -891,6 +949,57 @@ def _validate_broll_plan(plan, operation, contributions, timeline, errors, proje
     ordered_ranges = sorted(ranges)
     if any(current[0] < previous[1] for previous, current in zip(ordered_ranges, ordered_ranges[1:])):
         errors.append(prefix + "selected shot ranges overlap")
+
+    if receipt is not None:
+        artifacts = receipt.get("artifacts")
+        artifact_keys = {
+            "stills", "contact_sheet", "boundary_reel", "machine_summary",
+            "final_video", "comparison",
+        }
+        if not isinstance(artifacts, dict) or set(artifacts) != artifact_keys:
+            errors.append(prefix + "visual review receipt artifacts are invalid")
+        else:
+            expected_stills, shared = [], {}
+            for shot in selected:
+                shot_id, verification = shot.get("id"), shot.get("verification")
+                shot_stills = verification.get("stills") if isinstance(verification, dict) else None
+                if not isinstance(shot_stills, dict) or set(shot_stills) != {"first", "middle", "last"}:
+                    errors.append(prefix + f"shot {shot_id} verification stills are invalid")
+                    continue
+                for position in ("first", "middle", "last"):
+                    item = shot_stills[position]
+                    path = item.get("path") if isinstance(item, dict) else None
+                    if not isinstance(path, str) or not path.startswith("review/03-b-roll/stills/"):
+                        errors.append(prefix + f"shot {shot_id} {position} still path is invalid")
+                    bound_file(item, f"shot {shot_id} {position} still")
+                    if isinstance(item, dict):
+                        expected_stills.append({"shot_id": shot_id, "position": position, **item})
+                for key, expected_path in (
+                    ("contact_sheet", "review/03-b-roll/contact-sheet.jpg"),
+                    ("boundary_reel", "review/03-b-roll/boundary-reel.mp4"),
+                    ("report", "review/03-b-roll/b-roll-summary.md"),
+                ):
+                    item = verification.get(key) if isinstance(verification, dict) else None
+                    bound_file(item, f"shot {shot_id} {key.replace('_', ' ')}", expected_path)
+                    if key in shared and shared[key] != item:
+                        errors.append(prefix + f"verified shots disagree on {key.replace('_', ' ')}")
+                    else:
+                        shared[key] = item
+            expected = {
+                "stills": expected_stills,
+                "contact_sheet": shared.get("contact_sheet"),
+                "boundary_reel": shared.get("boundary_reel"),
+                "machine_summary": shared.get("report"),
+            }
+            if any(artifacts.get(key) != value for key, value in expected.items()):
+                errors.append(prefix + "visual review receipt artifact bindings do not match plan")
+            bound_file(
+                artifacts.get("final_video"), "final video", "final/final-video.mp4"
+            )
+            bound_file(
+                artifacts.get("comparison"), "source-time comparison",
+                "review/04-edit-compare/original-vs-final-source-time.mp4",
+            )
 
     if not isinstance(contributions, list):
         errors.append(prefix + "render contributions must be a list")

@@ -617,8 +617,14 @@ def register_operation(project, plan, *, plan_path="b-roll/broll-plan.json", rep
         )
         if sequence["operations"].count("b-roll") != 1 or references != 1:
             raise ValueError("completed visual review requires one B-roll sequence reference")
+        pending_check = {"status": "pending", "report": "../review/03-b-roll/b-roll-summary.md"}
+        completed_check = {"status": "pass", "report": completed_report}
+        if existing.get("status") == "verified" and existing.get("check") == completed_check:
+            return result
+        if existing.get("status") != "approved" or existing.get("check") != pending_check:
+            raise ValueError("registered operation must be approved with pending machine summary")
         existing["status"] = "verified"
-        existing["check"] = {"status": "pass", "report": completed_report}
+        existing["check"] = completed_check
         return result
 
     machine_report = "../review/03-b-roll/b-roll-summary.md"

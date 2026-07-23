@@ -2751,6 +2751,16 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
         duplicate["sequences"]["alternate"] = {"operations": ["b-roll"]}
         with self.assertRaisesRegex(ValueError, "one B-roll sequence reference"):
             broll_plan.register_operation(duplicate, completed)
+        failed = copy.deepcopy(registered)
+        failed_operation = next(item for item in failed["operations"] if item["id"] == "b-roll")
+        failed_operation["status"] = "failed"
+        failed_operation["check"] = {"status": "fail", "report": "../review/03-b-roll/b-roll-summary.md"}
+        with self.assertRaisesRegex(ValueError, "approved with pending machine summary"):
+            broll_plan.register_operation(failed, completed)
+        wrong_check = copy.deepcopy(registered)
+        next(item for item in wrong_check["operations"] if item["id"] == "b-roll")["check"]["status"] = "pass"
+        with self.assertRaisesRegex(ValueError, "approved with pending machine summary"):
+            broll_plan.register_operation(wrong_check, completed)
         registration = broll_plan.register_operation(registered, completed)
         operation = next(item for item in registration["operations"] if item["id"] == "b-roll")
         self.assertEqual("../review/03-b-roll/b-roll-visual-review.md", operation["check"]["report"])
@@ -2761,6 +2771,7 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
             if item.get("operation") == "b-roll"
         ]
         self.assertEqual(before_contributions, after_contributions)
+        self.assertEqual(registration, broll_plan.register_operation(registration, completed))
 
     def test_complete_visual_review_rejects_unchecked_or_stale_evidence(self):
         video, _ = self._normalized_for_check()
