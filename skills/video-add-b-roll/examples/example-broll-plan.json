@@ -1,0 +1,231 @@
+{
+  "schema_version": 1,
+  "timeline_id": "main",
+  "timebase": "program",
+  "program_duration_s": 30.0,
+  "dependencies": [
+    "understanding",
+    "cut",
+    "color-grade"
+  ],
+  "based_on": {
+    "understanding": 1,
+    "cut": 2,
+    "color-grade": 1
+  },
+  "input_hashes": {
+    "transcript_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "timeline_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "grade_plan_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "selected_lut_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "review_video_sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+  },
+  "brief": {
+    "density": "selective",
+    "style": "literal documentary footage",
+    "avoid": [
+      "logos",
+      "unreadable screens",
+      "generic office footage"
+    ]
+  },
+  "review_status": "approved",
+  "decision": {
+    "mode": "agent",
+    "actor": "Example Agent",
+    "rationale": "Selected the literal manufacturing process shot and skipped the weak software visual."
+  },
+  "review": {
+    "status": "approved",
+    "review_id": "123e4567-e89b-12d3-a456-426614174000",
+    "mode": "agent",
+    "actor": "Example Agent",
+    "rationale": "Selected the literal manufacturing process shot and skipped the weak software visual.",
+    "timestamp": "2026-07-23T12:00:00Z",
+    "plan_sha256": "278fe37aa4ac3bf528ebd0161bdb19a917158bd707debd19090f69b0f81fa2df",
+    "candidate_manifest_sha256": "4d46ef77624f6c2dfc1e0b2c62d54aba8bdac44609be6bc3ef5c1e8a625ab616",
+    "review_video_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "decisions": [
+      {
+        "id": "example-manufacturing-process",
+        "decision": "select",
+        "candidate_id": "example-owned-factory-video",
+        "source_trim": {
+          "start_s": 0.5,
+          "end_s": 3.5
+        }
+      },
+      {
+        "id": "example-software-claim",
+        "decision": "skip"
+      }
+    ],
+    "decision_skipped_shot_ids": [
+      "example-software-claim"
+    ],
+    "selected_asset_sha256": [
+      "6666666666666666666666666666666666666666666666666666666666666666"
+    ]
+  },
+  "shots": [
+    {
+      "id": "example-manufacturing-process",
+      "program_range": {
+        "start_s": 6.0,
+        "end_s": 9.0
+      },
+      "source_ranges": [
+        {
+          "clip_id": "clip-001",
+          "start_s": 6.0,
+          "end_s": 9.0
+        }
+      ],
+      "transcript_evidence": {
+        "words": [
+          {
+            "word": "manufacturing",
+            "source_range": {
+              "start_s": 6.2,
+              "end_s": 6.8
+            },
+            "program_range": {
+              "start_s": 6.2,
+              "end_s": 6.8
+            },
+            "clip_id": "clip-001"
+          }
+        ]
+      },
+      "editorial_reason": "Shows the physical process named in the claim.",
+      "visual_intent": "A wide, readable view of precision parts moving through a factory line.",
+      "queries": [
+        "precision parts factory line",
+        "manufacturing assembly process wide shot"
+      ],
+      "candidates": [
+        {
+          "id": "example-owned-factory-video",
+          "media_type": "video",
+          "cache_path": "cache/b-roll/candidates/example-owned-factory-video.mp4",
+          "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+          "bytes": 1234567,
+          "duration_s": 4.0,
+          "probe": {
+            "duration_s": 4.0,
+            "width": 1920,
+            "height": 1080,
+            "codec": "h264"
+          },
+          "provenance": {
+            "source_type": "local",
+            "creator": "Example Studio",
+            "license": "Example owned footage - replace with real rights statement",
+            "retrieval_time": "2026-07-23T10:00:00Z",
+            "original_path": "input/example-owned-factory-video.mp4"
+          }
+        }
+      ],
+      "selected": {
+        "candidate_id": "example-owned-factory-video",
+        "source_trim": {
+          "start_s": 0.5,
+          "end_s": 3.5
+        }
+      },
+      "status": "verified",
+      "normalized": {
+        "path": "cache/b-roll/normalized/broll-001.mp4",
+        "source_path": "cache/b-roll/candidates/example-owned-factory-video.mp4",
+        "source_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "probe": {
+          "duration_s": 3.0,
+          "width": 1920,
+          "height": 1080,
+          "fps": {
+            "num": 30000,
+            "den": 1001
+          },
+          "sar": "1:1",
+          "codec": "h264",
+          "pix_fmt": "yuv420p",
+          "has_audio": false,
+          "has_subtitles": false,
+          "has_data": false
+        },
+        "grade_plan_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "selected_lut_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+      },
+      "verification": {
+        "status": "pass",
+        "normalized_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "stills": {
+          "first": {
+            "path": "review/03-b-roll/stills/001-example-manufacturing-process-first.png",
+            "sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+          },
+          "middle": {
+            "path": "review/03-b-roll/stills/001-example-manufacturing-process-middle.png",
+            "sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+          },
+          "last": {
+            "path": "review/03-b-roll/stills/001-example-manufacturing-process-last.png",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "contact_sheet": {
+          "path": "review/03-b-roll/contact-sheet.jpg",
+          "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "boundary_reel": {
+          "path": "review/03-b-roll/boundary-reel.mp4",
+          "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "report": {
+          "path": "review/03-b-roll/b-roll-summary.md",
+          "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        }
+      }
+    },
+    {
+      "id": "example-software-claim",
+      "program_range": {
+        "start_s": 18.0,
+        "end_s": 20.0
+      },
+      "source_ranges": [
+        {
+          "clip_id": "clip-001",
+          "start_s": 18.0,
+          "end_s": 20.0
+        }
+      ],
+      "transcript_evidence": {
+        "words": [
+          {
+            "word": "software",
+            "source_range": {
+              "start_s": 18.2,
+              "end_s": 18.7
+            },
+            "program_range": {
+              "start_s": 18.2,
+              "end_s": 18.7
+            },
+            "clip_id": "clip-001"
+          }
+        ]
+      },
+      "editorial_reason": "A literal interface could clarify the software claim.",
+      "visual_intent": "A readable product interface showing the exact workflow described.",
+      "queries": [
+        "manufacturing workflow software interface",
+        "factory operations dashboard close up"
+      ],
+      "candidates": [],
+      "selected": null,
+      "status": "skipped"
+    }
+  ]
+}
