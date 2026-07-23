@@ -36,12 +36,20 @@ class _BrollFixture:
         self.transcript_path = self.root / "work/understand/transcript.json"
         projectlib.write_json(self.timeline_path, self.timeline)
         projectlib.write_json(self.transcript_path, self.transcript)
+        self.grade_plan_path = self.root / "work/color-grade/grade-plan.json"
+        self.selected_lut_path = self.root / "final/selected-color-look.cube"
+        self.selected_lut_path.parent.mkdir(parents=True)
+        self.selected_lut_path.write_text("TITLE local\nLUT_3D_SIZE 2\n", encoding="utf-8")
+        self.grade_plan = {"schema_version": 1, "selected_lut": "../../final/selected-color-look.cube"}
+        projectlib.write_json(self.grade_plan_path, self.grade_plan)
         asset = self.root / "work/cache/b-roll/factory.mp4"
         asset.write_bytes(b"asset")
         self.mapped_words = projectlib.map_transcript_to_timeline(self.transcript, self.timeline)["segments"][0]["words"]
-        candidate = {"id": "asset", "media_type": "video", "cache_path": "cache/b-roll/factory.mp4", "sha256": broll_plan.sha256_file(asset), "provenance": {"source_type": "local", "creator": "me", "license": "owned", "retrieval_time": "2026-07-23T00:00:00Z", "original_path": "input/factory.mp4"}}
-        self.plan = {"schema_version": 1, "timeline_id": "main", "timebase": "program", "program_duration_s": 10.0, "dependencies": ["understanding", "cut", "color-grade"], "based_on": {"understanding": 1, "cut": 2, "color-grade": 3}, "input_hashes": {"transcript_sha256": broll_plan.sha256_file(self.transcript_path), "timeline_sha256": broll_plan.sha256_file(self.timeline_path), "review_video_sha256": "b" * 64}, "brief": {"density": "selective"}, "decision": None, "review": None, "shots": [{"id": "shot", "program_range": {"start_s": 1.0, "end_s": 2.0}, "source_ranges": [{"clip_id": "one", "start_s": 1.0, "end_s": 2.0}], "transcript_evidence": {"words": [self.mapped_words[0]]}, "editorial_reason": "Supports the statement.", "visual_intent": "Factory work.", "queries": ["factory assembly", "manufacturing line"], "candidates": [candidate], "selected": None, "status": "candidates_ready"}]}
-        self.project = {"active_sequence": "main", "sequences": {"main": {"operations": ["cut", "color-grade"]}}, "operations": [{"id": "understanding", "revision": 1}, {"id": "cut", "revision": 2}, {"id": "color-grade", "revision": 3}]}
+        candidate = {"id": "asset", "media_type": "video", "cache_path": "cache/b-roll/factory.mp4", "sha256": broll_plan.sha256_file(asset), "bytes": asset.stat().st_size, "duration_s": 2.0, "probe": {"duration_s": 2.0, "width": 1920, "height": 1080}, "provenance": {"source_type": "local", "creator": "me", "license": "owned", "retrieval_time": "2026-07-23T00:00:00Z", "original_path": "input/factory.mp4"}}
+        self.plan = {"schema_version": 1, "timeline_id": "main", "timebase": "program", "program_duration_s": 10.0, "dependencies": ["understanding", "cut", "color-grade"], "based_on": {"understanding": 1, "cut": 2, "color-grade": 3}, "input_hashes": {"transcript_sha256": broll_plan.sha256_file(self.transcript_path), "timeline_sha256": broll_plan.sha256_file(self.timeline_path), "grade_plan_sha256": broll_plan.sha256_file(self.grade_plan_path), "selected_lut_sha256": broll_plan.sha256_file(self.selected_lut_path), "review_video_sha256": "b" * 64}, "brief": {"density": "selective"}, "decision": None, "review": None, "shots": [{"id": "shot", "program_range": {"start_s": 1.0, "end_s": 2.0}, "source_ranges": [{"clip_id": "one", "start_s": 1.0, "end_s": 2.0}], "transcript_evidence": {"words": [self.mapped_words[0]]}, "editorial_reason": "Supports the statement.", "visual_intent": "Factory work.", "queries": ["factory assembly", "manufacturing line"], "candidates": [candidate], "selected": None, "status": "candidates_ready"}]}
+        self.project = {"active_sequence": "main", "sequences": {"main": {"operations": ["cut", "color-grade"]}}, "operations": [{"id": "understanding", "revision": 1}, {"id": "cut", "revision": 2}, {"id": "color-grade", "revision": 3, "render": {"plan": "color-grade/grade-plan.json"}}]}
+        self.project_path = self.root / "work/project.json"
+        projectlib.write_json(self.project_path, self.project)
 
     def tearDown(self): self.temp.cleanup()
 
@@ -50,6 +58,31 @@ class _BrollFixture:
 
     def review_for(self, plan, shots, rationale="Relevant footage.", timestamp="2026-07-23T12:00:00Z", **extra):
         return {"review_id": "123e4567-e89b-12d3-a456-426614174000", "plan_sha256": broll_plan.canonical_sha256(broll_plan.review_subject(plan)), "candidate_manifest_sha256": broll_plan.canonical_sha256(broll_plan.candidate_manifest(plan)), "review_video_sha256": plan["input_hashes"]["review_video_sha256"], "rationale": rationale, "timestamp": timestamp, "shots": shots, **extra}
+
+    def pexels_candidate(self):
+        candidate = copy.deepcopy(self.plan["shots"][0]["candidates"][0])
+        candidate.update({
+            "provider_id": 101,
+            "file_id": 202,
+            "download_url": "https://videos.pexels.com/factory.mp4",
+            "width": 1920,
+            "height": 1080,
+            "duration_s": 2.0,
+        })
+        candidate["provenance"] = {
+            "source_type": "pexels",
+            "provider_id": 101,
+            "source_url": "https://www.pexels.com/video/factory-101/",
+            "creator": "Pexels Creator",
+            "license": "Pexels License",
+            "license_url": "https://www.pexels.com/license/",
+            "terms_url": "https://www.pexels.com/terms-of-service/",
+            "retrieval_time": "2026-07-23T00:00:00Z",
+            "download_url": "https://videos.pexels.com/factory.mp4",
+            "dimensions": {"width": 1920, "height": 1080},
+            "duration_s": 2.0,
+        }
+        return candidate
 
 
 class BrollPlanTests(_BrollFixture, unittest.TestCase):
@@ -238,6 +271,15 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
                         broll_plan.validate_plan(plan, self.timeline, self.transcript),
                     )
 
+        plan = copy.deepcopy(self.plan)
+        candidate = plan["shots"][0]["candidates"][0]
+        candidate.pop("duration_s")
+        candidate.pop("probe")
+        self.assertIn(
+            "shot candidate asset video requires a finite positive duration",
+            broll_plan.validate_plan(plan, self.timeline, self.transcript),
+        )
+
         for value in (None, [], "probe", 1, 1.0, True):
             plan = copy.deepcopy(self.plan)
             plan["shots"][0]["candidates"][0]["probe"] = value
@@ -247,20 +289,49 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
                     broll_plan.validate_plan(plan, self.timeline, self.transcript),
                 )
 
-    def test_candidate_durations_allow_missing_and_positive_numbers(self):
+    def test_candidate_durations_allow_positive_numbers_and_images_without_duration(self):
         variants = [
-            {},
-            {"duration_s": 1},
-            {"duration_s": 1.5},
-            {"probe": {}},
-            {"probe": {"duration_s": 1}},
-            {"probe": {"duration_s": 1.5}},
+            ({"duration_s": 1}, ("probe",)),
+            ({"duration_s": 1.5}, ("probe",)),
+            ({"probe": {"duration_s": 1}}, ("duration_s",)),
+            ({"probe": {"duration_s": 1.5}}, ("duration_s",)),
         ]
-        for variant in variants:
+        for variant, removed in variants:
             plan = copy.deepcopy(self.plan)
+            for key in removed:
+                plan["shots"][0]["candidates"][0].pop(key)
             plan["shots"][0]["candidates"][0].update(variant)
             with self.subTest(variant=variant):
                 self.assertEqual([], broll_plan.validate_plan(plan, self.timeline, self.transcript))
+
+        image = copy.deepcopy(self.plan)
+        candidate = image["shots"][0]["candidates"][0]
+        candidate["media_type"] = "image"
+        candidate.pop("duration_s")
+        candidate.pop("probe")
+        self.assertEqual([], broll_plan.validate_plan(image, self.timeline, self.transcript))
+
+    def test_apply_review_requires_authoritative_duration_and_bounded_trim(self):
+        cases = [
+            ({"remove": ("duration_s", "probe")}, {"start_s": 0, "end_s": 1}, "duration"),
+            ({"duration_s": 0.5, "remove": ("probe",)}, {"start_s": 0, "end_s": 1}, "source_trim"),
+            ({"duration_s": 2.0, "remove": ("probe",)}, {"start_s": 0, "end_s": 999}, "source_trim"),
+            ({"duration_s": 2.0, "probe": {"duration_s": 0}}, {"start_s": 0, "end_s": 1}, "probe.duration_s"),
+            ({"duration_s": 0, "probe": {"duration_s": 2.0}}, {"start_s": 0, "end_s": 1}, "duration_s"),
+        ]
+        for change, trim, message in cases:
+            plan = copy.deepcopy(self.plan)
+            candidate = plan["shots"][0]["candidates"][0]
+            for key in change.pop("remove", ()):
+                candidate.pop(key, None)
+            candidate.update(change)
+            review = self.review_for(plan, [{"id": "shot", "decision": "select", "candidate_id": "asset", "source_trim": trim}])
+            with self.subTest(change=change, trim=trim):
+                with self.assertRaisesRegex(ValueError, message):
+                    broll_plan.apply_review(plan, review, mode="agent", actor="agent", rationale="Relevant footage.")
+
+        approved = broll_plan.apply_review(self.plan, self.review(), mode="agent", actor="agent", rationale="Relevant footage.")
+        self.assertEqual({"start_s": 0, "end_s": 1}, approved["shots"][0]["selected"]["source_trim"])
 
     def test_apply_review_rejects_invalid_image_motion_without_null_decisions(self):
         missing = object()
@@ -354,6 +425,27 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         approved = broll_plan.apply_review(plan, review, mode="agent", actor="agent", rationale="Neither shot helps.")
         self.assertEqual(["shot"], approved["review"]["decision_skipped_shot_ids"])
         self.assertEqual([], broll_plan.validate_plan(approved, self.timeline, self.transcript))
+
+    def test_apply_review_requires_pre_skipped_shots_to_remain_skipped(self):
+        plan = copy.deepcopy(self.plan)
+        skipped = copy.deepcopy(plan["shots"][0])
+        skipped.update({"id": "already-skipped", "program_range": {"start_s": 3.0, "end_s": 4.0}, "source_ranges": [{"clip_id": "one", "start_s": 3.0, "end_s": 4.0}], "transcript_evidence": {"words": [self.mapped_words[2]]}, "status": "skipped"})
+        skipped["candidates"][0]["id"] = "skipped-asset"
+        plan["shots"].append(skipped)
+        malicious = self.review_for(plan, [
+            {"id": "shot", "decision": "select", "candidate_id": "asset", "source_trim": {"start_s": 0, "end_s": 1}},
+            {"id": "already-skipped", "decision": "select", "candidate_id": "skipped-asset", "source_trim": {"start_s": 0, "end_s": 1}},
+        ])
+        with self.assertRaisesRegex(ValueError, "already-skipped was already skipped and requires decision skip"):
+            broll_plan.apply_review(plan, malicious, mode="agent", actor="agent", rationale="Relevant footage.")
+
+        exact = self.review_for(plan, [
+            {"id": "shot", "decision": "select", "candidate_id": "asset", "source_trim": {"start_s": 0, "end_s": 1}},
+            {"id": "already-skipped", "decision": "skip"},
+        ])
+        approved = broll_plan.apply_review(plan, exact, mode="agent", actor="agent", rationale="Relevant footage.")
+        self.assertEqual("skipped", approved["shots"][1]["status"])
+        self.assertEqual([], approved["review"]["decision_skipped_shot_ids"])
 
     def test_all_skipped_lifecycle_marker_controls_validation_and_registration(self):
         approved = broll_plan.apply_review(self.plan, self.review_for(self.plan, [{"id": "shot", "decision": "skip"}], rationale="No useful footage."), mode="agent", actor="agent", rationale="No useful footage.")
@@ -502,6 +594,72 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         plan["input_hashes"]["timeline_sha256"] = "0" * 64
         self.assertIn("timeline SHA-256 is stale", broll_plan.validate_plan(plan, self.timeline, self.transcript, project=self.project, project_root=self.root))
 
+    def test_active_color_grade_files_and_hashes_must_be_current(self):
+        self.assertEqual([], broll_plan.validate_plan(self.plan, self.timeline, self.transcript, project=self.project, project_root=self.root, verify_files=True))
+        self.assertEqual([], broll_plan.validate_plan(self.plan, self.timeline, self.transcript, project_root=self.root, verify_files=True))
+
+        original_grade = self.grade_plan_path.read_bytes()
+        original_lut = self.selected_lut_path.read_bytes()
+        file_cases = [
+            ("changed grade plan", self.grade_plan_path, json.dumps({**self.grade_plan, "selected_look": "changed"}).encode(), "grade plan SHA-256 is stale"),
+            ("changed selected LUT", self.selected_lut_path, b"changed LUT", "selected LUT SHA-256 is stale"),
+            ("missing grade plan", self.grade_plan_path, None, "grade plan file is missing"),
+            ("missing selected LUT", self.selected_lut_path, None, "selected LUT file is missing"),
+        ]
+        for name, path, replacement, message in file_cases:
+            original = path.read_bytes()
+            if replacement is None:
+                path.unlink()
+            else:
+                path.write_bytes(replacement)
+            try:
+                with self.subTest(name=name):
+                    self.assertIn(message, broll_plan.validate_plan(self.plan, self.timeline, self.transcript, project=self.project, project_root=self.root, verify_files=True))
+            finally:
+                path.write_bytes(original)
+        self.assertEqual(original_grade, self.grade_plan_path.read_bytes())
+        self.assertEqual(original_lut, self.selected_lut_path.read_bytes())
+
+        for key, message in (("grade_plan_sha256", "grade plan SHA-256 is required"), ("selected_lut_sha256", "selected LUT SHA-256 is required")):
+            plan = copy.deepcopy(self.plan)
+            plan["input_hashes"].pop(key)
+            with self.subTest(missing_hash=key):
+                self.assertIn(message, broll_plan.validate_plan(plan, self.timeline, self.transcript, project=self.project, project_root=self.root, verify_files=True))
+
+    def test_active_color_grade_paths_and_plan_shape_are_validated(self):
+        grade_cases = [
+            ({"schema_version": 1}, "grade plan selected_lut is required"),
+            ({"schema_version": 1, "selected_lut": " "}, "grade plan selected_lut is required"),
+            ({"schema_version": 1, "selected_lut": "../../../outside.cube"}, "selected LUT path escapes project root"),
+            ([], "grade plan must be an object"),
+        ]
+        original = self.grade_plan_path.read_bytes()
+        for grade_plan, message in grade_cases:
+            projectlib.write_json(self.grade_plan_path, grade_plan)
+            plan = copy.deepcopy(self.plan)
+            plan["input_hashes"]["grade_plan_sha256"] = broll_plan.sha256_file(self.grade_plan_path)
+            try:
+                with self.subTest(grade_plan=grade_plan):
+                    self.assertIn(message, broll_plan.validate_plan(plan, self.timeline, self.transcript, project=self.project, project_root=self.root, verify_files=True))
+            finally:
+                self.grade_plan_path.write_bytes(original)
+
+        project = copy.deepcopy(self.project)
+        project["operations"][2]["render"]["plan"] = "color-grade/other-grade-plan.json"
+        self.assertIn("grade plan file is missing", broll_plan.validate_plan(self.plan, self.timeline, self.transcript, project=project, project_root=self.root, verify_files=True))
+
+    def test_color_grade_hashes_are_not_required_without_active_dependency(self):
+        plan = copy.deepcopy(self.plan)
+        plan["dependencies"] = ["understanding", "cut"]
+        plan["based_on"] = {"understanding": 1, "cut": 2}
+        plan["input_hashes"].pop("grade_plan_sha256")
+        plan["input_hashes"].pop("selected_lut_sha256")
+        project = copy.deepcopy(self.project)
+        errors = broll_plan.validate_plan(plan, self.timeline, self.transcript, project=project, project_root=self.root, verify_files=True)
+        self.assertFalse(any("grade plan SHA-256 is required" in error or "selected LUT SHA-256 is required" in error for error in errors), errors)
+        project["sequences"]["main"]["operations"] = ["cut"]
+        self.assertEqual([], broll_plan.validate_plan(plan, self.timeline, self.transcript, project=project, project_root=self.root, verify_files=True))
+
     def test_verify_files_rejects_escape_missing_and_hash_mismatch(self):
         self.assertEqual([], broll_plan.validate_plan(self.plan, self.timeline, self.transcript, project_root=self.root, verify_files=True))
         for path, digest, message in (("../escape.mp4", None, "path escapes project root"), ("cache/b-roll/missing.mp4", None, "file is missing"), ("cache/b-roll/factory.mp4", "0" * 64, "SHA-256 is stale")):
@@ -529,6 +687,142 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         plan = copy.deepcopy(self.plan); candidate = plan["shots"][0]["candidates"][0]; candidate["sha256"] = "g" * 64; candidate["provenance"]["original_path"] = 3
         errors = broll_plan.validate_plan(plan, self.timeline, self.transcript)
         self.assertIn("shot candidate asset SHA-256 is required", errors); self.assertIn("shot candidate asset provenance is incomplete", errors)
+
+    def test_source_specific_provenance_accepts_valid_acquisition_records(self):
+        self.assertEqual([], broll_plan.validate_plan(self.plan, self.timeline, self.transcript))
+
+        external = copy.deepcopy(self.plan)
+        external["shots"][0]["candidates"][0]["provenance"] = {
+            "source_type": "external-generated",
+            "creator": "Generator Operator",
+            "license": "commercial",
+            "retrieval_time": "2026-07-23T00:00:00+08:00",
+            "original_path": "input/generated.mp4",
+            "generation_provider": "provider",
+            "generation_model": "model-v1",
+            "prompt": "Factory assembly line",
+        }
+        self.assertEqual([], broll_plan.validate_plan(external, self.timeline, self.transcript))
+        external["shots"][0]["candidates"][0]["provenance"].pop("prompt")
+        external["shots"][0]["candidates"][0]["provenance"]["job_id"] = "job-123"
+        self.assertEqual([], broll_plan.validate_plan(external, self.timeline, self.transcript))
+
+        pexels_plan = copy.deepcopy(self.plan)
+        pexels_plan["shots"][0]["candidates"][0] = self.pexels_candidate()
+        self.assertEqual([], broll_plan.validate_plan(pexels_plan, self.timeline, self.transcript))
+
+    def test_common_and_local_provenance_fields_are_strict(self):
+        delete = object()
+        cases = [
+            (("bytes",), delete, "bytes must be a positive integer"),
+            (("bytes",), True, "bytes must be a positive integer"),
+            (("bytes",), 0, "bytes must be a positive integer"),
+            (("bytes",), -1, "bytes must be a positive integer"),
+            (("bytes",), 1.5, "bytes must be a positive integer"),
+            (("bytes",), "5", "bytes must be a positive integer"),
+            (("provenance", "creator"), " ", "provenance is incomplete"),
+            (("provenance", "license"), None, "provenance is incomplete"),
+            (("provenance", "retrieval_time"), "2026-07-23T00:00:00", "retrieval_time is invalid"),
+            (("provenance", "retrieval_time"), "not-a-time", "retrieval_time is invalid"),
+            (("provenance", "original_path"), delete, "local provenance original_path is required"),
+            (("provenance", "original_path"), " ", "local provenance original_path is required"),
+            (("provenance", "original_path"), 3, "local provenance original_path is required"),
+        ]
+        for path, value, message in cases:
+            plan = copy.deepcopy(self.plan)
+            target = plan["shots"][0]["candidates"][0]
+            for key in path[:-1]:
+                target = target[key]
+            if value is delete:
+                target.pop(path[-1])
+            else:
+                target[path[-1]] = value
+            with self.subTest(path=path, value=value):
+                errors = broll_plan.validate_plan(plan, self.timeline, self.transcript)
+                self.assertTrue(any(message in error for error in errors), errors)
+
+    def test_external_generated_provenance_fields_are_strict(self):
+        base = copy.deepcopy(self.plan["shots"][0]["candidates"][0])
+        base["provenance"] = {
+            "source_type": "external-generated",
+            "creator": "Generator Operator",
+            "license": "commercial",
+            "retrieval_time": "2026-07-23T00:00:00Z",
+            "original_path": "input/generated.mp4",
+            "generation_provider": "provider",
+            "generation_model": "model-v1",
+            "prompt": "Factory assembly line",
+        }
+        delete = object()
+        cases = [
+            ("original_path", delete),
+            ("generation_provider", delete),
+            ("generation_provider", " "),
+            ("generation_model", None),
+            ("prompt", delete),
+            ("prompt", " "),
+            ("prompt", 3),
+        ]
+        for field, value in cases:
+            plan = copy.deepcopy(self.plan)
+            candidate = copy.deepcopy(base)
+            if value is delete:
+                candidate["provenance"].pop(field)
+            else:
+                candidate["provenance"][field] = value
+            plan["shots"][0]["candidates"][0] = candidate
+            with self.subTest(field=field, value=value):
+                errors = broll_plan.validate_plan(plan, self.timeline, self.transcript)
+                self.assertTrue(any("external-generated provenance is incomplete" in error for error in errors), errors)
+
+    def test_pexels_provenance_and_selected_variant_must_be_exact_and_consistent(self):
+        delete = object()
+        cases = [
+            (("provider_id",), delete, "Pexels provider_id must be a positive integer"),
+            (("provider_id",), True, "Pexels provider_id must be a positive integer"),
+            (("file_id",), 0, "Pexels file_id must be a positive integer"),
+            (("download_url",), "https://evil.test/factory.mp4", "Pexels download_url is invalid"),
+            (("width",), 0, "Pexels width must be a positive integer"),
+            (("height",), 1.5, "Pexels height must be a positive integer"),
+            (("duration_s",), delete, "Pexels duration_s is required"),
+            (("provenance", "source_url"), "http://www.pexels.com/video/factory-101/", "Pexels source_url is invalid"),
+            (("provenance", "source_url"), "https://www.pexels.com/not-video/", "Pexels source_url is invalid"),
+            (("provenance", "license_url"), "https://www.pexels.com/other/", "Pexels license_url is invalid"),
+            (("provenance", "terms_url"), delete, "Pexels terms_url is invalid"),
+            (("provenance", "provider_id"), 999, "Pexels provenance provider_id does not match candidate"),
+            (("provenance", "download_url"), "https://videos.pexels.com/other.mp4", "Pexels provenance download_url does not match candidate"),
+            (("provenance", "dimensions", "width"), 1280, "Pexels provenance dimensions do not match candidate"),
+            (("provenance", "duration_s"), 3.0, "Pexels provenance duration_s does not match candidate"),
+        ]
+        for path, value, message in cases:
+            plan = copy.deepcopy(self.plan)
+            candidate = self.pexels_candidate()
+            target = candidate
+            for key in path[:-1]:
+                target = target[key]
+            if value is delete:
+                target.pop(path[-1])
+            else:
+                target[path[-1]] = value
+            plan["shots"][0]["candidates"][0] = candidate
+            with self.subTest(path=path, value=value):
+                errors = broll_plan.validate_plan(plan, self.timeline, self.transcript)
+                self.assertTrue(any(message in error for error in errors), errors)
+
+        plan = copy.deepcopy(self.plan)
+        candidate = self.pexels_candidate()
+        candidate["provider_id"] = 1
+        candidate["provenance"]["provider_id"] = True
+        plan["shots"][0]["candidates"][0] = candidate
+        errors = broll_plan.validate_plan(plan, self.timeline, self.transcript)
+        self.assertTrue(any("Pexels provenance provider_id must be a positive integer" in error for error in errors), errors)
+
+        candidate = self.pexels_candidate()
+        candidate["width"] = 1
+        candidate["provenance"]["dimensions"]["width"] = True
+        plan["shots"][0]["candidates"][0] = candidate
+        errors = broll_plan.validate_plan(plan, self.timeline, self.transcript)
+        self.assertTrue(any("Pexels provenance dimensions do not match candidate" in error for error in errors), errors)
 
     def test_lifecycles_and_current_dependency_set_are_enforced(self):
         plan = copy.deepcopy(self.plan); plan["shots"][0].update({"status": "selected", "selected": None})
@@ -1105,13 +1399,26 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             with self.subTest(revision=revision):
                 with self.assertRaisesRegex(ValueError, "positive integer"): broll_plan.active_dependencies(project)
 
+    def test_register_operation_rejects_non_object_operations_with_value_error(self):
+        for value in (None, [], 3, "operation"):
+            project = self._registration_project()
+            project["operations"].append(value)
+            with self.subTest(value=value):
+                try:
+                    broll_plan.register_operation(project, self._registered_plan((2, 3)))
+                except Exception as error:
+                    self.assertIsInstance(error, ValueError)
+                    self.assertRegex(str(error), "project operations must be a list of objects")
+                else:
+                    self.fail("register_operation accepted a non-object operation")
+
 
 class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
     def setUp(self):
         super().setUp()
         self.review_dir = self.root / "review/03-b-roll"
         self.video = self.root / "final/current.mp4"
-        self.video.parent.mkdir(parents=True)
+        self.video.parent.mkdir(parents=True, exist_ok=True)
         self.video.write_bytes(b"program")
         self.plan["input_hashes"]["review_video_sha256"] = broll_plan.sha256_file(self.video)
         self.real_probe_video = build_review_page._probe_video
@@ -1244,6 +1551,93 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
                     build_review_page.build_review_page(plan, self.timeline, self.transcript, video, self.review_dir, project_root=self.root)
                 extract.assert_not_called()
 
+    def test_build_review_page_requires_canonical_timeline_and_transcript(self):
+        review_id = "123e4567-e89b-12d3-a456-426614174020"
+        self.review_dir.mkdir(parents=True)
+        alias = self.review_dir / "b-roll-review.html"
+        alias.write_bytes(b"prior alias")
+        substituted_timeline = copy.deepcopy(self.timeline)
+        substituted_timeline["fps"] = {"num": 24, "den": 1}
+        substituted_transcript = copy.deepcopy(self.transcript)
+        substituted_transcript["segments"][0]["words"][0]["word"] = "substituted"
+        for label, timeline, transcript in (
+            ("timeline", substituted_timeline, self.transcript),
+            ("transcript", self.timeline, substituted_transcript),
+        ):
+            with self.subTest(label=label), mock.patch.object(build_review_page, "_extract_frame") as extract:
+                with self.assertRaisesRegex(ValueError, f"caller {label} does not match canonical"):
+                    build_review_page.build_review_page(
+                        self.plan, timeline, transcript, self.video, self.review_dir,
+                        project_root=self.root, review_id=review_id,
+                    )
+                extract.assert_not_called()
+                self.assertEqual(b"prior alias", alias.read_bytes())
+                self.assertFalse((self.review_dir / f"b-roll-review-{review_id}.html").exists())
+                self.assertFalse((self.review_dir / f"b-roll-review-{review_id}-assets").exists())
+
+    def test_build_review_page_requires_present_valid_canonical_files(self):
+        paths = [self.timeline_path, self.transcript_path, self.project_path]
+        review_ids = [
+            "123e4567-e89b-12d3-a456-426614174021",
+            "123e4567-e89b-12d3-a456-426614174022",
+            "123e4567-e89b-12d3-a456-426614174023",
+            "123e4567-e89b-12d3-a456-426614174024",
+            "123e4567-e89b-12d3-a456-426614174025",
+            "123e4567-e89b-12d3-a456-426614174026",
+        ]
+        cases = [(path, None, "missing") for path in paths] + [(path, b"{", "invalid") for path in paths]
+        self.review_dir.mkdir(parents=True)
+        alias = self.review_dir / "b-roll-review.html"
+        for (path, replacement, message), review_id in zip(cases, review_ids):
+            original = path.read_bytes()
+            if replacement is None:
+                path.unlink()
+            else:
+                path.write_bytes(replacement)
+            alias.write_bytes(b"prior alias")
+            try:
+                with self.subTest(path=path.name, message=message), mock.patch.object(build_review_page, "_extract_frame") as extract:
+                    with self.assertRaisesRegex((ValueError, FileNotFoundError), f"canonical .* {message}"):
+                        build_review_page.build_review_page(
+                            self.plan, self.timeline, self.transcript, self.video, self.review_dir,
+                            project_root=self.root, review_id=review_id,
+                        )
+                    extract.assert_not_called()
+                    self.assertEqual(b"prior alias", alias.read_bytes())
+                    self.assertFalse((self.review_dir / f"b-roll-review-{review_id}.html").exists())
+                    self.assertFalse((self.review_dir / f"b-roll-review-{review_id}-assets").exists())
+            finally:
+                path.write_bytes(original)
+
+    def test_build_review_page_rejects_stale_canonical_project(self):
+        original = self.project_path.read_bytes()
+        cases = []
+        revision = copy.deepcopy(self.project)
+        revision["operations"][2]["revision"] = 4
+        cases.append((revision, "based_on color-grade revision is stale"))
+        inactive = copy.deepcopy(self.project)
+        inactive["sequences"]["main"]["operations"] = ["cut"]
+        cases.append((inactive, "dependencies do not match"))
+        self.review_dir.mkdir(parents=True)
+        alias = self.review_dir / "b-roll-review.html"
+        for index, (project, message) in enumerate(cases, 27):
+            review_id = f"123e4567-e89b-12d3-a456-4266141740{index}"
+            projectlib.write_json(self.project_path, project)
+            alias.write_bytes(b"prior alias")
+            try:
+                with self.subTest(message=message), mock.patch.object(build_review_page, "_extract_frame") as extract:
+                    with self.assertRaisesRegex(ValueError, message):
+                        build_review_page.build_review_page(
+                            self.plan, self.timeline, self.transcript, self.video, self.review_dir,
+                            project_root=self.root, review_id=review_id,
+                        )
+                    extract.assert_not_called()
+                    self.assertEqual(b"prior alias", alias.read_bytes())
+                    self.assertFalse((self.review_dir / f"b-roll-review-{review_id}.html").exists())
+                    self.assertFalse((self.review_dir / f"b-roll-review-{review_id}-assets").exists())
+            finally:
+                self.project_path.write_bytes(original)
+
     def test_build_review_page_rejects_invalid_candidate_duration_before_publication(self):
         review_id = "123e4567-e89b-12d3-a456-426614174006"
         plan = copy.deepcopy(self.plan)
@@ -1264,14 +1658,16 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
 
     def test_payload_candidate_duration_is_always_a_positive_finite_number(self):
         variants = [
-            {},
-            {"duration_s": 2},
-            {"duration_s": 2.5},
-            {"probe": {"duration_s": 3}},
-            {"probe": {"duration_s": 3.5}},
+            ({"duration_s": 2}, ("probe",), 2.0),
+            ({"duration_s": 2.5}, ("probe",), 2.5),
+            ({"probe": {"duration_s": 3}}, ("duration_s",), 3.0),
+            ({"probe": {"duration_s": 3.5}}, ("duration_s",), 3.5),
+            ({"duration_s": 2, "probe": {"duration_s": 3}}, (), 2.0),
         ]
-        for index, variant in enumerate(variants, 10):
+        for index, (variant, removed, expected) in enumerate(variants, 10):
             plan = copy.deepcopy(self.plan)
+            for key in removed:
+                plan["shots"][0]["candidates"][0].pop(key)
             plan["shots"][0]["candidates"][0].update(variant)
             review_id = f"123e4567-e89b-12d3-a456-4266141740{index}"
             with self.subTest(variant=variant), mock.patch.object(build_review_page, "_extract_frame", side_effect=self._frame):
@@ -1286,6 +1682,27 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
             self.assertNotIsInstance(duration, bool)
             self.assertTrue(math.isfinite(duration))
             self.assertGreater(duration, 0)
+            self.assertEqual(expected, duration)
+
+    def test_build_review_page_does_not_invent_video_duration(self):
+        review_id = "123e4567-e89b-12d3-a456-426614174008"
+        plan = copy.deepcopy(self.plan)
+        candidate = plan["shots"][0]["candidates"][0]
+        candidate.pop("duration_s")
+        candidate.pop("probe")
+        self.review_dir.mkdir(parents=True)
+        alias = self.review_dir / "b-roll-review.html"
+        alias.write_bytes(b"prior alias")
+        with mock.patch.object(build_review_page, "_extract_frame") as extract:
+            with self.assertRaisesRegex(ValueError, "duration"):
+                build_review_page.build_review_page(
+                    plan, self.timeline, self.transcript, self.video, self.review_dir,
+                    project_root=self.root, review_id=review_id,
+                )
+        extract.assert_not_called()
+        self.assertEqual(b"prior alias", alias.read_bytes())
+        self.assertFalse((self.review_dir / f"b-roll-review-{review_id}.html").exists())
+        self.assertFalse((self.review_dir / f"b-roll-review-{review_id}-assets").exists())
 
     def test_payload_nan_rolls_back_publication_and_preserves_alias(self):
         review_id = "123e4567-e89b-12d3-a456-426614174007"

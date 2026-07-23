@@ -10,6 +10,7 @@ import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "video-understand" / "scripts"))
 import projectlib
@@ -17,6 +18,8 @@ import projectlib
 
 RANGE_EPSILON = 1e-6
 KEN_BURNS_DIRECTIONS = {"zoom-in", "pan-left", "pan-right"}
+PEXELS_LICENSE_URL = "https://www.pexels.com/license/"
+PEXELS_TERMS_URL = "https://www.pexels.com/terms-of-service/"
 _INVALID_NUMBER = object()
 
 
@@ -71,7 +74,7 @@ def _valid_source_trim(value, candidate):
     probe = candidate.get("probe")
     if isinstance(probe, dict) and "duration_s" in probe:
         durations.append(_positive_duration(probe["duration_s"]))
-    return all(duration is not None and trim[1] <= duration for duration in durations)
+    return bool(durations) and all(duration is not None and trim[1] <= duration for duration in durations)
 
 
 def _valid_ken_burns(value):
@@ -299,6 +302,25 @@ def _mapped_words(transcript, timeline):
     return result
 
 
+def _valid_pexels_url(value, host, path_prefix=None):
+    if not isinstance(value, str):
+        return False
+    try:
+        parsed = urlsplit(value)
+        port = parsed.port
+    except ValueError:
+        return False
+    return (
+        parsed.scheme == "https"
+        and not parsed.username
+        and not parsed.password
+        and (parsed.hostname or "").lower() == host
+        and port in (None, 443)
+        and not parsed.fragment
+        and (path_prefix is None or parsed.path.startswith(path_prefix))
+    )
+
+
 def _candidate_errors(shot_id, candidate):
     errors = []
     if not isinstance(candidate, dict):
@@ -308,7 +330,8 @@ def _candidate_errors(shot_id, candidate):
         errors.append(f"{shot_id} candidate id is required")
     elif candidate_id == "skip":
         errors.append(f"{shot_id} candidate id 'skip' is reserved")
-    if candidate.get("media_type") not in ("video", "image"):
+    media_type = candidate.get("media_type")
+    if media_type not in ("video", "image"):
         errors.append(f"{shot_id} candidate {candidate_id} media_type is invalid")
     if not isinstance(candidate.get("cache_path"), str) or not candidate["cache_path"].strip():
         errors.append(f"{shot_id} candidate {candidate_id} cache_path is required")
@@ -322,11 +345,72 @@ def _candidate_errors(shot_id, candidate):
             errors.append(f"{shot_id} candidate {candidate_id} probe must be an object")
         elif "duration_s" in probe and _positive_duration(probe["duration_s"]) is None:
             errors.append(f"{shot_id} candidate {candidate_id} probe.duration_s must be a finite positive number")
+    else:
+        probe = None
+    direct_duration = _positive_duration(candidate.get("duration_s"))
+    probe_duration = _positive_duration(probe.get("duration_s")) if isinstance(probe, dict) else None
+    if media_type == "video" and direct_duration is None and probe_duration is None:
+        errors.append(f"{shot_id} candidate {candidate_id} video requires a finite positive duration")
+    byte_count = candidate.get("bytes")
+    if not isinstance(byte_count, int) or isinstance(byte_count, bool) or byte_count <= 0:
+        errors.append(f"{shot_id} candidate {candidate_id} bytes must be a positive integer")
     provenance = candidate.get("provenance")
     if not isinstance(provenance, dict) or provenance.get("source_type") not in ("local", "pexels", "external-generated"):
         errors.append(f"{shot_id} candidate {candidate_id} provenance is invalid")
-    elif (not all(isinstance(provenance.get(key), str) and provenance[key].strip() for key in ("creator", "license", "retrieval_time")) or not any(isinstance(provenance.get(key), str) and provenance[key].strip() for key in ("source_url", "original_path"))):
+        return errors
+    if not all(isinstance(provenance.get(key), str) and provenance[key].strip() for key in ("creator", "license", "retrieval_time")):
         errors.append(f"{shot_id} candidate {candidate_id} provenance is incomplete")
+    if not _valid_timestamp(provenance.get("retrieval_time")):
+        errors.append(f"{shot_id} candidate {candidate_id} provenance retrieval_time is invalid")
+    source_type = provenance["source_type"]
+    if source_type == "local":
+        if not isinstance(provenance.get("original_path"), str) or not provenance["original_path"].strip():
+            errors.append(f"{shot_id} candidate {candidate_id} provenance is incomplete")
+            errors.append(f"{shot_id} candidate {candidate_id} local provenance original_path is required")
+    elif source_type == "external-generated":
+        required = ("original_path", "generation_provider", "generation_model")
+        prompt, job_id = provenance.get("prompt"), provenance.get("job_id")
+        optional_values = [value for key, value in (("prompt", prompt), ("job_id", job_id)) if key in provenance]
+        if (not all(isinstance(provenance.get(key), str) and provenance[key].strip() for key in required)
+                or not any(isinstance(value, str) and value.strip() for value in (prompt, job_id))
+                or any(not isinstance(value, str) or not value.strip() for value in optional_values)):
+            errors.append(f"{shot_id} candidate {candidate_id} external-generated provenance is incomplete")
+    elif source_type == "pexels":
+        for field in ("provider_id", "file_id"):
+            value = candidate.get(field)
+            if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+                errors.append(f"{shot_id} candidate {candidate_id} Pexels {field} must be a positive integer")
+        if not _valid_pexels_url(candidate.get("download_url"), "videos.pexels.com"):
+            errors.append(f"{shot_id} candidate {candidate_id} Pexels download_url is invalid")
+        for field in ("width", "height"):
+            value = candidate.get(field)
+            if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+                errors.append(f"{shot_id} candidate {candidate_id} Pexels {field} must be a positive integer")
+        if direct_duration is None:
+            errors.append(f"{shot_id} candidate {candidate_id} Pexels duration_s is required")
+        if not _valid_pexels_url(provenance.get("source_url"), "www.pexels.com", "/video/"):
+            errors.append(f"{shot_id} candidate {candidate_id} Pexels source_url is invalid")
+        if provenance.get("license_url") != PEXELS_LICENSE_URL:
+            errors.append(f"{shot_id} candidate {candidate_id} Pexels license_url is invalid")
+        if provenance.get("terms_url") != PEXELS_TERMS_URL:
+            errors.append(f"{shot_id} candidate {candidate_id} Pexels terms_url is invalid")
+        provenance_provider_id = provenance.get("provider_id")
+        if not isinstance(provenance_provider_id, int) or isinstance(provenance_provider_id, bool) or provenance_provider_id <= 0:
+            errors.append(f"{shot_id} candidate {candidate_id} Pexels provenance provider_id must be a positive integer")
+        if provenance_provider_id != candidate.get("provider_id"):
+            errors.append(f"{shot_id} candidate {candidate_id} Pexels provenance provider_id does not match candidate")
+        if provenance.get("download_url") != candidate.get("download_url"):
+            errors.append(f"{shot_id} candidate {candidate_id} Pexels provenance download_url does not match candidate")
+        dimensions = provenance.get("dimensions")
+        valid_dimensions = isinstance(dimensions, dict) and all(
+            isinstance(dimensions.get(field), int) and not isinstance(dimensions[field], bool) and dimensions[field] > 0
+            for field in ("width", "height")
+        )
+        if not valid_dimensions or dimensions.get("width") != candidate.get("width") or dimensions.get("height") != candidate.get("height"):
+            errors.append(f"{shot_id} candidate {candidate_id} Pexels provenance dimensions do not match candidate")
+        provenance_duration = _positive_duration(provenance.get("duration_s"))
+        if provenance_duration is None or provenance_duration != direct_duration:
+            errors.append(f"{shot_id} candidate {candidate_id} Pexels provenance duration_s does not match candidate")
     return errors
 
 
@@ -429,7 +513,7 @@ def _verified_overlays(plan):
 def register_operation(project, plan, *, plan_path="b-roll/broll-plan.json", report_path="../review/03-b-roll/b-roll-summary.md"):
     """Replace the active sequence's B-roll overlay operation from verified shots."""
     result = copy.deepcopy(project)
-    if not isinstance(result, dict) or not isinstance(result.get("operations"), list):
+    if not isinstance(result, dict) or not isinstance(result.get("operations"), list) or any(not isinstance(item, dict) for item in result.get("operations", [])):
         raise ValueError("project operations must be a list of objects")
     old = [item for item in result["operations"] if item.get("id") == "b-roll"]
     removed = bool(old)
@@ -609,6 +693,7 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
             if previous_id != shot_id and previous_start < end and start < previous_end:
                 errors.append(f"{shot_id} program range overlaps {previous_id}"); break
     errors.extend(_review_errors(plan, shots))
+    project_operations = None
     if project is not None:
         if not isinstance(project, dict): return errors + ["project must be an object"]
         operation_values = project.get("operations")
@@ -624,6 +709,7 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
         if any(not isinstance(item, str) or not item.strip() for item in operation_ids) or len(operation_ids) != len(set(operation_ids)):
             return errors + ["project operation ids must be unique nonblank strings"]
         operations = dict(zip(operation_ids, operation_values))
+        project_operations = operations
         for operation_id, operation in operations.items():
             revision = operation.get("revision")
             if not isinstance(revision, int) or isinstance(revision, bool) or revision <= 0:
@@ -650,10 +736,67 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
             if current != expected: errors.append(f"based_on {dependency} revision is stale: expected {expected}, current {current}")
     if verify_files and not project_root: errors.append("verify_files requires project_root")
     if project_root:
+        root = Path(project_root).resolve()
         hashes = plan.get("input_hashes", {})
         for key, path in (("transcript_sha256", Path(project_root) / "work/understand/transcript.json"), ("timeline_sha256", Path(project_root) / "work/timeline.json")):
             if not path.is_file(): errors.append(f"{key.split('_')[0]} file is missing")
             elif not isinstance(hashes, dict) or hashes.get(key) != sha256_file(path): errors.append(f"{key.split('_')[0]} SHA-256 is stale")
+        dependencies = plan.get("dependencies", [])
+        color_grade_active = isinstance(dependencies, list) and "color-grade" in dependencies
+        if color_grade_active:
+            grade_path = None
+            if project_operations is None:
+                grade_path = root / "work/color-grade/grade-plan.json"
+            else:
+                operation = project_operations.get("color-grade")
+                render = operation.get("render") if isinstance(operation, dict) else None
+                grade_value = render.get("plan") if isinstance(render, dict) else None
+                if not isinstance(grade_value, str) or not grade_value.strip():
+                    errors.append("color-grade operation render.plan is required")
+                else:
+                    raw_grade = Path(grade_value)
+                    grade_path = (raw_grade if raw_grade.is_absolute() else root / "work" / raw_grade).resolve()
+                    try:
+                        grade_path.relative_to(root)
+                    except ValueError:
+                        errors.append("grade plan path escapes project root")
+                        grade_path = None
+            if not isinstance(hashes, dict) or not _is_sha256(hashes.get("grade_plan_sha256")):
+                errors.append("grade plan SHA-256 is required")
+            if not isinstance(hashes, dict) or not _is_sha256(hashes.get("selected_lut_sha256")):
+                errors.append("selected LUT SHA-256 is required")
+            grade_plan = None
+            if grade_path is not None:
+                if not grade_path.is_file():
+                    errors.append("grade plan file is missing")
+                else:
+                    if isinstance(hashes, dict) and _is_sha256(hashes.get("grade_plan_sha256")) and hashes["grade_plan_sha256"] != sha256_file(grade_path):
+                        errors.append("grade plan SHA-256 is stale")
+                    try:
+                        grade_plan = json.loads(grade_path.read_text(encoding="utf-8"))
+                    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                        errors.append("grade plan is invalid JSON")
+            if grade_plan is not None:
+                if not isinstance(grade_plan, dict):
+                    errors.append("grade plan must be an object")
+                else:
+                    if grade_plan.get("schema_version") != 1:
+                        errors.append("grade plan schema_version must be 1")
+                    selected_lut = grade_plan.get("selected_lut")
+                    if not isinstance(selected_lut, str) or not selected_lut.strip():
+                        errors.append("grade plan selected_lut is required")
+                    else:
+                        raw_lut = Path(selected_lut)
+                        lut_path = (raw_lut if raw_lut.is_absolute() else grade_path.parent / raw_lut).resolve()
+                        try:
+                            lut_path.relative_to(root)
+                        except ValueError:
+                            errors.append("selected LUT path escapes project root")
+                        else:
+                            if not lut_path.is_file():
+                                errors.append("selected LUT file is missing")
+                            elif isinstance(hashes, dict) and _is_sha256(hashes.get("selected_lut_sha256")) and hashes["selected_lut_sha256"] != sha256_file(lut_path):
+                                errors.append("selected LUT SHA-256 is stale")
     return errors
 
 
@@ -717,6 +860,8 @@ def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None)
     for shot in result["shots"]:
         entry, decision = entries_by_id[shot["id"]], entries_by_id[shot["id"]].get("decision")
         if decision not in ("select", "skip"): raise ValueError(f"{shot['id']} decision must be select or skip")
+        if shot.get("status") == "skipped" and decision != "skip":
+            raise ValueError(f"{shot['id']} was already skipped and requires decision skip")
         if decision == "skip":
             if shot.get("status") != "skipped": decision_skipped_ids.append(shot["id"])
             shot["selected"], shot["status"] = None, "skipped"

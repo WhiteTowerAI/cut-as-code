@@ -86,15 +86,16 @@ def _payload(plan, root, assets_dir):
             suffix = path.suffix.lower() if re.fullmatch(r"\.[a-zA-Z0-9]{1,8}", path.suffix) else ""
             basename = f"candidate-{shot_index:03d}-{candidate_index:03d}{suffix}"
             candidate_specs.append((path, basename, candidate["sha256"]))
-            duration = broll_plan._positive_duration(candidate.get("duration_s"))
-            probe = candidate.get("probe")
-            if duration is None and isinstance(probe, dict):
-                duration = broll_plan._positive_duration(probe.get("duration_s"))
-            if duration is None:
-                duration = broll_plan._positive_duration(float(shot["program_range"]["end_s"]) - float(shot["program_range"]["start_s"]))
-            if duration is None:
-                raise ValueError(f"{shot['id']} candidate {candidate['id']} has no valid review duration")
-            candidates.append({"id": candidate["id"], "media_type": candidate["media_type"], "path": f"{assets_dir.name}/{basename}", "sha256": candidate["sha256"], "duration_s": duration, "provenance": candidate["provenance"]})
+            item = {"id": candidate["id"], "media_type": candidate["media_type"], "path": f"{assets_dir.name}/{basename}", "sha256": candidate["sha256"], "provenance": candidate["provenance"]}
+            if candidate["media_type"] == "video":
+                duration = broll_plan._positive_duration(candidate.get("duration_s"))
+                probe = candidate.get("probe")
+                if duration is None and isinstance(probe, dict):
+                    duration = broll_plan._positive_duration(probe.get("duration_s"))
+                if duration is None:
+                    raise ValueError(f"{shot['id']} candidate {candidate['id']} has no valid review duration")
+                item["duration_s"] = duration
+            candidates.append(item)
         payload_shots.append({"id": shot["id"], "program_range": shot["program_range"], "source_ranges": shot["source_ranges"], "transcript_evidence": shot["transcript_evidence"], "editorial_reason": shot["editorial_reason"], "visual_intent": shot["visual_intent"], "queries": shot["queries"], "source_frame": {"path": f"{assets_dir.name}/{frame.name}", "sha256": None}, "candidates": candidates})
     return payload_shots, candidate_specs, pre_skipped_ids
 
@@ -118,10 +119,28 @@ def build_review_page(plan, timeline, transcript, video, output_dir, *, project_
         raise ValueError("review video must resolve inside project_root")
     if not video.is_file():
         raise FileNotFoundError(f"review source video not found: {video}")
-    timeline_errors = projectlib.validate_timeline(timeline)
+    canonical_values = {}
+    for label, path in (
+        ("timeline", root / "work/timeline.json"),
+        ("transcript", root / "work/understand/transcript.json"),
+        ("project", root / "work/project.json"),
+    ):
+        if not path.is_file():
+            raise FileNotFoundError(f"canonical {label} is missing: {path}")
+        try:
+            canonical_values[label] = projectlib.load_json(path)
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise ValueError(f"canonical {label} is invalid: {path}") from error
+    canonical_timeline = canonical_values["timeline"]
+    canonical_transcript = canonical_values["transcript"]
+    if timeline != canonical_timeline:
+        raise ValueError("caller timeline does not match canonical timeline")
+    if transcript != canonical_transcript:
+        raise ValueError("caller transcript does not match canonical transcript")
+    timeline_errors = projectlib.validate_timeline(canonical_timeline)
     if timeline_errors:
         raise ValueError("invalid timeline: " + "; ".join(timeline_errors))
-    errors = broll_plan.validate_plan(plan, timeline, transcript, project_root=root, verify_files=True)
+    errors = broll_plan.validate_plan(plan, canonical_timeline, canonical_transcript, project=canonical_values["project"], project_root=root, verify_files=True)
     if errors:
         raise ValueError("invalid plan: " + "; ".join(errors))
     expected_video_hash = plan.get("input_hashes", {}).get("review_video_sha256")
@@ -130,8 +149,8 @@ def build_review_page(plan, timeline, transcript, video, output_dir, *, project_
     if _hash(video) != expected_video_hash:
         raise ValueError("review video SHA-256 does not match plan")
     duration = _probe_video(video)
-    fps = timeline["fps"]
-    if abs(duration - float(timeline["program_duration_s"])) > float(fps["den"]) / float(fps["num"]):
+    fps = canonical_timeline["fps"]
+    if abs(duration - float(canonical_timeline["program_duration_s"])) > float(fps["den"]) / float(fps["num"]):
         raise ValueError("review video duration does not match timeline")
     if not TEMPLATE_PATH.is_file():
         raise FileNotFoundError(f"review template not found: {TEMPLATE_PATH}")
