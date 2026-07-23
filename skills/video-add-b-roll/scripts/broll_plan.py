@@ -7,6 +7,7 @@ import math
 import os
 import sys
 import tempfile
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "video-understand" / "scripts"))
@@ -37,7 +38,7 @@ def review_subject(plan):
 
     def clean(item):
         if isinstance(item, dict):
-            for key in ("decision", "review", "selected", "normalized", "verification"):
+            for key in ("decision", "review", "review_status", "selected", "normalized", "verification"):
                 item.pop(key, None)
             for child in item.values():
                 clean(child)
@@ -54,15 +55,46 @@ def review_subject(plan):
     return value
 
 
+def _decision_manifest(shots):
+    decisions = []
+    for shot in shots:
+        if not isinstance(shot, dict) or not isinstance(shot.get("id"), str):
+            return None
+        if shot.get("status") == "skipped":
+            decisions.append({"id": shot["id"], "decision": "skip"})
+            continue
+        if shot.get("status") not in {"selected", "normalized", "verified"} or not isinstance(shot.get("selected"), dict):
+            return None
+        candidate = next((item for item in shot.get("candidates", []) if isinstance(item, dict) and item.get("id") == shot["selected"].get("candidate_id")), None)
+        if not isinstance(candidate, dict):
+            return None
+        option = "source_trim" if candidate.get("media_type") == "video" else "ken_burns" if candidate.get("media_type") == "image" else None
+        if option is None or not isinstance(shot["selected"].get(option), dict):
+            return None
+        decisions.append({"id": shot["id"], "decision": "select", "candidate_id": candidate["id"], option: copy.deepcopy(shot["selected"][option])})
+    return decisions
+
+
+def _valid_timestamp(value):
+    if not isinstance(value, str):
+        return False
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return parsed.tzinfo is not None and parsed.utcoffset() is not None
+
+
 def _review_errors(plan, shots):
     review, decision = plan.get("review"), plan.get("decision")
-    trust_required = (isinstance(review, dict) and review.get("status") == "approved") or any(
+    trust_required = "review_status" in plan or (isinstance(review, dict) and review.get("status") == "approved") or any(
         isinstance(shot, dict) and shot.get("status") in {"selected", "normalized", "verified"}
         for shot in shots
     )
     if not trust_required:
         return []
     errors = []
+    if plan.get("review_status") != "approved": errors.append("review_status must be approved")
     if not isinstance(decision, dict): errors.append("review trust requires decision object")
     if not isinstance(review, dict): errors.append("review trust requires review object")
     if not isinstance(decision, dict) or not isinstance(review, dict): return errors
@@ -74,8 +106,11 @@ def _review_errors(plan, shots):
     if not isinstance(rationale, str) or not rationale.strip(): errors.append("review rationale is required")
     if any(review.get(key) != decision.get(key) for key in ("mode", "actor", "rationale")):
         errors.append("decision and review authority do not match")
+    if not _valid_timestamp(review.get("timestamp")): errors.append("review timestamp is invalid")
     if mode == "human" and (decision.get("explicit_user_action") is not True or review.get("explicit_user_action") is not True):
         errors.append("human review requires explicit_user_action true")
+    if review.get("decisions") != _decision_manifest(shots):
+        errors.append("review decisions do not match current plan")
     decision_skipped_ids = review.get("decision_skipped_shot_ids")
     shot_statuses = {shot["id"]: shot.get("status") for shot in shots if isinstance(shot, dict) and isinstance(shot.get("id"), str)}
     if not isinstance(decision_skipped_ids, list) or any(not isinstance(shot_id, str) for shot_id in decision_skipped_ids) or decision_skipped_ids != sorted(set(decision_skipped_ids)) or any(shot_statuses.get(shot_id) != "skipped" for shot_id in decision_skipped_ids):
@@ -209,12 +244,14 @@ def _verified_overlays(plan):
         if shot_id in shot_ids:
             raise ValueError(f"duplicate registered shot id: {shot_id}")
         shot_ids.add(shot_id)
-    selected = [shot for shot in plan["shots"] if isinstance(shot, dict) and shot.get("status") != "skipped"]
-    if not selected:
-        return []
+    if plan.get("review_status") != "approved":
+        raise ValueError("review_status must be approved")
     errors = _review_errors(plan, plan["shots"])
     if errors:
         raise ValueError("; ".join(errors))
+    selected = [shot for shot in plan["shots"] if isinstance(shot, dict) and shot.get("status") != "skipped"]
+    if not selected:
+        return []
     overlays = []
     for shot in selected:
         if shot.get("status") != "verified":
@@ -451,6 +488,11 @@ def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None)
     if mode not in {"human", "agent"}: raise ValueError("mode must be human or agent")
     if not isinstance(actor, str) or not actor.strip(): raise ValueError("actor is required")
     if not isinstance(rationale, str) or not rationale.strip(): raise ValueError("rationale is required")
+    rationale = rationale.strip()
+    if not isinstance(review.get("rationale"), str) or not review["rationale"].strip() or review["rationale"].strip() != rationale:
+        raise ValueError("exported rationale does not match review rationale")
+    if not _valid_timestamp(review.get("timestamp")):
+        raise ValueError("review timestamp is invalid")
     if mode == "human" and review.get("explicit_user_action") is not True: raise ValueError("human review requires explicit_user_action true")
     if not isinstance(review.get("review_id"), str) or not review["review_id"].strip(): raise ValueError("review_id is required")
     input_hashes = plan.get("input_hashes")
@@ -476,11 +518,11 @@ def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None)
         if shot_id not in shots: raise ValueError(f"review has unknown shots: {shot_id}")
     missing = sorted(set(shots) - seen)
     if missing: raise ValueError("review is missing shots: " + ", ".join(missing))
-    result_shots = {shot["id"]: shot for shot in result["shots"]}
+    entries_by_id = {entry["id"]: entry for entry in entries}
     selected_hashes = []
     decision_skipped_ids = []
-    for entry in entries:
-        shot, decision = result_shots[entry["id"]], entry.get("decision")
+    for shot in result["shots"]:
+        entry, decision = entries_by_id[shot["id"]], entries_by_id[shot["id"]].get("decision")
         if decision not in {"select", "skip"}: raise ValueError(f"{shot['id']} decision must be select or skip")
         if decision == "skip":
             if shot.get("status") != "skipped": decision_skipped_ids.append(shot["id"])
@@ -491,9 +533,11 @@ def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None)
         option = "source_trim" if candidate.get("media_type") == "video" else "ken_burns"
         if not isinstance(entry.get(option), dict): raise ValueError(f"{shot['id']} select requires {option}")
         shot["selected"], shot["status"] = {"candidate_id": candidate["id"], option: copy.deepcopy(entry[option])}, "selected"; selected_hashes.append(candidate["sha256"])
+    decisions = _decision_manifest(result["shots"])
+    result["review_status"] = "approved"
     result["decision"] = {"mode": mode, "actor": actor, "rationale": rationale}
     if mode == "human": result["decision"]["explicit_user_action"] = True
-    result["review"] = {"status": "approved", "review_id": review["review_id"], "mode": mode, "actor": actor, "rationale": rationale, **expected_bindings, "decision_skipped_shot_ids": sorted(set(decision_skipped_ids)), "selected_asset_sha256": sorted(set(selected_hashes))}
+    result["review"] = {"status": "approved", "review_id": review["review_id"], "mode": mode, "actor": actor, "rationale": rationale, "timestamp": review["timestamp"], **expected_bindings, "decisions": decisions, "decision_skipped_shot_ids": sorted(set(decision_skipped_ids)), "selected_asset_sha256": sorted(set(selected_hashes))}
     if mode == "human": result["review"]["explicit_user_action"] = True
     if interaction_path:
         target = Path(interaction_path); target.parent.mkdir(parents=True, exist_ok=True)

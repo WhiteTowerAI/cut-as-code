@@ -145,10 +145,7 @@ def build_review_page(plan, timeline, transcript, video, output_dir, *, project_
             staged_assets.mkdir()
             for source, basename, digest in candidate_specs:
                 frozen = staged_assets / basename
-                try:
-                    os.link(source, frozen)
-                except OSError:
-                    shutil.copyfile(source, frozen)
+                shutil.copyfile(source, frozen)
                 if _hash(frozen) != digest:
                     raise ValueError(f"candidate SHA-256 changed during review publication: {source}")
             for index, shot in enumerate(shots, 1):
@@ -159,7 +156,7 @@ def build_review_page(plan, timeline, transcript, video, output_dir, *, project_
                 shot["source_frame"]["sha256"] = _hash(frame)
             subject_hash = broll_plan.canonical_sha256(broll_plan.review_subject(plan))
             payload = {"review_id": identifier, "plan_sha256": subject_hash, "plan_subject_sha256": subject_hash, "candidate_manifest_sha256": broll_plan.canonical_sha256(broll_plan.candidate_manifest(plan)), "review_video_sha256": expected_video_hash, "decision_modes": ["human", "agent"], "pre_skipped_ids": pre_skipped_ids, "shots": shots}
-            document = template.replace(PAYLOAD_MARKER, base64.b64encode(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")).decode("ascii"))
+            document = template.replace(PAYLOAD_MARKER, base64.b64encode(json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode("utf-8")).decode("ascii"))
             staged_page = stage / page.name
             staged_page.write_text(document, encoding="utf-8")
             output_dir.mkdir(parents=True, exist_ok=True)

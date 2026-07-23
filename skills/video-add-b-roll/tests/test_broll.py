@@ -47,8 +47,8 @@ class _BrollFixture:
     def review(self, **extra):
         return self.review_for(self.plan, [{"id": "shot", "decision": "select", "candidate_id": "asset", "source_trim": {"start_s": 0, "end_s": 1}}], **extra)
 
-    def review_for(self, plan, shots, **extra):
-        return {"review_id": "review-1", "plan_sha256": broll_plan.canonical_sha256(broll_plan.review_subject(plan)), "candidate_manifest_sha256": broll_plan.canonical_sha256(broll_plan.candidate_manifest(plan)), "review_video_sha256": plan["input_hashes"]["review_video_sha256"], "shots": shots, **extra}
+    def review_for(self, plan, shots, rationale="Relevant footage.", timestamp="2026-07-23T12:00:00Z", **extra):
+        return {"review_id": "review-1", "plan_sha256": broll_plan.canonical_sha256(broll_plan.review_subject(plan)), "candidate_manifest_sha256": broll_plan.canonical_sha256(broll_plan.candidate_manifest(plan)), "review_video_sha256": plan["input_hashes"]["review_video_sha256"], "rationale": rationale, "timestamp": timestamp, "shots": shots, **extra}
 
 
 class BrollPlanTests(_BrollFixture, unittest.TestCase):
@@ -67,7 +67,7 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
 
     def test_apply_review_rejects_human_without_action_and_agent_blank_rationale(self):
         with self.assertRaisesRegex(ValueError, "explicit_user_action"):
-            broll_plan.apply_review(self.plan, self.review(), mode="human", actor="person", rationale="ok")
+            broll_plan.apply_review(self.plan, self.review(rationale="ok"), mode="human", actor="person", rationale="ok")
         with self.assertRaisesRegex(ValueError, "rationale"):
             broll_plan.apply_review(self.plan, self.review(), mode="agent", actor="agent", rationale=" ")
 
@@ -78,10 +78,55 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         self.assertEqual(broll_plan.canonical_sha256(broll_plan.candidate_manifest(approved)), approved["review"]["candidate_manifest_sha256"])
         self.assertEqual([approved["shots"][0]["candidates"][0]["sha256"]], approved["review"]["selected_asset_sha256"])
         self.assertEqual(self.plan["input_hashes"]["review_video_sha256"], approved["review"]["review_video_sha256"])
-        skipped = broll_plan.apply_review(self.plan, self.review_for(self.plan, [{"id": "shot", "decision": "skip"}], review_id="skip"), mode="agent", actor="agent", rationale="No useful footage.")
+        skipped = broll_plan.apply_review(self.plan, self.review_for(self.plan, [{"id": "shot", "decision": "skip"}], rationale="No useful footage.", review_id="skip"), mode="agent", actor="agent", rationale="No useful footage.")
         self.assertEqual(("skipped", None), (skipped["shots"][0]["status"], skipped["shots"][0]["selected"]))
         self.assertEqual(["shot"], skipped["review"]["decision_skipped_shot_ids"])
         self.assertEqual([], broll_plan.validate_plan(skipped, self.timeline, self.transcript))
+
+    def test_review_decisions_bind_video_trim_and_image_motion(self):
+        approved = broll_plan.apply_review(self.plan, self.review(), mode="agent", actor="agent", rationale="Relevant footage.")
+        self.assertEqual([{"id": "shot", "decision": "select", "candidate_id": "asset", "source_trim": {"start_s": 0, "end_s": 1}}], approved["review"]["decisions"])
+        changed = copy.deepcopy(approved)
+        changed["shots"][0]["selected"]["source_trim"]["end_s"] = 0.5
+        self.assertIn("review decisions do not match current plan", broll_plan.validate_plan(changed, self.timeline, self.transcript))
+
+        image_plan = copy.deepcopy(self.plan)
+        image_plan["shots"][0]["candidates"][0]["media_type"] = "image"
+        image_review = self.review_for(image_plan, [{"id": "shot", "decision": "select", "candidate_id": "asset", "ken_burns": {"direction": "zoom-in"}}])
+        image = broll_plan.apply_review(image_plan, image_review, mode="agent", actor="agent", rationale="Relevant footage.")
+        image["shots"][0]["selected"]["ken_burns"]["direction"] = "pan-left"
+        self.assertIn("review decisions do not match current plan", broll_plan.validate_plan(image, self.timeline, self.transcript))
+
+    def test_review_decision_manifest_rejects_reorder_omit_duplicate_and_malformed(self):
+        plan = copy.deepcopy(self.plan)
+        second = copy.deepcopy(plan["shots"][0])
+        second.update({"id": "second", "program_range": {"start_s": 3.0, "end_s": 4.0}, "source_ranges": [{"clip_id": "one", "start_s": 3.0, "end_s": 4.0}], "transcript_evidence": {"words": []}})
+        second["candidates"][0]["id"] = "asset-2"
+        plan["shots"].append(second)
+        entries = [{"id": "shot", "decision": "select", "candidate_id": "asset", "source_trim": {"start_s": 0, "end_s": 1}}, {"id": "second", "decision": "select", "candidate_id": "asset-2", "source_trim": {"start_s": 0, "end_s": 1}}]
+        approved = broll_plan.apply_review(plan, self.review_for(plan, entries), mode="agent", actor="agent", rationale="Relevant footage.")
+        decisions = approved["review"]["decisions"]
+        for value in (list(reversed(decisions)), decisions[:1], [decisions[0], decisions[0]], None, [{"bad": []}]):
+            tampered = copy.deepcopy(approved)
+            tampered["review"]["decisions"] = value
+            with self.subTest(value=value):
+                self.assertIn("review decisions do not match current plan", broll_plan.validate_plan(tampered, self.timeline, self.transcript))
+
+    def test_exported_rationale_and_timestamp_are_required_and_bound(self):
+        valid = self.review(rationale="  Exact reason.  ", timestamp="2026-07-23T12:00:00Z")
+        approved = broll_plan.apply_review(self.plan, valid, mode="agent", actor="agent", rationale="Exact reason.")
+        self.assertEqual("Exact reason.", approved["review"]["rationale"])
+        self.assertEqual("2026-07-23T12:00:00Z", approved["review"]["timestamp"])
+        cases = []
+        for value in (None, " "):
+            review = self.review(); review["rationale"] = value; cases.append((review, "Relevant footage.", "exported rationale"))
+        cases.append((self.review(rationale="Other reason."), "Relevant footage.", "exported rationale"))
+        for value in (None, "not-a-time", "2026-07-23T12:00:00"):
+            review = self.review(); review["timestamp"] = value; cases.append((review, "Relevant footage.", "timestamp"))
+        for review, rationale, message in cases:
+            with self.subTest(message=message, value=review.get("rationale") or review.get("timestamp")):
+                with self.assertRaisesRegex(ValueError, message):
+                    broll_plan.apply_review(self.plan, review, mode="agent", actor="agent", rationale=rationale)
 
     def test_apply_review_rejects_old_or_tampered_artifact_bindings(self):
         for field in ("plan_sha256", "candidate_manifest_sha256", "review_video_sha256"):
@@ -113,13 +158,38 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         pre_skipped = copy.deepcopy(plan["shots"][0])
         pre_skipped.update({"id": "already-skipped", "program_range": {"start_s": 3.0, "end_s": 4.0}, "source_ranges": [{"clip_id": "one", "start_s": 3.0, "end_s": 4.0}], "transcript_evidence": {"words": []}, "candidates": [], "selected": None, "status": "skipped"})
         plan["shots"].append(pre_skipped)
-        review = self.review_for(plan, [{"id": "shot", "decision": "skip"}, {"id": "already-skipped", "decision": "skip"}])
+        review = self.review_for(plan, [{"id": "shot", "decision": "skip"}, {"id": "already-skipped", "decision": "skip"}], rationale="Neither shot helps.")
         approved = broll_plan.apply_review(plan, review, mode="agent", actor="agent", rationale="Neither shot helps.")
         self.assertEqual(["shot"], approved["review"]["decision_skipped_shot_ids"])
         self.assertEqual([], broll_plan.validate_plan(approved, self.timeline, self.transcript))
 
+    def test_all_skipped_lifecycle_marker_controls_validation_and_registration(self):
+        approved = broll_plan.apply_review(self.plan, self.review_for(self.plan, [{"id": "shot", "decision": "skip"}], rationale="No useful footage."), mode="agent", actor="agent", rationale="No useful footage.")
+        self.assertEqual("approved", approved["review_status"])
+        registered = broll_plan.register_operation(self._registration_project(), approved)
+        self.assertFalse(any(item.get("id") == "b-roll" for item in registered["operations"]))
+
+        missing_receipt = copy.deepcopy(approved)
+        missing_receipt["decision"] = missing_receipt["review"] = None
+        self.assertIn("review trust requires decision object", broll_plan.validate_plan(missing_receipt, self.timeline, self.transcript))
+        with self.assertRaises(ValueError): broll_plan.register_operation(self._registration_project(), missing_receipt)
+
+        missing_marker = copy.deepcopy(approved)
+        missing_marker.pop("review_status")
+        self.assertIn("review_status must be approved", broll_plan.validate_plan(missing_marker, self.timeline, self.transcript))
+        with self.assertRaises(ValueError): broll_plan.register_operation(self._registration_project(), missing_marker)
+
+        invalid_marker = copy.deepcopy(approved)
+        invalid_marker["review_status"] = "draft"
+        self.assertIn("review_status must be approved", broll_plan.validate_plan(invalid_marker, self.timeline, self.transcript))
+
+        pre_review = copy.deepcopy(self.plan)
+        pre_review["shots"][0]["status"] = "skipped"
+        self.assertEqual([], broll_plan.validate_plan(pre_review, self.timeline, self.transcript))
+        with self.assertRaises(ValueError): broll_plan.register_operation(self._registration_project(), pre_review)
+
     def test_decision_skipped_receipt_rejects_malformed_or_tampered_ids(self):
-        approved = broll_plan.apply_review(self.plan, self.review_for(self.plan, [{"id": "shot", "decision": "skip"}]), mode="agent", actor="agent", rationale="No useful footage.")
+        approved = broll_plan.apply_review(self.plan, self.review_for(self.plan, [{"id": "shot", "decision": "skip"}], rationale="No useful footage."), mode="agent", actor="agent", rationale="No useful footage.")
         cases = [(None, "decision_skipped_shot_ids"), (["shot", "shot"], "decision_skipped_shot_ids"), (["unknown"], "decision_skipped_shot_ids"), ([["shot"]], "decision_skipped_shot_ids"), ([], "review plan SHA-256 does not match")]
         for value, message in cases:
             tampered = copy.deepcopy(approved)
@@ -128,7 +198,7 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
                 self.assertTrue(any(message in error for error in broll_plan.validate_plan(tampered, self.timeline, self.transcript)))
 
     def test_approved_plan_with_nonstring_shot_id_returns_errors(self):
-        approved = broll_plan.apply_review(self.plan, self.review_for(self.plan, [{"id": "shot", "decision": "skip"}]), mode="agent", actor="agent", rationale="No useful footage.")
+        approved = broll_plan.apply_review(self.plan, self.review_for(self.plan, [{"id": "shot", "decision": "skip"}], rationale="No useful footage."), mode="agent", actor="agent", rationale="No useful footage.")
         for shot_id in ([], 3):
             malformed = copy.deepcopy(approved)
             malformed["shots"][0]["id"] = shot_id
@@ -212,7 +282,7 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         for candidate, message in ((None, "shot candidate must be an object"), ({"id": "asset", "media_type": "video"}, "shot candidate asset SHA-256 is required")):
             with self.subTest(message=message):
                 plan = copy.deepcopy(self.plan); plan["shots"][0]["candidates"] = [candidate]
-                with self.assertRaisesRegex(ValueError, message): broll_plan.apply_review(plan, self.review(), mode="agent", actor="agent", rationale="reason")
+                with self.assertRaisesRegex(ValueError, message): broll_plan.apply_review(plan, self.review(rationale="reason"), mode="agent", actor="agent", rationale="reason")
 
     def test_apply_review_rejects_missing_or_duplicate_plan_identifiers(self):
         cases = []
@@ -226,7 +296,7 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             cases.append((plan, message))
         for plan, message in cases:
             with self.subTest(message=message):
-                with self.assertRaisesRegex(ValueError, message): broll_plan.apply_review(plan, self.review(), mode="agent", actor="agent", rationale="reason")
+                with self.assertRaisesRegex(ValueError, message): broll_plan.apply_review(plan, self.review(rationale="reason"), mode="agent", actor="agent", rationale="reason")
 
     def test_candidate_id_skip_is_reserved_for_the_ui_decision(self):
         plan = copy.deepcopy(self.plan)
@@ -258,9 +328,10 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         missing_id = copy.deepcopy(approved); missing_id["review"].pop("review_id"); cases.append((missing_id, "review_id is required"))
         for field, message in (("plan_sha256", "review plan SHA-256 does not match"), ("candidate_manifest_sha256", "review candidate manifest SHA-256 does not match"), ("review_video_sha256", "review video SHA-256 does not match"), ("selected_asset_sha256", "review selected asset hashes do not match")):
             tampered = copy.deepcopy(approved); tampered["review"][field] = [] if field == "selected_asset_sha256" else "0" * 64; cases.append((tampered, message))
+        bad_timestamp = copy.deepcopy(approved); bad_timestamp["review"]["timestamp"] = "2026-07-23T12:00:00"; cases.append((bad_timestamp, "review timestamp is invalid"))
         for plan, message in cases:
             with self.subTest(message=message): self.assertIn(message, broll_plan.validate_plan(plan, self.timeline, self.transcript))
-        human = broll_plan.apply_review(self.plan, self.review(explicit_user_action=True), mode="human", actor="person", rationale="I chose it.")
+        human = broll_plan.apply_review(self.plan, self.review(rationale="I chose it.", explicit_user_action=True), mode="human", actor="person", rationale="I chose it.")
         self.assertTrue(human["decision"]["explicit_user_action"]); self.assertTrue(human["review"]["explicit_user_action"])
         human["review"].pop("explicit_user_action")
         self.assertIn("human review requires explicit_user_action true", broll_plan.validate_plan(human, self.timeline, self.transcript))
@@ -280,7 +351,7 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
 
     def test_review_entry_id_must_be_a_nonblank_string(self):
         for shot_id in (None, "", []):
-            review = self.review(); review["shots"][0]["id"] = shot_id
+            review = self.review(rationale="reason"); review["shots"][0]["id"] = shot_id
             with self.subTest(shot_id=shot_id):
                 with self.assertRaisesRegex(ValueError, "review shot id is required"): broll_plan.apply_review(self.plan, review, mode="agent", actor="agent", rationale="reason")
 
@@ -288,10 +359,10 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         before = set(self.root.iterdir())
         with mock.patch.object(broll_plan.os, "replace", side_effect=OSError("replace failed")):
             with self.assertRaisesRegex(OSError, "replace failed"):
-                broll_plan.apply_review(self.plan, self.review(), mode="agent", actor="agent", rationale="reason", interaction_path=self.root / "receipt.json")
+                broll_plan.apply_review(self.plan, self.review(rationale="reason"), mode="agent", actor="agent", rationale="reason", interaction_path=self.root / "receipt.json")
         self.assertEqual(before, set(self.root.iterdir()))
 
-    def _registered_plan(self, *ranges, dependencies=None):
+    def _registered_plan(self, *ranges, dependencies=None, skip=False):
         plan = copy.deepcopy(self.plan)
         if dependencies is not None:
             plan["dependencies"] = dependencies
@@ -307,8 +378,10 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             shot["selected"] = None
             shot["status"] = "candidates_ready"
             plan["shots"].append(shot)
-        plan = broll_plan.apply_review(plan, self.review_for(plan, [{"id": shot["id"], "decision": "select", "candidate_id": shot["candidates"][0]["id"], "source_trim": {"start_s": 0, "end_s": 1}} for shot in plan["shots"]], review_id="registered"), mode="agent", actor="agent", rationale="Relevant footage.")
+        decisions = [{"id": shot["id"], "decision": "skip"} if skip else {"id": shot["id"], "decision": "select", "candidate_id": shot["candidates"][0]["id"], "source_trim": {"start_s": 0, "end_s": 1}} for shot in plan["shots"]]
+        plan = broll_plan.apply_review(plan, self.review_for(plan, decisions, review_id="registered"), mode="agent", actor="agent", rationale="Relevant footage.")
         for index, shot in enumerate(plan["shots"], 1):
+            if shot["status"] == "skipped": continue
             shot["normalized"] = {"path": f"cache/b-roll/normalized/broll-{index:03d}.mp4", "sha256": "a" * 64}
             shot["verification"] = {"status": "pass"}
             shot["status"] = "verified"
@@ -362,7 +435,7 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
     def test_register_operation_removes_old_registration_for_no_selected_shots(self):
         project = self._registration_project(["cut", "b-roll", "b-roll", "captions"])
         project["operations"].extend([{"id": "b-roll", "revision": 7}, {"id": "b-roll", "revision": 6}])
-        plan = self._registered_plan((2, 3), dependencies=["understanding", "cut"]); plan["shots"][0].update({"status": "skipped", "selected": None})
+        plan = self._registered_plan((2, 3), dependencies=["understanding", "cut"], skip=True)
         result = broll_plan.register_operation(project, plan)
         self.assertNotIn("b-roll", result["sequences"]["main"]["operations"])
         self.assertFalse(any(item.get("id") == "b-roll" for item in result["operations"]))
@@ -371,14 +444,14 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
     def test_zero_selection_cleans_stale_broll_ids_from_every_sequence(self):
         project = self._registration_project(["cut", "captions"])
         project["sequences"]["alternate"] = {"operations": ["captions", "b-roll", "b-roll", "unknown"]}
-        plan = self._registered_plan((2, 3), dependencies=["understanding", "cut"]); plan["shots"][0].update({"status": "skipped", "selected": None})
+        plan = self._registered_plan((2, 3), dependencies=["understanding", "cut"], skip=True)
         result = broll_plan.register_operation(project, plan)
         self.assertEqual(["captions", "unknown"], result["sequences"]["alternate"]["operations"])
         self.assertEqual("draft", result["render"]["status"])
 
     def test_zero_selection_without_stale_broll_leaves_render_status(self):
         project = self._registration_project(["cut", "captions"])
-        plan = self._registered_plan((2, 3), dependencies=["understanding", "cut"]); plan["shots"][0].update({"status": "skipped", "selected": None})
+        plan = self._registered_plan((2, 3), dependencies=["understanding", "cut"], skip=True)
         result = broll_plan.register_operation(project, plan)
         self.assertEqual("verified", result["render"]["status"])
 
@@ -510,6 +583,32 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
         os.replace(replacement, live)
         self.assertEqual(b"asset", frozen.read_bytes())
 
+    def test_published_candidate_survives_in_place_cache_mutation(self):
+        with mock.patch.object(build_review_page, "_extract_frame", side_effect=self._frame):
+            result = build_review_page.build_review_page(self.plan, self.timeline, self.transcript, self.video, self.review_dir, project_root=self.root)
+        payload = json.loads(base64.b64decode(build_review_page.PAYLOAD_RE.search(result["page"].read_text(encoding="utf-8")).group(1)))
+        frozen = result["page"].parent / payload["shots"][0]["candidates"][0]["path"]
+        live = self.root / "work/cache/b-roll/factory.mp4"
+        live.write_bytes(b"changed in place")
+        self.assertEqual(b"asset", frozen.read_bytes())
+
+    def test_payload_is_ascii_safe_and_unicode_round_trips(self):
+        plan = copy.deepcopy(self.plan)
+        plan["shots"][0]["id"] = "shot-cafe\u0301"
+        plan["shots"][0]["queries"] = ["usine animee", "工場の映像"]
+        plan["shots"][0]["candidates"][0]["id"] = "候補"
+        plan["shots"][0]["candidates"][0]["provenance"]["creator"] = "Jose Alvarez - 東京"
+        with mock.patch.object(build_review_page, "_extract_frame", side_effect=self._frame):
+            result = build_review_page.build_review_page(plan, self.timeline, self.transcript, self.video, self.review_dir, project_root=self.root)
+        encoded = build_review_page.PAYLOAD_RE.search(result["page"].read_text(encoding="utf-8")).group(1)
+        payload_bytes = base64.b64decode(encoded)
+        payload_bytes.decode("ascii")
+        payload = json.loads(payload_bytes)
+        self.assertEqual("shot-cafe\u0301", payload["shots"][0]["id"])
+        self.assertEqual("工場の映像", payload["shots"][0]["queries"][1])
+        self.assertEqual("候補", payload["shots"][0]["candidates"][0]["id"])
+        self.assertEqual("Jose Alvarez - 東京", payload["shots"][0]["candidates"][0]["provenance"]["creator"])
+
     def test_build_review_page_rejects_video_path_hash_and_duration_before_frames(self):
         outside = self.root.parent / f"{self.root.name}-outside.mp4"
         outside.write_bytes(b"program")
@@ -543,6 +642,7 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
         self.assertIn("Queries:", template)
         self.assertIn("shot.queries", template)
         self.assertIn("data.pre_skipped_ids.map", template)
+        self.assertIn("timestamp:new Date().toISOString()", template)
 
     def test_mixed_plan_exports_pre_skipped_shot_exactly_once(self):
         plan = copy.deepcopy(self.plan)
@@ -555,6 +655,7 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
         self.assertEqual(["already-skipped"], payload["pre_skipped_ids"])
         self.assertEqual(["shot"], [shot["id"] for shot in payload["shots"]])
         review = {key: payload[key] for key in ("review_id", "plan_sha256", "candidate_manifest_sha256", "review_video_sha256")}
+        review.update({"rationale": "Relevant footage.", "timestamp": "2026-07-23T12:00:00Z"})
         review["shots"] = [{"id": shot_id, "decision": "skip"} for shot_id in payload["pre_skipped_ids"]] + [{"id": "shot", "decision": "select", "candidate_id": "asset", "source_trim": {"start_s": 0, "end_s": 1}}]
         approved = broll_plan.apply_review(plan, review, mode="agent", actor="agent", rationale="Relevant footage.")
         self.assertEqual(["selected", "skipped"], [shot["status"] for shot in approved["shots"]])
