@@ -329,6 +329,7 @@ def _recover_transaction(review_dir, plan_path):
         entries = marker["entries"]
         expected = [path.as_posix() for path in OWNED_ARTIFACTS]
         if (marker.get("schema_version") != 1
+                or marker.get("phase") not in ("prepared", "artifacts-published")
                 or not isinstance(marker.get("old_plan_sha256"), str)
                 or not re.fullmatch(r"[0-9a-f]{64}", marker["old_plan_sha256"])
                 or not isinstance(marker.get("new_plan_sha256"), str)
@@ -346,7 +347,11 @@ def _recover_transaction(review_dir, plan_path):
         current = broll_plan.sha256_file(plan_path)
     except OSError as exc:
         current, identity_error = None, f"canonical plan is unreadable: {exc}"
-    if current == marker["new_plan_sha256"]:
+    same_plan = marker["old_plan_sha256"] == marker["new_plan_sha256"]
+    committed = current == marker["new_plan_sha256"] and (
+        not same_plan or marker["phase"] == "artifacts-published"
+    )
+    if committed:
         try:
             _remove(_stage_dir(review_dir))
             _finish_transaction(transaction)
@@ -394,6 +399,7 @@ def _commit(stage, review_dir, plan_path, result):
         projectlib.write_json(plan_part, result)
         marker = {
             "schema_version": 1,
+            "phase": "prepared",
             "old_plan_sha256": old_plan_sha256,
             "new_plan_sha256": broll_plan.sha256_file(plan_part),
             "review_dir_existed": review_existed,
@@ -414,6 +420,9 @@ def _commit(stage, review_dir, plan_path, result):
             if source.exists():
                 target.parent.mkdir(parents=True, exist_ok=True)
                 os.replace(source, target)
+        marker["phase"] = "artifacts-published"
+        projectlib.write_json(marker_part, marker)
+        os.replace(marker_part, transaction / "marker.json")
         os.replace(plan_part, plan_path)
     except BaseException as original:
         try:

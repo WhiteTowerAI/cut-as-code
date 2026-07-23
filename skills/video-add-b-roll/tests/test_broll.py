@@ -2068,8 +2068,15 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
         self.assertEqual("review page", (review_dir / "index.html").read_text(encoding="utf-8"))
         self.assertEqual("immutable asset", (review_dir / "assets/review.js").read_text(encoding="utf-8"))
 
+    def _verification_artifact_bytes(self, plan):
+        verification = plan["shots"][0]["verification"]
+        bindings = [verification["contact_sheet"], verification["boundary_reel"], verification["report"],
+                    *verification["stills"].values()]
+        return {binding["path"]: (self.root / binding["path"]).read_bytes() for binding in bindings}
+
     def _crash_verification(self, video, mode):
         code = """
+import json
 import os
 import sys
 from pathlib import Path
@@ -2080,6 +2087,9 @@ real_replace = os.replace
 plan, review_dir, mode = Path(sys.argv[3]).resolve(), Path(sys.argv[7]).resolve(), sys.argv[8]
 def crash_after_move(source, target):
     source, target = Path(source).resolve(), Path(target).resolve()
+    phase = None
+    if target.name == "marker.json" and source.is_file():
+        phase = json.loads(source.read_text(encoding="utf-8")).get("phase")
     result = real_replace(source, target)
     if mode == "first-old" and source == review_dir / "stills" and target != review_dir / "stills":
         os._exit(91)
@@ -2087,6 +2097,8 @@ def crash_after_move(source, target):
         os._exit(92)
     if mode == "plan" and target == plan:
         os._exit(93)
+    if mode == "artifacts-published" and phase == "artifacts-published":
+        os._exit(94)
     return result
 os.replace = crash_after_move
 check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
@@ -2728,6 +2740,48 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
             self.assertEqual(digest, broll_plan.sha256_file(self.root / relative))
         self.assertEqual("review page", (review_dir / "index.html").read_text(encoding="utf-8"))
         self.assertEqual("immutable asset", (review_dir / "assets/review.js").read_text(encoding="utf-8"))
+
+    def test_checker_rolls_back_prepared_equal_hash_rerun_after_first_move(self):
+        video, _ = self._normalized_for_check()
+        verified, _ = check_broll.verify_plan(self.plan_path, self.timeline_path, self.root, video)
+        canonical, old_artifacts = self.plan_path.read_bytes(), self._verification_artifact_bytes(verified)
+
+        crashed = self._crash_verification(video, "first-old")
+
+        self.assertEqual(91, crashed.returncode, crashed.stderr)
+        transaction = self.root / "review/.03-b-roll.check.transaction"
+        marker = projectlib.load_json(transaction / "marker.json")
+        self.assertEqual(marker["old_plan_sha256"], marker["new_plan_sha256"])
+        with self.assertRaisesRegex(ValueError, "review video is missing"):
+            check_broll.verify_plan(
+                self.plan_path, self.timeline_path, self.root, self.root / "missing.mp4"
+            )
+        self.assertEqual(canonical, self.plan_path.read_bytes())
+        for relative, content in old_artifacts.items():
+            self.assertEqual(content, (self.root / relative).read_bytes())
+        self.assertEqual("prepared", marker["phase"])
+        self.assertFalse(transaction.exists())
+
+    def test_checker_keeps_equal_hash_rerun_after_artifacts_published_phase(self):
+        video, _ = self._normalized_for_check()
+        verified, _ = check_broll.verify_plan(self.plan_path, self.timeline_path, self.root, video)
+        canonical, expected_artifacts = self.plan_path.read_bytes(), self._verification_artifact_bytes(verified)
+
+        crashed = self._crash_verification(video, "artifacts-published")
+
+        self.assertEqual(94, crashed.returncode, crashed.stderr)
+        transaction = self.root / "review/.03-b-roll.check.transaction"
+        marker = projectlib.load_json(transaction / "marker.json")
+        self.assertEqual(marker["old_plan_sha256"], marker["new_plan_sha256"])
+        self.assertEqual("artifacts-published", marker["phase"])
+        with self.assertRaisesRegex(ValueError, "review video is missing"):
+            check_broll.verify_plan(
+                self.plan_path, self.timeline_path, self.root, self.root / "missing.mp4"
+            )
+        self.assertEqual(canonical, self.plan_path.read_bytes())
+        for relative, content in expected_artifacts.items():
+            self.assertEqual(content, (self.root / relative).read_bytes())
+        self.assertFalse(transaction.exists())
 
     def test_fresh_review_clears_verified_lifecycle_before_zero_selected_check(self):
         video, _ = self._normalized_for_check()
