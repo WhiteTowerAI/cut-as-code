@@ -11,6 +11,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 from urllib.error import HTTPError
+from urllib.request import Request
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "scripts"), str(ROOT.parent / "video-understand" / "scripts")]
@@ -459,6 +460,22 @@ class AcquisitionTests(unittest.TestCase):
                 with contextlib.redirect_stderr(stderr), self.assertRaises(SystemExit): pexels.main(list(argv))
                 self.assertEqual("Pexels API key must be set in PEXELS_API_KEY\n", stderr.getvalue())
                 self.assertNotIn("secret", stderr.getvalue())
+
+    def test_redirect_handler_rejects_cross_host_before_parent_and_allows_exact_host(self):
+        request = Request("https://api.pexels.com/videos/search", headers={"Authorization": "secret"})
+        handler = pexels._RedirectLimit({"api.pexels.com"})
+        with mock.patch.object(pexels.HTTPRedirectHandler, "redirect_request", side_effect=AssertionError("parent followed")):
+            for url in ("https://evil.test/", "https://videos.pexels.com/file.mp4"):
+                with self.subTest(url=url), self.assertRaises(ValueError):
+                    handler.redirect_request(request, None, 302, "found", {}, url)
+        redirected = handler.redirect_request(request, None, 302, "found", {}, "https://api.pexels.com/next")
+        self.assertEqual("https://api.pexels.com/next", redirected.full_url)
+
+    def test_download_redirect_handler_permits_only_video_host(self):
+        request = Request("https://videos.pexels.com/file.mp4")
+        handler = pexels._RedirectLimit(pexels.VIDEO_HOSTS)
+        with self.assertRaises(ValueError): handler.redirect_request(request, None, 302, "found", {}, "https://api.pexels.com/videos/search")
+        self.assertEqual("https://videos.pexels.com/next", handler.redirect_request(request, None, 302, "found", {}, "https://videos.pexels.com/next").full_url)
 
 
 if __name__ == "__main__": unittest.main()

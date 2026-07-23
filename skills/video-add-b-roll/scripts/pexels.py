@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit, urlunsplit
-from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "video-understand" / "scripts"))
 import projectlib
@@ -43,16 +43,24 @@ def validate_url(value, allowed_hosts):
 def _now(): return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def _open(opener, request, timeout=30):
-    handler = opener if opener is not None else _default_opener()
+def _open(opener, request, allowed_hosts, timeout=30):
+    handler = opener if opener is not None else _default_opener(allowed_hosts)
     return handler.open(request, timeout=timeout) if hasattr(handler, "open") else handler(request, timeout=timeout)
 
 
 class _RedirectLimit(HTTPRedirectHandler):
     max_redirections = 3
 
+    def __init__(self, allowed_hosts):
+        super().__init__()
+        self.allowed_hosts = frozenset(allowed_hosts)
 
-def _default_opener(): return build_opener(_RedirectLimit())
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        validate_url(newurl, self.allowed_hosts)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def _default_opener(allowed_hosts): return build_opener(_RedirectLimit(allowed_hosts))
 
 
 def _matches_orientation(width, height, orientation):
@@ -66,7 +74,7 @@ def search_videos(query, *, orientation="landscape", per_page=10, api_key=None, 
     key = api_key or os.environ.get("PEXELS_API_KEY")
     if not key: raise ValueError("Pexels API key is required")
     request = Request(f"{PEXELS_API}?{urlencode({'query': query, 'orientation': orientation, 'per_page': per_page})}", headers={"Authorization": key, "Accept": "application/json"})
-    with _open(opener, request) as response:
+    with _open(opener, request, API_HOSTS) as response:
         validate_url(response.geturl(), API_HOSTS)
         try: payload = json.loads(response.read().decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc: raise ValueError("invalid Pexels response") from exc
@@ -147,7 +155,7 @@ def download_candidate(candidate, destination, *, opener=None, max_bytes=250_000
         offset = part.stat().st_size if part.exists() else 0
         request = Request(url, headers={"Range": f"bytes={offset}-"} if offset else {})
         try:
-            with _open(opener, request) as response:
+            with _open(opener, request, VIDEO_HOSTS) as response:
                 final_url = validate_url(response.geturl(), VIDEO_HOSTS)
                 status = getattr(response, "status", response.getcode() if hasattr(response, "getcode") else 200)
                 headers = response.headers
