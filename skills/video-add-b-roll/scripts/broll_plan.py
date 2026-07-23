@@ -515,6 +515,9 @@ def register_operation(project, plan, *, plan_path="b-roll/broll-plan.json", rep
     result = copy.deepcopy(project)
     if not isinstance(result, dict) or not isinstance(result.get("operations"), list) or any(not isinstance(item, dict) for item in result.get("operations", [])):
         raise ValueError("project operations must be a list of objects")
+    if "render" in result and not isinstance(result["render"], dict):
+        raise ValueError("project render must be an object")
+    _project_parts(result)
     old = [item for item in result["operations"] if item.get("id") == "b-roll"]
     removed = bool(old)
     result["operations"] = [item for item in result["operations"] if item.get("id") != "b-roll"]

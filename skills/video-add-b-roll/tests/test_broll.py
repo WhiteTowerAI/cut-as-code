@@ -1352,7 +1352,7 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
 
     def test_register_operation_removes_old_registration_for_no_selected_shots(self):
         project = self._registration_project(["cut", "b-roll", "b-roll", "captions"])
-        project["operations"].extend([{"id": "b-roll", "revision": 7}, {"id": "b-roll", "revision": 6}])
+        project["operations"].append({"id": "b-roll", "revision": 7})
         plan = self._registered_plan((2, 3), dependencies=["understanding", "cut"], skip=True)
         result = broll_plan.register_operation(project, plan)
         self.assertNotIn("b-roll", result["sequences"]["main"]["operations"])
@@ -1411,6 +1411,54 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
                     self.assertRegex(str(error), "project operations must be a list of objects")
                 else:
                     self.fail("register_operation accepted a non-object operation")
+
+    def test_register_operation_rejects_invalid_existing_broll_revisions(self):
+        for revision in (None, "7", [], {}, 1.5, True, 0, -1):
+            project = self._registration_project()
+            project["operations"].append({"id": "b-roll", "revision": revision})
+            project["sequences"]["main"]["operations"].append("b-roll")
+            with self.subTest(revision=revision):
+                try:
+                    broll_plan.register_operation(project, self._registered_plan((2, 3)))
+                except Exception as error:
+                    self.assertIsInstance(error, ValueError)
+                    self.assertRegex(str(error), "project operation b-roll revision must be a positive integer")
+                else:
+                    self.fail("register_operation accepted an invalid existing B-roll revision")
+
+    def test_register_operation_rejects_non_object_render_for_selected_and_noop_plans(self):
+        selected = self._registered_plan((2, 3))
+        skipped = self._registered_plan((2, 3), skip=True)
+        for value in (None, [], 3, "render", True):
+            for kind, plan in (("selected", selected), ("skipped", skipped)):
+                project = self._registration_project()
+                project["render"] = value
+                with self.subTest(value=value, kind=kind):
+                    try:
+                        broll_plan.register_operation(project, plan)
+                    except Exception as error:
+                        self.assertIsInstance(error, ValueError)
+                        self.assertRegex(str(error), "project render must be an object")
+                    else:
+                        self.fail("register_operation accepted a non-object project render")
+
+    def test_register_operation_allows_missing_or_object_render_and_increments_valid_revision(self):
+        selected = self._registered_plan((2, 3))
+        skipped = self._registered_plan((2, 3), skip=True)
+        missing_selected = self._registration_project()
+        missing_selected.pop("render")
+        self.assertEqual("draft", broll_plan.register_operation(missing_selected, selected)["render"]["status"])
+        missing_skipped = self._registration_project()
+        missing_skipped.pop("render")
+        self.assertNotIn("render", broll_plan.register_operation(missing_skipped, skipped))
+        self.assertEqual("verified", broll_plan.register_operation(self._registration_project(), skipped)["render"]["status"])
+
+        project = self._registration_project()
+        project["operations"].append({"id": "b-roll", "revision": 7})
+        project["sequences"]["main"]["operations"].append("b-roll")
+        result = broll_plan.register_operation(project, selected)
+        operation = next(item for item in result["operations"] if item["id"] == "b-roll")
+        self.assertEqual(8, operation["revision"])
 
 
 class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
