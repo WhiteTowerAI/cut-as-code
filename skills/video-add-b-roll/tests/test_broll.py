@@ -1,6 +1,7 @@
 """Focused B-roll plan and review contract tests."""
 
 import copy
+import base64
 import contextlib
 import io
 import json
@@ -12,12 +13,14 @@ from pathlib import Path
 from unittest import mock
 from urllib.error import HTTPError
 from urllib.request import Request
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "scripts"), str(ROOT.parent / "video-understand" / "scripts")]
 import broll_plan
 import projectlib
 import pexels
+import build_review_page
 
 
 class BrollPlanTests(unittest.TestCase):
@@ -338,6 +341,64 @@ class BrollPlanTests(unittest.TestCase):
             project = self._registration_project(); project["operations"][0]["revision"] = revision
             with self.subTest(revision=revision):
                 with self.assertRaisesRegex(ValueError, "positive integer"): broll_plan.active_dependencies(project)
+
+
+class BrollReviewPageTests(BrollPlanTests):
+    def setUp(self):
+        super().setUp()
+        self.review_dir = self.root / "review/03-b-roll"
+        self.video = self.root / "final/current.mp4"
+        self.video.parent.mkdir(parents=True)
+        self.video.write_bytes(b"program")
+
+    @staticmethod
+    def _frame(video, time_s, output):
+        Image.new("RGB", (960, 540), "white").save(output, "JPEG")
+
+    def test_build_review_page_publishes_local_payload_and_immutable_assets(self):
+        review_id = "123e4567-e89b-12d3-a456-426614174000"
+        with mock.patch.object(build_review_page, "_extract_frame", side_effect=self._frame):
+            result = build_review_page.build_review_page(
+                self.plan, self.timeline, self.transcript, self.video, self.review_dir,
+                project_root=self.root, review_id=review_id,
+            )
+        page = result["page"]
+        self.assertEqual(page, self.review_dir / f"b-roll-review-{review_id}.html")
+        self.assertTrue(result["alias"].is_file())
+        self.assertTrue(result["assets_dir"].is_dir())
+        self.assertEqual([], result["warnings"])
+        html = page.read_text(encoding="utf-8")
+        self.assertNotIn("__BROLL_REVIEW_DATA__", html)
+        self.assertNotRegex(html, r"(?:src|href)=['\"]https?://")
+        payload = json.loads(base64.b64decode(build_review_page.PAYLOAD_RE.search(html).group(1)))
+        self.assertEqual(review_id, payload["review_id"])
+        self.assertEqual("assets/frame-001.jpg", payload["shots"][0]["source_frame"]["path"])
+        self.assertEqual("../../work/cache/b-roll/factory.mp4", payload["shots"][0]["candidates"][0]["path"])
+        self.assertIn("type=\"radio\"", html)
+        self.assertIn("textarea", html)
+        self.assertIn("ken_burns", html)
+        self.assertIn("explicit_user_action", html)
+        with self.assertRaises(FileExistsError):
+            build_review_page.build_review_page(self.plan, self.timeline, self.transcript, self.video, self.review_dir, project_root=self.root, review_id=review_id)
+
+    def test_build_review_page_rejects_invalid_or_escaping_input_without_publication(self):
+        invalid = copy.deepcopy(self.plan)
+        invalid["shots"][0]["candidates"][0]["cache_path"] = "../outside.mp4"
+        with self.assertRaises(ValueError):
+            build_review_page.build_review_page(invalid, self.timeline, self.transcript, self.video, self.review_dir, project_root=self.root)
+        self.assertFalse(self.review_dir.exists())
+
+    def test_build_review_page_rolls_back_bad_frame_and_allows_alias_warning(self):
+        def broken(video, time_s, output):
+            output.write_bytes(b"not jpeg")
+        with mock.patch.object(build_review_page, "_extract_frame", side_effect=broken):
+            with self.assertRaises(ValueError):
+                build_review_page.build_review_page(self.plan, self.timeline, self.transcript, self.video, self.review_dir, project_root=self.root)
+        self.assertFalse(self.review_dir.exists())
+        with mock.patch.object(build_review_page, "_extract_frame", side_effect=self._frame), mock.patch.object(build_review_page, "_write_alias", side_effect=OSError("alias unavailable")):
+            result = build_review_page.build_review_page(self.plan, self.timeline, self.transcript, self.video, self.review_dir, project_root=self.root)
+        self.assertTrue(result["page"].is_file())
+        self.assertEqual(["alias unavailable"], result["warnings"])
 
 
 class AcquisitionTests(unittest.TestCase):
