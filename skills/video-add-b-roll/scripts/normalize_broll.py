@@ -45,6 +45,24 @@ def _timeline_spec(timeline):
     return width, height, num, den
 
 
+def _timeline_with_media_geometry(timeline, root):
+    if not isinstance(timeline, dict) or all(
+        field in timeline for field in ("width", "height")
+    ):
+        return timeline
+    try:
+        media = projectlib.load_json(Path(root) / "work/understand/media.json")
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        media = {}
+    if not isinstance(media, dict):
+        media = {}
+    result = copy.deepcopy(timeline)
+    for field in ("width", "height"):
+        if field not in result:
+            result[field] = media.get(field)
+    return result
+
+
 def _shot_duration(shot, timeline):
     if not isinstance(shot, dict):
         raise ValueError("shot must be an object")
@@ -271,19 +289,7 @@ def normalize_plan(plan_path, timeline_path, project_root, *, lut=None):
         project = projectlib.load_json(root / "work/project.json")
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ValueError("canonical project inputs are missing or invalid") from exc
-    if isinstance(timeline, dict) and (
-        "width" not in timeline or "height" not in timeline
-    ):
-        try:
-            media = projectlib.load_json(root / "work/understand/media.json")
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-            media = {}
-        if not isinstance(media, dict):
-            media = {}
-        timeline = copy.deepcopy(timeline)
-        for field in ("width", "height"):
-            if field not in timeline:
-                timeline[field] = media.get(field)
+    timeline = _timeline_with_media_geometry(timeline, root)
     if not isinstance(plan, dict) or not isinstance(plan.get("shots"), list):
         raise ValueError("plan shots must be a list")
     if plan.get("review_status") != "approved":

@@ -555,6 +555,7 @@ def verify_plan(plan_path, timeline_path, project_root, video_path, *, review_di
     destination = _inside(review_dir or review_root / "03-b-roll", review_root, "review_dir")
     _recover_transaction(destination, plan_path)
     plan, timeline, transcript, project = _load_inputs(plan_path, timeline_path, root)
+    timeline = normalize_broll._timeline_with_media_geometry(timeline, root)
     if not isinstance(plan, dict) or not isinstance(plan.get("shots"), list):
         raise ValueError("plan shots must be a list")
     if plan.get("review_status") != "approved":

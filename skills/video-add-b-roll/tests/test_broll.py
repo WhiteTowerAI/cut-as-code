@@ -2187,25 +2187,32 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
         )
         self.assertEqual(updated, projectlib.load_json(self.plan_path))
 
-    def test_normalize_plan_derives_missing_geometry_from_canonical_media(self):
+    def test_normalize_and_verify_plans_derive_missing_geometry_from_canonical_media(self):
         self.timeline.pop("width")
         self.timeline.pop("height")
         projectlib.write_json(self.timeline_path, self.timeline)
         projectlib.write_json(
             self.root / "work/understand/media.json", {"width": 96, "height": 54}
         )
+        video = self._review_video()
         plan = copy.deepcopy(self.base_plan)
         plan["input_hashes"]["timeline_sha256"] = broll_plan.sha256_file(self.timeline_path)
+        plan["input_hashes"]["review_video_sha256"] = broll_plan.sha256_file(video)
         projectlib.write_json(self.plan_path, self._approve(plan))
 
-        updated = normalize_broll.normalize_plan(
+        normalize_broll.normalize_plan(
             self.plan_path, self.timeline_path, self.root, lut=self.selected_lut_path
+        )
+        verified, artifacts = check_broll.verify_plan(
+            self.plan_path, self.timeline_path, self.root, video
         )
 
         self.assertEqual((96, 54), (
-            updated["shots"][0]["normalized"]["probe"]["width"],
-            updated["shots"][0]["normalized"]["probe"]["height"],
+            verified["shots"][0]["normalized"]["probe"]["width"],
+            verified["shots"][0]["normalized"]["probe"]["height"],
         ))
+        self.assertEqual("verified", verified["shots"][0]["status"])
+        self.assertTrue(artifacts["contact_sheet"].is_file())
         self.assertTrue(
             {"width", "height"}.isdisjoint(projectlib.load_json(self.timeline_path))
         )
