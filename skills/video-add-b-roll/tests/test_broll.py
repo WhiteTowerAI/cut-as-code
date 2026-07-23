@@ -142,6 +142,20 @@ class BrollPlanTests(unittest.TestCase):
                 plan = copy.deepcopy(self.plan); plan["shots"][0]["candidates"] = [candidate]
                 with self.assertRaisesRegex(ValueError, message): broll_plan.apply_review(plan, self.review(), mode="agent", actor="agent", rationale="reason")
 
+    def test_apply_review_rejects_missing_or_duplicate_plan_identifiers(self):
+        cases = []
+        for shot_id in (None, "", 3):
+            plan = copy.deepcopy(self.plan); plan["shots"][0]["id"] = shot_id
+            cases.append((plan, "plan shot id is required"))
+        plan = copy.deepcopy(self.plan); plan["shots"].append(copy.deepcopy(plan["shots"][0]))
+        cases.append((plan, "duplicate plan shot id: shot"))
+        for candidate_id, sha256, message in ((None, "a" * 64, "shot candidate id is required"), ("", "a" * 64, "shot candidate id is required"), ("asset", "not-a-hash", "shot candidate asset SHA-256 is required")):
+            plan = copy.deepcopy(self.plan); plan["shots"][0]["candidates"][0].update({"id": candidate_id, "sha256": sha256})
+            cases.append((plan, message))
+        for plan, message in cases:
+            with self.subTest(message=message):
+                with self.assertRaisesRegex(ValueError, message): broll_plan.apply_review(plan, self.review(), mode="agent", actor="agent", rationale="reason")
+
     def test_source_ranges_must_be_ordered_nonnegative_and_within_source(self):
         for source_range in ({"start_s": -1, "end_s": 1}, {"start_s": 2, "end_s": 2}, {"start_s": 9, "end_s": 11}):
             with self.subTest(source_range=source_range):

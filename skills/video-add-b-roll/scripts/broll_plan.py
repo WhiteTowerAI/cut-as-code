@@ -244,8 +244,13 @@ def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None)
     plan_shots, entries = plan.get("shots"), review.get("shots")
     if not isinstance(plan_shots, list): raise ValueError("plan shots must be a list")
     if not isinstance(entries, list): raise ValueError("review shots must be a list")
+    plan_ids = set()
     for shot in plan_shots:
         if not isinstance(shot, dict): raise ValueError("plan shot must be an object")
+        shot_id = shot.get("id")
+        if not isinstance(shot_id, str) or not shot_id.strip(): raise ValueError("plan shot id is required")
+        if shot_id in plan_ids: raise ValueError(f"duplicate plan shot id: {shot_id}")
+        plan_ids.add(shot_id)
         candidates = shot.get("candidates", [])
         if not isinstance(candidates, list): raise ValueError(f"{shot.get('id', '<missing>')} candidates must be a list")
         for candidate in candidates:
