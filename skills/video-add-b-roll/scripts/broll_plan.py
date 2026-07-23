@@ -48,33 +48,58 @@ def review_subject(plan):
 
     clean(value)
     for shot in value.get("shots", []):
-        if isinstance(shot, dict) and shot.get("status") in {"planned", "candidates_ready", "selected", "normalized", "verified"}:
+        status = shot.get("status") if isinstance(shot, dict) else None
+        if isinstance(status, str) and status in ("planned", "candidates_ready", "selected", "normalized", "verified"):
             shot["status"] = "reviewable"
-        elif isinstance(shot, dict) and shot.get("status") == "skipped" and isinstance(shot.get("id"), str) and shot["id"] in decision_skipped_ids:
+        elif status == "skipped" and isinstance(shot.get("id"), str) and shot["id"] in decision_skipped_ids:
             shot["status"] = "reviewable"
     return value
 
 
 def _decision_manifest(shots):
+    if not isinstance(shots, list):
+        return None
     decisions = []
     for shot in shots:
-        if not isinstance(shot, dict) or not isinstance(shot.get("id"), str):
+        if not isinstance(shot, dict):
             return None
-        if shot.get("status") == "skipped":
-            decisions.append({"id": shot["id"], "decision": "skip"})
+        shot_id, status = shot.get("id"), shot.get("status")
+        if not isinstance(shot_id, str) or not shot_id.strip() or not isinstance(status, str):
+            return None
+        if status == "skipped":
+            decisions.append({"id": shot_id, "decision": "skip"})
             continue
-        if shot.get("status") not in {"selected", "normalized", "verified"} or not isinstance(shot.get("selected"), dict):
+        if status not in ("selected", "normalized", "verified"):
             return None
-        candidates = shot.get("candidates")
-        if not isinstance(candidates, list):
+        selected, candidates = shot.get("selected"), shot.get("candidates")
+        if not isinstance(selected, dict) or not isinstance(candidates, list):
             return None
-        candidate = next((item for item in candidates if isinstance(item, dict) and item.get("id") == shot["selected"].get("candidate_id")), None)
-        if not isinstance(candidate, dict):
+        selected_id = selected.get("candidate_id")
+        if not isinstance(selected_id, str) or not selected_id.strip():
             return None
-        option = "source_trim" if candidate.get("media_type") == "video" else "ken_burns" if candidate.get("media_type") == "image" else None
-        if option is None or not isinstance(shot["selected"].get(option), dict):
+        candidate = None
+        for item in candidates:
+            if not isinstance(item, dict):
+                continue
+            candidate_id = item.get("id")
+            if isinstance(candidate_id, str) and candidate_id.strip() and candidate_id == selected_id:
+                candidate = item
+                break
+        if candidate is None:
             return None
-        decisions.append({"id": shot["id"], "decision": "select", "candidate_id": candidate["id"], option: copy.deepcopy(shot["selected"][option])})
+        media_type = candidate.get("media_type")
+        if media_type == "video":
+            option, value = "source_trim", selected.get("source_trim")
+            trim = _range(value)
+            if not isinstance(value, dict) or not trim or trim[0] < 0 or trim[1] <= trim[0]:
+                return None
+        elif media_type == "image":
+            option, value = "ken_burns", selected.get("ken_burns")
+            if not isinstance(value, dict) or not value:
+                return None
+        else:
+            return None
+        decisions.append({"id": shot_id, "decision": "select", "candidate_id": selected_id, option: copy.deepcopy(value)})
     return decisions
 
 
@@ -91,7 +116,7 @@ def _valid_timestamp(value):
 def _review_errors(plan, shots):
     review, decision = plan.get("review"), plan.get("decision")
     trust_required = "review_status" in plan or (isinstance(review, dict) and review.get("status") == "approved") or any(
-        isinstance(shot, dict) and shot.get("status") in {"selected", "normalized", "verified"}
+        isinstance(shot, dict) and isinstance(shot.get("status"), str) and shot.get("status") in ("selected", "normalized", "verified")
         for shot in shots
     )
     if not trust_required:
@@ -112,7 +137,10 @@ def _review_errors(plan, shots):
     if not _valid_timestamp(review.get("timestamp")): errors.append("review timestamp is invalid")
     if mode == "human" and (decision.get("explicit_user_action") is not True or review.get("explicit_user_action") is not True):
         errors.append("human review requires explicit_user_action true")
-    if review.get("decisions") != _decision_manifest(shots):
+    decisions = _decision_manifest(shots)
+    if decisions is None:
+        errors.append("review decision manifest cannot be reconstructed")
+    elif review.get("decisions") != decisions:
         errors.append("review decisions do not match current plan")
     decision_skipped_ids = review.get("decision_skipped_shot_ids")
     shot_statuses = {shot["id"]: shot.get("status") for shot in shots if isinstance(shot, dict) and isinstance(shot.get("id"), str)}
@@ -130,7 +158,7 @@ def _review_errors(plan, shots):
         errors.append("review candidate manifest SHA-256 does not match")
     selected_hashes = []
     for shot in shots:
-        if not isinstance(shot, dict) or shot.get("status") not in {"selected", "normalized", "verified"} or not isinstance(shot.get("selected"), dict): continue
+        if not isinstance(shot, dict) or not isinstance(shot.get("status"), str) or shot.get("status") not in ("selected", "normalized", "verified") or not isinstance(shot.get("selected"), dict): continue
         candidates = shot.get("candidates")
         if not isinstance(candidates, list): continue
         candidate = next((item for item in candidates if isinstance(item, dict) and item.get("id") == shot["selected"].get("candidate_id")), None)
@@ -175,7 +203,7 @@ def _candidate_errors(shot_id, candidate):
         errors.append(f"{shot_id} candidate id is required")
     elif candidate_id == "skip":
         errors.append(f"{shot_id} candidate id 'skip' is reserved")
-    if candidate.get("media_type") not in {"video", "image"}:
+    if candidate.get("media_type") not in ("video", "image"):
         errors.append(f"{shot_id} candidate {candidate_id} media_type is invalid")
     if not isinstance(candidate.get("cache_path"), str) or not candidate["cache_path"].strip():
         errors.append(f"{shot_id} candidate {candidate_id} cache_path is required")
@@ -423,7 +451,7 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
                 elif not path.is_file(): errors.append(f"{prefix} file is missing")
                 elif candidate.get("sha256") != sha256_file(path): errors.append(f"{prefix} SHA-256 is stale")
         selected, status = shot.get("selected"), shot.get("status")
-        if status not in {"planned", "candidates_ready", "selected", "normalized", "verified", "skipped"}: errors.append(f"{shot_id} status is invalid")
+        if not isinstance(status, str) or status not in ("planned", "candidates_ready", "selected", "normalized", "verified", "skipped"): errors.append(f"{shot_id} status is invalid")
         elif status in {"planned", "candidates_ready", "skipped"} and selected is not None: errors.append(f"{shot_id} {status} shot must not select a candidate")
         elif status in {"selected", "normalized", "verified"} and not isinstance(selected, dict): errors.append(f"{shot_id} {status} shot requires a selection")
         elif status in {"selected", "normalized", "verified"}:

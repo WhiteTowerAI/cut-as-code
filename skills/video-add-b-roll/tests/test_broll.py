@@ -205,15 +205,59 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             with self.subTest(shot_id=shot_id):
                 self.assertIn("shot id is required", broll_plan.validate_plan(malformed, self.timeline, self.transcript))
 
-    def test_approved_plan_with_nonlist_candidates_returns_schema_and_receipt_errors(self):
+    def test_approved_plan_with_malformed_decision_inputs_returns_schema_and_receipt_errors(self):
         approved = broll_plan.apply_review(self.plan, self.review(), mode="agent", actor="agent", rationale="Relevant footage.")
-        for candidates in (None, 3):
+        delete = object()
+        cases = [
+            ("shot non-object", [(("shots", 0), None)], "shot must be an object"),
+            ("shot id missing", [(("shots", 0, "id"), delete)], "shot id is required"),
+            ("shot id none", [(("shots", 0, "id"), None)], "shot id is required"),
+            ("shot id list", [(("shots", 0, "id"), [])], "shot id is required"),
+            ("candidates none", [(("shots", 0, "candidates"), None)], "shot candidates must be a list"),
+            ("candidates scalar", [(("shots", 0, "candidates"), 3)], "shot candidates must be a list"),
+            ("candidate non-object", [(("shots", 0, "candidates"), [[]])], "shot candidate must be an object"),
+            ("candidate id missing", [(("shots", 0, "candidates", 0, "id"), delete)], "shot candidate id is required"),
+            ("candidate id none", [(("shots", 0, "candidates", 0, "id"), None), (("shots", 0, "selected", "candidate_id"), None)], "shot candidate id is required"),
+            ("candidate id list", [(("shots", 0, "candidates", 0, "id"), []), (("shots", 0, "selected", "candidate_id"), [])], "shot candidate id is required"),
+            ("reviewer candidate", [(("shots", 0, "candidates"), [{"media_type": "video"}]), (("shots", 0, "selected", "candidate_id"), None)], "shot candidate id is required"),
+            ("selected missing", [(("shots", 0, "selected"), delete)], "shot selected shot requires a selection"),
+            ("selected none", [(("shots", 0, "selected"), None)], "shot selected shot requires a selection"),
+            ("selected scalar", [(("shots", 0, "selected"), 3)], "shot selected shot requires a selection"),
+            ("selected candidate id missing", [(("shots", 0, "selected", "candidate_id"), delete)], "shot selected candidate does not belong to shot"),
+            ("selected candidate id none", [(("shots", 0, "selected", "candidate_id"), None)], "shot selected candidate does not belong to shot"),
+            ("selected candidate id list", [(("shots", 0, "selected", "candidate_id"), [])], "shot selected candidate does not belong to shot"),
+            ("selected candidate not found", [(("shots", 0, "selected", "candidate_id"), "missing")], "shot selected candidate does not belong to shot"),
+            ("video trim missing", [(("shots", 0, "selected", "source_trim"), delete)], "shot selected video requires a valid source_trim"),
+            ("video trim none", [(("shots", 0, "selected", "source_trim"), None)], "shot selected video requires a valid source_trim"),
+            ("video trim list", [(("shots", 0, "selected", "source_trim"), [])], "shot selected video requires a valid source_trim"),
+            ("video trim malformed", [(("shots", 0, "selected", "source_trim"), {"start_s": "bad"})], "shot selected video requires a valid source_trim"),
+            ("image motion missing", [(("shots", 0, "candidates", 0, "media_type"), "image")], "shot selected image requires a non-empty ken_burns"),
+            ("image motion none", [(("shots", 0, "candidates", 0, "media_type"), "image"), (("shots", 0, "selected", "ken_burns"), None)], "shot selected image requires a non-empty ken_burns"),
+            ("image motion list", [(("shots", 0, "candidates", 0, "media_type"), "image"), (("shots", 0, "selected", "ken_burns"), [])], "shot selected image requires a non-empty ken_burns"),
+            ("image motion empty", [(("shots", 0, "candidates", 0, "media_type"), "image"), (("shots", 0, "selected", "ken_burns"), {})], "shot selected image requires a non-empty ken_burns"),
+            ("unknown media type", [(("shots", 0, "candidates", 0, "media_type"), "audio")], "shot candidate asset media_type is invalid"),
+            ("media type list", [(("shots", 0, "candidates", 0, "media_type"), [])], "shot candidate asset media_type is invalid"),
+            ("status missing", [(("shots", 0, "status"), delete)], "shot status is invalid"),
+            ("status none", [(("shots", 0, "status"), None)], "shot status is invalid"),
+            ("status list", [(("shots", 0, "status"), [])], "shot status is invalid"),
+            ("normalized selection", [(("shots", 0, "status"), "normalized"), (("shots", 0, "selected"), None)], "shot normalized shot requires a selection"),
+            ("verified trim", [(("shots", 0, "status"), "verified"), (("shots", 0, "selected", "source_trim"), None)], "shot verified video requires a valid source_trim"),
+        ]
+        for name, changes, expected_error in cases:
             malformed = copy.deepcopy(approved)
-            malformed["shots"][0]["candidates"] = candidates
-            with self.subTest(candidates=candidates):
+            for path, value in changes:
+                target = malformed
+                for key in path[:-1]:
+                    target = target[key]
+                if value is delete:
+                    target.pop(path[-1], None)
+                else:
+                    target[path[-1]] = copy.deepcopy(value)
+            with self.subTest(name=name):
                 errors = broll_plan.validate_plan(malformed, self.timeline, self.transcript)
-                self.assertIn("shot candidates must be a list", errors)
-                self.assertIn("review decisions do not match current plan", errors)
+                self.assertTrue(errors)
+                self.assertIn(expected_error, errors)
+                self.assertIn("review decision manifest cannot be reconstructed", errors)
 
     def test_validate_plan_catches_stale_revisions_and_real_input_hashes(self):
         self.assertEqual([], broll_plan.validate_plan(self.plan, self.timeline, self.transcript, project=self.project, project_root=self.root))
