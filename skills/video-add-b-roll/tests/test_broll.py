@@ -1,6 +1,8 @@
 """Focused B-roll plan and review contract tests."""
 
 import copy
+import contextlib
+import io
 import json
 import os
 import sys
@@ -451,7 +453,12 @@ class AcquisitionTests(unittest.TestCase):
         self.assertEqual([], pexels.search_videos("portrait", orientation="portrait", api_key="k", opener=lambda request, timeout=None: Response(pexels.PEXELS_API)))
 
     def test_cli_search_does_not_accept_api_key(self):
-        with self.assertRaises(SystemExit): pexels.main(["search", "factory", "--api-key", "secret"])
+        for argv in (("search", "factory", "--api-key", "secret"), ("search", "factory", "--api-key=secret")):
+            with self.subTest(argv=argv):
+                stderr = io.StringIO()
+                with contextlib.redirect_stderr(stderr), self.assertRaises(SystemExit): pexels.main(list(argv))
+                self.assertEqual("Pexels API key must be set in PEXELS_API_KEY\n", stderr.getvalue())
+                self.assertNotIn("secret", stderr.getvalue())
 
 
 if __name__ == "__main__": unittest.main()

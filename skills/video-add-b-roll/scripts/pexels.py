@@ -204,6 +204,10 @@ def _json(value): return json.dumps(value, default=lambda item: item.as_posix() 
 
 
 def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+    if any(value == "--api-key" or value.startswith("--api-key=") for value in argv):
+        print("Pexels API key must be set in PEXELS_API_KEY", file=sys.stderr)
+        raise SystemExit(2)
     parser = argparse.ArgumentParser(); commands = parser.add_subparsers(dest="command", required=True)
     search = commands.add_parser("search"); search.add_argument("query"); search.add_argument("--orientation", default="landscape"); search.add_argument("--per-page", type=int, default=10)
     download = commands.add_parser("download"); download.add_argument("candidate_json"); download.add_argument("destination")
