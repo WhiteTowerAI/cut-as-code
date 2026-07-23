@@ -176,6 +176,39 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "shot select requires a valid source_trim"):
                     broll_plan.apply_review(self.plan, review, mode="agent", actor="agent", rationale="Relevant footage.")
 
+    def test_candidate_durations_reject_non_json_finite_numbers(self):
+        huge = 10 ** 10000
+        invalid = [
+            ("true", True),
+            ("false", False),
+            ("numeric string", "2"),
+            ("nan", float("nan")),
+            ("infinity", float("inf")),
+            ("negative infinity", float("-inf")),
+            ("huge positive", huge),
+            ("huge negative", -huge),
+        ]
+        for location in ("duration_s", "probe"):
+            for name, value in invalid:
+                plan = copy.deepcopy(self.plan)
+                candidate = plan["shots"][0]["candidates"][0]
+                if location == "duration_s":
+                    candidate[location] = value
+                else:
+                    candidate[location] = {"duration_s": value}
+                if name.startswith("huge"):
+                    review = self.review()
+                else:
+                    review = self.review_for(plan, [{"id": "shot", "decision": "select", "candidate_id": "asset", "source_trim": {"start_s": 0, "end_s": 1}}])
+                with self.subTest(action="apply", location=location, name=name):
+                    with self.assertRaises(ValueError):
+                        broll_plan.apply_review(plan, review, mode="agent", actor="agent", rationale="Relevant footage.")
+
+                persisted = copy.deepcopy(plan)
+                persisted["shots"][0].update({"status": "selected", "selected": {"candidate_id": "asset", "source_trim": {"start_s": 0, "end_s": 1}}})
+                with self.subTest(action="validate", location=location, name=name):
+                    self.assertIn("shot selected video requires a valid source_trim", broll_plan.validate_plan(persisted, self.timeline, self.transcript))
+
     def test_apply_review_rejects_invalid_image_motion_without_null_decisions(self):
         missing = object()
         for value in (missing, None, [], {}, {"direction": None}, {"direction": []}, {"direction": "spin"}):
@@ -745,6 +778,48 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
                 target[path[-1]] = value
                 with self.subTest(scope="timeline", name=name, sign=sign):
                     self.assertTrue(broll_plan.validate_plan(self.plan, timeline, self.transcript))
+
+    def test_top_level_durations_and_clip_speed_reject_non_json_finite_numbers(self):
+        huge = 10 ** 10000
+        invalid = [
+            ("true", True),
+            ("false", False),
+            ("nan", float("nan")),
+            ("infinity", float("inf")),
+            ("negative infinity", float("-inf")),
+            ("huge positive", huge),
+            ("huge negative", -huge),
+        ]
+        fields = [
+            ("plan program duration", "plan", ("program_duration_s",), "10", "plan program_duration_s is required"),
+            ("timeline program duration", "timeline", ("program_duration_s",), "10", "timeline program_duration_s is invalid"),
+            ("timeline source duration", "timeline", ("source_duration_s",), "10", "timeline source_duration_s is invalid"),
+            ("clip speed", "timeline", ("clips", 0, "speed"), "1", None),
+        ]
+        for field, target_name, path, numeric_string, expected in fields:
+            for name, value in [("numeric string", numeric_string), *invalid]:
+                plan, timeline = copy.deepcopy(self.plan), copy.deepcopy(self.timeline)
+                target = plan if target_name == "plan" else timeline
+                for key in path[:-1]:
+                    target = target[key]
+                target[path[-1]] = value
+                with self.subTest(field=field, name=name):
+                    errors = broll_plan.validate_plan(plan, timeline, self.transcript)
+                    if expected:
+                        self.assertIn(expected, errors)
+                    else:
+                        self.assertTrue(errors)
+
+    def test_all_numeric_sites_preserve_json_ints_and_floats(self):
+        plan, timeline = copy.deepcopy(self.plan), copy.deepcopy(self.timeline)
+        plan["program_duration_s"] = 10
+        timeline.update({"program_duration_s": 10.0, "source_duration_s": 10})
+        timeline["clips"][0]["speed"] = 1
+        candidate = plan["shots"][0]["candidates"][0]
+        candidate.update({"duration_s": 2, "probe": {"duration_s": 2.0}})
+        review = self.review_for(plan, [{"id": "shot", "decision": "select", "candidate_id": "asset", "source_trim": {"start_s": 0, "end_s": 1.0}}])
+        approved = broll_plan.apply_review(plan, review, mode="agent", actor="agent", rationale="Relevant footage.")
+        self.assertEqual([], broll_plan.validate_plan(approved, timeline, self.transcript))
 
     def test_review_receipt_integrity_and_human_authority_are_validated(self):
         approved = broll_plan.apply_review(self.plan, self.review(), mode="agent", actor="agent", rationale="Relevant footage.")

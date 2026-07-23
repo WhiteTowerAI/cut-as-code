@@ -17,6 +17,7 @@ import projectlib
 
 RANGE_EPSILON = 1e-6
 KEN_BURNS_DIRECTIONS = {"zoom-in", "pan-left", "pan-right"}
+_INVALID_NUMBER = object()
 
 
 def sha256_file(path):
@@ -45,25 +46,32 @@ def _is_sha256(value):
     return isinstance(value, str) and len(value) == 64 and all(char in "0123456789abcdefABCDEF" for char in value)
 
 
-def _positive_duration(value):
-    if isinstance(value, bool):
-        return None
+def _strict_finite_number(value):
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return _INVALID_NUMBER
     try:
-        duration = float(value)
-    except (TypeError, ValueError):
-        return None
-    return duration if math.isfinite(duration) and duration > 0 else None
+        number = float(value)
+    except (OverflowError, TypeError, ValueError):
+        return _INVALID_NUMBER
+    return number if math.isfinite(number) else _INVALID_NUMBER
+
+
+def _positive_duration(value):
+    duration = _strict_finite_number(value)
+    return duration if duration is not _INVALID_NUMBER and duration > 0 else _INVALID_NUMBER
 
 
 def _valid_source_trim(value, candidate):
     trim = _range(value)
     if not isinstance(value, dict) or not trim or trim[0] < 0 or trim[1] <= trim[0]:
         return False
-    durations = [_positive_duration(candidate.get("duration_s"))]
+    durations = []
+    if "duration_s" in candidate:
+        durations.append(_positive_duration(candidate["duration_s"]))
     probe = candidate.get("probe")
-    if isinstance(probe, dict):
-        durations.append(_positive_duration(probe.get("duration_s")))
-    return all(duration is None or trim[1] <= duration for duration in durations)
+    if isinstance(probe, dict) and "duration_s" in probe:
+        durations.append(_positive_duration(probe["duration_s"]))
+    return all(duration is not _INVALID_NUMBER and trim[1] <= duration for duration in durations)
 
 
 def _valid_ken_burns(value):
@@ -221,14 +229,11 @@ def _review_errors(plan, shots):
 def _range(value):
     if not isinstance(value, dict):
         return None
-    try:
-        start_value, end_value = value["start_s"], value["end_s"]
-        if any(not isinstance(item, (int, float)) or isinstance(item, bool) for item in (start_value, end_value)):
-            return None
-        start, end = float(start_value), float(end_value)
-    except (KeyError, OverflowError, TypeError, ValueError):
+    start = _strict_finite_number(value.get("start_s"))
+    end = _strict_finite_number(value.get("end_s"))
+    if start is _INVALID_NUMBER or end is _INVALID_NUMBER:
         return None
-    return (start, end) if math.isfinite(start) and math.isfinite(end) else None
+    return start, end
 
 
 def _timeline_source_ranges(program, timeline):
@@ -242,13 +247,10 @@ def _timeline_source_ranges(program, timeline):
         clip_id = clip.get("id")
         source = _range(clip.get("source_range"))
         clip_program = _range(clip.get("program_range"))
-        try:
-            speed = float(clip.get("speed"))
-        except (TypeError, ValueError):
-            return None
+        speed = _strict_finite_number(clip.get("speed"))
         if (not isinstance(clip_id, str) or not clip_id.strip() or not source or source[1] <= source[0]
                 or not clip_program or clip_program[1] <= clip_program[0]
-                or not math.isfinite(speed) or speed <= 0):
+                or speed is _INVALID_NUMBER or speed <= 0):
             return None
         start = max(program[0], clip_program[0])
         end = min(program[1], clip_program[1])
@@ -477,25 +479,21 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
     if plan.get("schema_version") != 1: errors.append("plan schema_version must be 1")
     if plan.get("timebase") != "program": errors.append("plan timebase must be program")
     if plan.get("timeline_id") != timeline.get("timeline_id"): errors.append("plan timeline_id does not match timeline")
-    try:
-        timeline_duration = float(timeline.get("program_duration_s"))
-        if not math.isfinite(timeline_duration) or timeline_duration < 0: raise ValueError
-    except (AttributeError, TypeError, ValueError):
+    timeline_duration = _strict_finite_number(timeline.get("program_duration_s"))
+    if timeline_duration is _INVALID_NUMBER or timeline_duration < 0:
         errors.append("timeline program_duration_s is invalid")
         timeline_duration = None
-    try:
-        plan_duration = float(plan.get("program_duration_s"))
-        if not math.isfinite(plan_duration): raise ValueError
+    plan_duration = _strict_finite_number(plan.get("program_duration_s"))
+    if plan_duration is _INVALID_NUMBER:
+        errors.append("plan program_duration_s is required")
+    else:
         if timeline_duration is not None and plan_duration != timeline_duration: errors.append("plan program_duration_s does not match timeline")
-    except (TypeError, ValueError): errors.append("plan program_duration_s is required")
     brief = plan.get("brief")
     if not isinstance(brief, dict): errors.append("brief must be an object")
     elif brief.get("density") != "selective": errors.append("brief density must be selective")
     duration = timeline_duration if timeline_duration is not None else 0
-    try:
-        source_duration = float(timeline.get("source_duration_s"))
-        if not math.isfinite(source_duration) or source_duration < 0: raise ValueError
-    except (AttributeError, TypeError, ValueError):
+    source_duration = _strict_finite_number(timeline.get("source_duration_s"))
+    if source_duration is _INVALID_NUMBER or source_duration < 0:
         errors.append("timeline source_duration_s is invalid")
         source_duration = None
     mapped = _mapped_words(transcript, timeline)
