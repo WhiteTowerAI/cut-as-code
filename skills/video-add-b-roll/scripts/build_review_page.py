@@ -71,9 +71,11 @@ def _review_id(value):
 
 def _payload(plan, root, assets_dir):
     payload_shots = []
+    pre_skipped_ids = []
     candidate_specs = []
     for shot_index, shot in enumerate(plan["shots"], 1):
         if shot["status"] == "skipped":
+            pre_skipped_ids.append(shot["id"])
             continue
         frame = assets_dir / f"frame-{len(payload_shots) + 1:03d}.jpg"
         candidates = []
@@ -86,7 +88,7 @@ def _payload(plan, root, assets_dir):
             candidate_specs.append((path, basename, candidate["sha256"]))
             candidates.append({"id": candidate["id"], "media_type": candidate["media_type"], "path": f"{assets_dir.name}/{basename}", "sha256": candidate["sha256"], "duration_s": candidate.get("duration_s") or candidate.get("probe", {}).get("duration_s") or float(shot["program_range"]["end_s"]) - float(shot["program_range"]["start_s"]), "provenance": candidate["provenance"]})
         payload_shots.append({"id": shot["id"], "program_range": shot["program_range"], "source_ranges": shot["source_ranges"], "transcript_evidence": shot["transcript_evidence"], "editorial_reason": shot["editorial_reason"], "visual_intent": shot["visual_intent"], "queries": shot["queries"], "source_frame": {"path": f"{assets_dir.name}/{frame.name}", "sha256": None}, "candidates": candidates})
-    return payload_shots, candidate_specs
+    return payload_shots, candidate_specs, pre_skipped_ids
 
 
 def _write_alias(page, alias):
@@ -132,8 +134,10 @@ def build_review_page(plan, timeline, transcript, video, output_dir, *, project_
     page, assets_dir = output_dir / f"b-roll-review-{identifier}.html", output_dir / f"b-roll-review-{identifier}-assets"
     if page.exists() or assets_dir.exists():
         raise FileExistsError(f"review publication already exists: {identifier}")
-    shots, candidate_specs = _payload(plan, root, assets_dir)
+    shots, candidate_specs, pre_skipped_ids = _payload(plan, root, assets_dir)
     output_dir.parent.mkdir(parents=True, exist_ok=True)
+    published_assets = False
+    published_page = False
     try:
         with tempfile.TemporaryDirectory(dir=output_dir.parent, prefix=f".{output_dir.name}-") as temporary:
             stage = Path(temporary)
@@ -154,25 +158,27 @@ def build_review_page(plan, timeline, transcript, video, output_dir, *, project_
                 _validate_jpeg(frame)
                 shot["source_frame"]["sha256"] = _hash(frame)
             subject_hash = broll_plan.canonical_sha256(broll_plan.review_subject(plan))
-            payload = {"review_id": identifier, "plan_sha256": subject_hash, "plan_subject_sha256": subject_hash, "candidate_manifest_sha256": broll_plan.canonical_sha256(broll_plan.candidate_manifest(plan)), "review_video_sha256": expected_video_hash, "decision_modes": ["human", "agent"], "shots": shots}
+            payload = {"review_id": identifier, "plan_sha256": subject_hash, "plan_subject_sha256": subject_hash, "candidate_manifest_sha256": broll_plan.canonical_sha256(broll_plan.candidate_manifest(plan)), "review_video_sha256": expected_video_hash, "decision_modes": ["human", "agent"], "pre_skipped_ids": pre_skipped_ids, "shots": shots}
             document = template.replace(PAYLOAD_MARKER, base64.b64encode(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")).decode("ascii"))
             staged_page = stage / page.name
             staged_page.write_text(document, encoding="utf-8")
             output_dir.mkdir(parents=True, exist_ok=True)
-            os.replace(staged_assets, assets_dir)
-            os.replace(staged_page, page)
+            assets_dir.mkdir()
+            published_assets = True
+            for asset in staged_assets.iterdir():
+                os.replace(asset, assets_dir / asset.name)
+            os.link(staged_page, page)
+            published_page = True
+        hashes = {"page": _hash(page), **{asset.relative_to(output_dir).as_posix(): _hash(asset) for asset in assets_dir.glob("*.jpg")}}
+        _write_alias(page, output_dir / "b-roll-review.html")
     except Exception:
-        if assets_dir.exists() and not page.exists():
+        if published_page:
+            page.unlink(missing_ok=True)
+        if published_assets:
             shutil.rmtree(assets_dir)
         raise
-    warnings = []
     alias = output_dir / "b-roll-review.html"
-    try:
-        _write_alias(page, alias)
-    except OSError as error:
-        warnings.append(str(error))
-    hashes = {"page": _hash(page), **{frame.relative_to(output_dir).as_posix(): _hash(frame) for frame in assets_dir.glob("*.jpg")}}
-    return {"page": page, "alias": alias, "review_id": identifier, "assets_dir": assets_dir, "warnings": warnings, "hashes": hashes}
+    return {"page": page, "alias": alias, "review_id": identifier, "assets_dir": assets_dir, "warnings": [], "hashes": hashes}
 
 
 def main(argv=None):

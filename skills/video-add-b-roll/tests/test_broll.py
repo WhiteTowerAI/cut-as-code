@@ -97,6 +97,13 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "input_hashes"):
             broll_plan.apply_review(malformed, self.review(), mode="agent", actor="agent", rationale="Relevant footage.")
 
+    def test_review_subject_rejects_stale_candidates_ready_to_skipped_export(self):
+        export = self.review()
+        current = copy.deepcopy(self.plan)
+        current["shots"][0]["status"] = "skipped"
+        with self.assertRaisesRegex(ValueError, "plan_sha256"):
+            broll_plan.apply_review(current, export, mode="agent", actor="agent", rationale="Relevant footage.")
+
     def test_validate_plan_catches_stale_revisions_and_real_input_hashes(self):
         self.assertEqual([], broll_plan.validate_plan(self.plan, self.timeline, self.transcript, project=self.project, project_root=self.root))
         project = copy.deepcopy(self.project); project["operations"][1]["revision"] = 3
@@ -189,6 +196,11 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         for plan, message in cases:
             with self.subTest(message=message):
                 with self.assertRaisesRegex(ValueError, message): broll_plan.apply_review(plan, self.review(), mode="agent", actor="agent", rationale="reason")
+
+    def test_candidate_id_skip_is_reserved_for_the_ui_decision(self):
+        plan = copy.deepcopy(self.plan)
+        plan["shots"][0]["candidates"][0]["id"] = "skip"
+        self.assertIn("shot candidate id 'skip' is reserved", broll_plan.validate_plan(plan, self.timeline, self.transcript))
 
     def test_source_ranges_must_be_ordered_nonnegative_and_within_source(self):
         for source_range in ({"start_s": -1, "end_s": 1}, {"start_s": 2, "end_s": 2}, {"start_s": 9, "end_s": 11}):
@@ -425,6 +437,36 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
         self.assertEqual(previous_bytes, original["page"].read_bytes())
         self.assertNotEqual(original["assets_dir"], next_review["assets_dir"])
 
+    def test_target_created_during_staging_is_never_overwritten(self):
+        review_id = "123e4567-e89b-12d3-a456-426614174004"
+        page = self.review_dir / f"b-roll-review-{review_id}.html"
+        alias = self.review_dir / "b-roll-review.html"
+        self.review_dir.mkdir(parents=True)
+        alias.write_bytes(b"prior alias")
+
+        def racing_frame(video, time_s, output):
+            self._frame(video, time_s, output)
+            page.write_bytes(b"racing publisher")
+
+        with mock.patch.object(build_review_page, "_extract_frame", side_effect=racing_frame):
+            with self.assertRaises(FileExistsError):
+                build_review_page.build_review_page(self.plan, self.timeline, self.transcript, self.video, self.review_dir, project_root=self.root, review_id=review_id)
+        self.assertEqual(b"racing publisher", page.read_bytes())
+        self.assertEqual(b"prior alias", alias.read_bytes())
+        self.assertFalse((self.review_dir / f"b-roll-review-{review_id}-assets").exists())
+
+    def test_alias_failure_rolls_back_uuid_publication_and_preserves_prior_alias(self):
+        review_id = "123e4567-e89b-12d3-a456-426614174005"
+        self.review_dir.mkdir(parents=True)
+        alias = self.review_dir / "b-roll-review.html"
+        alias.write_bytes(b"prior alias")
+        with mock.patch.object(build_review_page, "_extract_frame", side_effect=self._frame), mock.patch.object(build_review_page, "_write_alias", side_effect=OSError("alias unavailable")):
+            with self.assertRaisesRegex(OSError, "alias unavailable"):
+                build_review_page.build_review_page(self.plan, self.timeline, self.transcript, self.video, self.review_dir, project_root=self.root, review_id=review_id)
+        self.assertEqual(b"prior alias", alias.read_bytes())
+        self.assertFalse((self.review_dir / f"b-roll-review-{review_id}.html").exists())
+        self.assertFalse((self.review_dir / f"b-roll-review-{review_id}-assets").exists())
+
     def test_published_candidate_survives_live_cache_replacement(self):
         review_id = "123e4567-e89b-12d3-a456-426614174003"
         with mock.patch.object(build_review_page, "_extract_frame", side_effect=self._frame):
@@ -467,6 +509,24 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
             self.assertIn(text, template)
         for text in ("&amp;", "&lt;", "&gt;", "&quot;", "&#39;", "@media(max-width:600px)", "overflow-wrap:anywhere"):
             self.assertIn(text, template)
+        self.assertIn("Queries:", template)
+        self.assertIn("shot.queries", template)
+        self.assertIn("data.pre_skipped_ids.map", template)
+
+    def test_mixed_plan_exports_pre_skipped_shot_exactly_once(self):
+        plan = copy.deepcopy(self.plan)
+        skipped = copy.deepcopy(plan["shots"][0])
+        skipped.update({"id": "already-skipped", "program_range": {"start_s": 3.0, "end_s": 4.0}, "source_ranges": [{"clip_id": "one", "start_s": 3.0, "end_s": 4.0}], "transcript_evidence": {"words": []}, "candidates": [], "selected": None, "status": "skipped"})
+        plan["shots"].append(skipped)
+        with mock.patch.object(build_review_page, "_extract_frame", side_effect=self._frame):
+            result = build_review_page.build_review_page(plan, self.timeline, self.transcript, self.video, self.review_dir, project_root=self.root)
+        payload = json.loads(base64.b64decode(build_review_page.PAYLOAD_RE.search(result["page"].read_text(encoding="utf-8")).group(1)))
+        self.assertEqual(["already-skipped"], payload["pre_skipped_ids"])
+        self.assertEqual(["shot"], [shot["id"] for shot in payload["shots"]])
+        review = {key: payload[key] for key in ("review_id", "plan_sha256", "candidate_manifest_sha256", "review_video_sha256")}
+        review["shots"] = [{"id": shot_id, "decision": "skip"} for shot_id in payload["pre_skipped_ids"]] + [{"id": "shot", "decision": "select", "candidate_id": "asset", "source_trim": {"start_s": 0, "end_s": 1}}]
+        approved = broll_plan.apply_review(plan, review, mode="agent", actor="agent", rationale="Relevant footage.")
+        self.assertEqual(["selected", "skipped"], [shot["status"] for shot in approved["shots"]])
 
     def test_quoted_ids_remain_only_encoded_data(self):
         plan = copy.deepcopy(self.plan)
@@ -485,17 +545,13 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
             build_review_page.build_review_page(invalid, self.timeline, self.transcript, self.video, self.review_dir, project_root=self.root)
         self.assertFalse(self.review_dir.exists())
 
-    def test_build_review_page_rolls_back_bad_frame_and_allows_alias_warning(self):
+    def test_build_review_page_rolls_back_bad_frame(self):
         def broken(video, time_s, output):
             output.write_bytes(b"not jpeg")
         with mock.patch.object(build_review_page, "_extract_frame", side_effect=broken):
             with self.assertRaises(ValueError):
                 build_review_page.build_review_page(self.plan, self.timeline, self.transcript, self.video, self.review_dir, project_root=self.root)
         self.assertFalse(self.review_dir.exists())
-        with mock.patch.object(build_review_page, "_extract_frame", side_effect=self._frame), mock.patch.object(build_review_page, "_write_alias", side_effect=OSError("alias unavailable")):
-            result = build_review_page.build_review_page(self.plan, self.timeline, self.transcript, self.video, self.review_dir, project_root=self.root)
-        self.assertTrue(result["page"].is_file())
-        self.assertEqual(["alias unavailable"], result["warnings"])
 
 
 class AcquisitionTests(unittest.TestCase):

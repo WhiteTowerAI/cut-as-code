@@ -34,7 +34,7 @@ def review_subject(plan):
 
     def clean(item):
         if isinstance(item, dict):
-            for key in ("decision", "review", "selected", "status", "normalized", "verification"):
+            for key in ("decision", "review", "selected", "normalized", "verification"):
                 item.pop(key, None)
             for child in item.values():
                 clean(child)
@@ -44,8 +44,8 @@ def review_subject(plan):
 
     clean(value)
     for shot in value.get("shots", []):
-        if isinstance(shot, dict) and shot.get("status") in {"normalized", "verified"}:
-            shot["status"] = "selected"
+        if isinstance(shot, dict) and shot.get("status") in {"planned", "candidates_ready", "selected", "normalized", "verified"}:
+            shot["status"] = "reviewable"
     return value
 
 
@@ -124,6 +124,8 @@ def _candidate_errors(shot_id, candidate):
     candidate_id = candidate.get("id")
     if not isinstance(candidate_id, str) or not candidate_id.strip():
         errors.append(f"{shot_id} candidate id is required")
+    elif candidate_id == "skip":
+        errors.append(f"{shot_id} candidate id 'skip' is reserved")
     if candidate.get("media_type") not in {"video", "image"}:
         errors.append(f"{shot_id} candidate {candidate_id} media_type is invalid")
     if not isinstance(candidate.get("cache_path"), str) or not candidate["cache_path"].strip():
