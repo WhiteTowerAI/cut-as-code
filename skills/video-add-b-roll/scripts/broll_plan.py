@@ -65,7 +65,10 @@ def _decision_manifest(shots):
             continue
         if shot.get("status") not in {"selected", "normalized", "verified"} or not isinstance(shot.get("selected"), dict):
             return None
-        candidate = next((item for item in shot.get("candidates", []) if isinstance(item, dict) and item.get("id") == shot["selected"].get("candidate_id")), None)
+        candidates = shot.get("candidates")
+        if not isinstance(candidates, list):
+            return None
+        candidate = next((item for item in candidates if isinstance(item, dict) and item.get("id") == shot["selected"].get("candidate_id")), None)
         if not isinstance(candidate, dict):
             return None
         option = "source_trim" if candidate.get("media_type") == "video" else "ken_burns" if candidate.get("media_type") == "image" else None
@@ -128,7 +131,9 @@ def _review_errors(plan, shots):
     selected_hashes = []
     for shot in shots:
         if not isinstance(shot, dict) or shot.get("status") not in {"selected", "normalized", "verified"} or not isinstance(shot.get("selected"), dict): continue
-        candidate = next((item for item in shot.get("candidates", []) if isinstance(item, dict) and item.get("id") == shot["selected"].get("candidate_id")), None)
+        candidates = shot.get("candidates")
+        if not isinstance(candidates, list): continue
+        candidate = next((item for item in candidates if isinstance(item, dict) and item.get("id") == shot["selected"].get("candidate_id")), None)
         if isinstance(candidate, dict) and isinstance(candidate.get("sha256"), str): selected_hashes.append(candidate["sha256"])
     if review.get("selected_asset_sha256") != sorted(set(selected_hashes)):
         errors.append("review selected asset hashes do not match")

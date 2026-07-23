@@ -205,6 +205,16 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             with self.subTest(shot_id=shot_id):
                 self.assertIn("shot id is required", broll_plan.validate_plan(malformed, self.timeline, self.transcript))
 
+    def test_approved_plan_with_nonlist_candidates_returns_schema_and_receipt_errors(self):
+        approved = broll_plan.apply_review(self.plan, self.review(), mode="agent", actor="agent", rationale="Relevant footage.")
+        for candidates in (None, 3):
+            malformed = copy.deepcopy(approved)
+            malformed["shots"][0]["candidates"] = candidates
+            with self.subTest(candidates=candidates):
+                errors = broll_plan.validate_plan(malformed, self.timeline, self.transcript)
+                self.assertIn("shot candidates must be a list", errors)
+                self.assertIn("review decisions do not match current plan", errors)
+
     def test_validate_plan_catches_stale_revisions_and_real_input_hashes(self):
         self.assertEqual([], broll_plan.validate_plan(self.plan, self.timeline, self.transcript, project=self.project, project_root=self.root))
         project = copy.deepcopy(self.project); project["operations"][1]["revision"] = 3
