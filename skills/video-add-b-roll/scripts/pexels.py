@@ -22,6 +22,8 @@ PEXELS_API = "https://api.pexels.com/videos/search"
 LICENSE_URL = "https://www.pexels.com/license/"
 TERMS_URL = "https://www.pexels.com/terms-of-service/"
 VIDEO_HOSTS = {"videos.pexels.com"}
+API_HOSTS = {"api.pexels.com"}
+PAGE_HOSTS = {"www.pexels.com"}
 
 
 def validate_url(value, allowed_hosts):
@@ -42,7 +44,8 @@ def _now(): return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
 def _open(opener, request, timeout=30):
-    return (opener or _default_opener()).open(request, timeout=timeout) if hasattr(opener or _default_opener(), "open") else (opener or urlopen)(request, timeout=timeout)
+    handler = opener if opener is not None else _default_opener()
+    return handler.open(request, timeout=timeout) if hasattr(handler, "open") else handler(request, timeout=timeout)
 
 
 class _RedirectLimit(HTTPRedirectHandler):
@@ -50,6 +53,10 @@ class _RedirectLimit(HTTPRedirectHandler):
 
 
 def _default_opener(): return build_opener(_RedirectLimit())
+
+
+def _matches_orientation(width, height, orientation):
+    return width > height if orientation == "landscape" else height > width if orientation == "portrait" else width == height
 
 
 def search_videos(query, *, orientation="landscape", per_page=10, api_key=None, opener=None):
@@ -60,6 +67,7 @@ def search_videos(query, *, orientation="landscape", per_page=10, api_key=None, 
     if not key: raise ValueError("Pexels API key is required")
     request = Request(f"{PEXELS_API}?{urlencode({'query': query, 'orientation': orientation, 'per_page': per_page})}", headers={"Authorization": key, "Accept": "application/json"})
     with _open(opener, request) as response:
+        validate_url(response.geturl(), API_HOSTS)
         try: payload = json.loads(response.read().decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc: raise ValueError("invalid Pexels response") from exc
     if not isinstance(payload, dict) or not isinstance(payload.get("videos"), list): raise ValueError("invalid Pexels response")
@@ -67,7 +75,9 @@ def search_videos(query, *, orientation="landscape", per_page=10, api_key=None, 
     for video in payload["videos"]:
         if not isinstance(video, dict) or video.get("id") in seen_videos: continue
         duration, width, height = video.get("duration"), video.get("width"), video.get("height")
-        if not isinstance(duration, (int, float)) or duration <= 0 or not isinstance(width, int) or not isinstance(height, int) or width < height: continue
+        if not isinstance(duration, (int, float)) or duration <= 0 or not isinstance(width, int) or not isinstance(height, int) or width <= 0 or height <= 0: continue
+        try: source_url = validate_url(video.get("url"), PAGE_HOSTS)
+        except ValueError: continue
         choices = []
         for item in video.get("video_files", []):
             file_key = (video.get("id"), item.get("id")) if isinstance(item, dict) else None
@@ -75,12 +85,12 @@ def search_videos(query, *, orientation="landscape", per_page=10, api_key=None, 
             try: url = validate_url(item.get("link"), VIDEO_HOSTS)
             except ValueError: continue
             iw, ih = item.get("width"), item.get("height")
-            if isinstance(iw, int) and isinstance(ih, int) and iw >= ih and iw > 0 and ih > 0: choices.append((iw * ih, item, url))
+            if isinstance(iw, int) and isinstance(ih, int) and iw > 0 and ih > 0 and _matches_orientation(iw, ih, orientation): choices.append((iw * ih, item, url))
         if not choices: continue
         _, item, url = max(choices, key=lambda value: value[0])
         seen_videos.add(video["id"]); seen_files.add((video["id"], item["id"]))
         creator = video.get("user", {}).get("name") if isinstance(video.get("user"), dict) else None
-        records.append({"id": f"{video['id']}-{item['id']}", "provider_id": video["id"], "file_id": item["id"], "media_type": "video", "download_url": url, "width": item["width"], "height": item["height"], "duration_s": duration, "provenance": {"source_type": "pexels", "provider_id": video["id"], "source_url": video.get("url", ""), "creator": creator or "Pexels creator", "license": "Pexels License", "license_url": LICENSE_URL, "terms_url": TERMS_URL, "retrieval_time": _now(), "download_url": url, "dimensions": {"width": item["width"], "height": item["height"]}, "duration_s": duration}})
+        records.append({"id": f"{video['id']}-{item['id']}", "provider_id": video["id"], "file_id": item["id"], "media_type": "video", "download_url": url, "width": item["width"], "height": item["height"], "duration_s": duration, "provenance": {"source_type": "pexels", "provider_id": video["id"], "source_url": source_url, "creator": creator or "Pexels creator", "license": "Pexels License", "license_url": LICENSE_URL, "terms_url": TERMS_URL, "retrieval_time": _now(), "download_url": url, "dimensions": {"width": item["width"], "height": item["height"]}, "duration_s": duration}})
     return records
 
 
@@ -116,9 +126,9 @@ def _sha256(path):
     return digest.hexdigest()
 
 
-def _record(candidate, target, probe):
+def _record(candidate, target, probe, digest=None):
     result = dict(candidate)
-    result.update({"path": target, "cache_path": candidate.get("cache_path", target.as_posix()), "sha256": _sha256(target), "bytes": target.stat().st_size, "probe": probe})
+    result.update({"path": target, "cache_path": candidate.get("cache_path", target.as_posix()), "sha256": digest or _sha256(target), "bytes": target.stat().st_size, "probe": probe})
     return result
 
 
@@ -129,7 +139,7 @@ def download_candidate(candidate, destination, *, opener=None, max_bytes=250_000
     url = validate_url(candidate["download_url"], VIDEO_HOSTS)
     expected = candidate.get("sha256")
     if target.exists() and isinstance(expected, str) and _sha256(target) == expected:
-        try: return _record(candidate, target, probe_media(target))
+        try: return _record(candidate, target, probe_media(target), expected)
         except ValueError: target.unlink()
     elif target.exists():
         target.unlink()
@@ -159,10 +169,14 @@ def download_candidate(candidate, destination, *, opener=None, max_bytes=250_000
                 candidate = dict(candidate); candidate["download_url"] = final_url
             try: probe = probe_media(part)
             except Exception: part.unlink(missing_ok=True); raise
+            try: digest = _sha256(part)
+            except Exception: part.unlink(missing_ok=True); raise
             os.replace(part, target)
-            return _record(candidate, target, probe)
+            return _record(candidate, target, probe, digest)
         except HTTPError as exc:
-            if exc.code not in {408, 429, 500, 501, 502, 503, 504} or attempt + 1 == retries: raise
+            if exc.code not in {408, 429, 500, 502, 503, 504}:
+                part.unlink(missing_ok=True); raise
+            if attempt + 1 == retries: raise
         except URLError:
             if attempt + 1 == retries: raise
         except ValueError:
@@ -180,10 +194,10 @@ def import_local(source, destination, provenance):
     target.parent.mkdir(parents=True, exist_ok=True); part = target.with_name(target.name + ".part")
     try:
         with open(source, "rb") as incoming, open(part, "wb") as outgoing: shutil.copyfileobj(incoming, outgoing, 1024 * 1024)
-        probe = probe_media(part); os.replace(part, target)
+        probe = probe_media(part); digest = _sha256(part); os.replace(part, target)
     except Exception:
         part.unlink(missing_ok=True); raise
-    return _record({"id": target.stem, "media_type": "video", "provenance": dict(provenance)}, target, probe)
+    return _record({"id": target.stem, "media_type": "video", "provenance": dict(provenance)}, target, probe, digest)
 
 
 def _json(value): return json.dumps(value, default=lambda item: item.as_posix() if isinstance(item, Path) else (_ for _ in ()).throw(TypeError()), indent=2)
@@ -191,11 +205,11 @@ def _json(value): return json.dumps(value, default=lambda item: item.as_posix() 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(); commands = parser.add_subparsers(dest="command", required=True)
-    search = commands.add_parser("search"); search.add_argument("query"); search.add_argument("--api-key"); search.add_argument("--orientation", default="landscape"); search.add_argument("--per-page", type=int, default=10)
+    search = commands.add_parser("search"); search.add_argument("query"); search.add_argument("--orientation", default="landscape"); search.add_argument("--per-page", type=int, default=10)
     download = commands.add_parser("download"); download.add_argument("candidate_json"); download.add_argument("destination")
     local = commands.add_parser("import-local"); local.add_argument("source"); local.add_argument("destination"); local.add_argument("provenance_json")
     args = parser.parse_args(argv)
-    if args.command == "search": value = search_videos(args.query, api_key=args.api_key, orientation=args.orientation, per_page=args.per_page)
+    if args.command == "search": value = search_videos(args.query, orientation=args.orientation, per_page=args.per_page)
     elif args.command == "download": value = download_candidate(projectlib.load_json(args.candidate_json), args.destination)
     else: value = import_local(args.source, args.destination, projectlib.load_json(args.provenance_json))
     print(_json(value))

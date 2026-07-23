@@ -2,11 +2,13 @@
 
 import copy
 import json
+import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
+from urllib.error import HTTPError
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "scripts"), str(ROOT.parent / "video-understand" / "scripts")]
@@ -352,6 +354,7 @@ class AcquisitionTests(unittest.TestCase):
     def test_search_keeps_best_valid_file_and_never_exposes_key(self):
         payload = {"videos": [{"id": 7, "url": "https://www.pexels.com/video/7/", "user": {"name": "Maker"}, "duration": 4, "width": 1920, "height": 1080, "video_files": [{"id": 1, "link": "https://videos.pexels.com/one.mp4", "width": 640, "height": 360}, {"id": 2, "link": "https://videos.pexels.com/two.mp4", "width": 1920, "height": 1080}]}]}
         class Response:
+            def geturl(self): return pexels.PEXELS_API
             def read(self): return json.dumps(payload).encode()
             def __enter__(self): return self
             def __exit__(self, *args): pass
@@ -387,6 +390,68 @@ class AcquisitionTests(unittest.TestCase):
             result = pexels.import_local(source, self.cache / "copy.mp4", provenance)
         self.assertEqual(b"source", source.read_bytes()); self.assertEqual(b"source", result["path"].read_bytes())
         with self.assertRaises(ValueError): pexels.import_local(source, Path(self.temp.name) / "escape.mp4", provenance)
+
+    def test_permanent_http_errors_clean_part_without_retry(self):
+        for status in (401, 501):
+            with self.subTest(status=status):
+                target = self.cache / f"clip-{status}.mp4"; part = target.with_name(f"clip-{status}.mp4.part"); part.write_bytes(b"resume")
+                calls = []
+                def opener(request, timeout=None):
+                    calls.append(request); raise HTTPError(request.full_url, status, "no", {}, None)
+                with self.assertRaises(HTTPError): pexels.download_candidate({"download_url": "https://videos.pexels.com/clip.mp4"}, target, opener=opener, retries=3)
+                self.assertEqual(1, len(calls)); self.assertFalse(part.exists())
+
+    def test_exhausted_transient_error_preserves_part(self):
+        target = self.cache / "clip.mp4"; part = target.with_name("clip.mp4.part"); part.write_bytes(b"resume")
+        calls = []
+        def opener(request, timeout=None):
+            calls.append(request); raise HTTPError(request.full_url, 503, "later", {}, None)
+        with self.assertRaises(HTTPError): pexels.download_candidate({"download_url": "https://videos.pexels.com/clip.mp4"}, target, opener=opener, retries=2)
+        self.assertEqual(2, len(calls)); self.assertTrue(part.exists())
+
+    def test_download_hashes_part_before_atomic_publish(self):
+        target = self.cache / "hash.mp4"; events = []
+        class Response:
+            status = 200; headers = {"Content-Length": "3"}
+            def geturl(self): return "https://videos.pexels.com/hash.mp4"
+            def read(self, size): value, self.read = b"ok!", lambda size: b""; return value
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+        real_hash = pexels._sha256
+        real_replace = os.replace
+        def digest(path): events.append(("hash", Path(path).name)); return real_hash(path)
+        def publish(source, destination): events.append(("replace", Path(source).name)); real_replace(source, destination)
+        with mock.patch.object(pexels, "probe_media", return_value={"duration_s": 1, "width": 1, "height": 1}), mock.patch.object(pexels, "_sha256", side_effect=digest), mock.patch.object(pexels.os, "replace", side_effect=publish):
+            pexels.download_candidate({"download_url": "https://videos.pexels.com/hash.mp4"}, target, opener=lambda request, timeout=None: Response())
+        self.assertLess(events.index(("hash", "hash.mp4.part")), events.index(("replace", "hash.mp4.part")))
+
+    def test_hash_failure_cleans_part_without_final(self):
+        target = self.cache / "broken.mp4"
+        class Response:
+            status = 200; headers = {"Content-Length": "3"}
+            def geturl(self): return "https://videos.pexels.com/broken.mp4"
+            def read(self, size): value, self.read = b"bad", lambda size: b""; return value
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+        with mock.patch.object(pexels, "probe_media", return_value={"duration_s": 1, "width": 1, "height": 1}), mock.patch.object(pexels, "_sha256", side_effect=OSError("hash failed")):
+            with self.assertRaises(OSError): pexels.download_candidate({"download_url": "https://videos.pexels.com/broken.mp4"}, target, opener=lambda request, timeout=None: Response())
+        self.assertFalse(target.exists()); self.assertFalse(target.with_name("broken.mp4.part").exists())
+
+    def test_search_rejects_redirected_api_and_invalid_page_and_honors_orientation(self):
+        payload = {"videos": [{"id": 1, "url": "https://www.pexels.com/video/1/", "duration": 2, "width": 720, "height": 1280, "video_files": [{"id": 2, "link": "https://videos.pexels.com/one.mp4", "width": 720, "height": 1280}]}]}
+        class Response:
+            def __init__(self, final): self.final = final
+            def geturl(self): return self.final
+            def read(self): return json.dumps(payload).encode()
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+        with self.assertRaises(ValueError): pexels.search_videos("portrait", orientation="portrait", api_key="k", opener=lambda request, timeout=None: Response("https://evil.test/"))
+        self.assertEqual(1, len(pexels.search_videos("portrait", orientation="portrait", api_key="k", opener=lambda request, timeout=None: Response(pexels.PEXELS_API))))
+        payload["videos"][0]["url"] = "https://evil.pexels.com/video/1/"
+        self.assertEqual([], pexels.search_videos("portrait", orientation="portrait", api_key="k", opener=lambda request, timeout=None: Response(pexels.PEXELS_API)))
+
+    def test_cli_search_does_not_accept_api_key(self):
+        with self.assertRaises(SystemExit): pexels.main(["search", "factory", "--api-key", "secret"])
 
 
 if __name__ == "__main__": unittest.main()
