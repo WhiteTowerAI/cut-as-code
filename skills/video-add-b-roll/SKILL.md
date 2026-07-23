@@ -12,23 +12,15 @@ reference.
 
 ## Non-Negotiable Contract
 
-- Use the provided scripts for every acquisition, media validation, normalization, receipt
-  application, and verification step. Do not use `curl`, `Invoke-WebRequest`, browser-save,
-  or another raw download path.
-- V1 accepts project-local media and direct Pexels results through the single
-  `scripts/pexels.py` module. Do not add a provider interface, factory, broker, or substitute
-  another stock source.
-- Never use random, merely topical, or still-image fallback media. A missing or weak result
-  becomes an honest `skipped` shot.
-- Do not call native paid image or video generation APIs. Externally generated media is
-  eligible only after truthful local import with provider/model, prompt or job ID, creator,
-  license, retrieval time, and original path provenance.
-- Never fabricate a human response or label an Agent decision as human. Human and explicitly
-  delegated Agent review are separate receipt modes.
-- Keep density `selective`. B-roll must clarify meaning, provide evidence, or hide a necessary
-  edit. It is not a coverage quota.
-- A still requires an explicit review choice with `ken_burns.direction` set to `zoom-in`,
-  `pan-left`, or `pan-right`. Never silently replace a failed video search with a still.
+Follow every editorial, provenance, still, review, recovery, and delivery rule in
+[broll-rules.md](reference/broll-rules.md). Operationally:
+
+- Use the provided scripts for acquisition, validation, normalization, receipt application,
+  and verification. Never use a raw download path or substitute another stock source.
+- Never fabricate human authority. Agent review requires explicit delegation and a truthful
+  Agent receipt.
+- Missing, weak, or downloader-rejected media becomes `skipped`; never use random or still
+  fallback media.
 
 ## Requirements And Inputs
 
@@ -41,6 +33,10 @@ Run from the repository root and resolve the separate project root:
 $RepoRoot = (Resolve-Path '.').Path
 $ProjectRoot = (Resolve-Path 'path/to/video-project').Path
 $BrollScripts = Join-Path $RepoRoot 'skills/video-add-b-roll/scripts'
+$ProjectLib = Join-Path $RepoRoot 'skills/video-understand/scripts'
+$ReviewVideo = & python -c "import sys; from pathlib import Path; sys.path.insert(0,sys.argv[2]); import projectlib; root=Path(sys.argv[1]); project=projectlib.load_json(root/'work/project.json'); assert project.get('render',{}).get('status') == 'verified', 'current upstream delivery is not verified'; path=projectlib.resolve_project_path(root,project['render']['output']); assert path.is_file(), 'current upstream delivery is missing'; print(path)" $ProjectRoot $ProjectLib
+if ($LASTEXITCODE -ne 0) { throw 'Complete the active upstream delivery before B-roll review.' }
+$ReviewVideo = (Resolve-Path -LiteralPath $ReviewVideo).Path
 ```
 
 Consume these canonical inputs instead of re-transcribing or re-analyzing:
@@ -50,6 +46,11 @@ Consume these canonical inputs instead of re-transcribing or re-analyzing:
 - `work/understand/transcript.json`
 - `work/understand/understanding.json`
 - a current program-time review video whose pixels include active cut and color-grade work
+
+`$ReviewVideo` is that existing verified upstream delivery, not a filename to invent or a
+new B-roll render. It must already match the active timeline duration, dimensions, and FPS.
+If it is absent or stale, finish the upstream cut/color-grade delivery first, then resolve and
+hash it before continuing.
 
 The operation always depends on `understanding`, plus `cut` and `color-grade` when those
 operations are active on the target sequence. Copy their current positive integer revisions
@@ -150,19 +151,25 @@ Choose only a semantically accurate result. Save that single returned candidate 
 JSON, add its intended protocol-relative `cache_path`, then use the provided downloader:
 
 ```powershell
-python "$BrollScripts/pexels.py" download `
+$PexelsRecord = "$ProjectRoot/work/b-roll/pexels-12345-acquired.json"
+$PexelsJson = & python "$BrollScripts/pexels.py" download `
   "$ProjectRoot/work/b-roll/pexels-candidate.json" `
   "$ProjectRoot/work/cache/b-roll/candidates/pexels-12345.mp4"
+if ($LASTEXITCODE -ne 0) { throw 'Pexels acquisition failed.' }
+[IO.File]::WriteAllText($PexelsRecord, ($PexelsJson -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
 ```
 
-The downloader constrains hosts and size, validates redirects, probes and decodes media,
-hashes it, and publishes atomically. If a transient failure leaves `destination.part`, rerun
-the same `pexels.py download` command with the same frozen candidate and destination only
-when its configured byte bound and frozen response metadata still make recovery safe. Never
-manually promote, rename, or delete a `.part` file. If the partial already exceeds the bound,
-the response metadata is stale, or the provided downloader cannot validate the redirect,
-range, media, and hash, preserve the partial and honestly skip the shot. Do not substitute a
-generic local clip or publish unvalidated bytes.
+`$PexelsRecord` is the authoritative acquisition record: it contains the final redirected
+URL, `path`, protocol-relative `cache_path`, SHA-256, bytes, probe, and synchronized
+provenance. Replace the shot's search-result candidate with this complete record, then
+revalidate the plan. Never rerun a successfully published download using the unhashed search
+record; only the acquired record binds the published bytes.
+
+The downloader owns `.part` recovery. After a transient HTTP or network failure, rerun the
+exact `pexels.py download` command with the same candidate and destination and let it validate
+Range responses, redirects/hosts, size, media, and hash before atomic publication or cleanup.
+Never manually promote, rename, or delete a `.part` file. On downloader-declared validation
+failure, honestly skip the shot; do not substitute a generic clip or publish partial bytes.
 
 External generation follows the local import command with `source_type:
 "external-generated"` and complete truthful generation provenance. This is import only, not
@@ -174,19 +181,24 @@ Set `input_hashes.review_video_sha256` to the actual current review video's SHA-
 then publish the immutable local review:
 
 ```powershell
-python "$BrollScripts/build_review_page.py" `
+$ReviewPublication = & python "$BrollScripts/build_review_page.py" `
   "$ProjectRoot/work/b-roll/broll-plan.json" `
   "$ProjectRoot/review/03-b-roll" `
-  --video "$ProjectRoot/final/pre-b-roll-review.mp4" `
+  --video $ReviewVideo `
   --timeline "$ProjectRoot/work/timeline.json" `
   --transcript "$ProjectRoot/work/understand/transcript.json" `
-  --project-root "$ProjectRoot"
+  --project-root "$ProjectRoot" | ConvertFrom-Json
 
 Start-Process (Resolve-Path "$ProjectRoot/review/03-b-roll/b-roll-review.html")
 ```
 
-Review semantic fit, trim boundaries, framing, quality, license/provenance, logos, visible
-text, and grade compatibility. Review export must decide every shot exactly once.
+Apply the review checks in `reference/broll-rules.md`. The export must decide every shot
+exactly once. The browser downloads `b-roll-review-<UUID>.json`; after exporting, bind the
+actual operator-chosen download location rather than assuming it is in the review directory:
+
+```powershell
+$ReviewExport = (Resolve-Path -LiteralPath "<browser-download-directory>/b-roll-review-$($ReviewPublication.review_id).json").Path
+```
 
 For human mode, present the page and stop. Apply only the JSON the user explicitly exports;
 it must contain `explicit_user_action: true`. For Agent mode, proceed only when the user has
@@ -197,7 +209,7 @@ a non-empty decision rationale. Never create a human-mode receipt from silence o
 Apply the exported review and durably bind the interaction receipt:
 
 ```powershell
-python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]); sys.path.insert(0,sys.argv[2]); import broll_plan,projectlib; path=root/'work/b-roll/broll-plan.json'; plan=projectlib.load_json(path); review=projectlib.load_json(sys.argv[3]); updated=broll_plan.apply_review(plan,review,mode=sys.argv[4],actor=sys.argv[5],rationale=sys.argv[6],interaction_path=root/'work/b-roll/broll-interaction.json'); projectlib.write_json(path,updated)" $ProjectRoot $BrollScripts "$ProjectRoot/review/03-b-roll/b-roll-review-export.json" agent Codex "Selected literal process footage; skipped candidates that did not match the claim."
+python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]); sys.path.insert(0,sys.argv[2]); import broll_plan,projectlib; path=root/'work/b-roll/broll-plan.json'; plan=projectlib.load_json(path); review=projectlib.load_json(sys.argv[3]); updated=broll_plan.apply_review(plan,review,mode=sys.argv[4],actor=sys.argv[5],rationale=sys.argv[6],interaction_path=root/'work/b-roll/broll-interaction.json'); projectlib.write_json(path,updated)" $ProjectRoot $BrollScripts $ReviewExport agent Codex "Selected literal process footage; skipped candidates that did not match the claim."
 ```
 
 Use `human` and the actual human actor only after explicit user export. The command rationale
@@ -224,13 +236,12 @@ shots before continuing; do not hand-promote `.part.mp4` or `.part.json` files.
 Run the verifier against the same current program-time review video:
 
 ```powershell
-python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]); sys.path.insert(0,sys.argv[2]); import check_broll; check_broll.verify_plan(root/'work/b-roll/broll-plan.json',root/'work/timeline.json',root,Path(sys.argv[3]))" $ProjectRoot $BrollScripts "$ProjectRoot/final/pre-b-roll-review.mp4"
+python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]); sys.path.insert(0,sys.argv[2]); import check_broll; check_broll.verify_plan(root/'work/b-roll/broll-plan.json',root/'work/timeline.json',root,Path(sys.argv[3]))" $ProjectRoot $BrollScripts $ReviewVideo
 ```
 
 It revalidates hashes and receipts, probes and decodes normalized clips, marks selected shots
 `verified`, and publishes first/middle/last stills, a contact sheet, a short boundary reel,
-and the summary. Inspect all of them. Check literal semantic match, entry/exit timing, speaker
-context, crop, logos, readable/unwanted text, visible jumps, and grade match. If any check
+and the summary. Inspect applicable artifacts using `reference/broll-rules.md`. If any check
 fails, fix the plan or selection and repeat review, normalization, and verification. Do not
 edit hash-bound verification artifacts in place.
 
@@ -267,10 +278,17 @@ and representative first/middle/last stills before declaring completion:
 ```powershell
 Start-Process "$ProjectRoot/final/final-video.mp4"
 Start-Process "$ProjectRoot/review/04-edit-compare/original-vs-final-source-time.mp4"
-Start-Process "$ProjectRoot/review/03-b-roll/contact-sheet.jpg"
-Start-Process "$ProjectRoot/review/03-b-roll/boundary-reel.mp4"
+$ContactSheet = "$ProjectRoot/review/03-b-roll/contact-sheet.jpg"
+$BoundaryReel = "$ProjectRoot/review/03-b-roll/boundary-reel.mp4"
+$Stills = "$ProjectRoot/review/03-b-roll/stills"
+if (Test-Path -LiteralPath $ContactSheet) { Start-Process $ContactSheet }
+if (Test-Path -LiteralPath $BoundaryReel) { Start-Process $BoundaryReel }
+if (Test-Path -LiteralPath $Stills) { Get-ChildItem $Stills -File | Select-Object -First 3 | ForEach-Object { Start-Process $_.FullName } }
 Get-Content "$ProjectRoot/review/03-b-roll/b-roll-summary.md"
 ```
+
+For an all-skipped no-op, only the summary, final delivery, and source-time comparison are
+required; contact sheets, boundary reels, and stills do not exist.
 
 Completion is blocked until these final-pixel and visual checks pass. Successful commands or
 machine validation alone are not a self-check.

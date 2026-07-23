@@ -51,13 +51,12 @@
 
 ## Interrupted Work
 
-- Rerun the provided Pexels downloader with the same candidate and destination only when its
-  configured byte bound and frozen response metadata still make range recovery safe. It owns
-  redirect/host/range validation, media probing, hashing, and atomic publication.
-- Never manually promote, rename, or delete a `.part` download. If it exceeds the bound, has
-  stale metadata, or cannot be validated or recovered by the script, preserve it, record the
-  failure honestly, and skip the candidate. Never publish its bytes or substitute a generic
-  clip.
+- After a transient HTTP or network failure, rerun the exact Pexels download command with the
+  same candidate and destination. The downloader owns Range, redirect/host, size, media, and
+  hash validation, cleanup, and atomic publication.
+- Never manually promote, rename, or delete a `.part` download. If the downloader declares
+  validation or recovery failure, record it honestly and skip the candidate. Never publish
+  partial bytes or substitute a generic clip.
 - Rerun the normalizer or verifier after interruption. Their durable lifecycle records and
   transactions determine what is reusable; do not manufacture `normalized` or `verified`
   states.
