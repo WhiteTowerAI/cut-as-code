@@ -127,6 +127,14 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             with self.subTest(value=value):
                 self.assertTrue(any(message in error for error in broll_plan.validate_plan(tampered, self.timeline, self.transcript)))
 
+    def test_approved_plan_with_nonstring_shot_id_returns_errors(self):
+        approved = broll_plan.apply_review(self.plan, self.review_for(self.plan, [{"id": "shot", "decision": "skip"}]), mode="agent", actor="agent", rationale="No useful footage.")
+        for shot_id in ([], 3):
+            malformed = copy.deepcopy(approved)
+            malformed["shots"][0]["id"] = shot_id
+            with self.subTest(shot_id=shot_id):
+                self.assertIn("shot id is required", broll_plan.validate_plan(malformed, self.timeline, self.transcript))
+
     def test_validate_plan_catches_stale_revisions_and_real_input_hashes(self):
         self.assertEqual([], broll_plan.validate_plan(self.plan, self.timeline, self.transcript, project=self.project, project_root=self.root))
         project = copy.deepcopy(self.project); project["operations"][1]["revision"] = 3

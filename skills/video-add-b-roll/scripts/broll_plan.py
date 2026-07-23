@@ -49,7 +49,7 @@ def review_subject(plan):
     for shot in value.get("shots", []):
         if isinstance(shot, dict) and shot.get("status") in {"planned", "candidates_ready", "selected", "normalized", "verified"}:
             shot["status"] = "reviewable"
-        elif isinstance(shot, dict) and shot.get("status") == "skipped" and shot.get("id") in decision_skipped_ids:
+        elif isinstance(shot, dict) and shot.get("status") == "skipped" and isinstance(shot.get("id"), str) and shot["id"] in decision_skipped_ids:
             shot["status"] = "reviewable"
     return value
 
@@ -77,7 +77,7 @@ def _review_errors(plan, shots):
     if mode == "human" and (decision.get("explicit_user_action") is not True or review.get("explicit_user_action") is not True):
         errors.append("human review requires explicit_user_action true")
     decision_skipped_ids = review.get("decision_skipped_shot_ids")
-    shot_statuses = {shot.get("id"): shot.get("status") for shot in shots if isinstance(shot, dict)}
+    shot_statuses = {shot["id"]: shot.get("status") for shot in shots if isinstance(shot, dict) and isinstance(shot.get("id"), str)}
     if not isinstance(decision_skipped_ids, list) or any(not isinstance(shot_id, str) for shot_id in decision_skipped_ids) or decision_skipped_ids != sorted(set(decision_skipped_ids)) or any(shot_statuses.get(shot_id) != "skipped" for shot_id in decision_skipped_ids):
         errors.append("decision_skipped_shot_ids must be sorted unique current skipped shot ids")
     if review.get("plan_sha256") != canonical_sha256(review_subject(plan)):
