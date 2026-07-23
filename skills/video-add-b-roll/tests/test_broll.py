@@ -215,5 +215,78 @@ class BrollPlanTests(unittest.TestCase):
                 broll_plan.apply_review(self.plan, self.review(), mode="agent", actor="agent", rationale="reason", interaction_path=self.root / "receipt.json")
         self.assertEqual(before, set(self.root.iterdir()))
 
+    def _registered_plan(self, *ranges):
+        plan = copy.deepcopy(self.plan)
+        original = plan["shots"][0]
+        plan["shots"] = []
+        for index, (start, end) in enumerate(ranges, 1):
+            shot = copy.deepcopy(original)
+            shot["id"] = f"shot-{index}"
+            shot["candidates"][0]["id"] = f"asset-{index}"
+            shot["program_range"] = {"start_s": start, "end_s": end}
+            shot["selected"] = None
+            shot["status"] = "candidates_ready"
+            plan["shots"].append(shot)
+        plan = broll_plan.apply_review(plan, {"review_id": "registered", "shots": [{"id": shot["id"], "decision": "select", "candidate_id": shot["candidates"][0]["id"], "source_trim": {"start_s": 0, "end_s": 1}} for shot in plan["shots"]]}, mode="agent", actor="agent", rationale="Relevant footage.")
+        for index, shot in enumerate(plan["shots"], 1):
+            shot["normalized"] = {"path": f"cache/b-roll/normalized/broll-{index:03d}.mp4", "sha256": "a" * 64}
+            shot["verification"] = {"status": "pass"}
+            shot["status"] = "verified"
+        return plan
+
+    def _registration_project(self, sequence=None):
+        return {
+            "active_sequence": "main",
+            "sequences": {"main": {"operations": sequence or ["cut", "color-grade", "content-cards", "captions"]}},
+            "operations": [
+                {"id": "understanding", "revision": 1}, {"id": "cut", "revision": 2},
+                {"id": "color-grade", "revision": 3}, {"id": "content-cards", "revision": 4},
+                {"id": "captions", "revision": 5},
+            ],
+            "render": {"status": "verified"},
+        }
+
+    def test_active_dependencies_validates_project_and_uses_active_sequence(self):
+        project = self._registration_project()
+        self.assertEqual(["understanding", "cut", "color-grade"], broll_plan.active_dependencies(project))
+        self.assertEqual(["understanding"], broll_plan.active_dependencies(self._registration_project(["content-cards"])))
+        for invalid in (None, {"active_sequence": "main", "sequences": {}, "operations": []}, {"active_sequence": "main", "sequences": {"main": {"operations": []}}, "operations": []}, {"active_sequence": "main", "sequences": {"main": {"operations": "cut"}}, "operations": [{"id": "understanding", "revision": 1}]}):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(ValueError): broll_plan.active_dependencies(invalid)
+
+    def test_register_operation_creates_verified_overlay_without_mutating_input(self):
+        project = self._registration_project(); before = copy.deepcopy(project)
+        result = broll_plan.register_operation(project, self._registered_plan((2.0, 4.5)))
+        operation = next(item for item in result["operations"] if item["id"] == "b-roll")
+        self.assertEqual(before, project)
+        self.assertEqual(["cut", "color-grade", "b-roll", "content-cards", "captions"], result["sequences"]["main"]["operations"])
+        self.assertEqual(["understanding", "cut", "color-grade"], operation["depends_on"])
+        self.assertEqual({"understanding": 1, "cut": 2, "color-grade": 3}, operation["based_on"])
+        self.assertEqual(("video-add-b-roll", 1, "verified"), (operation["skill"], operation["revision"], operation["status"]))
+        self.assertEqual(["cache/b-roll/normalized/broll-001.mp4"], operation["outputs"])
+        self.assertEqual({"kind": "overlay", "asset": "cache/b-roll/normalized/broll-001.mp4", "start_s": 2.0, "duration_s": 2.5}, operation["render"][0])
+        self.assertEqual("draft", result["render"]["status"])
+
+    def test_register_operation_requires_verified_approved_normalized_shots_and_orders_overlays(self):
+        project = self._registration_project(["cut", "unknown", "content-cards", "captions"])
+        result = broll_plan.register_operation(project, self._registered_plan((2, 3), (4, 5)))
+        self.assertEqual(["cut", "b-roll", "unknown", "content-cards", "captions"], result["sequences"]["main"]["operations"])
+        self.assertEqual(["cache/b-roll/normalized/broll-001.mp4", "cache/b-roll/normalized/broll-002.mp4"], [item["asset"] for item in next(item for item in result["operations"] if item["id"] == "b-roll")["render"]])
+        for change in (("status", "selected"), ("normalized", {"path": "../bad.mp4", "sha256": "a" * 64}), ("review.status", "draft")):
+            plan = self._registered_plan((2, 3))
+            if change[0] == "review.status": plan["review"]["status"] = change[1]
+            else: plan["shots"][0][change[0]] = change[1]
+            with self.subTest(change=change):
+                with self.assertRaises(ValueError): broll_plan.register_operation(project, plan)
+
+    def test_register_operation_removes_old_registration_for_no_selected_shots(self):
+        project = self._registration_project(["cut", "b-roll", "b-roll", "captions"])
+        project["operations"].extend([{"id": "b-roll", "revision": 7}, {"id": "b-roll", "revision": 6}])
+        plan = self._registered_plan((2, 3)); plan["shots"][0].update({"status": "skipped", "selected": None})
+        result = broll_plan.register_operation(project, plan)
+        self.assertNotIn("b-roll", result["sequences"]["main"]["operations"])
+        self.assertFalse(any(item.get("id") == "b-roll" for item in result["operations"]))
+        self.assertEqual("draft", result["render"]["status"])
+
 
 if __name__ == "__main__": unittest.main()

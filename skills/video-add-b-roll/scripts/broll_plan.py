@@ -150,6 +150,114 @@ def _candidate_path(root, value):
     return candidate
 
 
+def _project_parts(project):
+    if not isinstance(project, dict):
+        raise ValueError("project must be an object")
+    active = project.get("active_sequence")
+    sequences, operations = project.get("sequences"), project.get("operations")
+    if not isinstance(active, str) or not active.strip() or not isinstance(sequences, dict):
+        raise ValueError("project active sequence is invalid")
+    sequence = sequences.get(active)
+    if not isinstance(sequence, dict) or not isinstance(sequence.get("operations"), list):
+        raise ValueError("project active sequence operations must be a list")
+    if not isinstance(operations, list) or any(not isinstance(item, dict) for item in operations):
+        raise ValueError("project operations must be a list of objects")
+    nodes = {}
+    for item in operations:
+        operation_id, revision = item.get("id"), item.get("revision")
+        if not isinstance(operation_id, str) or not operation_id.strip() or operation_id in nodes:
+            raise ValueError("project operation ids must be unique nonblank strings")
+        if not isinstance(revision, int) or isinstance(revision, bool):
+            raise ValueError(f"project operation {operation_id} revision must be an integer")
+        nodes[operation_id] = item
+    if any(not isinstance(item, str) or not item.strip() for item in sequence["operations"]):
+        raise ValueError("project active sequence operation ids must be nonblank strings")
+    return sequence, nodes
+
+
+def active_dependencies(project):
+    """Return the current evidence and active picture-operation dependencies."""
+    sequence, nodes = _project_parts(project)
+    if "understanding" not in nodes:
+        raise ValueError("project understanding operation is required")
+    return ["understanding", *[operation_id for operation_id in ("cut", "color-grade") if operation_id in sequence["operations"] and operation_id in nodes]]
+
+
+def _verified_overlays(plan):
+    if not isinstance(plan, dict) or not isinstance(plan.get("shots"), list):
+        raise ValueError("plan shots must be a list")
+    if any(not isinstance(shot, dict) for shot in plan["shots"]):
+        raise ValueError("plan shots must be objects")
+    selected = [shot for shot in plan["shots"] if isinstance(shot, dict) and shot.get("status") != "skipped"]
+    if not selected:
+        return []
+    errors = _review_errors(plan, plan["shots"])
+    if errors:
+        raise ValueError("; ".join(errors))
+    overlays = []
+    for shot in selected:
+        if shot.get("status") != "verified":
+            raise ValueError("selected shots must be verified")
+        selection = shot.get("selected")
+        candidate = next((item for item in shot.get("candidates", []) if isinstance(item, dict) and isinstance(selection, dict) and item.get("id") == selection.get("candidate_id")), None)
+        if candidate is None:
+            raise ValueError("verified shot selected candidate is invalid")
+        normalized = shot.get("normalized")
+        program = _range(shot.get("program_range"))
+        if not isinstance(normalized, dict) or not isinstance(normalized.get("path"), str) or not normalized["path"].strip() or _candidate_path(Path(".").resolve(), normalized["path"]) is None:
+            raise ValueError("verified shot normalized path is invalid")
+        digest = normalized.get("sha256")
+        if not isinstance(digest, str) or len(digest) != 64 or any(char not in "0123456789abcdefABCDEF" for char in digest):
+            raise ValueError("verified shot normalized SHA-256 is invalid")
+        if "source_path" in normalized and normalized["source_path"] != candidate.get("cache_path"):
+            raise ValueError("verified shot normalized source path does not match selected candidate")
+        if not program or program[1] <= program[0]:
+            raise ValueError("verified shot program range is invalid")
+        overlays.append({"kind": "overlay", "asset": normalized["path"], "start_s": program[0], "duration_s": program[1] - program[0]})
+    if overlays != sorted(overlays, key=lambda item: item["start_s"]):
+        raise ValueError("verified shots must be chronological")
+    return overlays
+
+
+def register_operation(project, plan, *, plan_path="b-roll/broll-plan.json", report_path="../review/03-b-roll/b-roll-summary.md"):
+    """Replace the active sequence's B-roll overlay operation from verified shots."""
+    result = copy.deepcopy(project)
+    if not isinstance(result, dict) or not isinstance(result.get("operations"), list):
+        raise ValueError("project operations must be a list of objects")
+    old = [item for item in result["operations"] if item.get("id") == "b-roll"]
+    result["operations"] = [item for item in result["operations"] if item.get("id") != "b-roll"]
+    if isinstance(result.get("sequences"), dict) and isinstance(result.get("active_sequence"), str) and isinstance(result["sequences"].get(result["active_sequence"]), dict):
+        sequence_ids = result["sequences"][result["active_sequence"]].get("operations")
+        if isinstance(sequence_ids, list):
+            result["sequences"][result["active_sequence"]]["operations"] = [item for item in sequence_ids if item != "b-roll"]
+    sequence, nodes = _project_parts(result)
+    dependencies = active_dependencies(result)
+    overlays = _verified_overlays(plan)
+    if not overlays:
+        if old:
+            result.setdefault("render", {})["status"] = "draft"
+        return result
+    revision = max((item.get("revision", 0) for item in old), default=0) + 1
+    operation = {
+        "id": "b-roll", "skill": "video-add-b-roll", "revision": revision,
+        "depends_on": dependencies, "based_on": {item: nodes[item]["revision"] for item in dependencies},
+        "status": "verified", "plan": plan_path, "outputs": [item["asset"] for item in overlays],
+        "target": {"sequence": result["active_sequence"], "scope": "b-roll"},
+        "effects": {"changes_timeline": False, "changes_geometry": False, "changes_video_pixels": True, "changes_audio": False, "adds_track": "b-roll"},
+        "check": {"status": "pass", "report": report_path}, "render": overlays,
+    }
+    result["operations"].append(operation)
+    ids = sequence["operations"]
+    anchors = [index for index, item in enumerate(ids) if item in {"cut", "color-grade"}]
+    if anchors:
+        index = anchors[-1] + 1
+    else:
+        index = next((index for index, item in enumerate(ids) if item in {"content-cards", "captions"}), len(ids))
+    ids.insert(index, "b-roll")
+    result.setdefault("render", {})["status"] = "draft"
+    return result
+
+
 def validate_plan(plan, timeline, transcript, project=None, project_root=None, verify_files=False):
     """Return ordinary schema and freshness errors without throwing."""
     errors = []
