@@ -24,6 +24,7 @@ import projectlib
 import pexels
 import build_review_page
 import normalize_broll
+import check_broll
 
 
 class _BrollFixture:
@@ -1982,6 +1983,25 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
         }
         return candidate, shot
 
+    def _review_video(self):
+        path = self.root / "final/review.mp4"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        subprocess.run([
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-f", "lavfi", "-i", "color=blue:size=96x54:rate=30000/1001",
+            "-t", "10", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(path),
+        ], check=True, capture_output=True)
+        return path
+
+    def _normalized_for_check(self):
+        video = self._review_video()
+        plan = copy.deepcopy(self.base_plan)
+        plan["input_hashes"]["review_video_sha256"] = broll_plan.sha256_file(video)
+        projectlib.write_json(self.plan_path, self._approve(plan))
+        return video, normalize_broll.normalize_plan(
+            self.plan_path, self.timeline_path, self.root, lut=self.selected_lut_path
+        )
+
     def test_normalizes_video_to_dimensions_fps_duration_and_no_audio(self):
         candidate, shot = self._video_shot(self._video())
         record = normalize_broll.normalize_shot(candidate, shot, self.timeline, self.output)
@@ -2277,6 +2297,137 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
         candidate, shot = self._video_shot(self.candidates / "source.mp4")
         record = normalize_broll.normalize_shot(candidate, shot, timeline, self.output)
         self.assertEqual({"num": 30000, "den": 1001}, record["probe"]["fps"])
+
+    def test_checker_rejects_bad_hash_audio_short_duration_and_stale_receipt(self):
+        video, normalized = self._normalized_for_check()
+        original_output = self.output.read_bytes()
+        review_dir = self.root / "review/03-b-roll"
+        cases = []
+
+        bad_hash = copy.deepcopy(normalized)
+        bad_hash["shots"][0]["normalized"]["sha256"] = "0" * 64
+        cases.append(("hash", bad_hash, None, "SHA-256"))
+
+        audio = copy.deepcopy(normalized)
+        cases.append(("audio", audio, [
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-f", "lavfi", "-i", "testsrc2=size=96x54:rate=30000/1001",
+            "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000",
+            "-t", "1", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac",
+            "-shortest", str(self.output),
+        ], "non-video streams"))
+
+        short = copy.deepcopy(normalized)
+        cases.append(("short", short, [
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-f", "lavfi", "-i", "testsrc2=size=96x54:rate=30000/1001",
+            "-t", "0.8", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(self.output),
+        ], "duration"))
+
+        stale = copy.deepcopy(normalized)
+        stale["review"]["plan_sha256"] = "0" * 64
+        cases.append(("receipt", stale, None, "review plan SHA-256"))
+
+        for name, plan, render, message in cases:
+            with self.subTest(name=name):
+                self.output.write_bytes(original_output)
+                if render:
+                    subprocess.run(render, check=True, capture_output=True)
+                    plan["shots"][0]["normalized"]["sha256"] = broll_plan.sha256_file(self.output)
+                    plan["shots"][0]["normalized"]["probe"] = normalize_broll._probe(self.output)
+                projectlib.write_json(self.plan_path, plan)
+                canonical = self.plan_path.read_bytes()
+                with self.assertRaisesRegex(ValueError, message):
+                    check_broll.verify_plan(self.plan_path, self.timeline_path, self.root, video)
+                self.assertEqual(canonical, self.plan_path.read_bytes())
+                self.assertEqual("normalized", projectlib.load_json(self.plan_path)["shots"][0]["status"])
+                self.assertFalse(review_dir.exists())
+
+    def test_checker_writes_three_stills_contact_sheet_boundary_reel_and_summary(self):
+        video, normalized = self._normalized_for_check()
+        immutable = self.root / "review/03-b-roll/index.html"
+        immutable.parent.mkdir(parents=True)
+        immutable.write_text("review page", encoding="utf-8")
+        updated, artifacts = check_broll.verify_plan(
+            self.plan_path, self.timeline_path, self.root, video
+        )
+
+        self.assertEqual("verified", updated["shots"][0]["status"])
+        self.assertEqual(updated, projectlib.load_json(self.plan_path))
+        verification = updated["shots"][0]["verification"]
+        self.assertEqual("pass", verification["status"])
+        self.assertEqual(normalized["shots"][0]["normalized"]["sha256"], verification["normalized_sha256"])
+
+        stills = [Path(path) for path in artifacts["stills"]]
+        self.assertEqual(3, len(stills))
+        for label, path in zip(("first", "middle", "last"), stills):
+            with Image.open(path) as image:
+                image.load()
+                self.assertEqual((96, 54), image.size)
+            binding = verification["stills"][label]
+            self.assertEqual(path.relative_to(self.root).as_posix(), binding["path"])
+            self.assertEqual(broll_plan.sha256_file(path), binding["sha256"])
+
+        contact_sheet = Path(artifacts["contact_sheet"])
+        with Image.open(contact_sheet) as image:
+            image.load()
+            self.assertEqual("JPEG", image.format)
+            self.assertGreater(image.width, 96 * 3)
+            self.assertGreater(image.height, 54)
+
+        boundary_reel = Path(artifacts["boundary_reel"])
+        reel_probe = normalize_broll._probe(boundary_reel)
+        self.assertEqual(("h264", "yuv420p", False), (
+            reel_probe["codec"], reel_probe["pix_fmt"], reel_probe["has_audio"]
+        ))
+        reel_frames = self.root / "reel-frames"
+        reel_frames.mkdir()
+        subprocess.run([
+            "ffmpeg", "-y", "-loglevel", "error", "-i", str(boundary_reel),
+            str(reel_frames / "%03d.png"),
+        ], check=True, capture_output=True)
+        varied = False
+        for path in reel_frames.iterdir():
+            with Image.open(path) as image:
+                varied |= max(channel[1] - channel[0] for channel in image.convert("RGB").getextrema()) > 40
+        self.assertTrue(varied, "boundary reel must include composited B-roll, not only the solid base video")
+
+        summary = Path(artifacts["summary"])
+        text = summary.read_text(encoding="utf-8")
+        for value in (
+            normalized["timeline_id"], normalized["review"]["review_id"],
+            normalized["shots"][0]["normalized"]["sha256"], "semantic fit",
+            "unwanted logos/text", "jump cuts", "boundaries", "grade match",
+        ):
+            self.assertIn(value, text)
+        for name, path in (("contact_sheet", contact_sheet), ("boundary_reel", boundary_reel), ("report", summary)):
+            binding = verification[name]
+            self.assertEqual(path.relative_to(self.root).as_posix(), binding["path"])
+            self.assertEqual(broll_plan.sha256_file(path), binding["sha256"])
+
+        hashes = {name: broll_plan.sha256_file(path) for name, path in artifacts.items() if name != "stills"}
+        hashes["stills"] = [broll_plan.sha256_file(path) for path in stills]
+        rerun, rerun_artifacts = check_broll.verify_plan(self.plan_path, self.timeline_path, self.root, video)
+        self.assertEqual(updated, rerun)
+        self.assertEqual(hashes, {
+            **{name: broll_plan.sha256_file(path) for name, path in rerun_artifacts.items() if name != "stills"},
+            "stills": [broll_plan.sha256_file(path) for path in rerun_artifacts["stills"]],
+        })
+        self.assertEqual("review page", immutable.read_text(encoding="utf-8"))
+
+        projectlib.write_json(self.plan_path, normalized)
+        canonical = self.plan_path.read_bytes()
+        with mock.patch.object(check_broll.projectlib, "write_json", side_effect=OSError("disk full")):
+            with self.assertRaisesRegex(OSError, "disk full"):
+                check_broll.verify_plan(self.plan_path, self.timeline_path, self.root, video)
+        self.assertEqual(canonical, self.plan_path.read_bytes())
+        self.assertEqual(hashes, {
+            **{name: broll_plan.sha256_file(path) for name, path in artifacts.items() if name != "stills"},
+            "stills": [broll_plan.sha256_file(path) for path in stills],
+        })
+        self.assertEqual("review page", immutable.read_text(encoding="utf-8"))
+        self.assertFalse((self.root / "review/.03-b-roll.check.part").exists())
+        self.assertFalse((self.root / "review/.03-b-roll.check.backup").exists())
 
 
 class AcquisitionTests(unittest.TestCase):
