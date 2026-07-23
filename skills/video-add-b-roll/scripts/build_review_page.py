@@ -4,6 +4,7 @@ import argparse
 import base64
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -38,6 +39,20 @@ def _extract_frame(video, time_s, output):
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-ss", f"{time_s:.6f}", "-i", str(video), "-frames:v", "1", "-vf", "scale=960:-2", "-q:v", "2", str(output)], check=True, capture_output=True)
 
 
+def _probe_video(video):
+    try:
+        result = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=index:format=duration", "-of", "json", str(video)], check=True, capture_output=True, text=True)
+        payload = json.loads(result.stdout)
+        duration = float(payload.get("format", {}).get("duration"))
+    except (subprocess.CalledProcessError, json.JSONDecodeError, AttributeError, TypeError, ValueError) as error:
+        raise ValueError("review video duration is invalid") from error
+    if not isinstance(payload.get("streams"), list) or not payload["streams"]:
+        raise ValueError("review video has no video stream")
+    if not math.isfinite(duration) or duration <= 0:
+        raise ValueError("review video duration is invalid")
+    return duration
+
+
 def _validate_jpeg(path):
     try:
         with Image.open(path) as image:
@@ -54,20 +69,24 @@ def _review_id(value):
         raise ValueError("review_id must be a UUID") from error
 
 
-def _payload(plan, timeline, root, assets_dir):
+def _payload(plan, root, assets_dir):
     payload_shots = []
-    for shot in plan["shots"]:
+    candidate_specs = []
+    for shot_index, shot in enumerate(plan["shots"], 1):
         if shot["status"] == "skipped":
             continue
         frame = assets_dir / f"frame-{len(payload_shots) + 1:03d}.jpg"
         candidates = []
-        for candidate in shot["candidates"]:
+        for candidate_index, candidate in enumerate(shot["candidates"], 1):
             path = broll_plan._candidate_path(root, candidate["cache_path"])
             if path is None or not path.is_file():
                 raise ValueError(f"{shot['id']} candidate path escapes project root")
-            candidates.append({"id": candidate["id"], "media_type": candidate["media_type"], "path": os.path.relpath(path, assets_dir.parent).replace("\\", "/"), "sha256": candidate["sha256"], "duration_s": candidate.get("duration_s") or candidate.get("probe", {}).get("duration_s") or float(shot["program_range"]["end_s"]) - float(shot["program_range"]["start_s"]), "provenance": candidate["provenance"]})
+            suffix = path.suffix.lower() if re.fullmatch(r"\.[a-zA-Z0-9]{1,8}", path.suffix) else ""
+            basename = f"candidate-{shot_index:03d}-{candidate_index:03d}{suffix}"
+            candidate_specs.append((path, basename, candidate["sha256"]))
+            candidates.append({"id": candidate["id"], "media_type": candidate["media_type"], "path": f"{assets_dir.name}/{basename}", "sha256": candidate["sha256"], "duration_s": candidate.get("duration_s") or candidate.get("probe", {}).get("duration_s") or float(shot["program_range"]["end_s"]) - float(shot["program_range"]["start_s"]), "provenance": candidate["provenance"]})
         payload_shots.append({"id": shot["id"], "program_range": shot["program_range"], "source_ranges": shot["source_ranges"], "transcript_evidence": shot["transcript_evidence"], "editorial_reason": shot["editorial_reason"], "visual_intent": shot["visual_intent"], "queries": shot["queries"], "source_frame": {"path": f"{assets_dir.name}/{frame.name}", "sha256": None}, "candidates": candidates})
-    return payload_shots
+    return payload_shots, candidate_specs
 
 
 def _write_alias(page, alias):
@@ -85,6 +104,8 @@ def build_review_page(plan, timeline, transcript, video, output_dir, *, project_
     review_root = root / "review" / "03-b-roll"
     if not _inside(review_root, output_dir):
         raise ValueError("output_dir must be inside project_root/review/03-b-roll")
+    if not _inside(root, video):
+        raise ValueError("review video must resolve inside project_root")
     if not video.is_file():
         raise FileNotFoundError(f"review source video not found: {video}")
     timeline_errors = projectlib.validate_timeline(timeline)
@@ -93,6 +114,15 @@ def build_review_page(plan, timeline, transcript, video, output_dir, *, project_
     errors = broll_plan.validate_plan(plan, timeline, transcript, project_root=root, verify_files=True)
     if errors:
         raise ValueError("invalid plan: " + "; ".join(errors))
+    expected_video_hash = plan.get("input_hashes", {}).get("review_video_sha256")
+    if not isinstance(expected_video_hash, str) or len(expected_video_hash) != 64 or any(char not in "0123456789abcdefABCDEF" for char in expected_video_hash):
+        raise ValueError("plan review video SHA-256 is invalid")
+    if _hash(video) != expected_video_hash:
+        raise ValueError("review video SHA-256 does not match plan")
+    duration = _probe_video(video)
+    fps = timeline["fps"]
+    if abs(duration - float(timeline["program_duration_s"])) > float(fps["den"]) / float(fps["num"]):
+        raise ValueError("review video duration does not match timeline")
     if not TEMPLATE_PATH.is_file():
         raise FileNotFoundError(f"review template not found: {TEMPLATE_PATH}")
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
@@ -102,13 +132,21 @@ def build_review_page(plan, timeline, transcript, video, output_dir, *, project_
     page, assets_dir = output_dir / f"b-roll-review-{identifier}.html", output_dir / f"b-roll-review-{identifier}-assets"
     if page.exists() or assets_dir.exists():
         raise FileExistsError(f"review publication already exists: {identifier}")
-    shots = _payload(plan, timeline, root, assets_dir)
+    shots, candidate_specs = _payload(plan, root, assets_dir)
     output_dir.parent.mkdir(parents=True, exist_ok=True)
     try:
         with tempfile.TemporaryDirectory(dir=output_dir.parent, prefix=f".{output_dir.name}-") as temporary:
             stage = Path(temporary)
             staged_assets = stage / assets_dir.name
             staged_assets.mkdir()
+            for source, basename, digest in candidate_specs:
+                frozen = staged_assets / basename
+                try:
+                    os.link(source, frozen)
+                except OSError:
+                    shutil.copyfile(source, frozen)
+                if _hash(frozen) != digest:
+                    raise ValueError(f"candidate SHA-256 changed during review publication: {source}")
             for index, shot in enumerate(shots, 1):
                 frame = staged_assets / f"frame-{index:03d}.jpg"
                 program = shot["program_range"]
@@ -116,7 +154,7 @@ def build_review_page(plan, timeline, transcript, video, output_dir, *, project_
                 _validate_jpeg(frame)
                 shot["source_frame"]["sha256"] = _hash(frame)
             subject_hash = broll_plan.canonical_sha256(broll_plan.review_subject(plan))
-            payload = {"review_id": identifier, "plan_sha256": subject_hash, "plan_subject_sha256": subject_hash, "candidate_manifest_sha256": broll_plan.canonical_sha256(broll_plan.candidate_manifest(plan)), "decision_modes": ["human", "agent"], "shots": shots}
+            payload = {"review_id": identifier, "plan_sha256": subject_hash, "plan_subject_sha256": subject_hash, "candidate_manifest_sha256": broll_plan.canonical_sha256(broll_plan.candidate_manifest(plan)), "review_video_sha256": expected_video_hash, "decision_modes": ["human", "agent"], "shots": shots}
             document = template.replace(PAYLOAD_MARKER, base64.b64encode(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")).decode("ascii"))
             staged_page = stage / page.name
             staged_page.write_text(document, encoding="utf-8")

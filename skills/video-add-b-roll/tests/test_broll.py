@@ -23,7 +23,7 @@ import pexels
 import build_review_page
 
 
-class BrollPlanTests(unittest.TestCase):
+class _BrollFixture:
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
@@ -39,13 +39,19 @@ class BrollPlanTests(unittest.TestCase):
         asset.write_bytes(b"asset")
         mapped = projectlib.map_transcript_to_timeline(self.transcript, self.timeline)["segments"][0]["words"][0]
         candidate = {"id": "asset", "media_type": "video", "cache_path": "cache/b-roll/factory.mp4", "sha256": broll_plan.sha256_file(asset), "provenance": {"source_type": "local", "creator": "me", "license": "owned", "retrieval_time": "2026-07-23T00:00:00Z", "original_path": "input/factory.mp4"}}
-        self.plan = {"schema_version": 1, "timeline_id": "main", "timebase": "program", "program_duration_s": 10.0, "dependencies": ["understanding", "cut", "color-grade"], "based_on": {"understanding": 1, "cut": 2, "color-grade": 3}, "input_hashes": {"transcript_sha256": broll_plan.sha256_file(self.transcript_path), "timeline_sha256": broll_plan.sha256_file(self.timeline_path)}, "brief": {"density": "selective"}, "decision": None, "review": None, "shots": [{"id": "shot", "program_range": {"start_s": 1.0, "end_s": 2.0}, "source_ranges": [{"clip_id": "one", "start_s": 1.0, "end_s": 2.0}], "transcript_evidence": {"words": [mapped]}, "editorial_reason": "Supports the statement.", "visual_intent": "Factory work.", "queries": ["factory assembly", "manufacturing line"], "candidates": [candidate], "selected": None, "status": "candidates_ready"}]}
+        self.plan = {"schema_version": 1, "timeline_id": "main", "timebase": "program", "program_duration_s": 10.0, "dependencies": ["understanding", "cut", "color-grade"], "based_on": {"understanding": 1, "cut": 2, "color-grade": 3}, "input_hashes": {"transcript_sha256": broll_plan.sha256_file(self.transcript_path), "timeline_sha256": broll_plan.sha256_file(self.timeline_path), "review_video_sha256": "b" * 64}, "brief": {"density": "selective"}, "decision": None, "review": None, "shots": [{"id": "shot", "program_range": {"start_s": 1.0, "end_s": 2.0}, "source_ranges": [{"clip_id": "one", "start_s": 1.0, "end_s": 2.0}], "transcript_evidence": {"words": [mapped]}, "editorial_reason": "Supports the statement.", "visual_intent": "Factory work.", "queries": ["factory assembly", "manufacturing line"], "candidates": [candidate], "selected": None, "status": "candidates_ready"}]}
         self.project = {"active_sequence": "main", "sequences": {"main": {"operations": ["cut", "color-grade"]}}, "operations": [{"id": "understanding", "revision": 1}, {"id": "cut", "revision": 2}, {"id": "color-grade", "revision": 3}]}
 
     def tearDown(self): self.temp.cleanup()
 
     def review(self, **extra):
-        return {"review_id": "review-1", "shots": [{"id": "shot", "decision": "select", "candidate_id": "asset", "source_trim": {"start_s": 0, "end_s": 1}}], **extra}
+        return self.review_for(self.plan, [{"id": "shot", "decision": "select", "candidate_id": "asset", "source_trim": {"start_s": 0, "end_s": 1}}], **extra)
+
+    def review_for(self, plan, shots, **extra):
+        return {"review_id": "review-1", "plan_sha256": broll_plan.canonical_sha256(broll_plan.review_subject(plan)), "candidate_manifest_sha256": broll_plan.canonical_sha256(broll_plan.candidate_manifest(plan)), "review_video_sha256": plan["input_hashes"]["review_video_sha256"], "shots": shots, **extra}
+
+
+class BrollPlanTests(_BrollFixture, unittest.TestCase):
 
     def test_rejects_invalid_overlapping_or_out_of_bounds_ranges(self):
         plan = copy.deepcopy(self.plan); duplicate = copy.deepcopy(plan["shots"][0]); duplicate["id"] = "second"; duplicate["program_range"] = {"start_s": 1.5, "end_s": 3}; plan["shots"].append(duplicate)
@@ -71,8 +77,25 @@ class BrollPlanTests(unittest.TestCase):
         self.assertEqual(broll_plan.canonical_sha256(broll_plan.review_subject(approved)), approved["review"]["plan_sha256"])
         self.assertEqual(broll_plan.canonical_sha256(broll_plan.candidate_manifest(approved)), approved["review"]["candidate_manifest_sha256"])
         self.assertEqual([approved["shots"][0]["candidates"][0]["sha256"]], approved["review"]["selected_asset_sha256"])
-        skipped = broll_plan.apply_review(self.plan, {"review_id": "skip", "shots": [{"id": "shot", "decision": "skip"}]}, mode="agent", actor="agent", rationale="No useful footage.")
+        self.assertEqual(self.plan["input_hashes"]["review_video_sha256"], approved["review"]["review_video_sha256"])
+        skipped = broll_plan.apply_review(self.plan, self.review_for(self.plan, [{"id": "shot", "decision": "skip"}], review_id="skip"), mode="agent", actor="agent", rationale="No useful footage.")
         self.assertEqual(("skipped", None), (skipped["shots"][0]["status"], skipped["shots"][0]["selected"]))
+
+    def test_apply_review_rejects_old_or_tampered_artifact_bindings(self):
+        for field in ("plan_sha256", "candidate_manifest_sha256", "review_video_sha256"):
+            for value in (None, "0" * 64):
+                review = self.review()
+                if value is None:
+                    review.pop(field)
+                else:
+                    review[field] = value
+                with self.subTest(field=field, value=value):
+                    with self.assertRaisesRegex(ValueError, field):
+                        broll_plan.apply_review(self.plan, review, mode="agent", actor="agent", rationale="Relevant footage.")
+        malformed = copy.deepcopy(self.plan)
+        malformed["input_hashes"] = None
+        with self.assertRaisesRegex(ValueError, "input_hashes"):
+            broll_plan.apply_review(malformed, self.review(), mode="agent", actor="agent", rationale="Relevant footage.")
 
     def test_validate_plan_catches_stale_revisions_and_real_input_hashes(self):
         self.assertEqual([], broll_plan.validate_plan(self.plan, self.timeline, self.transcript, project=self.project, project_root=self.root))
@@ -190,7 +213,7 @@ class BrollPlanTests(unittest.TestCase):
         invalid_mode = copy.deepcopy(approved); invalid_mode["decision"]["mode"] = invalid_mode["review"]["mode"] = "robot"; cases.append((invalid_mode, "review mode must be human or agent"))
         blank_actor = copy.deepcopy(approved); blank_actor["decision"]["actor"] = blank_actor["review"]["actor"] = " "; cases.append((blank_actor, "review actor is required"))
         missing_id = copy.deepcopy(approved); missing_id["review"].pop("review_id"); cases.append((missing_id, "review_id is required"))
-        for field, message in (("plan_sha256", "review plan SHA-256 does not match"), ("candidate_manifest_sha256", "review candidate manifest SHA-256 does not match"), ("selected_asset_sha256", "review selected asset hashes do not match")):
+        for field, message in (("plan_sha256", "review plan SHA-256 does not match"), ("candidate_manifest_sha256", "review candidate manifest SHA-256 does not match"), ("review_video_sha256", "review video SHA-256 does not match"), ("selected_asset_sha256", "review selected asset hashes do not match")):
             tampered = copy.deepcopy(approved); tampered["review"][field] = [] if field == "selected_asset_sha256" else "0" * 64; cases.append((tampered, message))
         for plan, message in cases:
             with self.subTest(message=message): self.assertIn(message, broll_plan.validate_plan(plan, self.timeline, self.transcript))
@@ -241,7 +264,7 @@ class BrollPlanTests(unittest.TestCase):
             shot["selected"] = None
             shot["status"] = "candidates_ready"
             plan["shots"].append(shot)
-        plan = broll_plan.apply_review(plan, {"review_id": "registered", "shots": [{"id": shot["id"], "decision": "select", "candidate_id": shot["candidates"][0]["id"], "source_trim": {"start_s": 0, "end_s": 1}} for shot in plan["shots"]]}, mode="agent", actor="agent", rationale="Relevant footage.")
+        plan = broll_plan.apply_review(plan, self.review_for(plan, [{"id": shot["id"], "decision": "select", "candidate_id": shot["candidates"][0]["id"], "source_trim": {"start_s": 0, "end_s": 1}} for shot in plan["shots"]], review_id="registered"), mode="agent", actor="agent", rationale="Relevant footage.")
         for index, shot in enumerate(plan["shots"], 1):
             shot["normalized"] = {"path": f"cache/b-roll/normalized/broll-{index:03d}.mp4", "sha256": "a" * 64}
             shot["verification"] = {"status": "pass"}
@@ -343,13 +366,18 @@ class BrollPlanTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "positive integer"): broll_plan.active_dependencies(project)
 
 
-class BrollReviewPageTests(BrollPlanTests):
+class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
     def setUp(self):
         super().setUp()
         self.review_dir = self.root / "review/03-b-roll"
         self.video = self.root / "final/current.mp4"
         self.video.parent.mkdir(parents=True)
         self.video.write_bytes(b"program")
+        self.plan["input_hashes"]["review_video_sha256"] = broll_plan.sha256_file(self.video)
+        self.real_probe_video = build_review_page._probe_video
+        self.probe = mock.patch.object(build_review_page, "_probe_video", return_value=10.0)
+        self.probe.start()
+        self.addCleanup(self.probe.stop)
 
     @staticmethod
     def _frame(video, time_s, output):
@@ -374,7 +402,12 @@ class BrollReviewPageTests(BrollPlanTests):
         self.assertEqual(review_id, payload["review_id"])
         self.assertEqual(f"b-roll-review-{review_id}-assets/frame-001.jpg", payload["shots"][0]["source_frame"]["path"])
         self.assertTrue((page.parent / payload["shots"][0]["source_frame"]["path"]).is_file())
-        self.assertEqual("../../work/cache/b-roll/factory.mp4", payload["shots"][0]["candidates"][0]["path"])
+        candidate_path = page.parent / payload["shots"][0]["candidates"][0]["path"]
+        self.assertEqual(result["assets_dir"], candidate_path.parent)
+        self.assertEqual(b"asset", candidate_path.read_bytes())
+        self.assertEqual(self.plan["input_hashes"]["review_video_sha256"], payload["review_video_sha256"])
+        for field in ("plan_sha256", "candidate_manifest_sha256", "review_video_sha256"):
+            self.assertIn(f"{field}:data.{field}", html)
         self.assertIn("type=\"radio\"", html)
         self.assertIn("textarea", html)
         self.assertIn("ken_burns", html)
@@ -392,6 +425,35 @@ class BrollReviewPageTests(BrollPlanTests):
         self.assertEqual(previous_bytes, original["page"].read_bytes())
         self.assertNotEqual(original["assets_dir"], next_review["assets_dir"])
 
+    def test_published_candidate_survives_live_cache_replacement(self):
+        review_id = "123e4567-e89b-12d3-a456-426614174003"
+        with mock.patch.object(build_review_page, "_extract_frame", side_effect=self._frame):
+            result = build_review_page.build_review_page(self.plan, self.timeline, self.transcript, self.video, self.review_dir, project_root=self.root, review_id=review_id)
+        payload = json.loads(base64.b64decode(build_review_page.PAYLOAD_RE.search(result["page"].read_text(encoding="utf-8")).group(1)))
+        frozen = result["page"].parent / payload["shots"][0]["candidates"][0]["path"]
+        live = self.root / "work/cache/b-roll/factory.mp4"
+        replacement = live.with_suffix(".replacement")
+        replacement.write_bytes(b"changed")
+        os.replace(replacement, live)
+        self.assertEqual(b"asset", frozen.read_bytes())
+
+    def test_build_review_page_rejects_video_path_hash_and_duration_before_frames(self):
+        outside = self.root.parent / f"{self.root.name}-outside.mp4"
+        outside.write_bytes(b"program")
+        self.addCleanup(outside.unlink, missing_ok=True)
+        cases = [(outside, self.plan, 10.0, "inside project_root"), (self.video, {**self.plan, "input_hashes": {**self.plan["input_hashes"], "review_video_sha256": "0" * 64}}, 10.0, "review video SHA-256"), (self.video, self.plan, 9.9, "duration")]
+        for video, plan, duration, message in cases:
+            with self.subTest(message=message), mock.patch.object(build_review_page, "_probe_video", return_value=duration), mock.patch.object(build_review_page, "_extract_frame") as extract:
+                with self.assertRaisesRegex((ValueError, FileNotFoundError), message):
+                    build_review_page.build_review_page(plan, self.timeline, self.transcript, video, self.review_dir, project_root=self.root)
+                extract.assert_not_called()
+
+    def test_probe_video_requires_video_stream_and_positive_finite_duration(self):
+        for payload in ([], {"streams": "invalid", "format": {"duration": "10"}}, {"streams": [], "format": {"duration": "10"}}, {"streams": [{"index": 0}], "format": {"duration": "nan"}}, {"streams": [{"index": 0}], "format": {"duration": "0"}}):
+            with self.subTest(payload=payload), mock.patch.object(build_review_page.subprocess, "run", return_value=mock.Mock(stdout=json.dumps(payload))):
+                with self.assertRaisesRegex(ValueError, "video|duration"):
+                    self.real_probe_video(self.video)
+
     def test_review_jpeg_requires_exact_review_width(self):
         wrong = self.root / "wrong.jpg"
         Image.new("RGB", (959, 540), "white").save(wrong, "JPEG")
@@ -403,6 +465,18 @@ class BrollReviewPageTests(BrollPlanTests):
         self.assertNotIn("路", template)
         for text in ("Number.isFinite(start)", "end>start", "end>duration", "ken_burns", "Select a Ken Burns direction", "Invalid video trim"):
             self.assertIn(text, template)
+        for text in ("&amp;", "&lt;", "&gt;", "&quot;", "&#39;", "@media(max-width:600px)", "overflow-wrap:anywhere"):
+            self.assertIn(text, template)
+
+    def test_quoted_ids_remain_only_encoded_data(self):
+        plan = copy.deepcopy(self.plan)
+        plan["shots"][0]["id"] = 'shot" onmouseover="evil'
+        plan["shots"][0]["candidates"][0]["id"] = "asset' onerror='evil"
+        with mock.patch.object(build_review_page, "_extract_frame", side_effect=self._frame):
+            result = build_review_page.build_review_page(plan, self.timeline, self.transcript, self.video, self.review_dir, project_root=self.root)
+        html = result["page"].read_text(encoding="utf-8")
+        self.assertNotIn('onmouseover="evil', html)
+        self.assertNotIn("onerror='evil", html)
 
     def test_build_review_page_rejects_invalid_or_escaping_input_without_publication(self):
         invalid = copy.deepcopy(self.plan)

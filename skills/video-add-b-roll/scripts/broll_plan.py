@@ -34,7 +34,7 @@ def review_subject(plan):
 
     def clean(item):
         if isinstance(item, dict):
-            for key in ("review", "normalized", "verification"):
+            for key in ("decision", "review", "selected", "status", "normalized", "verification"):
                 item.pop(key, None)
             for child in item.values():
                 clean(child)
@@ -88,6 +88,8 @@ def _review_errors(plan, shots):
         if isinstance(candidate, dict) and isinstance(candidate.get("sha256"), str): selected_hashes.append(candidate["sha256"])
     if review.get("selected_asset_sha256") != sorted(set(selected_hashes)):
         errors.append("review selected asset hashes do not match")
+    if review.get("review_video_sha256") != plan.get("input_hashes", {}).get("review_video_sha256"):
+        errors.append("review video SHA-256 does not match")
     return errors
 
 
@@ -440,6 +442,19 @@ def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None)
     if not isinstance(rationale, str) or not rationale.strip(): raise ValueError("rationale is required")
     if mode == "human" and review.get("explicit_user_action") is not True: raise ValueError("human review requires explicit_user_action true")
     if not isinstance(review.get("review_id"), str) or not review["review_id"].strip(): raise ValueError("review_id is required")
+    input_hashes = plan.get("input_hashes")
+    if not isinstance(input_hashes, dict):
+        raise ValueError("plan input_hashes must be an object")
+    expected_bindings = {
+        "plan_sha256": canonical_sha256(review_subject(plan)),
+        "candidate_manifest_sha256": canonical_sha256(candidate_manifest(plan)),
+        "review_video_sha256": input_hashes.get("review_video_sha256"),
+    }
+    if not isinstance(expected_bindings["review_video_sha256"], str) or len(expected_bindings["review_video_sha256"]) != 64 or any(char not in "0123456789abcdefABCDEF" for char in expected_bindings["review_video_sha256"]):
+        raise ValueError("plan review_video_sha256 is invalid")
+    for field, expected in expected_bindings.items():
+        if review.get(field) != expected:
+            raise ValueError(f"{field} does not match current review artifacts")
     result, shots = copy.deepcopy(plan), {shot.get("id"): shot for shot in plan_shots}
     seen = set()
     for entry in entries:
@@ -463,7 +478,7 @@ def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None)
         shot["selected"], shot["status"] = {"candidate_id": candidate["id"], option: copy.deepcopy(entry[option])}, "selected"; selected_hashes.append(candidate["sha256"])
     result["decision"] = {"mode": mode, "actor": actor, "rationale": rationale}
     if mode == "human": result["decision"]["explicit_user_action"] = True
-    result["review"] = {"status": "approved", "review_id": review["review_id"], "mode": mode, "actor": actor, "rationale": rationale, "plan_sha256": canonical_sha256(review_subject(result)), "candidate_manifest_sha256": canonical_sha256(candidate_manifest(result)), "selected_asset_sha256": sorted(set(selected_hashes))}
+    result["review"] = {"status": "approved", "review_id": review["review_id"], "mode": mode, "actor": actor, "rationale": rationale, **expected_bindings, "selected_asset_sha256": sorted(set(selected_hashes))}
     if mode == "human": result["review"]["explicit_user_action"] = True
     if interaction_path:
         target = Path(interaction_path); target.parent.mkdir(parents=True, exist_ok=True)
