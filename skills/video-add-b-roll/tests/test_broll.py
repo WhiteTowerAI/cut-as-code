@@ -30,16 +30,16 @@ class _BrollFixture:
         (self.root / "work/cache/b-roll").mkdir(parents=True)
         (self.root / "work/understand").mkdir()
         self.timeline = {"schema_version": 1, "timeline_id": "main", "source_duration_s": 10.0, "program_duration_s": 10.0, "fps": {"num": 30, "den": 1}, "clips": [{"id": "one", "source_range": {"start_s": 0, "end_s": 10}, "program_range": {"start_s": 0, "end_s": 10}, "speed": 1.0, "decision_ref": "keep"}]}
-        self.transcript = {"segments": [{"words": [{"word": "factory", "start": 1.0, "end": 2.0}]}]}
+        self.transcript = {"segments": [{"words": [{"word": "factory", "start": 1.0, "end": 2.0}, {"word": "process", "start": 2.0, "end": 3.0}, {"word": "output", "start": 3.0, "end": 4.0}, {"word": "quality", "start": 4.0, "end": 5.0}]}]}
         self.timeline_path = self.root / "work/timeline.json"
         self.transcript_path = self.root / "work/understand/transcript.json"
         projectlib.write_json(self.timeline_path, self.timeline)
         projectlib.write_json(self.transcript_path, self.transcript)
         asset = self.root / "work/cache/b-roll/factory.mp4"
         asset.write_bytes(b"asset")
-        mapped = projectlib.map_transcript_to_timeline(self.transcript, self.timeline)["segments"][0]["words"][0]
+        self.mapped_words = projectlib.map_transcript_to_timeline(self.transcript, self.timeline)["segments"][0]["words"]
         candidate = {"id": "asset", "media_type": "video", "cache_path": "cache/b-roll/factory.mp4", "sha256": broll_plan.sha256_file(asset), "provenance": {"source_type": "local", "creator": "me", "license": "owned", "retrieval_time": "2026-07-23T00:00:00Z", "original_path": "input/factory.mp4"}}
-        self.plan = {"schema_version": 1, "timeline_id": "main", "timebase": "program", "program_duration_s": 10.0, "dependencies": ["understanding", "cut", "color-grade"], "based_on": {"understanding": 1, "cut": 2, "color-grade": 3}, "input_hashes": {"transcript_sha256": broll_plan.sha256_file(self.transcript_path), "timeline_sha256": broll_plan.sha256_file(self.timeline_path), "review_video_sha256": "b" * 64}, "brief": {"density": "selective"}, "decision": None, "review": None, "shots": [{"id": "shot", "program_range": {"start_s": 1.0, "end_s": 2.0}, "source_ranges": [{"clip_id": "one", "start_s": 1.0, "end_s": 2.0}], "transcript_evidence": {"words": [mapped]}, "editorial_reason": "Supports the statement.", "visual_intent": "Factory work.", "queries": ["factory assembly", "manufacturing line"], "candidates": [candidate], "selected": None, "status": "candidates_ready"}]}
+        self.plan = {"schema_version": 1, "timeline_id": "main", "timebase": "program", "program_duration_s": 10.0, "dependencies": ["understanding", "cut", "color-grade"], "based_on": {"understanding": 1, "cut": 2, "color-grade": 3}, "input_hashes": {"transcript_sha256": broll_plan.sha256_file(self.transcript_path), "timeline_sha256": broll_plan.sha256_file(self.timeline_path), "review_video_sha256": "b" * 64}, "brief": {"density": "selective"}, "decision": None, "review": None, "shots": [{"id": "shot", "program_range": {"start_s": 1.0, "end_s": 2.0}, "source_ranges": [{"clip_id": "one", "start_s": 1.0, "end_s": 2.0}], "transcript_evidence": {"words": [self.mapped_words[0]]}, "editorial_reason": "Supports the statement.", "visual_intent": "Factory work.", "queries": ["factory assembly", "manufacturing line"], "candidates": [candidate], "selected": None, "status": "candidates_ready"}]}
         self.project = {"active_sequence": "main", "sequences": {"main": {"operations": ["cut", "color-grade"]}}, "operations": [{"id": "understanding", "revision": 1}, {"id": "cut", "revision": 2}, {"id": "color-grade", "revision": 3}]}
 
     def tearDown(self): self.temp.cleanup()
@@ -48,7 +48,7 @@ class _BrollFixture:
         return self.review_for(self.plan, [{"id": "shot", "decision": "select", "candidate_id": "asset", "source_trim": {"start_s": 0, "end_s": 1}}], **extra)
 
     def review_for(self, plan, shots, rationale="Relevant footage.", timestamp="2026-07-23T12:00:00Z", **extra):
-        return {"review_id": "review-1", "plan_sha256": broll_plan.canonical_sha256(broll_plan.review_subject(plan)), "candidate_manifest_sha256": broll_plan.canonical_sha256(broll_plan.candidate_manifest(plan)), "review_video_sha256": plan["input_hashes"]["review_video_sha256"], "rationale": rationale, "timestamp": timestamp, "shots": shots, **extra}
+        return {"review_id": "123e4567-e89b-12d3-a456-426614174000", "plan_sha256": broll_plan.canonical_sha256(broll_plan.review_subject(plan)), "candidate_manifest_sha256": broll_plan.canonical_sha256(broll_plan.candidate_manifest(plan)), "review_video_sha256": plan["input_hashes"]["review_video_sha256"], "rationale": rationale, "timestamp": timestamp, "shots": shots, **extra}
 
 
 class BrollPlanTests(_BrollFixture, unittest.TestCase):
@@ -78,7 +78,7 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         self.assertEqual(broll_plan.canonical_sha256(broll_plan.candidate_manifest(approved)), approved["review"]["candidate_manifest_sha256"])
         self.assertEqual([approved["shots"][0]["candidates"][0]["sha256"]], approved["review"]["selected_asset_sha256"])
         self.assertEqual(self.plan["input_hashes"]["review_video_sha256"], approved["review"]["review_video_sha256"])
-        skipped = broll_plan.apply_review(self.plan, self.review_for(self.plan, [{"id": "shot", "decision": "skip"}], rationale="No useful footage.", review_id="skip"), mode="agent", actor="agent", rationale="No useful footage.")
+        skipped = broll_plan.apply_review(self.plan, self.review_for(self.plan, [{"id": "shot", "decision": "skip"}], rationale="No useful footage.", review_id="123e4567-e89b-12d3-a456-426614174010"), mode="agent", actor="agent", rationale="No useful footage.")
         self.assertEqual(("skipped", None), (skipped["shots"][0]["status"], skipped["shots"][0]["selected"]))
         self.assertEqual(["shot"], skipped["review"]["decision_skipped_shot_ids"])
         self.assertEqual([], broll_plan.validate_plan(skipped, self.timeline, self.transcript))
@@ -97,10 +97,82 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         image["shots"][0]["selected"]["ken_burns"]["direction"] = "pan-left"
         self.assertIn("review decisions do not match current plan", broll_plan.validate_plan(image, self.timeline, self.transcript))
 
+    def test_review_id_must_be_a_uuid_when_applied_or_persisted(self):
+        review = self.review(review_id="review-1")
+        with self.assertRaisesRegex(ValueError, "review_id must be a UUID"):
+            broll_plan.apply_review(self.plan, review, mode="agent", actor="agent", rationale="Relevant footage.")
+
+        approved = broll_plan.apply_review(self.plan, self.review(), mode="agent", actor="agent", rationale="Relevant footage.")
+        approved["review"]["review_id"] = "review-1"
+        self.assertIn("review_id must be a UUID", broll_plan.validate_plan(approved, self.timeline, self.transcript))
+
+    def test_apply_review_rejects_invalid_video_trim_without_null_decisions(self):
+        missing = object()
+        cases = [
+            missing,
+            None,
+            [],
+            {},
+            {"start_s": -0.1, "end_s": 1},
+            {"start_s": 1, "end_s": 1},
+            {"start_s": 2, "end_s": 1},
+            {"start_s": "bad", "end_s": 1},
+            {"start_s": 0, "end_s": float("nan")},
+            {"start_s": 0, "end_s": float("inf")},
+        ]
+        for value in cases:
+            plan = copy.deepcopy(self.plan)
+            plan["shots"][0]["candidates"][0]["duration_s"] = 2.0
+            entry = {"id": "shot", "decision": "select", "candidate_id": "asset"}
+            if value is not missing:
+                entry["source_trim"] = copy.deepcopy(value)
+            review = self.review_for(plan, [entry])
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ValueError, "shot select requires a valid source_trim"):
+                    broll_plan.apply_review(plan, review, mode="agent", actor="agent", rationale="Relevant footage.")
+
+        for duration_field in ("duration_s", "probe"):
+            plan = copy.deepcopy(self.plan)
+            if duration_field == "duration_s":
+                plan["shots"][0]["candidates"][0][duration_field] = 1.0
+            else:
+                plan["shots"][0]["candidates"][0][duration_field] = {"duration_s": 1.0}
+            review = self.review_for(plan, [{"id": "shot", "decision": "select", "candidate_id": "asset", "source_trim": {"start_s": 0, "end_s": 1.1}}])
+            with self.subTest(duration_field=duration_field):
+                with self.assertRaisesRegex(ValueError, "shot select requires a valid source_trim"):
+                    broll_plan.apply_review(plan, review, mode="agent", actor="agent", rationale="Relevant footage.")
+
+    def test_apply_review_rejects_invalid_image_motion_without_null_decisions(self):
+        missing = object()
+        for value in (missing, None, [], {}, {"direction": None}, {"direction": []}, {"direction": "spin"}):
+            plan = copy.deepcopy(self.plan)
+            plan["shots"][0]["candidates"][0]["media_type"] = "image"
+            entry = {"id": "shot", "decision": "select", "candidate_id": "asset"}
+            if value is not missing:
+                entry["ken_burns"] = copy.deepcopy(value)
+            review = self.review_for(plan, [entry])
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ValueError, "shot select requires a valid ken_burns direction"):
+                    broll_plan.apply_review(plan, review, mode="agent", actor="agent", rationale="Relevant footage.")
+
+    def test_every_valid_selected_media_control_immediately_validates(self):
+        plan = copy.deepcopy(self.plan)
+        plan["shots"][0]["candidates"][0].update({"duration_s": 2.0, "probe": {"duration_s": 2.0}})
+        video = broll_plan.apply_review(plan, self.review_for(plan, [{"id": "shot", "decision": "select", "candidate_id": "asset", "source_trim": {"start_s": 0, "end_s": 2}}]), mode="agent", actor="agent", rationale="Relevant footage.")
+        self.assertEqual([], broll_plan.validate_plan(video, self.timeline, self.transcript))
+
+        for direction in ("zoom-in", "pan-left", "pan-right"):
+            plan = copy.deepcopy(self.plan)
+            plan["shots"][0]["candidates"][0]["media_type"] = "image"
+            review = self.review_for(plan, [{"id": "shot", "decision": "select", "candidate_id": "asset", "ken_burns": {"direction": direction}}])
+            approved = broll_plan.apply_review(plan, review, mode="agent", actor="agent", rationale="Relevant footage.")
+            with self.subTest(direction=direction):
+                self.assertEqual([], broll_plan.validate_plan(approved, self.timeline, self.transcript))
+
     def test_review_decision_manifest_rejects_reorder_omit_duplicate_and_malformed(self):
         plan = copy.deepcopy(self.plan)
         second = copy.deepcopy(plan["shots"][0])
-        second.update({"id": "second", "program_range": {"start_s": 3.0, "end_s": 4.0}, "source_ranges": [{"clip_id": "one", "start_s": 3.0, "end_s": 4.0}], "transcript_evidence": {"words": []}})
+        second.update({"id": "second", "program_range": {"start_s": 3.0, "end_s": 4.0}, "source_ranges": [{"clip_id": "one", "start_s": 3.0, "end_s": 4.0}], "transcript_evidence": {"words": [self.mapped_words[2]]}})
         second["candidates"][0]["id"] = "asset-2"
         plan["shots"].append(second)
         entries = [{"id": "shot", "decision": "select", "candidate_id": "asset", "source_trim": {"start_s": 0, "end_s": 1}}, {"id": "second", "decision": "select", "candidate_id": "asset-2", "source_trim": {"start_s": 0, "end_s": 1}}]
@@ -156,7 +228,7 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
     def test_mixed_pre_skipped_and_decision_skipped_receipt_validates(self):
         plan = copy.deepcopy(self.plan)
         pre_skipped = copy.deepcopy(plan["shots"][0])
-        pre_skipped.update({"id": "already-skipped", "program_range": {"start_s": 3.0, "end_s": 4.0}, "source_ranges": [{"clip_id": "one", "start_s": 3.0, "end_s": 4.0}], "transcript_evidence": {"words": []}, "candidates": [], "selected": None, "status": "skipped"})
+        pre_skipped.update({"id": "already-skipped", "program_range": {"start_s": 3.0, "end_s": 4.0}, "source_ranges": [{"clip_id": "one", "start_s": 3.0, "end_s": 4.0}], "transcript_evidence": {"words": [self.mapped_words[2]]}, "candidates": [], "selected": None, "status": "skipped"})
         plan["shots"].append(pre_skipped)
         review = self.review_for(plan, [{"id": "shot", "decision": "skip"}, {"id": "already-skipped", "decision": "skip"}], rationale="Neither shot helps.")
         approved = broll_plan.apply_review(plan, review, mode="agent", actor="agent", rationale="Neither shot helps.")
@@ -368,6 +440,47 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             with self.subTest(message=message):
                 self.assertIn(message, broll_plan.validate_plan(self.plan, self.timeline, self.transcript, project=project))
 
+    def test_project_operation_and_active_sequence_shapes_are_total(self):
+        cases = []
+        for operation in (None, []):
+            project = copy.deepcopy(self.project); project["operations"] = [operation]
+            cases.append((project, "project operations must be a list of objects"))
+        for operation_id in (None, "", " ", [], {}):
+            project = copy.deepcopy(self.project); project["operations"][0]["id"] = copy.deepcopy(operation_id)
+            cases.append((project, "project operation ids must be unique nonblank strings"))
+        duplicate = copy.deepcopy(self.project); duplicate["operations"].append(copy.deepcopy(duplicate["operations"][0]))
+        cases.append((duplicate, "project operation ids must be unique nonblank strings"))
+        for active_operations in (None, 3, "cut"):
+            project = copy.deepcopy(self.project); project["sequences"]["main"]["operations"] = active_operations
+            cases.append((project, "project active sequence operations must be a list"))
+        for operation_id in (None, "", " ", [], {}):
+            project = copy.deepcopy(self.project); project["sequences"]["main"]["operations"] = [copy.deepcopy(operation_id)]
+            cases.append((project, "project active sequence operation ids must be nonblank strings"))
+        for active in ([], {}):
+            project = copy.deepcopy(self.project); project["active_sequence"] = copy.deepcopy(active)
+            cases.append((project, "project active sequence must be an object"))
+        for project, message in cases:
+            with self.subTest(message=message, project=project):
+                self.assertIn(message, broll_plan.validate_plan(self.plan, self.timeline, self.transcript, project=project))
+
+    def test_dependency_ids_and_revisions_are_strict_positive_integers(self):
+        for dependency in (None, "", " ", [], {}):
+            plan = copy.deepcopy(self.plan)
+            plan["dependencies"] = [copy.deepcopy(dependency)]
+            with self.subTest(kind="dependency", value=dependency):
+                self.assertIn("dependencies must contain nonblank strings", broll_plan.validate_plan(plan, self.timeline, self.transcript, project=self.project))
+
+        for revision in (True, 0, -1, 1.0, "1"):
+            project = copy.deepcopy(self.project)
+            project["operations"][0]["revision"] = revision
+            with self.subTest(kind="project", revision=revision):
+                self.assertIn("project operation understanding revision must be a positive integer", broll_plan.validate_plan(self.plan, self.timeline, self.transcript, project=project))
+
+            plan = copy.deepcopy(self.plan)
+            plan["based_on"]["understanding"] = revision
+            with self.subTest(kind="based_on", revision=revision):
+                self.assertIn("based_on understanding revision must be a positive integer", broll_plan.validate_plan(plan, self.timeline, self.transcript, project=self.project))
+
     def test_apply_review_rejects_malformed_objects_and_collections(self):
         cases = [(None, self.review(), "plan must be an object"), (self.plan, None, "review must be an object"), ({**self.plan, "shots": None}, self.review(), "plan shots must be a list"), ({**self.plan, "shots": [None]}, self.review(), "plan shot must be an object"), (self.plan, {"review_id": "r", "shots": None}, "review shots must be a list"), (self.plan, {"review_id": "r", "shots": [None]}, "review shot must be an object")]
         for plan, review, message in cases:
@@ -405,6 +518,101 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
                 plan = copy.deepcopy(self.plan); plan["shots"][0]["source_ranges"] = [source_range]
                 self.assertIn("shot source range is outside timeline", broll_plan.validate_plan(plan, self.timeline, self.transcript))
 
+    def _retimed_plan(self):
+        timeline = {
+            "schema_version": 1,
+            "timeline_id": "main",
+            "source_duration_s": 7.0,
+            "program_duration_s": 4.0,
+            "fps": {"num": 30, "den": 1},
+            "clips": [
+                {"id": "fast", "source_range": {"start_s": 0, "end_s": 4}, "program_range": {"start_s": 0, "end_s": 2}, "speed": 2.0},
+                {"id": "normal", "source_range": {"start_s": 5, "end_s": 7}, "program_range": {"start_s": 2, "end_s": 4}, "speed": 1.0},
+            ],
+        }
+        transcript = {"segments": [{"words": [{"word": "fast", "start": 2.0, "end": 4.0}, {"word": "normal", "start": 5.0, "end": 6.0}]}]}
+        mapped = projectlib.map_transcript_to_timeline(transcript, timeline)["segments"][0]["words"]
+        plan = copy.deepcopy(self.plan)
+        plan.update({"program_duration_s": 4.0, "shots": [copy.deepcopy(plan["shots"][0])]})
+        plan["shots"][0].update({
+            "program_range": {"start_s": 1.0, "end_s": 3.0},
+            "source_ranges": [
+                {"clip_id": "fast", "start_s": 2.0, "end_s": 4.0},
+                {"clip_id": "normal", "start_s": 5.0, "end_s": 6.0},
+            ],
+            "transcript_evidence": {"words": mapped},
+        })
+        return plan, timeline, transcript
+
+    def test_source_ranges_exactly_reconstruct_identity_and_retimed_timeline(self):
+        self.assertEqual([], broll_plan.validate_plan(self.plan, self.timeline, self.transcript))
+        plan, timeline, transcript = self._retimed_plan()
+        self.assertEqual([], broll_plan.validate_plan(plan, timeline, transcript))
+
+        within_tolerance = copy.deepcopy(plan)
+        within_tolerance["shots"][0]["source_ranges"][0]["start_s"] += 0.0000005
+        self.assertEqual([], broll_plan.validate_plan(within_tolerance, timeline, transcript))
+
+        outside_tolerance = copy.deepcopy(plan)
+        outside_tolerance["shots"][0]["source_ranges"][0]["start_s"] += 0.000002
+        self.assertIn("shot source_ranges do not match timeline", broll_plan.validate_plan(outside_tolerance, timeline, transcript))
+
+    def test_source_ranges_reject_missing_extra_unrelated_wrong_and_reordered_clips(self):
+        plan, timeline, transcript = self._retimed_plan()
+        valid = plan["shots"][0]["source_ranges"]
+        cases = {
+            "missing": valid[:1],
+            "extra": valid + [{"clip_id": "normal", "start_s": 6.0, "end_s": 7.0}],
+            "unrelated": [{"clip_id": "other", "start_s": 2.0, "end_s": 4.0}, valid[1]],
+            "wrong clip": [{**valid[0], "clip_id": "normal"}, valid[1]],
+            "reordered": list(reversed(valid)),
+        }
+        for name, source_ranges in cases.items():
+            malformed = copy.deepcopy(plan)
+            malformed["shots"][0]["source_ranges"] = copy.deepcopy(source_ranges)
+            with self.subTest(name=name):
+                self.assertIn("shot source_ranges do not match timeline", broll_plan.validate_plan(malformed, timeline, transcript))
+
+    def test_transcript_evidence_must_be_nonempty_inside_shot_and_declared_source(self):
+        empty = copy.deepcopy(self.plan)
+        empty["shots"][0]["transcript_evidence"]["words"] = []
+        self.assertIn("shot transcript evidence requires at least one word", broll_plan.validate_plan(empty, self.timeline, self.transcript))
+
+        other_moment = copy.deepcopy(self.plan)
+        other_moment["shots"][0]["transcript_evidence"]["words"] = [copy.deepcopy(self.mapped_words[1])]
+        self.assertIn("shot transcript evidence word is outside shot program range", broll_plan.validate_plan(other_moment, self.timeline, self.transcript))
+
+        not_contained = copy.deepcopy(self.plan)
+        not_contained["shots"][0]["source_ranges"] = [{"clip_id": "one", "start_s": 1.1, "end_s": 2.0}]
+        self.assertIn("shot transcript evidence source range is outside shot source_ranges", broll_plan.validate_plan(not_contained, self.timeline, self.transcript))
+
+    def test_malformed_transcript_and_timeline_mapping_returns_errors_without_raising(self):
+        transcript_cases = [
+            {"segments": None},
+            {"segments": [None]},
+            {"segments": [[]]},
+            {"segments": [{"words": None}]},
+            {"segments": [{"words": [None]}]},
+            {"segments": [{"words": [[]]}]},
+            {"segments": [{"words": [{}]}]},
+        ]
+        for transcript in transcript_cases:
+            with self.subTest(kind="transcript", value=transcript):
+                self.assertTrue(broll_plan.validate_plan(self.plan, self.timeline, transcript))
+
+        timeline_cases = []
+        for clips in (None, 3, [None]):
+            timeline_cases.append({**self.timeline, "clips": clips})
+        for clip in (
+            {"id": "one", "source_range": None, "program_range": {"start_s": 0, "end_s": 10}, "speed": 1},
+            {"id": "one", "source_range": {"start_s": 0, "end_s": 10}, "program_range": [], "speed": 1},
+            {"id": "one", "source_range": {"start_s": 0, "end_s": 10}, "program_range": {"start_s": 0, "end_s": 10}, "speed": []},
+        ):
+            timeline_cases.append({**self.timeline, "clips": [clip]})
+        for timeline in timeline_cases:
+            with self.subTest(kind="timeline", value=timeline["clips"]):
+                self.assertTrue(broll_plan.validate_plan(self.plan, timeline, self.transcript))
+
     def test_persisted_selected_media_requires_its_media_contract(self):
         plan = copy.deepcopy(self.plan); plan["shots"][0].update({"status": "selected", "selected": {"candidate_id": "asset", "source_trim": {"start_s": 1, "end_s": 1}}})
         self.assertIn("shot selected video requires a valid source_trim", broll_plan.validate_plan(plan, self.timeline, self.transcript))
@@ -434,14 +642,77 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
 
     def test_review_subject_is_stable_across_post_review_lifecycle(self):
         selected = broll_plan.apply_review(self.plan, self.review(), mode="agent", actor="agent", rationale="Relevant footage.")
-        normalized = copy.deepcopy(selected); normalized["shots"][0].update({"status": "normalized", "normalized": {"path": "asset.mp4"}})
+        normalized = copy.deepcopy(selected); normalized["shots"][0].update({"status": "normalized", "normalized": {"path": "asset.mp4", "sha256": "a" * 64}})
         verified = copy.deepcopy(normalized); verified["shots"][0].update({"status": "verified", "verification": {"status": "pass"}})
         self.assertEqual(broll_plan.review_subject(selected), broll_plan.review_subject(normalized))
         self.assertEqual(broll_plan.review_subject(selected), broll_plan.review_subject(verified))
         self.assertEqual([], broll_plan.validate_plan(verified, self.timeline, self.transcript))
 
+    def test_normalized_and_verified_lifecycle_records_are_required_and_validated(self):
+        selected = broll_plan.apply_review(self.plan, self.review(), mode="agent", actor="agent", rationale="Relevant footage.")
+        normalized = copy.deepcopy(selected)
+        normalized["shots"][0].update({"status": "normalized", "normalized": {"path": "cache/b-roll/normalized/shot.mp4", "sha256": "a" * 64}})
+        self.assertEqual([], broll_plan.validate_plan(normalized, self.timeline, self.transcript))
+        verified = copy.deepcopy(normalized)
+        verified["shots"][0].update({"status": "verified", "verification": {"status": "pass", "report": "review/report.md"}})
+        self.assertEqual([], broll_plan.validate_plan(verified, self.timeline, self.transcript))
+
+        delete = object()
+        normalized_cases = [
+            (delete, "shot normalized record is required"),
+            (None, "shot normalized record is required"),
+            ([], "shot normalized record is required"),
+            ({"path": "", "sha256": "a" * 64}, "shot normalized path is invalid"),
+            ({"path": [], "sha256": "a" * 64}, "shot normalized path is invalid"),
+            ({"path": "asset.mp4", "sha256": "bad"}, "shot normalized SHA-256 is invalid"),
+        ]
+        for status in ("normalized", "verified"):
+            for value, message in normalized_cases:
+                malformed = copy.deepcopy(verified if status == "verified" else normalized)
+                malformed["shots"][0]["status"] = status
+                if value is delete:
+                    malformed["shots"][0].pop("normalized", None)
+                else:
+                    malformed["shots"][0]["normalized"] = copy.deepcopy(value)
+                with self.subTest(status=status, value=value):
+                    self.assertIn(message, broll_plan.validate_plan(malformed, self.timeline, self.transcript))
+
+        for verification in (None, [], {}, {"status": "fail"}, {"status": None}):
+            malformed = copy.deepcopy(verified)
+            malformed["shots"][0]["verification"] = copy.deepcopy(verification)
+            with self.subTest(verification=verification):
+                self.assertIn("shot verified verification must pass", broll_plan.validate_plan(malformed, self.timeline, self.transcript))
+
+        for status in ("normalized", "verified"):
+            malformed = copy.deepcopy(selected)
+            malformed["shots"][0].update({"status": status, "selected": None})
+            with self.subTest(status=status, missing="selection and lifecycle"):
+                errors = broll_plan.validate_plan(malformed, self.timeline, self.transcript)
+                self.assertIn(f"shot {status} shot requires a selection", errors)
+                self.assertIn("shot normalized record is required", errors)
+                if status == "verified":
+                    self.assertIn("shot verified verification must pass", errors)
+
+    def test_registration_requires_approved_receipt_and_passing_verification(self):
+        for verification in (None, {}, {"status": "fail"}):
+            plan = self._registered_plan((2, 3))
+            plan["shots"][0]["verification"] = copy.deepcopy(verification)
+            with self.subTest(verification=verification):
+                with self.assertRaisesRegex(ValueError, "verification must pass"):
+                    broll_plan.register_operation(self._registration_project(), plan)
+
+        hand_built = copy.deepcopy(self.plan)
+        hand_built["shots"][0].update({
+            "status": "verified",
+            "selected": {"candidate_id": "asset", "source_trim": {"start_s": 0, "end_s": 1}},
+            "normalized": {"path": "asset.mp4", "sha256": "a" * 64},
+            "verification": {"status": "pass"},
+        })
+        with self.assertRaisesRegex(ValueError, "review_status must be approved"):
+            broll_plan.register_operation(self._registration_project(), hand_built)
+
     def test_shots_must_be_chronological_even_without_overlap(self):
-        later = copy.deepcopy(self.plan["shots"][0]); later.update({"id": "later", "program_range": {"start_s": 3, "end_s": 4}, "source_ranges": [{"start_s": 3, "end_s": 4}], "candidates": []})
+        later = copy.deepcopy(self.plan["shots"][0]); later.update({"id": "later", "program_range": {"start_s": 3, "end_s": 4}, "source_ranges": [{"clip_id": "one", "start_s": 3, "end_s": 4}], "transcript_evidence": {"words": [self.mapped_words[2]]}, "candidates": []})
         plan = copy.deepcopy(self.plan); plan["shots"] = [later, plan["shots"][0]]
         self.assertIn("shots must be in chronological program order", broll_plan.validate_plan(plan, self.timeline, self.transcript))
 
@@ -471,11 +742,13 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             shot["id"] = f"shot-{index}"
             shot["candidates"][0]["id"] = f"asset-{index}"
             shot["program_range"] = {"start_s": start, "end_s": end}
+            shot["source_ranges"] = [{"clip_id": "one", "start_s": start, "end_s": end}]
+            shot["transcript_evidence"] = {"words": [copy.deepcopy(next(word for word in self.mapped_words if word["program_range"]["start_s"] >= start and word["program_range"]["end_s"] <= end))]}
             shot["selected"] = None
             shot["status"] = "candidates_ready"
             plan["shots"].append(shot)
         decisions = [{"id": shot["id"], "decision": "skip"} if skip else {"id": shot["id"], "decision": "select", "candidate_id": shot["candidates"][0]["id"], "source_trim": {"start_s": 0, "end_s": 1}} for shot in plan["shots"]]
-        plan = broll_plan.apply_review(plan, self.review_for(plan, decisions, review_id="registered"), mode="agent", actor="agent", rationale="Relevant footage.")
+        plan = broll_plan.apply_review(plan, self.review_for(plan, decisions, review_id="123e4567-e89b-12d3-a456-426614174011"), mode="agent", actor="agent", rationale="Relevant footage.")
         for index, shot in enumerate(plan["shots"], 1):
             if shot["status"] == "skipped": continue
             shot["normalized"] = {"path": f"cache/b-roll/normalized/broll-{index:03d}.mp4", "sha256": "a" * 64}
@@ -743,7 +1016,7 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
     def test_mixed_plan_exports_pre_skipped_shot_exactly_once(self):
         plan = copy.deepcopy(self.plan)
         skipped = copy.deepcopy(plan["shots"][0])
-        skipped.update({"id": "already-skipped", "program_range": {"start_s": 3.0, "end_s": 4.0}, "source_ranges": [{"clip_id": "one", "start_s": 3.0, "end_s": 4.0}], "transcript_evidence": {"words": []}, "candidates": [], "selected": None, "status": "skipped"})
+        skipped.update({"id": "already-skipped", "program_range": {"start_s": 3.0, "end_s": 4.0}, "source_ranges": [{"clip_id": "one", "start_s": 3.0, "end_s": 4.0}], "transcript_evidence": {"words": [self.mapped_words[2]]}, "candidates": [], "selected": None, "status": "skipped"})
         plan["shots"].append(skipped)
         with mock.patch.object(build_review_page, "_extract_frame", side_effect=self._frame):
             result = build_review_page.build_review_page(plan, self.timeline, self.transcript, self.video, self.review_dir, project_root=self.root)
