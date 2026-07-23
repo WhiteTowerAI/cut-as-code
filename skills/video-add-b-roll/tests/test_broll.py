@@ -7,6 +7,7 @@ import io
 import json
 import math
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -22,6 +23,7 @@ import broll_plan
 import projectlib
 import pexels
 import build_review_page
+import normalize_broll
 
 
 class _BrollFixture:
@@ -1902,6 +1904,127 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
             with self.assertRaises(ValueError):
                 build_review_page.build_review_page(self.plan, self.timeline, self.transcript, self.video, self.review_dir, project_root=self.root)
         self.assertFalse(self.review_dir.exists())
+
+
+class NormalizeAndCheckTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        self.candidates = self.root / "work/cache/b-roll/candidates"
+        self.candidates.mkdir(parents=True)
+        self.output = self.root / "work/cache/b-roll/normalized/broll-001.mp4"
+        self.timeline = {
+            "schema_version": 1,
+            "timeline_id": "main",
+            "program_duration_s": 1.0,
+            "width": 96,
+            "height": 54,
+            "fps": {"num": 30000, "den": 1001},
+        }
+
+    def tearDown(self): self.temp.cleanup()
+
+    def _video(self, name="source.mp4"):
+        path = self.candidates / name
+        subprocess.run([
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-f", "lavfi", "-i", "testsrc2=size=128x96:rate=24",
+            "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000",
+            "-t", "2", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-shortest", str(path),
+        ], check=True, capture_output=True)
+        return path
+
+    def _video_shot(self, source):
+        candidate = {
+            "id": "asset", "media_type": "video",
+            "cache_path": source.relative_to(self.root / "work").as_posix(),
+            "probe": {"duration_s": 2.0},
+        }
+        shot = {
+            "id": "shot", "status": "selected",
+            "program_range": {"start_s": 0, "end_s": 1},
+            "candidates": [candidate],
+            "selected": {"candidate_id": "asset", "source_trim": {"start_s": 0.25, "end_s": 1.25}},
+        }
+        return candidate, shot
+
+    def test_normalizes_video_to_dimensions_fps_duration_and_no_audio(self):
+        candidate, shot = self._video_shot(self._video())
+        record = normalize_broll.normalize_shot(candidate, shot, self.timeline, self.output)
+        self.assertEqual(self.output, record["path"])
+        self.assertEqual((96, 54), (record["probe"]["width"], record["probe"]["height"]))
+        self.assertEqual({"num": 30000, "den": 1001}, record["probe"]["fps"])
+        self.assertEqual("1:1", record["probe"]["sar"])
+        self.assertFalse(record["probe"]["has_audio"])
+        self.assertAlmostEqual(1.0, record["probe"]["duration_s"], delta=1001 / 30000)
+
+        plan_path = self.root / "work/b-roll/broll-plan.json"
+        timeline_path = self.root / "work/timeline.json"
+        projectlib.write_json(plan_path, {"schema_version": 1, "timeline_id": "main", "shots": [shot]})
+        projectlib.write_json(timeline_path, self.timeline)
+        updated = normalize_broll.normalize_plan(plan_path, timeline_path, self.root)
+        self.assertEqual("normalized", updated["shots"][0]["status"])
+        self.assertEqual("cache/b-roll/normalized/broll-001.mp4", updated["shots"][0]["normalized"]["path"])
+        self.assertEqual(updated, projectlib.load_json(plan_path))
+
+    def test_explicit_still_uses_ken_burns_but_no_implicit_fallback(self):
+        source = self.candidates / "still.png"
+        image = Image.new("RGB", (128, 96))
+        image.putdata([(x * 2, y * 2, (x + y) % 256) for y in range(96) for x in range(128)])
+        image.save(source)
+        candidate = {
+            "id": "still", "media_type": "image",
+            "cache_path": source.relative_to(self.root / "work").as_posix(),
+        }
+        shot = {
+            "id": "shot", "status": "selected",
+            "program_range": {"start_s": 0, "end_s": 1},
+            "candidates": [candidate],
+            "selected": {"candidate_id": "still", "ken_burns": {"direction": "zoom-in"}},
+        }
+        record = normalize_broll.normalize_shot(candidate, shot, self.timeline, self.output)
+        self.assertEqual(self.output, record["path"])
+        first, last = self.root / "first.png", self.root / "last.png"
+        for time_s, frame in ((0, first), (0.8, last)):
+            subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-ss", str(time_s), "-i", str(self.output), "-frames:v", "1", str(frame)], check=True, capture_output=True)
+        with Image.open(first) as first_image, Image.open(last) as last_image:
+            self.assertNotEqual(first_image.tobytes(), last_image.tobytes())
+
+        implicit = copy.deepcopy(shot)
+        implicit["selected"].pop("ken_burns")
+        fallback = self.output.with_name("implicit.mp4")
+        with self.assertRaisesRegex(ValueError, "ken_burns"):
+            normalize_broll.normalize_shot(candidate, implicit, self.timeline, fallback)
+        self.assertFalse(fallback.exists())
+        self.assertFalse(fallback.with_suffix(".part.mp4").exists())
+
+    def test_active_lut_is_applied_by_basename_from_lut_cwd(self):
+        candidate, shot = self._video_shot(self._video("graded-source.mp4"))
+        lut = self.root / "final/look.cube"
+        lut.parent.mkdir(parents=True)
+        lut.write_text(
+            'TITLE "Identity"\nLUT_3D_SIZE 2\nDOMAIN_MIN 0 0 0\nDOMAIN_MAX 1 1 1\n'
+            "0 0 0\n0 0 1\n0 1 0\n0 1 1\n1 0 0\n1 0 1\n1 1 0\n1 1 1\n",
+            encoding="ascii",
+        )
+        grade_plan = self.root / "work/color-grade/grade-plan.json"
+        projectlib.write_json(grade_plan, {"schema_version": 1, "selected_lut": "../../final/look.cube"})
+        calls, real_run = [], subprocess.run
+
+        def capture(command, *args, **kwargs):
+            calls.append((command, kwargs.get("cwd")))
+            return real_run(command, *args, **kwargs)
+
+        with mock.patch.object(normalize_broll.subprocess, "run", side_effect=capture):
+            record = normalize_broll.normalize_shot(candidate, shot, self.timeline, self.output, lut=lut)
+        command, cwd = next((command, cwd) for command, cwd in calls if command[0] == "ffmpeg" and "-vf" in command)
+        video_filter = command[command.index("-vf") + 1]
+        self.assertIn("lut3d=look.cube", video_filter)
+        self.assertNotIn(str(lut), video_filter)
+        self.assertEqual(lut.parent.resolve(), Path(cwd).resolve())
+        self.assertEqual(broll_plan.sha256_file(grade_plan), record["grade_plan_sha256"])
+        self.assertEqual(broll_plan.sha256_file(lut), record["selected_lut_sha256"])
 
 
 class AcquisitionTests(unittest.TestCase):
