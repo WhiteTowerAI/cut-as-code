@@ -114,12 +114,26 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
     if plan.get("timebase") != "program": errors.append("plan timebase must be program")
     if plan.get("timeline_id") != timeline.get("timeline_id"): errors.append("plan timeline_id does not match timeline")
     try:
-        if float(plan.get("program_duration_s")) != float(timeline.get("program_duration_s")): errors.append("plan program_duration_s does not match timeline")
+        timeline_duration = float(timeline.get("program_duration_s"))
+        if not math.isfinite(timeline_duration) or timeline_duration < 0: raise ValueError
+    except (AttributeError, TypeError, ValueError):
+        errors.append("timeline program_duration_s is invalid")
+        timeline_duration = None
+    try:
+        plan_duration = float(plan.get("program_duration_s"))
+        if not math.isfinite(plan_duration): raise ValueError
+        if timeline_duration is not None and plan_duration != timeline_duration: errors.append("plan program_duration_s does not match timeline")
     except (TypeError, ValueError): errors.append("plan program_duration_s is required")
     brief = plan.get("brief")
     if not isinstance(brief, dict): errors.append("brief must be an object")
     elif brief.get("density") != "selective": errors.append("brief density must be selective")
-    duration = float(timeline.get("program_duration_s", 0) or 0)
+    duration = timeline_duration if timeline_duration is not None else 0
+    try:
+        source_duration = float(timeline.get("source_duration_s"))
+        if not math.isfinite(source_duration) or source_duration < 0: raise ValueError
+    except (AttributeError, TypeError, ValueError):
+        errors.append("timeline source_duration_s is invalid")
+        source_duration = None
     mapped = _mapped_words(transcript, timeline)
     seen_shots, ranges, candidate_ids = set(), [], set()
     shots = plan.get("shots", [])
@@ -138,7 +152,10 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
         else: ranges.append((program[0], program[1], shot_id))
         source_ranges = shot.get("source_ranges", [])
         if not isinstance(source_ranges, list): errors.append(f"{shot_id} source_ranges must be a list")
-        elif any(not isinstance(item, dict) or not _range(item) for item in source_ranges): errors.append(f"{shot_id} source range is invalid")
+        else:
+            for item in source_ranges:
+                source = _range(item) if isinstance(item, dict) else None
+                if not source or source[0] < 0 or source[1] <= source[0] or (source_duration is not None and source[1] > source_duration): errors.append(f"{shot_id} source range is outside timeline")
         evidence = shot.get("transcript_evidence")
         if not isinstance(evidence, dict):
             errors.append(f"{shot_id} transcript evidence must be an object")
@@ -174,7 +191,13 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
         if status not in {"planned", "candidates_ready", "selected", "normalized", "verified", "skipped"}: errors.append(f"{shot_id} status is invalid")
         elif status in {"planned", "candidates_ready", "skipped"} and selected is not None: errors.append(f"{shot_id} {status} shot must not select a candidate")
         elif status in {"selected", "normalized", "verified"} and not isinstance(selected, dict): errors.append(f"{shot_id} {status} shot requires a selection")
-        elif status in {"selected", "normalized", "verified"} and selected.get("candidate_id") not in local_ids: errors.append(f"{shot_id} selected candidate does not belong to shot")
+        elif status in {"selected", "normalized", "verified"}:
+            candidate = next((item for item in candidates if isinstance(item, dict) and item.get("id") == selected.get("candidate_id")), None)
+            if candidate is None: errors.append(f"{shot_id} selected candidate does not belong to shot")
+            elif candidate.get("media_type") == "video":
+                trim = _range(selected.get("source_trim"))
+                if not trim or trim[0] < 0 or trim[1] <= trim[0]: errors.append(f"{shot_id} {status} video requires a valid source_trim")
+            elif candidate.get("media_type") == "image" and (not isinstance(selected.get("ken_burns"), dict) or not selected["ken_burns"]): errors.append(f"{shot_id} {status} image requires a non-empty ken_burns")
     for start, end, shot_id in sorted(ranges):
         for previous_start, previous_end, previous_id in ranges:
             if previous_id != shot_id and previous_start < end and start < previous_end:

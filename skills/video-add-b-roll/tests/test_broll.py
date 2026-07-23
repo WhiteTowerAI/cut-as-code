@@ -115,5 +115,21 @@ class BrollPlanTests(unittest.TestCase):
         self.timeline_path.unlink()
         self.assertIn("timeline file is missing", broll_plan.validate_plan(self.plan, self.timeline, self.transcript, project_root=self.root))
 
+    def test_malformed_timeline_duration_returns_error_without_raising(self):
+        timeline = copy.deepcopy(self.timeline); timeline["program_duration_s"] = "not-a-number"
+        self.assertIn("timeline program_duration_s is invalid", broll_plan.validate_plan(self.plan, timeline, self.transcript))
+
+    def test_source_ranges_must_be_ordered_nonnegative_and_within_source(self):
+        for source_range in ({"start_s": -1, "end_s": 1}, {"start_s": 2, "end_s": 2}, {"start_s": 9, "end_s": 11}):
+            with self.subTest(source_range=source_range):
+                plan = copy.deepcopy(self.plan); plan["shots"][0]["source_ranges"] = [source_range]
+                self.assertIn("shot source range is outside timeline", broll_plan.validate_plan(plan, self.timeline, self.transcript))
+
+    def test_persisted_selected_media_requires_its_media_contract(self):
+        plan = copy.deepcopy(self.plan); plan["shots"][0].update({"status": "selected", "selected": {"candidate_id": "asset", "source_trim": {"start_s": 1, "end_s": 1}}})
+        self.assertIn("shot selected video requires a valid source_trim", broll_plan.validate_plan(plan, self.timeline, self.transcript))
+        plan = copy.deepcopy(self.plan); plan["shots"][0]["candidates"][0]["media_type"] = "image"; plan["shots"][0].update({"status": "verified", "selected": {"candidate_id": "asset", "ken_burns": {}}})
+        self.assertIn("shot verified image requires a non-empty ken_burns", broll_plan.validate_plan(plan, self.timeline, self.transcript))
+
 
 if __name__ == "__main__": unittest.main()
