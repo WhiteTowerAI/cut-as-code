@@ -302,5 +302,13 @@ class BrollPlanTests(unittest.TestCase):
         result = broll_plan.register_operation(project, plan)
         self.assertEqual("verified", result["render"]["status"])
 
+    def test_register_operation_rejects_missing_nonstrings_and_duplicate_shot_ids(self):
+        for shot_id in (None, "", 3):
+            plan = self._registered_plan((2, 3)); plan["shots"][0]["id"] = shot_id
+            with self.subTest(shot_id=shot_id):
+                with self.assertRaisesRegex(ValueError, "registered shot id"): broll_plan.register_operation(self._registration_project(), plan)
+        plan = self._registered_plan((2, 3), (4, 5)); plan["shots"][1]["id"] = plan["shots"][0]["id"]
+        with self.assertRaisesRegex(ValueError, "duplicate registered shot id"): broll_plan.register_operation(self._registration_project(), plan)
+
 
 if __name__ == "__main__": unittest.main()

@@ -188,6 +188,14 @@ def _verified_overlays(plan):
         raise ValueError("plan shots must be a list")
     if any(not isinstance(shot, dict) for shot in plan["shots"]):
         raise ValueError("plan shots must be objects")
+    shot_ids = set()
+    for shot in plan["shots"]:
+        shot_id = shot.get("id")
+        if not isinstance(shot_id, str) or not shot_id.strip():
+            raise ValueError("registered shot id is required")
+        if shot_id in shot_ids:
+            raise ValueError(f"duplicate registered shot id: {shot_id}")
+        shot_ids.add(shot_id)
     selected = [shot for shot in plan["shots"] if isinstance(shot, dict) and shot.get("status") != "skipped"]
     if not selected:
         return []
