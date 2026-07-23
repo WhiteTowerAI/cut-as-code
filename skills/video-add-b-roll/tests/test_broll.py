@@ -691,6 +691,17 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
                     broll_plan.validate_plan(plan, self.timeline, self.transcript, project=self.project),
                 )
 
+    def test_validate_plan_requires_canonical_understanding_operation(self):
+        self.assertEqual([], broll_plan.validate_plan(self.plan, self.timeline, self.transcript, project=self.project))
+        plan, project = copy.deepcopy(self.plan), copy.deepcopy(self.project)
+        plan["dependencies"][0] = "understand"
+        plan["based_on"]["understand"] = plan["based_on"].pop("understanding")
+        project["operations"][0]["id"] = "understand"
+        self.assertIn(
+            "project understanding operation is required",
+            broll_plan.validate_plan(plan, self.timeline, self.transcript, project=project),
+        )
+
     def test_verify_files_rejects_escape_missing_and_hash_mismatch(self):
         self.assertEqual([], broll_plan.validate_plan(self.plan, self.timeline, self.transcript, project_root=self.root, verify_files=True))
         for path, digest, message in (("../escape.mp4", None, "path escapes project root"), ("cache/b-roll/missing.mp4", None, "file is missing"), ("cache/b-roll/factory.mp4", "0" * 64, "SHA-256 is stale")):
@@ -1949,6 +1960,7 @@ class AcquisitionTests(unittest.TestCase):
         candidate["cache_path"] = "cache/b-roll/candidates/redirected.mp4"
         candidate["download_url"] = initial_url
         candidate["provenance"]["download_url"] = initial_url
+        candidate["provenance"]["other"] = {"nested": [{"value": "original"}]}
         original = copy.deepcopy(candidate)
         target = fixture.root / "work/cache/b-roll/candidates/redirected.mp4"
         target.parent.mkdir(parents=True)
@@ -1969,10 +1981,17 @@ class AcquisitionTests(unittest.TestCase):
         with self.subTest(field="caller immutability"):
             self.assertEqual(original, candidate)
             self.assertIsNot(result["provenance"], candidate["provenance"])
+            self.assertIsNot(result["provenance"]["dimensions"], candidate["provenance"]["dimensions"])
+            self.assertIsNot(result["provenance"]["other"], candidate["provenance"]["other"])
+            self.assertIsNot(result["provenance"]["other"]["nested"], candidate["provenance"]["other"]["nested"])
+            self.assertIsNot(result["provenance"]["other"]["nested"][0], candidate["provenance"]["other"]["nested"][0])
         plan = copy.deepcopy(fixture.plan)
         plan["shots"][0]["candidates"] = [result]
         with self.subTest(field="plan validation"):
             self.assertEqual([], broll_plan.validate_plan(plan, fixture.timeline, fixture.transcript))
+        result["provenance"]["dimensions"]["width"] = 1
+        result["provenance"]["other"]["nested"][0]["value"] = "changed"
+        self.assertEqual(original, candidate)
 
         with self.assertRaises(ValueError):
             pexels.download_candidate(

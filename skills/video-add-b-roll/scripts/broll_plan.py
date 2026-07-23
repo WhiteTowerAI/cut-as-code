@@ -723,8 +723,11 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
             return errors + ["project active sequence operations must be a list"]
         if any(not isinstance(item, str) or not item.strip() for item in active_ids):
             return errors + ["project active sequence operation ids must be nonblank strings"]
-        required = (["understanding"] if "understanding" in operations else ["understand"] if "understand" in operations and "understand" in dependencies else [])
-        required += [operation_id for operation_id in ("cut", "color-grade") if operation_id in active_ids and operation_id in operations]
+        try:
+            required = active_dependencies(project)
+        except ValueError as exc:
+            errors.append(str(exc))
+            required = []
         if dependencies != required: errors.append("plan dependencies do not match current dependencies")
         if set(dependencies) != set(based_on): errors.append("based_on does not match dependencies")
         for dependency in dependencies:
