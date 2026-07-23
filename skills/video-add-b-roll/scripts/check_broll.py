@@ -5,6 +5,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 from fractions import Fraction
@@ -260,10 +261,70 @@ def _summary(plan, selected, records, artifacts, root, stage, destination, path)
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
+def _reparse_attributes(path):
+    try:
+        return getattr(Path(path).stat(follow_symlinks=False), "st_file_attributes", 0)
+    except FileNotFoundError:
+        return 0
+
+
+def _is_link_or_junction(path):
+    path = Path(path)
+    if path.is_symlink():
+        return True
+    is_junction = getattr(path, "is_junction", None)
+    if is_junction is not None and is_junction():
+        return True
+    return bool(_reparse_attributes(path) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0))
+
+
+def _safe_scratch_path(path, parent, label):
+    path, parent = Path(path).absolute(), Path(parent).absolute()
+    try:
+        path.relative_to(parent)
+    except ValueError as exc:
+        raise ValueError(f"{label} must be inside {parent}") from exc
+    if _is_link_or_junction(path):
+        raise ValueError(f"{label} must not be a link or reparse point")
+    try:
+        path.resolve().relative_to(parent.resolve())
+    except ValueError as exc:
+        raise ValueError(f"{label} must resolve inside {parent.resolve()}") from exc
+    return path
+
+
+def _safe_scratch_tree(path, parent, label):
+    path = _safe_scratch_path(path, parent, label)
+    if not path.exists() or not path.is_dir():
+        return path
+    for child in path.iterdir():
+        _safe_scratch_tree(child, parent, label)
+    return path
+
+
 def _remove(path):
     path = Path(path)
-    if path.is_dir() and not path.is_symlink():
-        shutil.rmtree(path)
+    if _is_link_or_junction(path):
+        if path.is_symlink():
+            path.unlink(missing_ok=True)
+        else:
+            path.rmdir()
+        return
+    if not path.exists():
+        return
+    if path.is_dir():
+        if _is_link_or_junction(path):
+            path.rmdir()
+            return
+        for child in list(path.iterdir()):
+            _remove(child)
+        if _is_link_or_junction(path):
+            if path.is_symlink():
+                path.unlink(missing_ok=True)
+            else:
+                path.rmdir()
+        else:
+            path.rmdir()
     else:
         path.unlink(missing_ok=True)
 
@@ -284,12 +345,16 @@ def _stage_dir(review_dir):
 
 
 def _restore_backup(source, target):
+    source = _safe_scratch_tree(source, source.parent, "transaction backup")
     part = target.parent / f".{target.name}.restore.part"
+    _safe_scratch_tree(part, target.parent, "restore part")
     _ignore_remove(part)
     target.parent.mkdir(parents=True, exist_ok=True)
     if source.is_dir():
+        _safe_scratch_tree(source, source.parent, "transaction backup")
         shutil.copytree(source, part)
     else:
+        _safe_scratch_path(source, source.parent, "transaction backup")
         shutil.copy2(source, part)
     if target.exists():
         _remove(target)
@@ -297,30 +362,45 @@ def _restore_backup(source, target):
 
 
 def _finish_transaction(transaction):
-    marker, errors = transaction / "marker.json", []
-    for child in transaction.iterdir():
+    transaction = _safe_scratch_tree(transaction, transaction.parent, "transaction cleanup")
+    marker = _safe_scratch_path(transaction / "marker.json", transaction, "transaction marker")
+    errors = []
+    for child in list(transaction.iterdir()):
         if child != marker:
             try:
+                _safe_scratch_tree(child, transaction, "transaction cleanup")
                 _remove(child)
             except Exception as exc:
                 errors.append(f"{child.name}: {exc}")
     if errors:
         raise OSError("; ".join(errors))
-    marker.unlink()
-    transaction.rmdir()
+    _safe_scratch_path(marker, transaction, "transaction marker").unlink()
+    _safe_scratch_path(transaction, transaction.parent, "transaction cleanup").rmdir()
 
 
 def _recover_transaction(review_dir, plan_path):
     transaction = _transaction_dir(review_dir)
+    try:
+        _safe_scratch_path(transaction, review_dir.parent, "transaction")
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"B-roll publication recovery failed: {exc}") from exc
     if not transaction.exists():
         return
-    marker_path = transaction / "marker.json"
-    plan_part = plan_path.with_suffix(".part.json")
+    stage = _stage_dir(review_dir)
+    marker_path, plan_part = transaction / "marker.json", plan_path.with_suffix(".part.json")
+    try:
+        _safe_scratch_tree(stage, review_dir.parent, "verification stage")
+        _safe_scratch_path(marker_path, transaction, "transaction marker")
+        _safe_scratch_path(plan_part, plan_path.parent, "plan part")
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"B-roll publication recovery failed: {exc}") from exc
     if not marker_path.is_file():
         try:
-            _remove(_stage_dir(review_dir))
+            _safe_scratch_tree(transaction, review_dir.parent, "transaction cleanup")
+            _safe_scratch_tree(stage, review_dir.parent, "verification stage")
+            _remove(stage)
             _remove(transaction)
-        except OSError as exc:
+        except (OSError, ValueError) as exc:
             raise ValueError(f"B-roll publication recovery failed: {exc}") from exc
         _ignore_remove(plan_part)
         return
@@ -342,6 +422,15 @@ def _recover_transaction(review_dir, plan_path):
             raise ValueError("transaction marker is invalid")
     except (OSError, KeyError, TypeError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
         raise ValueError(f"B-roll publication recovery failed: {exc}") from exc
+    old_dir = transaction / "old"
+    try:
+        _safe_scratch_tree(old_dir, transaction, "transaction backup directory")
+        for entry in entries:
+            _safe_scratch_tree(
+                old_dir / Path(entry["path"]), old_dir, "transaction backup"
+            )
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"B-roll publication recovery failed: {exc}") from exc
     identity_error = None
     try:
         current = broll_plan.sha256_file(plan_path)
@@ -353,15 +442,20 @@ def _recover_transaction(review_dir, plan_path):
     )
     if committed:
         try:
-            _remove(_stage_dir(review_dir))
+            _safe_scratch_tree(stage, review_dir.parent, "verification stage")
+            _remove(stage)
             _finish_transaction(transaction)
-        except OSError as exc:
+        except (OSError, ValueError) as exc:
             raise ValueError(f"B-roll publication recovery failed: {exc}") from exc
         _ignore_remove(plan_part)
         return
+    if current not in (marker["old_plan_sha256"], marker["new_plan_sha256"]):
+        raise ValueError(
+            "B-roll publication recovery failed: "
+            + (identity_error or "canonical plan matches neither transaction identity")
+        )
 
     errors = []
-    old_dir = transaction / "old"
     for entry in entries:
         relative = Path(entry["path"])
         target, backup = review_dir / relative, old_dir / relative
@@ -375,16 +469,15 @@ def _recover_transaction(review_dir, plan_path):
                 _remove(target)
         except Exception as exc:
             errors.append(f"{entry['path']}: {exc}")
-    if current != marker["old_plan_sha256"]:
-        errors.insert(0, identity_error or "canonical plan matches neither transaction identity")
     if errors:
         raise ValueError("B-roll publication recovery failed: " + "; ".join(errors))
     try:
         if not marker["review_dir_existed"] and review_dir.exists() and not any(review_dir.iterdir()):
             review_dir.rmdir()
-        _remove(_stage_dir(review_dir))
+        _safe_scratch_tree(stage, review_dir.parent, "verification stage")
+        _remove(stage)
         _finish_transaction(transaction)
-    except OSError as exc:
+    except (OSError, ValueError) as exc:
         raise ValueError(f"B-roll publication recovery failed: {exc}") from exc
     _ignore_remove(plan_part)
 
@@ -395,6 +488,9 @@ def _commit(stage, review_dir, plan_path, result):
     review_existed = review_dir.exists()
     _recover_transaction(review_dir, plan_path)
     try:
+        _safe_scratch_path(transaction, review_dir.parent, "transaction")
+        _safe_scratch_tree(stage, review_dir.parent, "verification stage")
+        _safe_scratch_path(plan_part, plan_path.parent, "plan part")
         old_plan_sha256 = broll_plan.sha256_file(plan_path)
         projectlib.write_json(plan_part, result)
         marker = {
@@ -407,22 +503,33 @@ def _commit(stage, review_dir, plan_path, result):
                         for relative in OWNED_ARTIFACTS],
         }
         transaction.mkdir(parents=True)
-        marker_part = transaction / "marker.part.json"
+        marker_path, marker_part = transaction / "marker.json", transaction / "marker.part.json"
+        _safe_scratch_path(marker_path, transaction, "transaction marker")
+        _safe_scratch_path(marker_part, transaction, "transaction marker part")
         projectlib.write_json(marker_part, marker)
-        os.replace(marker_part, transaction / "marker.json")
+        _safe_scratch_path(marker_part, transaction, "transaction marker part")
+        _safe_scratch_path(marker_path, transaction, "transaction marker")
+        os.replace(marker_part, marker_path)
         review_dir.mkdir(parents=True, exist_ok=True)
         for entry in marker["entries"]:
             relative = Path(entry["path"])
             target, source, saved = review_dir / relative, stage / relative, transaction / "old" / relative
+            _safe_scratch_tree(source, stage, "verification stage artifact")
+            _safe_scratch_path(saved, transaction, "transaction backup")
             if target.exists():
                 saved.parent.mkdir(parents=True, exist_ok=True)
+                _safe_scratch_path(saved, transaction, "transaction backup")
                 os.replace(target, saved)
             if source.exists():
                 target.parent.mkdir(parents=True, exist_ok=True)
+                _safe_scratch_tree(source, stage, "verification stage artifact")
                 os.replace(source, target)
         marker["phase"] = "artifacts-published"
         projectlib.write_json(marker_part, marker)
-        os.replace(marker_part, transaction / "marker.json")
+        _safe_scratch_path(marker_part, transaction, "transaction marker part")
+        _safe_scratch_path(marker_path, transaction, "transaction marker")
+        os.replace(marker_part, marker_path)
+        _safe_scratch_path(plan_part, plan_path.parent, "plan part")
         os.replace(plan_part, plan_path)
     except BaseException as original:
         try:
@@ -461,6 +568,7 @@ def verify_plan(plan_path, timeline_path, project_root, video_path, *, review_di
     selected = _selected_shots(plan, timeline, root, grade_hashes)
     video = _review_video(plan, timeline, root, video_path)
     stage = _stage_dir(destination)
+    _safe_scratch_tree(stage, review_root, "verification stage")
     _remove(stage)
     stage.mkdir(parents=True)
     try:

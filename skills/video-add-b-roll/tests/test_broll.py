@@ -7,6 +7,7 @@ import io
 import json
 import math
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -2074,6 +2075,54 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
                     *verification["stills"].values()]
         return {binding["path"]: (self.root / binding["path"]).read_bytes() for binding in bindings}
 
+    def _tree_snapshot(self, root):
+        root = Path(root)
+        if not root.exists():
+            return None
+        snapshot = {".": ("directory", None)}
+
+        def visit(directory):
+            for entry in os.scandir(directory):
+                path = Path(entry.path)
+                relative = path.relative_to(root).as_posix()
+                linked = entry.is_symlink() or (
+                    hasattr(path, "is_junction") and path.is_junction()
+                )
+                if linked:
+                    snapshot[relative] = ("link", os.readlink(path))
+                elif entry.is_dir(follow_symlinks=False):
+                    snapshot[relative] = ("directory", None)
+                    visit(path)
+                else:
+                    snapshot[relative] = ("file", path.read_bytes())
+
+        visit(root)
+        return snapshot
+
+    def _directory_link_or_skip(self, link, target):
+        try:
+            link.symlink_to(target, target_is_directory=True)
+            return
+        except PermissionError as exc:
+            symlink_error = exc
+        except OSError as exc:
+            if getattr(exc, "winerror", None) == 1314:
+                symlink_error = exc
+            else:
+                raise
+        if os.name == "nt":
+            junction = subprocess.run(
+                ["cmd", "/c", "mklink", "/J", str(link), str(target)],
+                capture_output=True, text=True,
+            )
+            if junction.returncode == 0:
+                return
+            raise OSError(
+                f"directory symlink failed ({symlink_error}); "
+                f"junction failed ({junction.returncode}): {junction.stderr.strip()}"
+            )
+        self.skipTest(f"directory symlinks are unavailable: {symlink_error}")
+
     def _crash_verification(self, video, mode):
         code = """
 import json
@@ -2691,15 +2740,21 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
         crashed = self._crash_verification(video, "all-new")
         self.assertEqual(92, crashed.returncode, crashed.stderr)
         transaction = self.root / "review/.03-b-roll.check.transaction"
+        stage = self.root / "review/.03-b-roll.check.part"
+        artifact_snapshot = self._tree_snapshot(review_dir)
+        transaction_snapshot = self._tree_snapshot(transaction)
+        stage_snapshot = self._tree_snapshot(stage)
         self.plan_path.write_bytes(old_plan + b"\n")
+        third_identity = self.plan_path.read_bytes()
 
         with self.assertRaisesRegex(ValueError, "matches neither transaction identity"):
             check_broll.verify_plan(
                 self.plan_path, self.timeline_path, self.root, self.root / "missing.mp4"
             )
-        self._assert_old_review_outputs(review_dir, expected)
-        self.assertTrue((transaction / "marker.json").is_file())
-        self.assertTrue(all((transaction / "old" / relative).exists() for relative in expected))
+        self.assertEqual(third_identity, self.plan_path.read_bytes())
+        self.assertEqual(artifact_snapshot, self._tree_snapshot(review_dir))
+        self.assertEqual(transaction_snapshot, self._tree_snapshot(transaction))
+        self.assertEqual(stage_snapshot, self._tree_snapshot(stage))
 
         self.plan_path.write_bytes(old_plan)
         with self.assertRaisesRegex(ValueError, "review video is missing"):
@@ -2740,6 +2795,130 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
             self.assertEqual(digest, broll_plan.sha256_file(self.root / relative))
         self.assertEqual("review page", (review_dir / "index.html").read_text(encoding="utf-8"))
         self.assertEqual("immutable asset", (review_dir / "assets/review.js").read_text(encoding="utf-8"))
+
+    def test_checker_rejects_unreadable_committed_plan_before_mutating_recovery_state(self):
+        video, _ = self._normalized_for_check()
+        review_dir, _ = self._seed_review_outputs()
+        crashed = self._crash_verification(video, "plan")
+        self.assertEqual(93, crashed.returncode, crashed.stderr)
+        transaction = self.root / "review/.03-b-roll.check.transaction"
+        stage = self.root / "review/.03-b-roll.check.part"
+        committed = self.plan_path.read_bytes()
+        artifact_snapshot = self._tree_snapshot(review_dir)
+        transaction_snapshot = self._tree_snapshot(transaction)
+        stage_snapshot = self._tree_snapshot(stage)
+        saved_plan = self.plan_path.with_name("broll-plan.saved.json")
+        os.replace(self.plan_path, saved_plan)
+
+        with self.assertRaisesRegex(ValueError, "canonical plan is unreadable"):
+            check_broll.verify_plan(
+                self.plan_path, self.timeline_path, self.root, self.root / "missing.mp4"
+            )
+        self.assertEqual(artifact_snapshot, self._tree_snapshot(review_dir))
+        self.assertEqual(transaction_snapshot, self._tree_snapshot(transaction))
+        self.assertEqual(stage_snapshot, self._tree_snapshot(stage))
+
+        os.replace(saved_plan, self.plan_path)
+        with self.assertRaisesRegex(ValueError, "review video is missing"):
+            check_broll.verify_plan(
+                self.plan_path, self.timeline_path, self.root, self.root / "missing.mp4"
+            )
+        self.assertEqual(committed, self.plan_path.read_bytes())
+        self.assertEqual(artifact_snapshot, self._tree_snapshot(review_dir))
+        self.assertFalse(transaction.exists())
+        self.assertFalse(stage.exists())
+
+    def test_checker_rejects_third_plan_identity_before_mutating_committed_state(self):
+        video, _ = self._normalized_for_check()
+        review_dir, _ = self._seed_review_outputs()
+        crashed = self._crash_verification(video, "plan")
+        self.assertEqual(93, crashed.returncode, crashed.stderr)
+        transaction = self.root / "review/.03-b-roll.check.transaction"
+        stage = self.root / "review/.03-b-roll.check.part"
+        committed = self.plan_path.read_bytes()
+        artifact_snapshot = self._tree_snapshot(review_dir)
+        transaction_snapshot = self._tree_snapshot(transaction)
+        stage_snapshot = self._tree_snapshot(stage)
+        third_plan = projectlib.load_json(self.plan_path)
+        third_plan["unexpected_identity"] = True
+        projectlib.write_json(self.plan_path, third_plan)
+        third_identity = self.plan_path.read_bytes()
+
+        with self.assertRaisesRegex(ValueError, "matches neither transaction identity"):
+            check_broll.verify_plan(
+                self.plan_path, self.timeline_path, self.root, self.root / "missing.mp4"
+            )
+        self.assertEqual(third_identity, self.plan_path.read_bytes())
+        self.assertEqual(artifact_snapshot, self._tree_snapshot(review_dir))
+        self.assertEqual(transaction_snapshot, self._tree_snapshot(transaction))
+        self.assertEqual(stage_snapshot, self._tree_snapshot(stage))
+
+        self.plan_path.write_bytes(committed)
+        with self.assertRaisesRegex(ValueError, "review video is missing"):
+            check_broll.verify_plan(
+                self.plan_path, self.timeline_path, self.root, self.root / "missing.mp4"
+            )
+        self.assertEqual(artifact_snapshot, self._tree_snapshot(review_dir))
+        self.assertFalse(transaction.exists())
+        self.assertFalse(stage.exists())
+
+    def test_checker_rejects_linked_transaction_without_touching_external_target(self):
+        video, _ = self._normalized_for_check()
+        review_dir, _ = self._seed_review_outputs()
+        transaction = self.root / "review/.03-b-roll.check.transaction"
+        outside_temp = tempfile.TemporaryDirectory()
+        self.addCleanup(outside_temp.cleanup)
+        outside = Path(outside_temp.name)
+        (outside / "sentinel.bin").write_bytes(b"external transaction sentinel")
+        outside_snapshot = self._tree_snapshot(outside)
+        self._directory_link_or_skip(transaction, outside)
+
+        with self.assertRaisesRegex(ValueError, "transaction.*link|transaction.*reparse"):
+            check_broll.verify_plan(self.plan_path, self.timeline_path, self.root, video)
+        self.assertTrue(transaction.is_symlink() or (
+            hasattr(transaction, "is_junction") and transaction.is_junction()
+        ))
+        self.assertEqual(outside_snapshot, self._tree_snapshot(outside))
+        self._assert_old_review_outputs(review_dir, {
+            "stills/old.txt": b"old stills",
+            "contact-sheet.jpg": b"old contact",
+            "boundary-reel.mp4": b"old reel",
+            "b-roll-summary.md": b"old summary",
+        })
+
+    def test_checker_rejects_linked_backup_before_copy_or_cleanup(self):
+        video, _ = self._normalized_for_check()
+        review_dir, _ = self._seed_review_outputs()
+        crashed = self._crash_verification(video, "all-new")
+        self.assertEqual(92, crashed.returncode, crashed.stderr)
+        transaction = self.root / "review/.03-b-roll.check.transaction"
+        stage = self.root / "review/.03-b-roll.check.part"
+        old_dir = transaction / "old"
+        shutil.rmtree(old_dir)
+        outside_temp = tempfile.TemporaryDirectory()
+        self.addCleanup(outside_temp.cleanup)
+        outside = Path(outside_temp.name)
+        (outside / "stills").mkdir(parents=True)
+        (outside / "stills/sentinel.bin").write_bytes(b"external stills")
+        for name in ("contact-sheet.jpg", "boundary-reel.mp4", "b-roll-summary.md"):
+            (outside / name).write_bytes(f"external {name}".encode("ascii"))
+        self._directory_link_or_skip(old_dir, outside)
+        artifact_snapshot = self._tree_snapshot(review_dir)
+        marker = (transaction / "marker.json").read_bytes()
+        stage_snapshot = self._tree_snapshot(stage)
+        outside_snapshot = self._tree_snapshot(outside)
+
+        with self.assertRaisesRegex(ValueError, "backup.*link|backup.*reparse"):
+            check_broll.verify_plan(
+                self.plan_path, self.timeline_path, self.root, self.root / "missing.mp4"
+            )
+        self.assertEqual(artifact_snapshot, self._tree_snapshot(review_dir))
+        self.assertEqual(marker, (transaction / "marker.json").read_bytes())
+        self.assertTrue(old_dir.is_symlink() or (
+            hasattr(old_dir, "is_junction") and old_dir.is_junction()
+        ))
+        self.assertEqual(stage_snapshot, self._tree_snapshot(stage))
+        self.assertEqual(outside_snapshot, self._tree_snapshot(outside))
 
     def test_checker_rolls_back_prepared_equal_hash_rerun_after_first_move(self):
         video, _ = self._normalized_for_check()
@@ -2841,6 +3020,75 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
             self.assertLess(pixels[index][1], 30)
         for overlay, base in ((1, 0), (2, 3), (5, 4), (6, 7)):
             self.assertGreater(max(abs(a - b) for a, b in zip(pixels[overlay], pixels[base])), 40)
+
+    def test_boundary_reel_clips_short_shots_at_program_edges(self):
+        video = self._review_video()
+        self.transcript = {"segments": [{"words": [
+            {"word": "opening", "start": 0.05, "end": 0.35},
+            {"word": "closing", "start": 9.65, "end": 9.95},
+        ]}]}
+        projectlib.write_json(self.transcript_path, self.transcript)
+        mapped = projectlib.map_transcript_to_timeline(self.transcript, self.timeline)["segments"][0]["words"]
+        plan = copy.deepcopy(self.base_plan)
+        first = plan["shots"][0]
+        first.update({
+            "id": "opening", "program_range": {"start_s": 0, "end_s": 0.4},
+            "source_ranges": [{"clip_id": "one", "start_s": 0, "end_s": 0.4}],
+            "transcript_evidence": {"words": [mapped[0]]},
+        })
+        second = copy.deepcopy(first)
+        second.update({
+            "id": "closing", "program_range": {"start_s": 9.6, "end_s": 10},
+            "source_ranges": [{"clip_id": "one", "start_s": 9.6, "end_s": 10}],
+            "transcript_evidence": {"words": [mapped[1]]},
+        })
+        second["candidates"][0]["id"] = "asset-2"
+        plan["shots"] = [first, second]
+        plan["input_hashes"].update({
+            "review_video_sha256": broll_plan.sha256_file(video),
+            "transcript_sha256": broll_plan.sha256_file(self.transcript_path),
+        })
+        decisions = [
+            {"id": shot["id"], "decision": "select", "candidate_id": shot["candidates"][0]["id"],
+             "source_trim": {"start_s": 0.25, "end_s": 0.65}}
+            for shot in plan["shots"]
+        ]
+        projectlib.write_json(
+            self.plan_path,
+            broll_plan.apply_review(
+                plan, self.review_for(plan, decisions), mode="agent", actor="agent",
+                rationale="Relevant footage.",
+            ),
+        )
+        normalize_broll.normalize_plan(
+            self.plan_path, self.timeline_path, self.root, lut=self.selected_lut_path
+        )
+        _, artifacts = check_broll.verify_plan(
+            self.plan_path, self.timeline_path, self.root, video
+        )
+
+        samples = {
+            name: self._reel_pixel(artifacts["boundary_reel"], time_s)
+            for name, time_s in (
+                ("start-entry-overlay", 0.2), ("start-entry-base", 0.45),
+                ("start-exit-overlay", 0.7), ("start-exit-base", 1.2),
+                ("end-entry-base", 1.6), ("end-entry-overlay", 2.1),
+                ("end-exit-base", 2.35), ("end-exit-overlay", 2.6),
+            )
+        }
+        for name in ("start-entry-base", "start-exit-base", "end-entry-base", "end-exit-base"):
+            self.assertGreater(samples[name][2], 200)
+            self.assertLess(samples[name][0], 30)
+            self.assertLess(samples[name][1], 30)
+        for overlay, base in (
+            ("start-entry-overlay", "start-entry-base"),
+            ("start-exit-overlay", "start-exit-base"),
+            ("end-entry-overlay", "end-entry-base"),
+            ("end-exit-overlay", "end-exit-base"),
+        ):
+            self.assertGreater(
+                max(abs(a - b) for a, b in zip(samples[overlay], samples[base])), 40
+            )
 
 
 class AcquisitionTests(unittest.TestCase):
