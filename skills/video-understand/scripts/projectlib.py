@@ -698,27 +698,38 @@ def _validate_broll_plan(plan, operation, contributions, timeline, errors, proje
         return parsed.tzinfo is not None and parsed.utcoffset() is not None
 
     def bound_file(binding, label, expected_path=None):
+        path_value = binding.get("path") if isinstance(binding, dict) else None
         valid = (
             isinstance(binding, dict) and set(binding) == {"path", "sha256"}
+            and isinstance(path_value, str) and bool(path_value.strip())
             and re.fullmatch(r"[0-9a-fA-F]{64}", str(binding.get("sha256", "")))
-            and (expected_path is None or binding.get("path") == expected_path)
+            and (expected_path is None or path_value == expected_path)
         )
         if not valid:
             errors.append(prefix + f"{label} binding is invalid")
             return None
         if project_root is None:
             return None
-        root, raw = Path(project_root).resolve(), Path(binding["path"])
-        path = (root / raw).resolve()
+        try:
+            root, raw = Path(project_root).resolve(), Path(path_value)
+            path = (root / raw).resolve()
+        except (OSError, ValueError, TypeError, RuntimeError):
+            errors.append(prefix + f"{label} path is invalid")
+            return None
         try:
             path.relative_to(root)
         except ValueError:
             errors.append(prefix + f"{label} path escapes project root")
             return None
-        if not path.is_file():
-            errors.append(prefix + f"{label} file is missing")
+        try:
+            if not path.is_file():
+                errors.append(prefix + f"{label} file is missing")
+                return None
+            digest = _sha256_file(path)
+        except (OSError, ValueError, TypeError, RuntimeError):
+            errors.append(prefix + f"{label} file could not be validated")
             return None
-        if _sha256_file(path) != binding["sha256"]:
+        if digest != binding["sha256"]:
             errors.append(prefix + f"{label} SHA-256 is stale")
             return None
         return path

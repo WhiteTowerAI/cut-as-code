@@ -600,6 +600,19 @@ def check_broll_compiler_consistency():
             "non-object receipt", copy.deepcopy(completed_plan), [],
             "receipt must be an object",
         )
+
+        def malformed_still_path(value, expected):
+            current_plan, current_receipt = copy.deepcopy(completed_plan), copy.deepcopy(receipt)
+            current_plan["shots"][0]["verification"]["stills"]["first"]["path"] = value
+            current_receipt["artifacts"]["stills"][0]["path"] = value
+            subject = {key: item for key, item in current_plan.items() if key != "visual_review"}
+            payload = json.dumps(subject, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+            digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+            current_plan["visual_review"]["plan_sha256"] = current_receipt["plan_sha256"] = digest
+            completed_failure(f"still path {value!r}", current_plan, current_receipt, expected)
+
+        malformed_still_path(None, "binding is invalid")
+        malformed_still_path("review/03-b-roll/stills/bad\0.png", "path is invalid")
         projectlib.write_json(receipt_path, receipt)
         completed_plan["visual_review"]["receipt"]["sha256"] = hashlib.sha256(
             receipt_path.read_bytes()
