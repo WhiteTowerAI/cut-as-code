@@ -188,7 +188,6 @@ def normalize_shot(candidate, shot, timeline, destination, *, lut=None):
     target, root = _destination(destination)
     part = target.with_suffix(".part.mp4")
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.unlink(missing_ok=True)
     part.unlink(missing_ok=True)
     try:
         width, height, num, den = _timeline_spec(timeline)
@@ -232,7 +231,6 @@ def normalize_shot(candidate, shot, timeline, destination, *, lut=None):
         }
     except BaseException:
         part.unlink(missing_ok=True)
-        target.unlink(missing_ok=True)
         raise
 
 

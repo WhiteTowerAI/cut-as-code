@@ -2001,6 +2001,43 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
         )
         self.assertEqual(updated, projectlib.load_json(self.plan_path))
 
+    def test_normalize_shot_preserves_existing_target_until_atomic_success(self):
+        candidate, shot = self._video_shot(self.candidates / "source.mp4")
+        sentinel = b"last-good-normalized-output"
+        part = self.output.with_suffix(".part.mp4")
+        invalid = copy.deepcopy(shot)
+        invalid["selected"].pop("source_trim")
+        real_run = subprocess.run
+
+        def fail_render(command, *args, **kwargs):
+            if command[0] == "ffmpeg" and "-vf" in command:
+                raise subprocess.CalledProcessError(1, command)
+            return real_run(command, *args, **kwargs)
+
+        def render_failure():
+            with mock.patch.object(normalize_broll.subprocess, "run", side_effect=fail_render):
+                normalize_broll.normalize_shot(candidate, shot, self.timeline, self.output)
+
+        failures = (
+            ("validation", ValueError, lambda: normalize_broll.normalize_shot(candidate, invalid, self.timeline, self.output)),
+            ("render", subprocess.CalledProcessError, render_failure),
+        )
+        for name, error, action in failures:
+            with self.subTest(name=name):
+                self.output.parent.mkdir(parents=True, exist_ok=True)
+                self.output.write_bytes(sentinel)
+                part.write_bytes(b"stale-part")
+                with self.assertRaises(error):
+                    action()
+                self.assertTrue(self.output.exists())
+                self.assertEqual(sentinel, self.output.read_bytes())
+                self.assertFalse(part.exists())
+
+        self.output.write_bytes(sentinel)
+        record = normalize_broll.normalize_shot(candidate, shot, self.timeline, self.output)
+        self.assertNotEqual(sentinel, self.output.read_bytes())
+        self.assertEqual(broll_plan.sha256_file(self.output), record["sha256"])
+
     def test_explicit_still_uses_ken_burns_but_no_implicit_fallback(self):
         source = self.candidates / "still.png"
         image = Image.new("RGB", (128, 96))
