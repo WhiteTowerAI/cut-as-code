@@ -223,11 +223,11 @@ def _range(value):
         return None
     try:
         start_value, end_value = value["start_s"], value["end_s"]
-    except KeyError:
+        if any(not isinstance(item, (int, float)) or isinstance(item, bool) for item in (start_value, end_value)):
+            return None
+        start, end = float(start_value), float(end_value)
+    except (KeyError, OverflowError, TypeError, ValueError):
         return None
-    if any(not isinstance(item, (int, float)) or isinstance(item, bool) for item in (start_value, end_value)):
-        return None
-    start, end = float(start_value), float(end_value)
     return (start, end) if math.isfinite(start) and math.isfinite(end) else None
 
 
@@ -277,7 +277,7 @@ def _source_ranges_match(declared, expected):
 def _mapped_words(transcript, timeline):
     try:
         mapped = projectlib.map_transcript_to_timeline(transcript, timeline)
-    except (AttributeError, KeyError, TypeError, ValueError):
+    except (AttributeError, KeyError, OverflowError, TypeError, ValueError):
         return set()
     result = set()
     segments = mapped.get("segments", []) if isinstance(mapped, dict) else []

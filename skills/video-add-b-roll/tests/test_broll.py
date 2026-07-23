@@ -162,6 +162,20 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "shot select requires a valid source_trim"):
                     broll_plan.apply_review(self.plan, review, mode="agent", actor="agent", rationale="Relevant footage.")
 
+    def test_apply_review_contains_oversized_integer_trim_endpoints(self):
+        huge = 10 ** 10000
+        trims = [
+            ("positive start", {"start_s": huge, "end_s": 1}),
+            ("negative start", {"start_s": -huge, "end_s": 1}),
+            ("positive end", {"start_s": 0, "end_s": huge}),
+            ("negative end", {"start_s": 0, "end_s": -huge}),
+        ]
+        for name, trim in trims:
+            review = self.review_for(self.plan, [{"id": "shot", "decision": "select", "candidate_id": "asset", "source_trim": trim}])
+            with self.subTest(name=name):
+                with self.assertRaisesRegex(ValueError, "shot select requires a valid source_trim"):
+                    broll_plan.apply_review(self.plan, review, mode="agent", actor="agent", rationale="Relevant footage.")
+
     def test_apply_review_rejects_invalid_image_motion_without_null_decisions(self):
         missing = object()
         for value in (missing, None, [], {}, {"direction": None}, {"direction": []}, {"direction": "spin"}):
@@ -685,6 +699,52 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         valid["shots"][0]["program_range"] = {"start_s": 1, "end_s": 2.0}
         valid["shots"][0]["source_ranges"][0].update({"start_s": 1.0, "end_s": 2})
         self.assertEqual([], broll_plan.validate_plan(valid, self.timeline, self.transcript))
+
+    def test_persisted_plan_timeline_and_evidence_contain_oversized_integer_ranges(self):
+        huge = 10 ** 10000
+        plan_paths = [
+            ("program start", ("shots", 0, "program_range", "start_s")),
+            ("program end", ("shots", 0, "program_range", "end_s")),
+            ("source start", ("shots", 0, "source_ranges", 0, "start_s")),
+            ("source end", ("shots", 0, "source_ranges", 0, "end_s")),
+            ("evidence source start", ("shots", 0, "transcript_evidence", "words", 0, "source_range", "start_s")),
+            ("evidence source end", ("shots", 0, "transcript_evidence", "words", 0, "source_range", "end_s")),
+            ("evidence program start", ("shots", 0, "transcript_evidence", "words", 0, "program_range", "start_s")),
+            ("evidence program end", ("shots", 0, "transcript_evidence", "words", 0, "program_range", "end_s")),
+        ]
+        for name, path in plan_paths:
+            for sign, value in (("positive", huge), ("negative", -huge)):
+                plan = copy.deepcopy(self.plan)
+                target = plan
+                for key in path[:-1]:
+                    target = target[key]
+                target[path[-1]] = value
+                with self.subTest(scope="plan", name=name, sign=sign):
+                    self.assertTrue(broll_plan.validate_plan(plan, self.timeline, self.transcript))
+
+        approved = broll_plan.apply_review(self.plan, self.review(), mode="agent", actor="agent", rationale="Relevant footage.")
+        for endpoint in ("start_s", "end_s"):
+            for sign, value in (("positive", huge), ("negative", -huge)):
+                plan = copy.deepcopy(approved)
+                plan["shots"][0]["selected"]["source_trim"][endpoint] = value
+                with self.subTest(scope="selected", endpoint=endpoint, sign=sign):
+                    self.assertIn("shot selected video requires a valid source_trim", broll_plan.validate_plan(plan, self.timeline, self.transcript))
+
+        timeline_paths = [
+            ("source start", ("clips", 0, "source_range", "start_s")),
+            ("source end", ("clips", 0, "source_range", "end_s")),
+            ("program start", ("clips", 0, "program_range", "start_s")),
+            ("program end", ("clips", 0, "program_range", "end_s")),
+        ]
+        for name, path in timeline_paths:
+            for sign, value in (("positive", huge), ("negative", -huge)):
+                timeline = copy.deepcopy(self.timeline)
+                target = timeline
+                for key in path[:-1]:
+                    target = target[key]
+                target[path[-1]] = value
+                with self.subTest(scope="timeline", name=name, sign=sign):
+                    self.assertTrue(broll_plan.validate_plan(self.plan, timeline, self.transcript))
 
     def test_review_receipt_integrity_and_human_authority_are_validated(self):
         approved = broll_plan.apply_review(self.plan, self.review(), mode="agent", actor="agent", rationale="Relevant footage.")
