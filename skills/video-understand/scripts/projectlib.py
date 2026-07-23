@@ -66,9 +66,15 @@ def _validate_node(node, nodes, errors, *, allow_render=False):
     if not isinstance(dependencies, list):
         errors.append(f"{node_id} depends_on must be a list")
         dependencies = []
+    valid_dependencies = []
     for dependency in dependencies:
+        if not isinstance(dependency, str) or not dependency.strip():
+            errors.append(f"{node_id} dependency id must be a nonblank string")
+            continue
+        valid_dependencies.append(dependency)
         if dependency not in nodes and not (allow_render and dependency == "render"):
             errors.append(f"{node_id} missing dependency: {dependency}")
+    dependencies = valid_dependencies
 
     based_on = node.get("based_on", {})
     if not isinstance(based_on, dict):
@@ -222,7 +228,7 @@ def validate_project(project, project_root, check_files=True, check_media=False)
         operation_id: {
             dependency
             for dependency in operation.get("depends_on", [])
-            if dependency in nodes
+            if isinstance(dependency, str) and dependency in nodes
         }
         for operation_id, operation in nodes.items()
         if operation_id
@@ -639,7 +645,7 @@ def _validate_caption_plan(plan, contribution, operation_id, errors, project_roo
         errors.append(f"{operation_id} caption runtime asset hashes are invalid")
 
 
-def _validate_broll_plan(plan, operation, contributions, timeline, errors, active_sequence):
+def _validate_broll_plan(plan, operation, contributions, timeline, errors):
     operation_id = operation.get("id") if isinstance(operation, dict) else "b-roll"
     prefix = f"{operation_id or 'b-roll'} B-roll plan mismatch: "
 
@@ -714,9 +720,9 @@ def _validate_broll_plan(plan, operation, contributions, timeline, errors, activ
         errors.append(prefix + "program_duration_s does not match timeline")
 
     target = operation.get("target")
-    if not isinstance(target, dict) or target.get("sequence") != active_sequence:
-        errors.append(prefix + "operation target sequence does not match active_sequence")
-    if not isinstance(target, dict) or target.get("scope") != "b-roll":
+    if not isinstance(target, dict):
+        errors.append(prefix + "operation target must be an object")
+    elif target.get("scope") != "b-roll":
         errors.append(prefix + "operation target scope must be b-roll")
     revision = operation.get("revision")
     if not isinstance(revision, int) or isinstance(revision, bool) or revision <= 0:
@@ -949,6 +955,12 @@ def build_render_plan(project, project_root):
         contributions = declared if isinstance(declared, list) else [declared]
         if operation.get("skill") == "video-add-b-roll":
             before = len(errors)
+            target = operation.get("target")
+            if not isinstance(target, dict) or target.get("sequence") != sequence_name:
+                errors.append(
+                    f"{operation_id} B-roll plan mismatch: "
+                    "operation target sequence does not match active_sequence"
+                )
             plan_value = operation.get("plan")
             if not plan_value:
                 errors.append(f"{operation_id} B-roll plan mismatch: plan is required")
@@ -959,9 +971,7 @@ def build_render_plan(project, project_root):
                 except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
                     errors.append(f"{operation_id} B-roll plan mismatch: invalid plan: {exc}")
                 else:
-                    _validate_broll_plan(
-                        broll_plan, operation, contributions, timeline, errors, sequence_name
-                    )
+                    _validate_broll_plan(broll_plan, operation, contributions, timeline, errors)
             if len(errors) != before:
                 continue
         for contribution in contributions:

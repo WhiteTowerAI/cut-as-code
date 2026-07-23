@@ -547,16 +547,25 @@ def check_broll_compiler_consistency():
         missing_based_on_operation["based_on"] = {"understanding": 1}
         direct_probes.append(("incomplete based_on mappings", missing_based_on_plan, missing_based_on_operation, timeline, "based_on keys must exactly match dependencies"))
         malformed_dependencies_plan = copy.deepcopy(plan)
-        malformed_dependencies_operation = copy.deepcopy(project["operations"][2])
+        malformed_dependencies_project = copy.deepcopy(project)
         malformed_dependencies_plan["dependencies"] = [["understanding"]]
-        malformed_dependencies_operation["depends_on"] = [["understanding"]]
-        direct_probes.append(("malformed dependencies", malformed_dependencies_plan, malformed_dependencies_operation, timeline, "dependencies must be unique and canonically ordered"))
+        malformed_dependencies_project["operations"][2]["depends_on"] = [["understanding"]]
+        try:
+            compile_values(malformed_dependencies_plan, malformed_dependencies_project, timeline)
+        except ValueError as error:
+            if "b-roll dependency id must be a nonblank string" not in str(error):
+                failures.append(f"malformed build dependencies: {error}")
+        except Exception as error:
+            failures.append(f"malformed build dependencies: {type(error).__name__}: {error}")
+        else:
+            failures.append("malformed build dependencies: mismatch was accepted")
+
         for label, current_plan, operation, current_timeline, expected in direct_probes:
             direct_errors = []
             try:
                 projectlib._validate_broll_plan(
                     current_plan, operation, operation["render"], current_timeline,
-                    direct_errors, "main",
+                    direct_errors,
                 )
             except TypeError as error:
                 failures.append(f"{label}: {error}")
