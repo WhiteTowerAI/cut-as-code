@@ -2131,6 +2131,58 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
                     normalize_broll.normalize_plan(self.plan_path, self.timeline_path, self.root, lut=self.selected_lut_path)
                 self.assertFalse(self.output.exists())
 
+    def test_plan_requires_exact_canonical_plan_and_timeline_paths(self):
+        alternate_plan = self.root / "work/b-roll/alternate-plan.json"
+        alternate_timeline = self.root / "work/alternate-timeline.json"
+        projectlib.write_json(alternate_plan, self.plan)
+        projectlib.write_json(alternate_timeline, self.timeline)
+        canonical_plan = self.plan_path.read_bytes()
+        cases = (
+            (alternate_plan, self.timeline_path, "plan_path must be canonical"),
+            (self.plan_path, alternate_timeline, "timeline_path must be canonical"),
+        )
+        for plan_path, timeline_path, message in cases:
+            with self.subTest(message=message):
+                self.output.unlink(missing_ok=True)
+                with mock.patch.object(normalize_broll, "normalize_shot", wraps=normalize_broll.normalize_shot) as render, mock.patch.object(normalize_broll.projectlib, "write_json", wraps=projectlib.write_json) as write:
+                    with self.assertRaisesRegex(ValueError, message):
+                        normalize_broll.normalize_plan(plan_path, timeline_path, self.root, lut=self.selected_lut_path)
+                    render.assert_not_called()
+                    write.assert_not_called()
+                self.assertFalse(self.output.exists())
+                self.assertFalse(self.output.with_suffix(".part.mp4").exists())
+                self.assertEqual(canonical_plan, self.plan_path.read_bytes())
+
+    def test_plan_write_failure_removes_only_new_unrecorded_output(self):
+        projectlib.write_json(self.plan_path, self._two_shot_plan())
+        real_normalize = normalize_broll.normalize_shot
+
+        def fail_second(candidate, *args, **kwargs):
+            if candidate["id"] == "asset-2":
+                raise RuntimeError("pause after first")
+            return real_normalize(candidate, *args, **kwargs)
+
+        with mock.patch.object(normalize_broll, "normalize_shot", side_effect=fail_second):
+            with self.assertRaisesRegex(RuntimeError, "pause after first"):
+                normalize_broll.normalize_plan(self.plan_path, self.timeline_path, self.root, lut=self.selected_lut_path)
+        persisted = projectlib.load_json(self.plan_path)
+        first_bytes = self.output.read_bytes()
+        second_output = self.output.with_name("broll-002.mp4")
+        real_write = projectlib.write_json
+
+        def fail_after_write(path, value):
+            real_write(path, value)
+            raise OSError("disk full")
+
+        with mock.patch.object(normalize_broll.projectlib, "write_json", side_effect=fail_after_write):
+            with self.assertRaisesRegex(OSError, "disk full"):
+                normalize_broll.normalize_plan(self.plan_path, self.timeline_path, self.root, lut=self.selected_lut_path)
+        self.assertEqual(persisted, projectlib.load_json(self.plan_path))
+        self.assertEqual(first_bytes, self.output.read_bytes())
+        self.assertFalse(second_output.exists())
+        self.assertFalse(second_output.with_suffix(".part.mp4").exists())
+        self.assertFalse(self.plan_path.with_suffix(".part.json").exists())
+
     def test_plan_uses_reviewed_cache_path_not_candidate_path(self):
         reviewed = self.candidates / "reviewed.mp4"
         alternate = self.candidates / "alternate.mp4"

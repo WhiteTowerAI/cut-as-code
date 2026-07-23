@@ -262,11 +262,10 @@ def normalize_plan(plan_path, timeline_path, project_root, *, lut=None):
     """Validate, resume, and durably normalize each selected shot."""
     root = Path(project_root).resolve()
     plan_path, timeline_path = Path(plan_path).resolve(), Path(timeline_path).resolve()
-    for label, path in (("plan", plan_path), ("timeline", timeline_path)):
-        try:
-            path.relative_to(root)
-        except ValueError as exc:
-            raise ValueError(f"{label} path escapes project root") from exc
+    if plan_path != (root / "work/b-roll/broll-plan.json").resolve():
+        raise ValueError("plan_path must be canonical work/b-roll/broll-plan.json")
+    if timeline_path != (root / "work/timeline.json").resolve():
+        raise ValueError("timeline_path must be canonical work/timeline.json")
     try:
         plan = projectlib.load_json(plan_path)
         timeline = projectlib.load_json(timeline_path)
@@ -315,11 +314,20 @@ def normalize_plan(plan_path, timeline_path, project_root, *, lut=None):
         record = normalize_shot(candidate, shot, timeline, output, lut=lut_path)
         record["path"] = output.relative_to(root / "work").as_posix()
         shot["normalized"], shot["status"] = record, "normalized"
-        errors = broll_plan.validate_plan(
-            result, timeline, transcript, project=project, project_root=root, verify_files=True
-        )
-        if errors:
-            output.unlink(missing_ok=True)
-            raise ValueError("invalid normalized plan: " + "; ".join(errors))
-        projectlib.write_json(plan_path, result)
+        plan_part = plan_path.with_suffix(".part.json")
+        try:
+            errors = broll_plan.validate_plan(
+                result, timeline, transcript, project=project, project_root=root, verify_files=True
+            )
+            if errors:
+                raise ValueError("invalid normalized plan: " + "; ".join(errors))
+            projectlib.write_json(plan_part, result)
+            os.replace(plan_part, plan_path)
+        except BaseException:
+            for path in (output, output.with_suffix(".part.mp4"), plan_part):
+                try:
+                    path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            raise
     return result
