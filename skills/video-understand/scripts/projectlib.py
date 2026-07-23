@@ -639,7 +639,7 @@ def _validate_caption_plan(plan, contribution, operation_id, errors, project_roo
         errors.append(f"{operation_id} caption runtime asset hashes are invalid")
 
 
-def _validate_broll_plan(plan, operation, contributions, timeline, errors):
+def _validate_broll_plan(plan, operation, contributions, timeline, errors, active_sequence):
     operation_id = operation.get("id") if isinstance(operation, dict) else "b-roll"
     prefix = f"{operation_id or 'b-roll'} B-roll plan mismatch: "
 
@@ -652,6 +652,26 @@ def _validate_broll_plan(plan, operation, contributions, timeline, errors):
             return None
         return value if math.isfinite(value) else None
 
+    def valid_dependencies(value):
+        if (
+            not isinstance(value, list) or not value
+            or any(not isinstance(item, str) or not item.strip() for item in value)
+        ):
+            return False
+        order = ("understanding", "cut", "color-grade")
+        return len(value) == len(set(value)) and value == [item for item in order if item in value]
+
+    def valid_based_on(value, dependencies):
+        return (
+            isinstance(value, dict)
+            and isinstance(dependencies, list)
+            and set(value) == set(dependencies)
+            and all(
+                isinstance(revision, int) and not isinstance(revision, bool) and revision > 0
+                for revision in value.values()
+            )
+        )
+
     if not isinstance(plan, dict):
         errors.append(prefix + "plan must be an object")
         return
@@ -661,14 +681,27 @@ def _validate_broll_plan(plan, operation, contributions, timeline, errors):
     if not isinstance(timeline, dict):
         errors.append(prefix + "timeline must be an object")
         return
-    if plan.get("schema_version") != 1:
+    schema_version = plan.get("schema_version")
+    if not isinstance(schema_version, int) or isinstance(schema_version, bool):
+        errors.append(prefix + "plan schema_version must be integer 1")
+    elif schema_version != 1:
         errors.append(prefix + "plan schema_version must be 1")
     if plan.get("review_status") != "approved":
         errors.append(prefix + "review_status must be approved")
     review = plan.get("review")
     if not isinstance(review, dict) or review.get("status") != "approved":
         errors.append(prefix + "review receipt must be approved")
-    if plan.get("timeline_id") != timeline.get("timeline_id"):
+    plan_timeline_id = plan.get("timeline_id")
+    timeline_id = timeline.get("timeline_id")
+    if not isinstance(plan_timeline_id, str) or not plan_timeline_id.strip():
+        errors.append(prefix + "plan timeline_id must be nonblank")
+    if not isinstance(timeline_id, str) or not timeline_id.strip():
+        errors.append(prefix + "timeline timeline_id must be nonblank")
+    if (
+        isinstance(plan_timeline_id, str) and plan_timeline_id.strip()
+        and isinstance(timeline_id, str) and timeline_id.strip()
+        and plan_timeline_id != timeline_id
+    ):
         errors.append(prefix + "timeline_id does not match timeline")
 
     duration = number(plan.get("program_duration_s"))
@@ -681,13 +714,37 @@ def _validate_broll_plan(plan, operation, contributions, timeline, errors):
         errors.append(prefix + "program_duration_s does not match timeline")
 
     target = operation.get("target")
-    if not isinstance(target, dict) or target.get("sequence") != "main":
-        errors.append(prefix + "operation target must be the current main sequence")
+    if not isinstance(target, dict) or target.get("sequence") != active_sequence:
+        errors.append(prefix + "operation target sequence does not match active_sequence")
     if not isinstance(target, dict) or target.get("scope") != "b-roll":
         errors.append(prefix + "operation target scope must be b-roll")
-    if operation.get("depends_on") != plan.get("dependencies"):
+    revision = operation.get("revision")
+    if not isinstance(revision, int) or isinstance(revision, bool) or revision <= 0:
+        errors.append(prefix + "operation revision must be a positive integer")
+
+    operation_dependencies = operation.get("depends_on")
+    plan_dependencies = plan.get("dependencies")
+    operation_dependencies_valid = valid_dependencies(operation_dependencies)
+    plan_dependencies_valid = valid_dependencies(plan_dependencies)
+    if not operation_dependencies_valid:
+        errors.append(prefix + "operation dependencies must be unique and canonically ordered")
+    if not plan_dependencies_valid:
+        errors.append(prefix + "plan dependencies must be unique and canonically ordered")
+    if operation_dependencies != plan_dependencies:
         errors.append(prefix + "operation dependencies do not match plan")
-    if operation.get("based_on") != plan.get("based_on"):
+        errors.append(prefix + "plan dependencies do not match operation")
+
+    operation_based_on = operation.get("based_on")
+    plan_based_on = plan.get("based_on")
+    if not isinstance(operation_based_on, dict) or not operation_dependencies_valid or set(operation_based_on) != set(operation_dependencies):
+        errors.append(prefix + "operation based_on keys must exactly match dependencies")
+    elif not valid_based_on(operation_based_on, operation_dependencies):
+        errors.append(prefix + "operation based_on revisions must be positive integers")
+    if not isinstance(plan_based_on, dict) or not plan_dependencies_valid or set(plan_based_on) != set(plan_dependencies):
+        errors.append(prefix + "plan based_on keys must exactly match dependencies")
+    elif not valid_based_on(plan_based_on, plan_dependencies):
+        errors.append(prefix + "plan based_on revisions must be positive integers")
+    if operation_based_on != plan_based_on:
         errors.append(prefix + "operation based_on does not match plan")
 
     shots = plan.get("shots")
@@ -696,12 +753,18 @@ def _validate_broll_plan(plan, operation, contributions, timeline, errors):
         return
     selected = []
     ranges = []
+    shot_ids = set()
     for index, shot in enumerate(shots, 1):
         if not isinstance(shot, dict):
             errors.append(prefix + f"shot {index} must be an object")
             continue
         shot_id = shot.get("id")
         label = shot_id if isinstance(shot_id, str) and shot_id.strip() else str(index)
+        if isinstance(shot_id, str):
+            if shot_id in shot_ids:
+                errors.append(prefix + f"duplicate shot id: {shot_id}")
+            else:
+                shot_ids.add(shot_id)
         status = shot.get("status")
         if status == "skipped":
             if shot.get("selected") is not None or "normalized" in shot or "verification" in shot:
@@ -764,6 +827,11 @@ def _validate_broll_plan(plan, operation, contributions, timeline, errors):
         if not isinstance(contribution, dict):
             errors.append(prefix + f"contribution {index} must be an object")
             continue
+        if set(contribution) != {"kind", "asset", "start_s", "duration_s"}:
+            errors.append(
+                prefix + f"contribution {index} fields must be exactly "
+                "asset, duration_s, kind, start_s"
+            )
         if contribution.get("kind") != "overlay":
             errors.append(prefix + f"contribution {index} kind must be overlay")
         normalized = shot.get("normalized")
@@ -891,7 +959,9 @@ def build_render_plan(project, project_root):
                 except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
                     errors.append(f"{operation_id} B-roll plan mismatch: invalid plan: {exc}")
                 else:
-                    _validate_broll_plan(broll_plan, operation, contributions, timeline, errors)
+                    _validate_broll_plan(
+                        broll_plan, operation, contributions, timeline, errors, sequence_name
+                    )
             if len(errors) != before:
                 continue
         for contribution in contributions:

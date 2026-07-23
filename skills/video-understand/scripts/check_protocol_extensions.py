@@ -471,10 +471,14 @@ def check_broll_compiler_consistency():
         mutations = [
             ("non-object plan", "plan", (), [], "plan must be an object"),
             ("plan schema", "plan", ("schema_version",), 2, "plan schema_version must be 1"),
+            ("boolean plan schema", "plan", ("schema_version",), True, "plan schema_version must be integer 1"),
+            ("float plan schema", "plan", ("schema_version",), 1.0, "plan schema_version must be integer 1"),
             ("contribution asset", "project", ("operations", 2, "render", 0, "asset"), "cache/b-roll/normalized/broll-002.mp4", "contribution 1 asset"),
             ("contribution start", "project", ("operations", 2, "render", 0, "start_s"), 0.5, "contribution 1 start_s"),
             ("contribution duration", "project", ("operations", 2, "render", 0, "duration_s"), 2.0, "contribution 1 duration_s"),
             ("contribution kind", "project", ("operations", 2, "render", 0, "kind"), "precomputed-asset", "contribution 1 kind"),
+            ("contribution extra field", "project", ("operations", 2, "render", 0, "blend"), "normal", "contribution 1 fields must be exactly"),
+            ("contribution operation override", "project", ("operations", 2, "render", 0, "operation"), "forged", "contribution 1 fields must be exactly"),
             ("extra contribution", "project", ("operations", 2, "render"), extra_render, "overlay contribution count"),
             ("review status marker", "plan", ("review_status",), "draft", "review_status must be approved"),
             ("review receipt status", "plan", ("review", "status"), "draft", "review receipt must be approved"),
@@ -482,26 +486,39 @@ def check_broll_compiler_consistency():
             ("shot lifecycle", "plan", ("shots", 0, "status"), "normalized", "shot shot-001 must be verified or skipped"),
             ("shot verification", "plan", ("shots", 0, "verification", "status"), "fail", "shot shot-001 verification must pass"),
             ("timeline id", "plan", ("timeline_id",), "other", "timeline_id does not match timeline"),
+            ("missing plan timeline id", "plan", ("timeline_id",), "", "plan timeline_id must be nonblank"),
             ("program duration", "plan", ("program_duration_s",), 5.0, "program_duration_s does not match timeline"),
             ("finite program duration", "plan", ("program_duration_s",), float("inf"), "program_duration_s must be finite"),
             ("operation dependency order", "project", ("operations", 2, "depends_on"), ["cut", "understanding"], "operation dependencies do not match plan"),
+            ("plan dependency order", "plan", ("dependencies",), ["cut", "understanding"], "plan dependencies do not match operation"),
+            ("operation based_on integer", "project", ("operations", 2, "based_on", "understanding"), 1.0, "operation based_on revisions must be positive integers"),
+            ("plan based_on integer", "plan", ("based_on", "understanding"), 1.0, "plan based_on revisions must be positive integers"),
+            ("operation based_on boolean revision", "project", ("operations", 2, "based_on", "understanding"), True, "operation based_on revisions must be positive integers"),
+            ("plan based_on boolean revision", "plan", ("based_on", "understanding"), True, "plan based_on revisions must be positive integers"),
             ("plan based_on parity", "plan", ("based_on",), {"understanding": 1}, "operation based_on does not match plan"),
-            ("operation target sequence", "project", ("operations", 2, "target", "sequence"), "alternate", "operation target must be the current main sequence"),
+            ("operation target sequence", "project", ("operations", 2, "target", "sequence"), "alternate", "operation target sequence does not match active_sequence"),
             ("operation target scope", "project", ("operations", 2, "target", "scope"), "overlay", "operation target scope must be b-roll"),
             ("unsafe normalized path", "plan", ("shots", 0, "normalized", "path"), "../escape.mp4", "shot shot-001 normalized path"),
             ("normalized SHA", "plan", ("shots", 0, "normalized", "sha256"), "bad", "shot shot-001 normalized SHA-256"),
             ("selected overlap", "plan", ("shots", 1, "program_range"), {"start_s": 1.5, "end_s": 3.5}, "selected shot ranges overlap"),
             ("selected order", "plan", ("shots",), list(reversed(copy.deepcopy(shots))), "selected shots must be chronological"),
+            ("duplicate shot id", "plan", ("shots", 1, "id"), "shot-001", "duplicate shot id: shot-001"),
             ("skipped contribution", "plan", ("shots", 0, "status"), "skipped", "overlay contribution count"),
             ("malformed shots", "plan", ("shots",), {}, "shots must be a list"),
             ("malformed contribution", "project", ("operations", 2, "render", 0), [], "contribution 1 must be an object"),
+            ("duplicate dependencies", "both-dependencies", (), ["understanding", "cut", "cut"], "dependencies must be unique and canonically ordered"),
+            ("reordered dependencies", "both-dependencies", (), ["cut", "understanding"], "dependencies must be unique and canonically ordered"),
         ]
 
+        failures = []
         for label, target_name, path, replacement, expected in mutations:
             current_plan = copy.deepcopy(plan)
             current_project = copy.deepcopy(project)
             current_timeline = copy.deepcopy(timeline)
-            if not path:
+            if target_name == "both-dependencies":
+                current_plan["dependencies"] = replacement
+                current_project["operations"][2]["depends_on"] = replacement
+            elif not path:
                 current_plan = replacement
             else:
                 target = {"plan": current_plan, "project": current_project, "timeline": current_timeline}[target_name]
@@ -512,10 +529,58 @@ def check_broll_compiler_consistency():
                 compile_values(current_plan, current_project, current_timeline)
             except ValueError as error:
                 message = str(error)
-                assert "b-roll B-roll plan mismatch:" in message, (label, message)
-                assert expected in message, (label, message)
+                if "b-roll B-roll plan mismatch:" not in message or expected not in message:
+                    failures.append(f"{label}: {message}")
             else:
-                raise AssertionError(f"{label} B-roll mismatch was accepted")
+                failures.append(f"{label}: mismatch was accepted")
+
+        direct_probes = []
+        missing_timeline_id = copy.deepcopy(timeline)
+        missing_timeline_id["timeline_id"] = ""
+        direct_probes.append(("missing timeline timeline_id", plan, project["operations"][2], missing_timeline_id, "timeline timeline_id must be nonblank"))
+        boolean_revision = copy.deepcopy(project["operations"][2])
+        boolean_revision["revision"] = True
+        direct_probes.append(("boolean operation revision", plan, boolean_revision, timeline, "operation revision must be a positive integer"))
+        missing_based_on_plan = copy.deepcopy(plan)
+        missing_based_on_operation = copy.deepcopy(project["operations"][2])
+        missing_based_on_plan["based_on"] = {"understanding": 1}
+        missing_based_on_operation["based_on"] = {"understanding": 1}
+        direct_probes.append(("incomplete based_on mappings", missing_based_on_plan, missing_based_on_operation, timeline, "based_on keys must exactly match dependencies"))
+        malformed_dependencies_plan = copy.deepcopy(plan)
+        malformed_dependencies_operation = copy.deepcopy(project["operations"][2])
+        malformed_dependencies_plan["dependencies"] = [["understanding"]]
+        malformed_dependencies_operation["depends_on"] = [["understanding"]]
+        direct_probes.append(("malformed dependencies", malformed_dependencies_plan, malformed_dependencies_operation, timeline, "dependencies must be unique and canonically ordered"))
+        for label, current_plan, operation, current_timeline, expected in direct_probes:
+            direct_errors = []
+            try:
+                projectlib._validate_broll_plan(
+                    current_plan, operation, operation["render"], current_timeline,
+                    direct_errors, "main",
+                )
+            except TypeError as error:
+                failures.append(f"{label}: {error}")
+            else:
+                if not any(expected in error for error in direct_errors):
+                    failures.append(f"{label}: {direct_errors}")
+
+        alternate = copy.deepcopy(project)
+        alternate["active_sequence"] = "alternate"
+        alternate["sequences"]["main"]["operations"] = []
+        alternate["sequences"]["alternate"] = {
+            "operations": ["b-roll"], "timeline": "timeline.json",
+        }
+        alternate["operations"][2]["target"]["sequence"] = "alternate"
+        try:
+            alternate_compiled = compile_values(plan, alternate, timeline)["contributions"]
+        except ValueError as error:
+            failures.append(f"alternate active sequence: {error}")
+        else:
+            if [item["operation"] for item in alternate_compiled] != ["b-roll", "b-roll"]:
+                failures.append(f"alternate active sequence: {alternate_compiled}")
+
+        if failures:
+            raise AssertionError("B-roll compiler review regressions:\n- " + "\n- ".join(failures))
 
 
 def check_dependency_revision_coverage():
