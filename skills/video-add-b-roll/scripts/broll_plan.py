@@ -225,16 +225,21 @@ def register_operation(project, plan, *, plan_path="b-roll/broll-plan.json", rep
     if not isinstance(result, dict) or not isinstance(result.get("operations"), list):
         raise ValueError("project operations must be a list of objects")
     old = [item for item in result["operations"] if item.get("id") == "b-roll"]
+    removed = bool(old)
     result["operations"] = [item for item in result["operations"] if item.get("id") != "b-roll"]
-    if isinstance(result.get("sequences"), dict) and isinstance(result.get("active_sequence"), str) and isinstance(result["sequences"].get(result["active_sequence"]), dict):
-        sequence_ids = result["sequences"][result["active_sequence"]].get("operations")
-        if isinstance(sequence_ids, list):
-            result["sequences"][result["active_sequence"]]["operations"] = [item for item in sequence_ids if item != "b-roll"]
+    if isinstance(result.get("sequences"), dict):
+        for value in result["sequences"].values():
+            if not isinstance(value, dict) or not isinstance(value.get("operations"), list):
+                continue
+            sequence_ids = value["operations"]
+            cleaned = [item for item in sequence_ids if item != "b-roll"]
+            removed = removed or len(cleaned) != len(sequence_ids)
+            value["operations"] = cleaned
     sequence, nodes = _project_parts(result)
     dependencies = active_dependencies(result)
     overlays = _verified_overlays(plan)
     if not overlays:
-        if old:
+        if removed:
             result.setdefault("render", {})["status"] = "draft"
         return result
     revision = max((item.get("revision", 0) for item in old), default=0) + 1

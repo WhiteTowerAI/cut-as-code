@@ -288,5 +288,19 @@ class BrollPlanTests(unittest.TestCase):
         self.assertFalse(any(item.get("id") == "b-roll" for item in result["operations"]))
         self.assertEqual("draft", result["render"]["status"])
 
+    def test_zero_selection_cleans_stale_broll_ids_from_every_sequence(self):
+        project = self._registration_project(["cut", "captions"])
+        project["sequences"]["alternate"] = {"operations": ["captions", "b-roll", "b-roll", "unknown"]}
+        plan = self._registered_plan((2, 3)); plan["shots"][0].update({"status": "skipped", "selected": None})
+        result = broll_plan.register_operation(project, plan)
+        self.assertEqual(["captions", "unknown"], result["sequences"]["alternate"]["operations"])
+        self.assertEqual("draft", result["render"]["status"])
+
+    def test_zero_selection_without_stale_broll_leaves_render_status(self):
+        project = self._registration_project(["cut", "captions"])
+        plan = self._registered_plan((2, 3)); plan["shots"][0].update({"status": "skipped", "selected": None})
+        result = broll_plan.register_operation(project, plan)
+        self.assertEqual("verified", result["render"]["status"])
+
 
 if __name__ == "__main__": unittest.main()
