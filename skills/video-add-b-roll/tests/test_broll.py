@@ -119,6 +119,11 @@ class BrollPlanTests(unittest.TestCase):
         timeline = copy.deepcopy(self.timeline); timeline["program_duration_s"] = "not-a-number"
         self.assertIn("timeline program_duration_s is invalid", broll_plan.validate_plan(self.plan, timeline, self.transcript))
 
+    def test_non_object_timeline_returns_error_without_raising(self):
+        for timeline in (None, []):
+            with self.subTest(timeline=timeline):
+                self.assertEqual(["timeline must be an object"], broll_plan.validate_plan(self.plan, timeline, self.transcript))
+
     def test_source_ranges_must_be_ordered_nonnegative_and_within_source(self):
         for source_range in ({"start_s": -1, "end_s": 1}, {"start_s": 2, "end_s": 2}, {"start_s": 9, "end_s": 11}):
             with self.subTest(source_range=source_range):

@@ -110,6 +110,10 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
     errors = []
     if not isinstance(plan, dict):
         return ["plan must be an object"]
+    if not isinstance(timeline, dict):
+        return ["timeline must be an object"]
+    if not isinstance(transcript, dict):
+        return ["transcript must be an object"]
     if plan.get("schema_version") != 1: errors.append("plan schema_version must be 1")
     if plan.get("timebase") != "program": errors.append("plan timebase must be program")
     if plan.get("timeline_id") != timeline.get("timeline_id"): errors.append("plan timeline_id does not match timeline")
