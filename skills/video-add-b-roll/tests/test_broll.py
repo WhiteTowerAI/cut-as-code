@@ -124,6 +124,24 @@ class BrollPlanTests(unittest.TestCase):
             with self.subTest(timeline=timeline):
                 self.assertEqual(["timeline must be an object"], broll_plan.validate_plan(self.plan, timeline, self.transcript))
 
+    def test_malformed_project_contracts_return_errors_without_raising(self):
+        cases = [([], "project must be an object"), ({"operations": {}}, "project operations must be a list"), ({"operations": [], "sequences": []}, "project sequences must be an object"), ({"operations": [], "active_sequence": "main", "sequences": {"main": []}}, "project active sequence must be an object")]
+        for project, message in cases:
+            with self.subTest(message=message):
+                self.assertIn(message, broll_plan.validate_plan(self.plan, self.timeline, self.transcript, project=project))
+
+    def test_apply_review_rejects_malformed_objects_and_collections(self):
+        cases = [(None, self.review(), "plan must be an object"), (self.plan, None, "review must be an object"), ({**self.plan, "shots": None}, self.review(), "plan shots must be a list"), ({**self.plan, "shots": [None]}, self.review(), "plan shot must be an object"), (self.plan, {"review_id": "r", "shots": None}, "review shots must be a list"), (self.plan, {"review_id": "r", "shots": [None]}, "review shot must be an object")]
+        for plan, review, message in cases:
+            with self.subTest(message=message):
+                with self.assertRaisesRegex(ValueError, message): broll_plan.apply_review(plan, review, mode="agent", actor="agent", rationale="reason")
+
+    def test_apply_review_rejects_malformed_candidates_before_receipt_hashing(self):
+        for candidate, message in ((None, "shot candidate must be an object"), ({"id": "asset", "media_type": "video"}, "shot candidate asset SHA-256 is required")):
+            with self.subTest(message=message):
+                plan = copy.deepcopy(self.plan); plan["shots"][0]["candidates"] = [candidate]
+                with self.assertRaisesRegex(ValueError, message): broll_plan.apply_review(plan, self.review(), mode="agent", actor="agent", rationale="reason")
+
     def test_source_ranges_must_be_ordered_nonnegative_and_within_source(self):
         for source_range in ({"start_s": -1, "end_s": 1}, {"start_s": 2, "end_s": 2}, {"start_s": 9, "end_s": 11}):
             with self.subTest(source_range=source_range):

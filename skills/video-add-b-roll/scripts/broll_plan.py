@@ -207,13 +207,20 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
             if previous_id != shot_id and previous_start < end and start < previous_end:
                 errors.append(f"{shot_id} program range overlaps {previous_id}"); break
     if project is not None:
-        operations = {item.get("id"): item for item in project.get("operations", []) if isinstance(item, dict)} if isinstance(project, dict) else {}
+        if not isinstance(project, dict): return errors + ["project must be an object"]
+        operation_values = project.get("operations")
+        if not isinstance(operation_values, list): return errors + ["project operations must be a list"]
+        sequences = project.get("sequences", {})
+        if not isinstance(sequences, dict): return errors + ["project sequences must be an object"]
+        active = project.get("active_sequence")
+        if active is not None and (not isinstance(active, str) or not isinstance(sequences.get(active, {}), dict)):
+            return errors + ["project active sequence must be an object"]
+        operations = {item.get("id"): item for item in operation_values if isinstance(item, dict)}
         dependencies, based_on = plan.get("dependencies", []), plan.get("based_on", {})
         if not isinstance(dependencies, list): errors.append("dependencies must be a list"); dependencies = []
         elif any(not isinstance(item, str) or not item.strip() for item in dependencies): errors.append("dependencies must contain nonblank strings"); dependencies = [item for item in dependencies if isinstance(item, str) and item.strip()]
         if not isinstance(based_on, dict): errors.append("based_on must be an object"); based_on = {}
-        active = project.get("active_sequence") if isinstance(project, dict) else None
-        sequence = project.get("sequences", {}).get(active, {}) if isinstance(project, dict) and isinstance(project.get("sequences"), dict) else {}
+        sequence = sequences.get(active, {})
         active_ids = sequence.get("operations", []) if isinstance(sequence, dict) else []
         required = (["understanding"] if "understanding" in operations else ["understand"] if "understand" in operations and "understand" in dependencies else [])
         required += [operation_id for operation_id in ("cut", "color-grade") if operation_id in active_ids and operation_id in operations]
@@ -232,14 +239,27 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
 
 
 def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None):
+    if not isinstance(plan, dict): raise ValueError("plan must be an object")
+    if not isinstance(review, dict): raise ValueError("review must be an object")
+    plan_shots, entries = plan.get("shots"), review.get("shots")
+    if not isinstance(plan_shots, list): raise ValueError("plan shots must be a list")
+    if not isinstance(entries, list): raise ValueError("review shots must be a list")
+    for shot in plan_shots:
+        if not isinstance(shot, dict): raise ValueError("plan shot must be an object")
+        candidates = shot.get("candidates", [])
+        if not isinstance(candidates, list): raise ValueError(f"{shot.get('id', '<missing>')} candidates must be a list")
+        for candidate in candidates:
+            candidate_errors = _candidate_errors(shot.get("id", "<missing>"), candidate)
+            if candidate_errors: raise ValueError("; ".join(candidate_errors))
+    for entry in entries:
+        if not isinstance(entry, dict): raise ValueError("review shot must be an object")
     if mode not in {"human", "agent"}: raise ValueError("mode must be human or agent")
     if not isinstance(actor, str) or not actor.strip(): raise ValueError("actor is required")
     if not isinstance(rationale, str) or not rationale.strip(): raise ValueError("rationale is required")
     if mode == "human" and review.get("explicit_user_action") is not True: raise ValueError("human review requires explicit_user_action true")
     if not isinstance(review.get("review_id"), str) or not review["review_id"].strip(): raise ValueError("review_id is required")
-    result, shots = copy.deepcopy(plan), {shot.get("id"): shot for shot in plan.get("shots", [])}
-    entries, seen = review.get("shots", []), set()
-    if not isinstance(entries, list): raise ValueError("review shots must be a list")
+    result, shots = copy.deepcopy(plan), {shot.get("id"): shot for shot in plan_shots}
+    seen = set()
     for entry in entries:
         shot_id = entry.get("id")
         if shot_id in seen: raise ValueError(f"duplicate review shot id: {shot_id}")
