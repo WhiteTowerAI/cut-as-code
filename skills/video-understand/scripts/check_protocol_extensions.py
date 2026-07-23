@@ -1,6 +1,8 @@
 """Small regression checks for shared protocol extensions."""
 
 import copy
+import hashlib
+import json
 import tempfile
 from pathlib import Path
 
@@ -432,11 +434,11 @@ def check_broll_compiler_consistency():
                     "id": "b-roll", "skill": "video-add-b-roll", "revision": 1,
                     "depends_on": ["understanding"],
                     "based_on": {"understanding": 1},
-                    "status": "verified", "plan": "b-roll/broll-plan.json",
+                    "status": "approved", "plan": "b-roll/broll-plan.json",
                     "outputs": [shot["normalized"]["path"] for shot in shots],
                     "target": {"sequence": "main", "scope": "b-roll"},
                     "effects": {**effects, "changes_video_pixels": True, "adds_track": "b-roll"},
-                    "check": {"status": "pass", "report": "../review/03-b-roll/b-roll-summary.md"},
+                    "check": {"status": "pending", "report": "../review/03-b-roll/b-roll-summary.md"},
                     "render": [
                         {"kind": "overlay", "asset": shot["normalized"]["path"],
                          "start_s": shot["program_range"]["start_s"],
@@ -473,6 +475,55 @@ def check_broll_compiler_consistency():
             "../cache/b-roll/normalized/broll-001.mp4",
             "../cache/b-roll/normalized/broll-002.mp4",
         ]
+
+        receipt_path = root / "work/b-roll/b-roll-visual-review.json"
+        report_path = root / "review/03-b-roll/b-roll-visual-review.md"
+        receipt_path.write_bytes(b"completed receipt")
+        report_path.write_bytes(b"completed report")
+        completed_plan = copy.deepcopy(plan)
+        plan_payload = json.dumps(
+            completed_plan, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        )
+        completed_plan["visual_review"] = {
+            "status": "completed",
+            "review_id": plan["review"]["review_id"],
+            "plan_sha256": hashlib.sha256(plan_payload.encode("utf-8")).hexdigest(),
+            "mode": "agent", "actor": "compiler-fixture",
+            "rationale": "All final visual evidence passed inspection.",
+            "timestamp": "2026-07-24T01:00:00Z",
+            "checks": {
+                "semantic_fit": True, "unwanted_logos_or_text": True,
+                "jump_cuts": True, "entry_exit_boundaries": True,
+                "grade_match": True,
+            },
+            "receipt": {
+                "path": "work/b-roll/b-roll-visual-review.json",
+                "sha256": hashlib.sha256(receipt_path.read_bytes()).hexdigest(),
+            },
+            "report": {
+                "path": "review/03-b-roll/b-roll-visual-review.md",
+                "sha256": hashlib.sha256(report_path.read_bytes()).hexdigest(),
+            },
+        }
+        completed_project = copy.deepcopy(project)
+        completed_operation = completed_project["operations"][2]
+        completed_operation["status"] = "verified"
+        completed_operation["check"] = {
+            "status": "pass",
+            "report": "../review/03-b-roll/b-roll-visual-review.md",
+        }
+        completed_compiled = compile_values(completed_plan, completed_project, timeline)["contributions"]
+        assert completed_operation["revision"] == project["operations"][2]["revision"]
+        assert completed_operation["render"] == project["operations"][2]["render"]
+        assert completed_compiled == compiled
+        report_path.write_bytes(b"tampered report")
+        try:
+            compile_values(completed_plan, completed_project, timeline)
+        except ValueError as error:
+            assert "visual review report SHA-256 is stale" in str(error)
+        else:
+            raise AssertionError("compiler accepted a stale completed visual review report")
+        report_path.write_bytes(b"completed report")
 
         extra_render = copy.deepcopy(project["operations"][2]["render"])
         extra_render.append(copy.deepcopy(extra_render[0]))

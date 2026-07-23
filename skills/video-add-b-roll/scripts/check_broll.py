@@ -216,6 +216,201 @@ def _hash_binding(path, published, root):
     return {"path": _relative(published, root), "sha256": broll_plan.sha256_file(path)}
 
 
+def _verified_artifact(binding, root, label):
+    if not isinstance(binding, dict) or not isinstance(binding.get("path"), str):
+        raise ValueError(f"{label} artifact binding is invalid")
+    digest = binding.get("sha256")
+    if not broll_plan._is_sha256(digest):
+        raise ValueError(f"{label} artifact SHA-256 is invalid")
+    raw = Path(binding["path"])
+    if raw.is_absolute():
+        raise ValueError(f"{label} artifact path must be project-relative")
+    path = _inside(root / raw, root, f"{label} artifact")
+    if not path.is_file() or broll_plan.sha256_file(path) != digest:
+        raise ValueError(f"{label} artifact SHA-256 is stale")
+    return {"path": raw.as_posix(), "sha256": digest}
+
+
+def _delivery_artifact(path, expected, root, label):
+    raw = Path(path)
+    resolved = _inside(raw if raw.is_absolute() else root / raw, root, label)
+    if resolved != expected.resolve():
+        raise ValueError(f"{label} must be {expected}")
+    if not resolved.is_file():
+        raise ValueError(f"{label} is missing")
+    return {"path": _relative(resolved, root), "sha256": broll_plan.sha256_file(resolved)}
+
+
+def _visual_review_artifacts(plan, root, final_video, comparison):
+    stills, shared = [], {}
+    selected = [shot for shot in plan["shots"] if shot.get("status") != "skipped"]
+    if not selected:
+        raise ValueError("visual review requires at least one selected B-roll shot")
+    for shot in selected:
+        verification = shot.get("verification")
+        if shot.get("status") != "verified" or not isinstance(verification, dict) or verification.get("status") != "pass":
+            raise ValueError("visual review requires verified B-roll shots")
+        shot_stills = verification.get("stills")
+        if not isinstance(shot_stills, dict) or set(shot_stills) != {"first", "middle", "last"}:
+            raise ValueError("visual review requires first, middle, and last stills")
+        for position in ("first", "middle", "last"):
+            binding = _verified_artifact(shot_stills[position], root, f"{shot.get('id')} {position} still")
+            stills.append({"shot_id": shot.get("id"), "position": position, **binding})
+        for key in ("contact_sheet", "boundary_reel", "report"):
+            binding = _verified_artifact(verification.get(key), root, key.replace("_", " "))
+            if key in shared and binding != shared[key]:
+                raise ValueError(f"verified shots disagree on {key.replace('_', ' ')}")
+            shared[key] = binding
+    return {
+        "stills": stills,
+        "contact_sheet": shared["contact_sheet"],
+        "boundary_reel": shared["boundary_reel"],
+        "machine_summary": shared["report"],
+        "final_video": _delivery_artifact(
+            final_video, root / "final/final-video.mp4", root, "final video"
+        ),
+        "comparison": _delivery_artifact(
+            comparison,
+            root / "review/04-edit-compare/original-vs-final-source-time.mp4",
+            root, "source-time comparison",
+        ),
+    }
+
+
+def _visual_review_report(receipt):
+    labels = {
+        "semantic_fit": "Semantic fit",
+        "unwanted_logos_or_text": "Unwanted logos or text",
+        "jump_cuts": "Jump cuts",
+        "entry_exit_boundaries": "Entry and exit boundaries",
+        "grade_match": "Grade match",
+    }
+    lines = [
+        "# B-roll visual review", "", "Visual review status: completed", "",
+        f"- Mode: `{receipt['mode']}`", f"- Actor: `{receipt['actor']}`",
+        f"- Timestamp: `{receipt['timestamp']}`",
+        f"- Active review UUID: `{receipt['review_id']}`",
+        f"- Reviewed plan SHA-256: `{receipt['plan_sha256']}`",
+        f"- Rationale: {receipt['rationale']}", "", "## Visual checks", "",
+    ]
+    lines.extend(f"- [x] {labels[key]}: pass" for key in broll_plan.VISUAL_REVIEW_CHECKS)
+    lines.extend(["", "## Bound artifacts", ""])
+    artifacts = receipt["artifacts"]
+    for still in artifacts["stills"]:
+        lines.append(
+            f"- {still['shot_id']} {still['position']} still: `{still['path']}` (`{still['sha256']}`)"
+        )
+    for key in ("contact_sheet", "boundary_reel", "machine_summary", "final_video", "comparison"):
+        binding = artifacts[key]
+        lines.append(
+            f"- {key.replace('_', ' ').title()}: `{binding['path']}` (`{binding['sha256']}`)"
+        )
+    return "\n".join(lines) + "\n"
+
+
+def _publish_visual_review(parts, snapshots):
+    try:
+        for part, target in parts:
+            os.replace(part, target)
+    except BaseException:
+        for _, target in parts:
+            previous = snapshots[target]
+            if previous is None:
+                target.unlink(missing_ok=True)
+            else:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(previous)
+        raise
+    finally:
+        for part, _ in parts:
+            part.unlink(missing_ok=True)
+
+
+def complete_visual_review(plan_path, project_root, review, final_video, comparison):
+    """Bind an actual visual inspection to verified evidence and publish its receipt."""
+    root, plan_path = Path(project_root).resolve(), Path(plan_path).resolve()
+    if plan_path != (root / "work/b-roll/broll-plan.json").resolve():
+        raise ValueError("plan_path must be canonical work/b-roll/broll-plan.json")
+    if not isinstance(review, dict):
+        raise ValueError("visual review must be an object")
+    plan, timeline, transcript, project = _load_inputs(
+        plan_path, root / "work/timeline.json", root
+    )
+    if "visual_review" in plan:
+        raise ValueError("visual review is already completed")
+    timeline = normalize_broll._timeline_with_media_geometry(timeline, root)
+    errors = broll_plan.validate_plan(
+        plan, timeline, transcript, project=project, project_root=root, verify_files=True
+    )
+    if errors:
+        raise ValueError("invalid verified B-roll plan: " + "; ".join(errors))
+    broll_plan._verified_overlays(plan)
+    plan_sha256 = broll_plan.canonical_sha256(broll_plan.visual_review_subject(plan))
+    if review.get("plan_sha256") != plan_sha256:
+        raise ValueError("visual review plan SHA-256 does not match")
+    active = plan.get("review")
+    if not isinstance(active, dict) or review.get("review_id") != active.get("review_id"):
+        raise ValueError("visual review UUID does not match active review")
+    mode, actor, rationale = review.get("mode"), review.get("actor"), review.get("rationale")
+    if mode not in ("human", "agent"):
+        raise ValueError("visual review mode must be human or agent")
+    if not isinstance(actor, str) or not actor.strip():
+        raise ValueError("visual review actor is required")
+    if not isinstance(rationale, str) or not rationale.strip():
+        raise ValueError("visual review rationale is required")
+    if not broll_plan._valid_timestamp(review.get("timestamp")):
+        raise ValueError("visual review timestamp is invalid")
+    if mode == "human" and review.get("explicit_user_action") is not True:
+        raise ValueError("human visual review requires explicit_user_action true")
+    checks = review.get("checks")
+    if (not isinstance(checks, dict) or set(checks) != set(broll_plan.VISUAL_REVIEW_CHECKS)
+            or any(checks[key] is not True for key in broll_plan.VISUAL_REVIEW_CHECKS)):
+        raise ValueError("all visual checks must be true booleans")
+    artifacts = _visual_review_artifacts(plan, root, final_video, comparison)
+    receipt = {
+        "schema_version": 1, "status": "completed", "review_id": active["review_id"],
+        "plan_sha256": plan_sha256, "mode": mode, "actor": actor.strip(),
+        "rationale": rationale.strip(), "timestamp": review["timestamp"],
+        "checks": {key: True for key in broll_plan.VISUAL_REVIEW_CHECKS},
+        "artifacts": artifacts,
+    }
+    if mode == "human":
+        receipt["explicit_user_action"] = True
+    receipt_path = root / "work/b-roll/b-roll-visual-review.json"
+    report_path = root / "review/03-b-roll/b-roll-visual-review.md"
+    receipt_part, report_part = Path(str(receipt_path) + ".part"), Path(str(report_path) + ".part")
+    plan_part = Path(str(plan_path) + ".part")
+    parts = ((receipt_part, receipt_path), (report_part, report_path), (plan_part, plan_path))
+    snapshots = {target: target.read_bytes() if target.is_file() else None for _, target in parts}
+    for part, target in parts:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        part.unlink(missing_ok=True)
+    try:
+        projectlib.write_json(receipt_part, receipt)
+        report_part.write_text(_visual_review_report(receipt), encoding="utf-8")
+        result = copy.deepcopy(plan)
+        result["visual_review"] = {
+            "status": "completed", "review_id": receipt["review_id"],
+            "plan_sha256": plan_sha256, "mode": mode, "actor": receipt["actor"],
+            "rationale": receipt["rationale"], "timestamp": receipt["timestamp"],
+            "checks": copy.deepcopy(receipt["checks"]),
+            "receipt": _hash_binding(receipt_part, receipt_path, root),
+            "report": _hash_binding(report_part, report_path, root),
+        }
+        if mode == "human":
+            result["visual_review"]["explicit_user_action"] = True
+        errors = broll_plan._visual_review_errors(result)
+        if errors:
+            raise ValueError("; ".join(errors))
+        projectlib.write_json(plan_part, result)
+        _publish_visual_review(parts, snapshots)
+    except BaseException:
+        for part, _ in parts:
+            part.unlink(missing_ok=True)
+        raise
+    return result, {"receipt": receipt_path, "report": report_path}
+
+
 def _summary(plan, selected, records, artifacts, root, stage, destination, path):
     review = plan["review"]
     lines = [
@@ -588,6 +783,7 @@ def verify_plan(plan_path, timeline_path, project_root, video_path, *, review_di
             "contact_sheet": contact, "boundary_reel": reel,
         }, root, stage, destination, summary)
         result = copy.deepcopy(plan)
+        result.pop("visual_review", None)
         for (index, _, _, _), (_, _, _, stills) in zip(selected, records):
             shot = result["shots"][index - 1]
             shot["status"] = "verified"

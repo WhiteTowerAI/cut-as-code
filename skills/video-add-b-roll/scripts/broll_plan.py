@@ -18,6 +18,10 @@ import projectlib
 
 RANGE_EPSILON = 1e-6
 KEN_BURNS_DIRECTIONS = {"zoom-in", "pan-left", "pan-right"}
+VISUAL_REVIEW_CHECKS = (
+    "semantic_fit", "unwanted_logos_or_text", "jump_cuts",
+    "entry_exit_boundaries", "grade_match",
+)
 PEXELS_LICENSE_URL = "https://www.pexels.com/license/"
 PEXELS_TERMS_URL = "https://www.pexels.com/terms-of-service/"
 _INVALID_NUMBER = object()
@@ -33,6 +37,10 @@ def sha256_file(path):
 
 def canonical_sha256(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+
+
+def visual_review_subject(plan):
+    return {key: value for key, value in plan.items() if key != "visual_review"}
 
 
 def _is_uuid(value):
@@ -89,7 +97,7 @@ def review_subject(plan):
 
     def clean(item):
         if isinstance(item, dict):
-            for key in ("decision", "review", "review_status", "selected", "normalized", "verification"):
+            for key in ("decision", "review", "review_status", "selected", "normalized", "verification", "visual_review"):
                 item.pop(key, None)
             for child in item.values():
                 clean(child)
@@ -222,6 +230,53 @@ def _review_errors(plan, shots):
         input_hashes = {}
     if review.get("review_video_sha256") != input_hashes.get("review_video_sha256"):
         errors.append("review video SHA-256 does not match")
+    return errors
+
+
+def _visual_review_errors(plan, *, project_root=None, verify_files=False):
+    review = plan.get("visual_review")
+    if not isinstance(review, dict) or review.get("status") != "completed":
+        return ["visual review must be completed"]
+    errors = []
+    decision = plan.get("review")
+    if not isinstance(decision, dict) or review.get("review_id") != decision.get("review_id"):
+        errors.append("visual review UUID does not match active review")
+    if review.get("plan_sha256") != canonical_sha256(visual_review_subject(plan)):
+        errors.append("visual review plan SHA-256 does not match")
+    if review.get("mode") not in ("human", "agent"):
+        errors.append("visual review mode must be human or agent")
+    if not isinstance(review.get("actor"), str) or not review["actor"].strip():
+        errors.append("visual review actor is required")
+    if not isinstance(review.get("rationale"), str) or not review["rationale"].strip():
+        errors.append("visual review rationale is required")
+    if not _valid_timestamp(review.get("timestamp")):
+        errors.append("visual review timestamp is invalid")
+    if review.get("mode") == "human" and review.get("explicit_user_action") is not True:
+        errors.append("human visual review requires explicit_user_action true")
+    checks = review.get("checks")
+    if (not isinstance(checks, dict) or set(checks) != set(VISUAL_REVIEW_CHECKS)
+            or any(checks[key] is not True for key in VISUAL_REVIEW_CHECKS)):
+        errors.append("all visual checks must be true booleans")
+    for name, expected_path in (
+        ("receipt", "work/b-roll/b-roll-visual-review.json"),
+        ("report", "review/03-b-roll/b-roll-visual-review.md"),
+    ):
+        binding = review.get(name)
+        if not isinstance(binding, dict) or binding.get("path") != expected_path or not _is_sha256(binding.get("sha256")):
+            errors.append(f"visual review {name} binding is invalid")
+            continue
+        if verify_files and project_root:
+            root, raw = Path(project_root).resolve(), Path(binding["path"])
+            path = (root / raw).resolve()
+            try:
+                path.relative_to(root)
+            except ValueError:
+                errors.append(f"visual review {name} path escapes project root")
+                continue
+            if not path.is_file():
+                errors.append(f"visual review {name} file is missing")
+            elif sha256_file(path) != binding["sha256"]:
+                errors.append(f"visual review {name} SHA-256 is stale")
     return errors
 
 
@@ -506,25 +561,13 @@ def _verified_overlays(plan):
     return overlays
 
 
-def register_operation(project, plan, *, plan_path="b-roll/broll-plan.json", report_path="../review/03-b-roll/b-roll-summary.md"):
-    """Replace the active sequence's B-roll overlay operation from verified shots."""
+def register_operation(project, plan, *, plan_path="b-roll/broll-plan.json", report_path=None):
+    """Register verified overlays, or finalize their completed visual review in place."""
     result = copy.deepcopy(project)
     if not isinstance(result, dict) or not isinstance(result.get("operations"), list) or any(not isinstance(item, dict) for item in result.get("operations", [])):
         raise ValueError("project operations must be a list of objects")
     if "render" in result and not isinstance(result["render"], dict):
         raise ValueError("project render must be an object")
-    _project_parts(result)
-    old = [item for item in result["operations"] if item.get("id") == "b-roll"]
-    removed = bool(old)
-    result["operations"] = [item for item in result["operations"] if item.get("id") != "b-roll"]
-    if isinstance(result.get("sequences"), dict):
-        for value in result["sequences"].values():
-            if not isinstance(value, dict) or not isinstance(value.get("operations"), list):
-                continue
-            sequence_ids = value["operations"]
-            cleaned = [item for item in sequence_ids if item != "b-roll"]
-            removed = removed or len(cleaned) != len(sequence_ids)
-            value["operations"] = cleaned
     sequence, nodes = _project_parts(result)
     dependencies = active_dependencies(result)
     expected_based_on = {item: nodes[item]["revision"] for item in dependencies}
@@ -533,18 +576,66 @@ def register_operation(project, plan, *, plan_path="b-roll/broll-plan.json", rep
     if plan.get("based_on") != expected_based_on:
         raise ValueError("plan based_on does not match current revisions")
     overlays = _verified_overlays(plan)
+    old = [item for item in result["operations"] if item.get("id") == "b-roll"]
     if not overlays:
+        removed = bool(old)
+        result["operations"] = [item for item in result["operations"] if item.get("id") != "b-roll"]
+        if isinstance(result.get("sequences"), dict):
+            for value in result["sequences"].values():
+                if not isinstance(value, dict) or not isinstance(value.get("operations"), list):
+                    continue
+                cleaned = [item for item in value["operations"] if item != "b-roll"]
+                removed = removed or len(cleaned) != len(value["operations"])
+                value["operations"] = cleaned
         if removed:
             result.setdefault("render", {})["status"] = "draft"
         return result
-    revision = max((item.get("revision", 0) for item in old), default=0) + 1
-    operation = {
-        "id": "b-roll", "skill": "video-add-b-roll", "revision": revision,
+    common = {
+        "id": "b-roll", "skill": "video-add-b-roll",
         "depends_on": dependencies, "based_on": copy.deepcopy(expected_based_on),
-        "status": "verified", "plan": plan_path, "outputs": [item["asset"] for item in overlays],
+        "plan": plan_path, "outputs": [item["asset"] for item in overlays],
         "target": {"sequence": result["active_sequence"], "scope": "b-roll"},
         "effects": {"changes_timeline": False, "changes_geometry": False, "changes_video_pixels": True, "changes_audio": False, "adds_track": "b-roll"},
-        "check": {"status": "pass", "report": report_path}, "render": overlays,
+        "render": overlays,
+    }
+    if "visual_review" in plan:
+        visual_review_errors = _visual_review_errors(plan)
+        if visual_review_errors:
+            raise ValueError("; ".join(visual_review_errors))
+        completed_report = "../" + plan["visual_review"]["report"]["path"]
+        if report_path is not None and report_path != completed_report:
+            raise ValueError("report_path does not match completed visual review")
+        if len(old) != 1:
+            raise ValueError("completed visual review requires one matching registered operation")
+        existing = old[0]
+        for key, value in common.items():
+            if existing.get(key) != value:
+                raise ValueError("completed visual review does not match registered operation")
+        references = sum(
+            value["operations"].count("b-roll") for value in result["sequences"].values()
+            if isinstance(value, dict) and isinstance(value.get("operations"), list)
+        )
+        if sequence["operations"].count("b-roll") != 1 or references != 1:
+            raise ValueError("completed visual review requires one B-roll sequence reference")
+        existing["status"] = "verified"
+        existing["check"] = {"status": "pass", "report": completed_report}
+        return result
+
+    machine_report = "../review/03-b-roll/b-roll-summary.md"
+    if report_path is not None and report_path != machine_report:
+        raise ValueError("report_path does not match pending machine verification")
+    result["operations"] = [item for item in result["operations"] if item.get("id") != "b-roll"]
+    if isinstance(result.get("sequences"), dict):
+        for value in result["sequences"].values():
+            if not isinstance(value, dict) or not isinstance(value.get("operations"), list):
+                continue
+            cleaned = [item for item in value["operations"] if item != "b-roll"]
+            value["operations"] = cleaned
+    sequence, _ = _project_parts(result)
+    revision = max((item.get("revision", 0) for item in old), default=0) + 1
+    operation = {
+        **common, "revision": revision, "status": "approved",
+        "check": {"status": "pending", "report": machine_report},
     }
     result["operations"].append(operation)
     ids = sequence["operations"]
@@ -696,6 +787,10 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
             if previous_id != shot_id and previous_start < end and start < previous_end:
                 errors.append(f"{shot_id} program range overlaps {previous_id}"); break
     errors.extend(_review_errors(plan, shots))
+    if "visual_review" in plan:
+        errors.extend(_visual_review_errors(
+            plan, project_root=project_root, verify_files=verify_files
+        ))
     project_operations = None
     if project is not None:
         if not isinstance(project, dict): return errors + ["project must be an object"]
@@ -851,6 +946,7 @@ def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None)
         if review.get(field) != expected:
             raise ValueError(f"{field} does not match current review artifacts")
     result, shots = copy.deepcopy(plan), {shot.get("id"): shot for shot in plan_shots}
+    result.pop("visual_review", None)
     seen = set()
     for entry in entries:
         shot_id = entry.get("id")

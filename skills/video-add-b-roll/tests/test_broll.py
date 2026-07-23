@@ -1423,7 +1423,11 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         self.assertEqual(["cut", "color-grade", "b-roll", "content-cards", "captions"], result["sequences"]["main"]["operations"])
         self.assertEqual(["understanding", "cut", "color-grade"], operation["depends_on"])
         self.assertEqual({"understanding": 1, "cut": 2, "color-grade": 3}, operation["based_on"])
-        self.assertEqual(("video-add-b-roll", 1, "verified"), (operation["skill"], operation["revision"], operation["status"]))
+        self.assertEqual(("video-add-b-roll", 1, "approved"), (operation["skill"], operation["revision"], operation["status"]))
+        self.assertEqual(
+            {"status": "pending", "report": "../review/03-b-roll/b-roll-summary.md"},
+            operation["check"],
+        )
         self.assertEqual(["cache/b-roll/normalized/broll-001.mp4"], operation["outputs"])
         self.assertEqual({"kind": "overlay", "asset": "cache/b-roll/normalized/broll-001.mp4", "start_s": 2.0, "duration_s": 2.5}, operation["render"][0])
         self.assertEqual("draft", result["render"]["status"])
@@ -2624,6 +2628,208 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
         self.assertEqual("review page", immutable.read_text(encoding="utf-8"))
         self.assertFalse((self.root / "review/.03-b-roll.check.part").exists())
         self.assertFalse((self.root / "review/.03-b-roll.check.backup").exists())
+
+    def _visual_review(self, plan_sha256, **changes):
+        review = {
+            "review_id": "123e4567-e89b-12d3-a456-426614174000",
+            "plan_sha256": plan_sha256,
+            "mode": "agent",
+            "actor": "Codex",
+            "rationale": "The footage fits the spoken claim and all transitions are clean.",
+            "timestamp": "2026-07-24T12:00:00Z",
+            "checks": {
+                "semantic_fit": True,
+                "unwanted_logos_or_text": True,
+                "jump_cuts": True,
+                "entry_exit_boundaries": True,
+                "grade_match": True,
+            },
+        }
+        review.update(changes)
+        return review
+
+    def test_complete_visual_review_binds_exact_evidence_and_registration_report(self):
+        video, _ = self._normalized_for_check()
+        verified, artifacts = check_broll.verify_plan(
+            self.plan_path, self.timeline_path, self.root, video
+        )
+        summary_bytes = artifacts["summary"].read_bytes()
+        final_video = self.root / "final/final-video.mp4"
+        comparison = self.root / "review/04-edit-compare/original-vs-final-source-time.mp4"
+        plan_sha256 = broll_plan.canonical_sha256(broll_plan.visual_review_subject(verified))
+
+        source = self.root / "input/source.mp4"
+        source.parent.mkdir()
+        source.write_bytes(b"source")
+        source_stat = source.stat()
+        effects = {
+            "changes_timeline": False, "changes_geometry": False,
+            "changes_video_pixels": False, "changes_audio": False,
+            "adds_track": None,
+        }
+        compiler_project = {
+            "schema_version": 1, "project_id": "visual-review-order",
+            "source": {"path": "../input/source.mp4", "fingerprint": {
+                "size": source_stat.st_size, "modified_ns": source_stat.st_mtime_ns,
+                "duration_s": 10.0,
+            }},
+            "active_sequence": "main",
+            "sequences": {"main": {
+                "operations": ["cut", "color-grade"], "timeline": "timeline.json",
+            }},
+            "operations": [
+                {"id": "understanding", "skill": "video-understand", "revision": 1,
+                 "depends_on": [], "based_on": {}, "status": "verified", "outputs": [],
+                 "target": {"sequence": "main", "scope": "evidence"}, "effects": effects},
+                {"id": "cut", "skill": "video-cut", "revision": 2,
+                 "depends_on": ["understanding"], "based_on": {"understanding": 1},
+                 "status": "verified", "outputs": [],
+                 "target": {"sequence": "main", "scope": "timeline"}, "effects": effects,
+                 "render": {"kind": "output-constraint"}},
+                {"id": "color-grade", "skill": "video-color-grade", "revision": 3,
+                 "depends_on": ["understanding"], "based_on": {"understanding": 1},
+                 "status": "verified", "outputs": [],
+                 "target": {"sequence": "main", "scope": "color"}, "effects": effects,
+                 "render": {"kind": "output-constraint", "plan": "color-grade/grade-plan.json"}},
+            ],
+            "render": {"plan": "render/render-plan.json",
+                       "output": "../final/final-video.mp4", "status": "verified"},
+            "reviews": [],
+        }
+        registered = broll_plan.register_operation(compiler_project, verified)
+        pending = next(item for item in registered["operations"] if item["id"] == "b-roll")
+        self.assertEqual(("approved", "pending", "../review/03-b-roll/b-roll-summary.md"), (
+            pending["status"], pending["check"]["status"], pending["check"]["report"],
+        ))
+        before_contributions = [
+            item for item in projectlib.build_render_plan(registered, self.root)["contributions"]
+            if item.get("operation") == "b-roll"
+        ]
+        final_video.write_bytes(video.read_bytes())
+        comparison.parent.mkdir(parents=True)
+        comparison.write_bytes(b"source-time comparison")
+        registered["render"]["status"] = "verified"
+        projectlib.write_json(self.project_path, registered)
+        resolved_root = self.root.resolve()
+        completed, published = check_broll.complete_visual_review(
+            self.plan_path, self.root, self._visual_review(plan_sha256),
+            resolved_root / "final/final-video.mp4",
+            resolved_root / "review/04-edit-compare/original-vs-final-source-time.mp4",
+        )
+
+        self.assertEqual(summary_bytes, artifacts["summary"].read_bytes())
+        self.assertIn("Manual review status: pending.", summary_bytes.decode("utf-8"))
+        self.assertEqual(completed, projectlib.load_json(self.plan_path))
+        receipt = projectlib.load_json(published["receipt"])
+        self.assertEqual(("completed", "agent", "Codex"), (
+            receipt["status"], receipt["mode"], receipt["actor"],
+        ))
+        self.assertEqual(plan_sha256, receipt["plan_sha256"])
+        self.assertEqual(verified["review"]["review_id"], receipt["review_id"])
+        self.assertTrue(all(receipt["checks"].values()))
+        expected_hashes = {
+            artifacts["contact_sheet"].relative_to(self.root).as_posix(): broll_plan.sha256_file(artifacts["contact_sheet"]),
+            artifacts["boundary_reel"].relative_to(self.root).as_posix(): broll_plan.sha256_file(artifacts["boundary_reel"]),
+            artifacts["summary"].relative_to(self.root).as_posix(): broll_plan.sha256_file(artifacts["summary"]),
+            final_video.relative_to(self.root).as_posix(): broll_plan.sha256_file(final_video),
+            comparison.relative_to(self.root).as_posix(): broll_plan.sha256_file(comparison),
+            **{path.relative_to(self.root).as_posix(): broll_plan.sha256_file(path) for path in artifacts["stills"]},
+        }
+        bound_hashes = {
+            item["path"]: item["sha256"]
+            for key, value in receipt["artifacts"].items()
+            for item in (value if key == "stills" else [value])
+        }
+        for path, digest in expected_hashes.items():
+            self.assertEqual(digest, bound_hashes[path])
+        report_text = published["report"].read_text(encoding="utf-8")
+        for value in ("Visual review status: completed", "Codex", plan_sha256,
+                      expected_hashes[final_video.relative_to(self.root).as_posix()],
+                      expected_hashes[comparison.relative_to(self.root).as_posix()]):
+            self.assertIn(value, report_text)
+        duplicate = copy.deepcopy(registered)
+        duplicate["sequences"]["alternate"] = {"operations": ["b-roll"]}
+        with self.assertRaisesRegex(ValueError, "one B-roll sequence reference"):
+            broll_plan.register_operation(duplicate, completed)
+        registration = broll_plan.register_operation(registered, completed)
+        operation = next(item for item in registration["operations"] if item["id"] == "b-roll")
+        self.assertEqual("../review/03-b-roll/b-roll-visual-review.md", operation["check"]["report"])
+        self.assertEqual((pending["revision"], pending["render"]), (operation["revision"], operation["render"]))
+        self.assertEqual("verified", registration["render"]["status"])
+        after_contributions = [
+            item for item in projectlib.build_render_plan(registration, self.root)["contributions"]
+            if item.get("operation") == "b-roll"
+        ]
+        self.assertEqual(before_contributions, after_contributions)
+
+    def test_complete_visual_review_rejects_unchecked_or_stale_evidence(self):
+        video, _ = self._normalized_for_check()
+        _, artifacts = check_broll.verify_plan(
+            self.plan_path, self.timeline_path, self.root, video
+        )
+        final_video = self.root / "final/final-video.mp4"
+        comparison = self.root / "review/04-edit-compare/original-vs-final-source-time.mp4"
+        final_video.write_bytes(video.read_bytes())
+        comparison.parent.mkdir(parents=True)
+        comparison.write_bytes(b"source-time comparison")
+        original_plan = self.plan_path.read_bytes()
+        current_plan = projectlib.load_json(self.plan_path)
+        plan_sha256 = broll_plan.canonical_sha256(broll_plan.visual_review_subject(current_plan))
+        cases = []
+        for value in (False, None, "pass"):
+            checks = self._visual_review(plan_sha256)["checks"]
+            checks["semantic_fit"] = value
+            cases.append((f"check-{value}", self._visual_review(plan_sha256, checks=checks), None, "visual checks"))
+        cases.append(("stale-plan", self._visual_review("0" * 64), None, "plan SHA-256"))
+        cases.append(("stale-still", self._visual_review(plan_sha256), artifacts["stills"][0], "artifact SHA-256"))
+        cases.append(("stale-summary", self._visual_review(plan_sha256), artifacts["summary"], "artifact SHA-256"))
+
+        for name, review, mutation, message in cases:
+            with self.subTest(name=name):
+                if mutation:
+                    original_artifact = mutation.read_bytes()
+                    mutation.write_bytes(original_artifact + b"changed")
+                with self.assertRaisesRegex(ValueError, message):
+                    check_broll.complete_visual_review(
+                        self.plan_path, self.root, review, final_video, comparison,
+                    )
+                if mutation:
+                    mutation.write_bytes(original_artifact)
+                self.assertEqual(original_plan, self.plan_path.read_bytes())
+                self.assertFalse((self.root / "work/b-roll/b-roll-visual-review.json").exists())
+                self.assertFalse((self.root / "review/03-b-roll/b-roll-visual-review.md").exists())
+
+    def test_complete_visual_review_rolls_back_partial_publication(self):
+        video, _ = self._normalized_for_check()
+        check_broll.verify_plan(self.plan_path, self.timeline_path, self.root, video)
+        final_video = self.root / "final/final-video.mp4"
+        comparison = self.root / "review/04-edit-compare/original-vs-final-source-time.mp4"
+        final_video.write_bytes(video.read_bytes())
+        comparison.parent.mkdir(parents=True)
+        comparison.write_bytes(b"source-time comparison")
+        original_plan = self.plan_path.read_bytes()
+        current_plan = projectlib.load_json(self.plan_path)
+        review = self._visual_review(
+            broll_plan.canonical_sha256(broll_plan.visual_review_subject(current_plan))
+        )
+        real_replace, calls = os.replace, 0
+
+        def fail_plan_replace(source, target):
+            nonlocal calls
+            calls += 1
+            if calls == 3:
+                raise OSError("plan replace failed")
+            return real_replace(source, target)
+
+        with mock.patch.object(check_broll.os, "replace", side_effect=fail_plan_replace):
+            with self.assertRaisesRegex(OSError, "plan replace failed"):
+                check_broll.complete_visual_review(
+                    self.plan_path, self.root, review, final_video, comparison,
+                )
+        self.assertEqual(original_plan, self.plan_path.read_bytes())
+        self.assertFalse((self.root / "work/b-roll/b-roll-visual-review.json").exists())
+        self.assertFalse((self.root / "review/03-b-roll/b-roll-visual-review.md").exists())
+        self.assertFalse(any(path.name.endswith(".part") for path in self.root.rglob("*")))
 
     def test_checker_accepts_duration_short_by_one_frame_and_extracts_last_still(self):
         video, normalized = self._normalized_for_check()

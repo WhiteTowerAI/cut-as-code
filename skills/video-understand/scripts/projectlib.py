@@ -1,5 +1,6 @@
 """Shared Open Recut project protocol helpers."""
 
+import hashlib
 import json
 import math
 import os
@@ -645,7 +646,7 @@ def _validate_caption_plan(plan, contribution, operation_id, errors, project_roo
         errors.append(f"{operation_id} caption runtime asset hashes are invalid")
 
 
-def _validate_broll_plan(plan, operation, contributions, timeline, errors):
+def _validate_broll_plan(plan, operation, contributions, timeline, errors, project_root=None):
     operation_id = operation.get("id") if isinstance(operation, dict) else "b-roll"
     prefix = f"{operation_id or 'b-roll'} B-roll plan mismatch: "
 
@@ -697,6 +698,62 @@ def _validate_broll_plan(plan, operation, contributions, timeline, errors):
     review = plan.get("review")
     if not isinstance(review, dict) or review.get("status") != "approved":
         errors.append(prefix + "review receipt must be approved")
+    visual_review = plan.get("visual_review")
+    required_checks = {
+        "semantic_fit", "unwanted_logos_or_text", "jump_cuts",
+        "entry_exit_boundaries", "grade_match",
+    }
+    if operation.get("status") == "approved":
+        if visual_review is not None:
+            errors.append(prefix + "approved operation must not carry completed visual review")
+        check = operation.get("check")
+        expected_report = "../review/03-b-roll/b-roll-summary.md"
+        if not isinstance(check, dict) or check.get("status") != "pending" or check.get("report") != expected_report:
+            errors.append(prefix + "approved operation check must reference pending machine summary")
+    elif not isinstance(visual_review, dict) or visual_review.get("status") != "completed":
+        errors.append(prefix + "visual review must be completed")
+    else:
+        active_review_id = review.get("review_id") if isinstance(review, dict) else None
+        if visual_review.get("review_id") != active_review_id:
+            errors.append(prefix + "visual review UUID does not match active review")
+        subject = {key: value for key, value in plan.items() if key != "visual_review"}
+        payload = json.dumps(subject, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        expected_plan_hash = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+        if visual_review.get("plan_sha256") != expected_plan_hash:
+            errors.append(prefix + "visual review plan SHA-256 does not match")
+        checks = visual_review.get("checks")
+        if (not isinstance(checks, dict) or set(checks) != required_checks
+                or any(value is not True for value in checks.values())):
+            errors.append(prefix + "all visual checks must be true booleans")
+        for name, expected_path in (
+            ("receipt", "work/b-roll/b-roll-visual-review.json"),
+            ("report", "review/03-b-roll/b-roll-visual-review.md"),
+        ):
+            binding = visual_review.get(name)
+            valid = (
+                isinstance(binding, dict) and binding.get("path") == expected_path
+                and re.fullmatch(r"[0-9a-fA-F]{64}", str(binding.get("sha256", "")))
+            )
+            if not valid:
+                errors.append(prefix + f"visual review {name} binding is invalid")
+                continue
+            if project_root is not None:
+                path = (Path(project_root).resolve() / binding["path"]).resolve()
+                try:
+                    path.relative_to(Path(project_root).resolve())
+                except ValueError:
+                    errors.append(prefix + f"visual review {name} path escapes project root")
+                    continue
+                if not path.is_file():
+                    errors.append(prefix + f"visual review {name} file is missing")
+                else:
+                    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+                    if digest != binding["sha256"]:
+                        errors.append(prefix + f"visual review {name} SHA-256 is stale")
+        check = operation.get("check")
+        expected_report = "../review/03-b-roll/b-roll-visual-review.md"
+        if not isinstance(check, dict) or check.get("status") != "pass" or check.get("report") != expected_report:
+            errors.append(prefix + "operation check must reference completed visual review")
     plan_timeline_id = plan.get("timeline_id")
     timeline_id = timeline.get("timeline_id")
     if not isinstance(plan_timeline_id, str) or not plan_timeline_id.strip():
@@ -998,7 +1055,10 @@ def build_render_plan(project, project_root):
                 except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
                     errors.append(f"{operation_id} B-roll plan mismatch: invalid plan: {exc}")
                 else:
-                    _validate_broll_plan(broll_plan, operation, contributions, timeline, errors)
+                    _validate_broll_plan(
+                        broll_plan, operation, contributions, timeline, errors,
+                        project_root=project_root,
+                    )
             if len(errors) != before:
                 continue
         for contribution in contributions:

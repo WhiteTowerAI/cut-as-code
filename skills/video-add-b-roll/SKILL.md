@@ -231,7 +231,7 @@ selected trim or Ken Burns direction, and publishes each validated result atomic
 Rerun `normalize_plan()` after interruption. It validates and preserves completed normalized
 shots before continuing; do not hand-promote `.part.mp4` or `.part.json` files.
 
-### 6. Verify, Inspect, And Register
+### 6. Verify And Pre-Register
 
 Run the verifier against the same current program-time review video:
 
@@ -241,18 +241,21 @@ python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]); sys.pat
 
 It revalidates hashes and receipts, probes and decodes normalized clips, marks selected shots
 `verified`, and publishes first/middle/last stills, a contact sheet, a short boundary reel,
-and the summary. Inspect applicable artifacts using `reference/broll-rules.md`. If any check
-fails, fix the plan or selection and repeat review, normalization, and verification. Do not
-edit hash-bound verification artifacts in place.
+and the immutable machine summary. The summary deliberately remains `Manual review status:
+pending.` Inspect applicable artifacts using `reference/broll-rules.md`. If any check fails,
+fix the plan or selection and repeat review, normalization, and verification. Do not edit
+hash-bound verification artifacts in place.
 
-After visual inspection passes, register from the verified plan. An all-skipped plan removes
-any stale B-roll operation and leaves no empty active operation:
+Pre-register from the verified plan before building delivery. Selected shots create an
+`approved` operation whose check remains pending against the machine summary; this is the
+operation the renderer consumes. An all-skipped plan removes any stale B-roll operation and
+leaves no empty active operation:
 
 ```powershell
 python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]); sys.path.insert(0,sys.argv[2]); import broll_plan,projectlib; project_path=root/'work/project.json'; project=projectlib.load_json(project_path); plan=projectlib.load_json(root/'work/b-roll/broll-plan.json'); projectlib.write_json(project_path,broll_plan.register_operation(project,plan))" $ProjectRoot $BrollScripts
 ```
 
-### 7. Build Delivery And Perform Final Self-Check
+### 7. Build Delivery, Complete Visual Review, And Finalize
 
 Compile approved active operations and render delivery once:
 
@@ -273,7 +276,7 @@ python "$RepoRoot/skills/video-edit-compare/scripts/make_compare.py" `
 ```
 
 Open and inspect the final delivery, source-time comparison, contact sheet, boundary reel,
-and representative first/middle/last stills before declaring completion:
+and representative first/middle/last stills:
 
 ```powershell
 Start-Process "$ProjectRoot/final/final-video.mp4"
@@ -287,8 +290,36 @@ if (Test-Path -LiteralPath $Stills) { Get-ChildItem $Stills -File | Select-Objec
 Get-Content "$ProjectRoot/review/03-b-roll/b-roll-summary.md"
 ```
 
+After actual inspection, create an Agent- or human-authored JSON export containing the active
+`review_id`, the canonical SHA-256 of the verified plan without `visual_review`, a timezone-aware
+`timestamp`, `mode`, real `actor`, non-empty `rationale`, and exactly these boolean results:
+`semantic_fit`, `unwanted_logos_or_text`, `jump_cuts`, `entry_exit_boundaries`, and
+`grade_match`. Every result must be `true`. Use `mode: "human"` and
+`explicit_user_action: true` only after an explicit user action; otherwise use delegated
+`mode: "agent"`. Never infer or fabricate a human pass.
+
+Complete the visual review before final registration. This writes the durable receipt and
+completed report, binding the plan UUID/hash, verifier stills, contact sheet, boundary reel,
+pending machine summary, final video, and source-time comparison by SHA-256:
+
+```powershell
+$VisualReviewExport = "$ProjectRoot/work/b-roll/b-roll-visual-review-export.json"
+python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]).resolve(); sys.path.insert(0,sys.argv[2]); import check_broll,projectlib; check_broll.complete_visual_review(root/'work/b-roll/broll-plan.json',root,projectlib.load_json(sys.argv[3]),root/'final/final-video.mp4',root/'review/04-edit-compare/original-vs-final-source-time.mp4')" $ProjectRoot $BrollScripts $VisualReviewExport
+```
+
+Run registration again. It finalizes the exact pre-registered operation in place as
+`verified`, points `operation.check.report` to `b-roll-visual-review.md`, and preserves its
+revision, render contributions, sequence position, and verified delivery status. It does not
+request another render:
+
+```powershell
+python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]); sys.path.insert(0,sys.argv[2]); import broll_plan,projectlib; project_path=root/'work/project.json'; project=projectlib.load_json(project_path); plan=projectlib.load_json(root/'work/b-roll/broll-plan.json'); projectlib.write_json(project_path,broll_plan.register_operation(project,plan))" $ProjectRoot $BrollScripts
+python "$RepoRoot/skills/video-understand/scripts/build_render_plan.py" $ProjectRoot
+```
+
 For an all-skipped no-op, only the summary, final delivery, and source-time comparison are
 required; contact sheets, boundary reels, and stills do not exist.
 
-Completion is blocked until these final-pixel and visual checks pass. Successful commands or
-machine validation alone are not a self-check.
+For selected B-roll, completion is blocked until the completed visual-review receipt,
+final-pixel checks, and compiler validation pass. Successful render or machine-verification
+commands alone are not a self-check.
