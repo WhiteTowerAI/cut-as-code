@@ -1,5 +1,6 @@
 """Small regression checks for shared protocol extensions."""
 
+import copy
 import tempfile
 from pathlib import Path
 
@@ -313,6 +314,210 @@ def check_precomputed_overlay_compatibility():
         assert str(overlay.resolve()) in command
 
 
+def check_broll_compiler_consistency():
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        for directory in (
+            "input", "final", "review/03-b-roll", "work/b-roll",
+            "work/cache/b-roll/normalized", "work/render",
+        ):
+            (root / directory).mkdir(parents=True, exist_ok=True)
+        source = root / "input/source.mp4"
+        source.write_bytes(b"source")
+        (root / "review/03-b-roll/b-roll-summary.md").write_text(
+            "# B-roll\n", encoding="utf-8"
+        )
+        for index in (1, 2):
+            (root / f"work/cache/b-roll/normalized/broll-{index:03d}.mp4").write_bytes(
+                f"overlay-{index}".encode()
+            )
+
+        timeline = {
+            "schema_version": 1,
+            "timeline_id": "main",
+            "source_asset_id": "source",
+            "fps": {"num": 30, "den": 1},
+            "source_duration_s": 6.0,
+            "program_duration_s": 6.0,
+            "clips": [{
+                "id": "clip-001",
+                "source_range": {"start_s": 0.0, "end_s": 6.0},
+                "program_range": {"start_s": 0.0, "end_s": 6.0},
+                "speed": 1.0,
+                "decision_ref": "source",
+            }],
+        }
+        shots = []
+        for index, (start, end) in enumerate(((1.0, 2.0), (3.0, 4.5)), 1):
+            digest = str(index) * 64
+            shots.append({
+                "id": f"shot-{index:03d}",
+                "status": "verified",
+                "program_range": {"start_s": start, "end_s": end},
+                "selected": {"candidate_id": f"asset-{index:03d}", "source_trim": {"start_s": 0.0, "end_s": end - start}},
+                "candidates": [{"id": f"asset-{index:03d}", "media_type": "video", "sha256": digest}],
+                "normalized": {
+                    "path": f"cache/b-roll/normalized/broll-{index:03d}.mp4",
+                    "sha256": digest,
+                },
+                "verification": {"status": "pass", "normalized_sha256": digest},
+            })
+        plan = {
+            "schema_version": 1,
+            "timeline_id": "main",
+            "timebase": "program",
+            "program_duration_s": 6.0,
+            "dependencies": ["understanding", "cut"],
+            "based_on": {"understanding": 1, "cut": 2},
+            "input_hashes": {"review_video_sha256": "f" * 64},
+            "review_status": "approved",
+            "decision": {"mode": "agent", "actor": "compiler-fixture", "rationale": "Both shots support the narration."},
+            "review": {
+                "status": "approved",
+                "review_id": "123e4567-e89b-12d3-a456-426614174000",
+                "mode": "agent",
+                "actor": "compiler-fixture",
+                "rationale": "Both shots support the narration.",
+                "timestamp": "2026-07-24T00:00:00Z",
+                "plan_sha256": "a" * 64,
+                "candidate_manifest_sha256": "b" * 64,
+                "review_video_sha256": "f" * 64,
+                "decision_skipped_shot_ids": [],
+                "selected_asset_sha256": ["1" * 64, "2" * 64],
+                "decisions": [
+                    {"id": "shot-001", "decision": "select", "candidate_id": "asset-001", "source_trim": {"start_s": 0.0, "end_s": 1.0}},
+                    {"id": "shot-002", "decision": "select", "candidate_id": "asset-002", "source_trim": {"start_s": 0.0, "end_s": 1.5}},
+                ],
+            },
+            "shots": shots,
+        }
+        effects = {
+            "changes_timeline": False,
+            "changes_geometry": False,
+            "changes_video_pixels": False,
+            "changes_audio": False,
+            "adds_track": None,
+        }
+        source_stat = source.stat()
+        project = {
+            "schema_version": 1,
+            "project_id": "broll-compiler-fixture",
+            "source": {
+                "path": "../input/source.mp4",
+                "fingerprint": {
+                    "size": source_stat.st_size,
+                    "modified_ns": source_stat.st_mtime_ns,
+                    "duration_s": 6.0,
+                },
+            },
+            "active_sequence": "main",
+            "sequences": {
+                "main": {"operations": ["b-roll"], "timeline": "timeline.json"},
+                "alternate": {"operations": []},
+            },
+            "operations": [
+                {
+                    "id": "understanding", "skill": "video-understand", "revision": 1,
+                    "depends_on": [], "based_on": {}, "status": "verified", "outputs": [],
+                    "target": {"sequence": "main", "scope": "evidence"}, "effects": effects,
+                },
+                {
+                    "id": "cut", "skill": "video-cut", "revision": 2,
+                    "depends_on": ["understanding"], "based_on": {"understanding": 1},
+                    "status": "verified", "outputs": [],
+                    "target": {"sequence": "main", "scope": "timeline"}, "effects": effects,
+                },
+                {
+                    "id": "b-roll", "skill": "video-add-b-roll", "revision": 1,
+                    "depends_on": ["understanding", "cut"],
+                    "based_on": {"understanding": 1, "cut": 2},
+                    "status": "verified", "plan": "b-roll/broll-plan.json",
+                    "outputs": [shot["normalized"]["path"] for shot in shots],
+                    "target": {"sequence": "main", "scope": "b-roll"},
+                    "effects": {**effects, "changes_video_pixels": True, "adds_track": "b-roll"},
+                    "check": {"status": "pass", "report": "../review/03-b-roll/b-roll-summary.md"},
+                    "render": [
+                        {"kind": "overlay", "asset": shot["normalized"]["path"],
+                         "start_s": shot["program_range"]["start_s"],
+                         "duration_s": shot["program_range"]["end_s"] - shot["program_range"]["start_s"]}
+                        for shot in shots
+                    ],
+                },
+            ],
+            "render": {
+                "plan": "render/render-plan.json",
+                "output": "../final/final-video.mp4",
+                "status": "draft",
+            },
+            "reviews": [],
+        }
+
+        def compile_values(current_plan, current_project, current_timeline):
+            projectlib.write_json(root / "work/timeline.json", current_timeline)
+            projectlib.write_json(root / "work/b-roll/broll-plan.json", current_plan)
+            return projectlib.build_render_plan(current_project, root)
+
+        compiled = compile_values(plan, project, timeline)["contributions"]
+        assert [item["operation"] for item in compiled] == ["b-roll", "b-roll"]
+        assert [item["start_s"] for item in compiled] == [1.0, 3.0]
+        assert [item["duration_s"] for item in compiled] == [1.0, 1.5]
+        assert [item["asset"] for item in compiled] == [
+            "../cache/b-roll/normalized/broll-001.mp4",
+            "../cache/b-roll/normalized/broll-002.mp4",
+        ]
+
+        extra_render = copy.deepcopy(project["operations"][2]["render"])
+        extra_render.append(copy.deepcopy(extra_render[0]))
+        mutations = [
+            ("non-object plan", "plan", (), [], "plan must be an object"),
+            ("plan schema", "plan", ("schema_version",), 2, "plan schema_version must be 1"),
+            ("contribution asset", "project", ("operations", 2, "render", 0, "asset"), "cache/b-roll/normalized/broll-002.mp4", "contribution 1 asset"),
+            ("contribution start", "project", ("operations", 2, "render", 0, "start_s"), 0.5, "contribution 1 start_s"),
+            ("contribution duration", "project", ("operations", 2, "render", 0, "duration_s"), 2.0, "contribution 1 duration_s"),
+            ("contribution kind", "project", ("operations", 2, "render", 0, "kind"), "precomputed-asset", "contribution 1 kind"),
+            ("extra contribution", "project", ("operations", 2, "render"), extra_render, "overlay contribution count"),
+            ("review status marker", "plan", ("review_status",), "draft", "review_status must be approved"),
+            ("review receipt status", "plan", ("review", "status"), "draft", "review receipt must be approved"),
+            ("missing review receipt", "plan", ("review",), None, "review receipt must be approved"),
+            ("shot lifecycle", "plan", ("shots", 0, "status"), "normalized", "shot shot-001 must be verified or skipped"),
+            ("shot verification", "plan", ("shots", 0, "verification", "status"), "fail", "shot shot-001 verification must pass"),
+            ("timeline id", "plan", ("timeline_id",), "other", "timeline_id does not match timeline"),
+            ("program duration", "plan", ("program_duration_s",), 5.0, "program_duration_s does not match timeline"),
+            ("finite program duration", "plan", ("program_duration_s",), float("inf"), "program_duration_s must be finite"),
+            ("operation dependency order", "project", ("operations", 2, "depends_on"), ["cut", "understanding"], "operation dependencies do not match plan"),
+            ("plan based_on parity", "plan", ("based_on",), {"understanding": 1}, "operation based_on does not match plan"),
+            ("operation target sequence", "project", ("operations", 2, "target", "sequence"), "alternate", "operation target must be the current main sequence"),
+            ("operation target scope", "project", ("operations", 2, "target", "scope"), "overlay", "operation target scope must be b-roll"),
+            ("unsafe normalized path", "plan", ("shots", 0, "normalized", "path"), "../escape.mp4", "shot shot-001 normalized path"),
+            ("normalized SHA", "plan", ("shots", 0, "normalized", "sha256"), "bad", "shot shot-001 normalized SHA-256"),
+            ("selected overlap", "plan", ("shots", 1, "program_range"), {"start_s": 1.5, "end_s": 3.5}, "selected shot ranges overlap"),
+            ("selected order", "plan", ("shots",), list(reversed(copy.deepcopy(shots))), "selected shots must be chronological"),
+            ("skipped contribution", "plan", ("shots", 0, "status"), "skipped", "overlay contribution count"),
+            ("malformed shots", "plan", ("shots",), {}, "shots must be a list"),
+            ("malformed contribution", "project", ("operations", 2, "render", 0), [], "contribution 1 must be an object"),
+        ]
+
+        for label, target_name, path, replacement, expected in mutations:
+            current_plan = copy.deepcopy(plan)
+            current_project = copy.deepcopy(project)
+            current_timeline = copy.deepcopy(timeline)
+            if not path:
+                current_plan = replacement
+            else:
+                target = {"plan": current_plan, "project": current_project, "timeline": current_timeline}[target_name]
+                for key in path[:-1]:
+                    target = target[key]
+                target[path[-1]] = replacement
+            try:
+                compile_values(current_plan, current_project, current_timeline)
+            except ValueError as error:
+                message = str(error)
+                assert "b-roll B-roll plan mismatch:" in message, (label, message)
+                assert expected in message, (label, message)
+            else:
+                raise AssertionError(f"{label} B-roll mismatch was accepted")
+
+
 def check_dependency_revision_coverage():
     effects = {
         "changes_timeline": False,
@@ -438,11 +643,13 @@ def main():
     check_program_transcript_mapping()
     check_image_sequence_overlay()
     check_precomputed_overlay_compatibility()
+    check_broll_compiler_consistency()
     check_dependency_revision_coverage()
     check_verified_durable_outputs()
     print("[protocol-extensions] program transcript mapping passed")
     print("[protocol-extensions] image-sequence overlay passed")
     print("[protocol-extensions] precomputed overlay compatibility passed")
+    print("[protocol-extensions] B-roll compiler consistency passed")
     print("[protocol-extensions] dependency revision coverage passed")
     print("[protocol-extensions] verified durable outputs passed")
 

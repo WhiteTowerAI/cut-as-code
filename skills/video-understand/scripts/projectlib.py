@@ -639,6 +639,148 @@ def _validate_caption_plan(plan, contribution, operation_id, errors, project_roo
         errors.append(f"{operation_id} caption runtime asset hashes are invalid")
 
 
+def _validate_broll_plan(plan, operation, contributions, timeline, errors):
+    operation_id = operation.get("id") if isinstance(operation, dict) else "b-roll"
+    prefix = f"{operation_id or 'b-roll'} B-roll plan mismatch: "
+
+    def number(value):
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        try:
+            value = float(value)
+        except (OverflowError, TypeError, ValueError):
+            return None
+        return value if math.isfinite(value) else None
+
+    if not isinstance(plan, dict):
+        errors.append(prefix + "plan must be an object")
+        return
+    if not isinstance(operation, dict):
+        errors.append(prefix + "operation must be an object")
+        return
+    if not isinstance(timeline, dict):
+        errors.append(prefix + "timeline must be an object")
+        return
+    if plan.get("schema_version") != 1:
+        errors.append(prefix + "plan schema_version must be 1")
+    if plan.get("review_status") != "approved":
+        errors.append(prefix + "review_status must be approved")
+    review = plan.get("review")
+    if not isinstance(review, dict) or review.get("status") != "approved":
+        errors.append(prefix + "review receipt must be approved")
+    if plan.get("timeline_id") != timeline.get("timeline_id"):
+        errors.append(prefix + "timeline_id does not match timeline")
+
+    duration = number(plan.get("program_duration_s"))
+    timeline_duration = number(timeline.get("program_duration_s"))
+    if duration is None:
+        errors.append(prefix + "program_duration_s must be finite")
+    elif timeline_duration is None:
+        errors.append(prefix + "timeline program_duration_s must be finite")
+    elif duration != timeline_duration:
+        errors.append(prefix + "program_duration_s does not match timeline")
+
+    target = operation.get("target")
+    if not isinstance(target, dict) or target.get("sequence") != "main":
+        errors.append(prefix + "operation target must be the current main sequence")
+    if not isinstance(target, dict) or target.get("scope") != "b-roll":
+        errors.append(prefix + "operation target scope must be b-roll")
+    if operation.get("depends_on") != plan.get("dependencies"):
+        errors.append(prefix + "operation dependencies do not match plan")
+    if operation.get("based_on") != plan.get("based_on"):
+        errors.append(prefix + "operation based_on does not match plan")
+
+    shots = plan.get("shots")
+    if not isinstance(shots, list):
+        errors.append(prefix + "shots must be a list")
+        return
+    selected = []
+    ranges = []
+    for index, shot in enumerate(shots, 1):
+        if not isinstance(shot, dict):
+            errors.append(prefix + f"shot {index} must be an object")
+            continue
+        shot_id = shot.get("id")
+        label = shot_id if isinstance(shot_id, str) and shot_id.strip() else str(index)
+        status = shot.get("status")
+        if status == "skipped":
+            if shot.get("selected") is not None or "normalized" in shot or "verification" in shot:
+                errors.append(prefix + f"shot {label} skipped lifecycle is invalid")
+            continue
+        selected.append(shot)
+        if status != "verified":
+            errors.append(prefix + f"shot {label} must be verified or skipped")
+        if not isinstance(shot.get("selected"), dict):
+            errors.append(prefix + f"shot {label} selection must be an object")
+        verification = shot.get("verification")
+        if not isinstance(verification, dict) or verification.get("status") != "pass":
+            errors.append(prefix + f"shot {label} verification must pass")
+
+        program_range = shot.get("program_range")
+        start = number(program_range.get("start_s")) if isinstance(program_range, dict) else None
+        end = number(program_range.get("end_s")) if isinstance(program_range, dict) else None
+        if (
+            start is None or end is None or timeline_duration is None
+            or start < 0 or end <= start or end > timeline_duration
+        ):
+            errors.append(prefix + f"shot {label} program_range is invalid")
+        else:
+            ranges.append((start, end, label))
+
+        normalized = shot.get("normalized")
+        if not isinstance(normalized, dict):
+            errors.append(prefix + f"shot {label} normalized record is required")
+            continue
+        value = normalized.get("path")
+        if not isinstance(value, str) or not value.strip():
+            safe_path = False
+        else:
+            path = Path(value)
+            safe_path = (
+                not path.is_absolute() and not path.drive and ".." not in path.parts
+                and path.as_posix() == value
+            )
+        if not safe_path:
+            errors.append(prefix + f"shot {label} normalized path must be safe and project-relative")
+        if not re.fullmatch(r"[0-9a-fA-F]{64}", str(normalized.get("sha256", ""))):
+            errors.append(prefix + f"shot {label} normalized SHA-256 is invalid")
+
+    if [item[0] for item in ranges] != sorted(item[0] for item in ranges):
+        errors.append(prefix + "selected shots must be chronological")
+    ordered_ranges = sorted(ranges)
+    if any(current[0] < previous[1] for previous, current in zip(ordered_ranges, ordered_ranges[1:])):
+        errors.append(prefix + "selected shot ranges overlap")
+
+    if not isinstance(contributions, list):
+        errors.append(prefix + "render contributions must be a list")
+        return
+    if len(contributions) != len(selected):
+        errors.append(
+            prefix + f"overlay contribution count {len(contributions)} does not match "
+            f"verified selected shot count {len(selected)}"
+        )
+    for index, (shot, contribution) in enumerate(zip(selected, contributions), 1):
+        label = shot.get("id") or index
+        if not isinstance(contribution, dict):
+            errors.append(prefix + f"contribution {index} must be an object")
+            continue
+        if contribution.get("kind") != "overlay":
+            errors.append(prefix + f"contribution {index} kind must be overlay")
+        normalized = shot.get("normalized")
+        expected_asset = normalized.get("path") if isinstance(normalized, dict) else None
+        if contribution.get("asset") != expected_asset:
+            errors.append(prefix + f"contribution {index} asset does not match shot {label} normalized path")
+        program_range = shot.get("program_range")
+        start = number(program_range.get("start_s")) if isinstance(program_range, dict) else None
+        end = number(program_range.get("end_s")) if isinstance(program_range, dict) else None
+        contribution_start = number(contribution.get("start_s"))
+        contribution_duration = number(contribution.get("duration_s"))
+        if contribution_start is None or start is None or contribution_start != start:
+            errors.append(prefix + f"contribution {index} start_s does not match shot {label}")
+        if contribution_duration is None or start is None or end is None or contribution_duration != end - start:
+            errors.append(prefix + f"contribution {index} duration_s does not match shot {label}")
+
+
 def _validate_image_sequence(contribution, asset_path, expected_fps, operation_id, errors):
     pattern = contribution.get("pattern")
     start_number = contribution.get("start_number", 1)
@@ -737,6 +879,21 @@ def build_render_plan(project, project_root):
             errors.append(f"{operation_id} has no render contribution")
             continue
         contributions = declared if isinstance(declared, list) else [declared]
+        if operation.get("skill") == "video-add-b-roll":
+            before = len(errors)
+            plan_value = operation.get("plan")
+            if not plan_value:
+                errors.append(f"{operation_id} B-roll plan mismatch: plan is required")
+            elif timeline:
+                try:
+                    broll_path = resolve_project_path(project_root, plan_value)
+                    broll_plan = load_json(broll_path)
+                except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                    errors.append(f"{operation_id} B-roll plan mismatch: invalid plan: {exc}")
+                else:
+                    _validate_broll_plan(broll_plan, operation, contributions, timeline, errors)
+            if len(errors) != before:
+                continue
         for contribution in contributions:
             if not isinstance(contribution, dict):
                 errors.append(f"{operation_id} render contribution must be an object")
