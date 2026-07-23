@@ -191,7 +191,12 @@ def download_candidate(candidate, destination, *, opener=None, max_bytes=250_000
                         handle.write(chunk)
                 if expected_bytes is not None and response_bytes != expected_bytes: raise ValueError("download is incomplete")
                 if range_total is not None and part.stat().st_size != range_total: raise ValueError("range download is incomplete")
-                candidate = dict(candidate); candidate["download_url"] = final_url
+                candidate = dict(candidate)
+                provenance = candidate.get("provenance")
+                if isinstance(provenance, dict) and provenance.get("source_type") == "pexels":
+                    candidate["provenance"] = dict(provenance)
+                    candidate["provenance"]["download_url"] = final_url
+                candidate["download_url"] = final_url
             try: probe = probe_media(part)
             except Exception: part.unlink(missing_ok=True); raise
             try: digest = _sha256(part)

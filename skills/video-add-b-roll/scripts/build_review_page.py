@@ -88,10 +88,8 @@ def _payload(plan, root, assets_dir):
             candidate_specs.append((path, basename, candidate["sha256"]))
             item = {"id": candidate["id"], "media_type": candidate["media_type"], "path": f"{assets_dir.name}/{basename}", "sha256": candidate["sha256"], "provenance": candidate["provenance"]}
             if candidate["media_type"] == "video":
-                duration = broll_plan._positive_duration(candidate.get("duration_s"))
                 probe = candidate.get("probe")
-                if duration is None and isinstance(probe, dict):
-                    duration = broll_plan._positive_duration(probe.get("duration_s"))
+                duration = broll_plan._positive_duration(probe.get("duration_s")) if isinstance(probe, dict) else None
                 if duration is None:
                     raise ValueError(f"{shot['id']} candidate {candidate['id']} has no valid review duration")
                 item["duration_s"] = duration

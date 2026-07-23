@@ -68,13 +68,9 @@ def _valid_source_trim(value, candidate):
     trim = _range(value)
     if not isinstance(value, dict) or not trim or trim[0] < 0 or trim[1] <= trim[0]:
         return False
-    durations = []
-    if "duration_s" in candidate:
-        durations.append(_positive_duration(candidate["duration_s"]))
     probe = candidate.get("probe")
-    if isinstance(probe, dict) and "duration_s" in probe:
-        durations.append(_positive_duration(probe["duration_s"]))
-    return bool(durations) and all(duration is not None and trim[1] <= duration for duration in durations)
+    duration = _positive_duration(probe.get("duration_s")) if isinstance(probe, dict) else None
+    return duration is not None and trim[1] <= duration
 
 
 def _valid_ken_burns(value):
@@ -349,8 +345,8 @@ def _candidate_errors(shot_id, candidate):
         probe = None
     direct_duration = _positive_duration(candidate.get("duration_s"))
     probe_duration = _positive_duration(probe.get("duration_s")) if isinstance(probe, dict) else None
-    if media_type == "video" and direct_duration is None and probe_duration is None:
-        errors.append(f"{shot_id} candidate {candidate_id} video requires a finite positive duration")
+    if media_type == "video" and probe_duration is None:
+        errors.append(f"{shot_id} candidate {candidate_id} video requires a finite positive probe.duration_s")
     byte_count = candidate.get("bytes")
     if not isinstance(byte_count, int) or isinstance(byte_count, bool) or byte_count <= 0:
         errors.append(f"{shot_id} candidate {candidate_id} bytes must be a positive integer")
@@ -729,7 +725,7 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
             return errors + ["project active sequence operation ids must be nonblank strings"]
         required = (["understanding"] if "understanding" in operations else ["understand"] if "understand" in operations and "understand" in dependencies else [])
         required += [operation_id for operation_id in ("cut", "color-grade") if operation_id in active_ids and operation_id in operations]
-        if set(dependencies) != set(required): errors.append("plan dependencies do not match current dependencies")
+        if dependencies != required: errors.append("plan dependencies do not match current dependencies")
         if set(dependencies) != set(based_on): errors.append("based_on does not match dependencies")
         for dependency in dependencies:
             expected = based_on.get(dependency)
