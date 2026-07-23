@@ -5,6 +5,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "scripts"), str(ROOT.parent / "video-understand" / "scripts")]
@@ -167,6 +168,52 @@ class BrollPlanTests(unittest.TestCase):
         self.assertIn("shot selected video requires a valid source_trim", broll_plan.validate_plan(plan, self.timeline, self.transcript))
         plan = copy.deepcopy(self.plan); plan["shots"][0]["candidates"][0]["media_type"] = "image"; plan["shots"][0].update({"status": "verified", "selected": {"candidate_id": "asset", "ken_burns": {}}})
         self.assertIn("shot verified image requires a non-empty ken_burns", broll_plan.validate_plan(plan, self.timeline, self.transcript))
+
+    def test_review_receipt_integrity_and_human_authority_are_validated(self):
+        approved = broll_plan.apply_review(self.plan, self.review(), mode="agent", actor="agent", rationale="Relevant footage.")
+        self.assertEqual([], broll_plan.validate_plan(approved, self.timeline, self.transcript))
+        cases = []
+        missing = copy.deepcopy(approved); missing["decision"] = None; cases.append((missing, "review trust requires decision object"))
+        missing = copy.deepcopy(approved); missing["review"] = None; cases.append((missing, "review trust requires review object"))
+        draft = copy.deepcopy(approved); draft["review"]["status"] = "draft"; cases.append((draft, "review status must be approved"))
+        mismatch = copy.deepcopy(approved); mismatch["decision"]["actor"] = "other"; cases.append((mismatch, "decision and review authority do not match"))
+        invalid_mode = copy.deepcopy(approved); invalid_mode["decision"]["mode"] = invalid_mode["review"]["mode"] = "robot"; cases.append((invalid_mode, "review mode must be human or agent"))
+        blank_actor = copy.deepcopy(approved); blank_actor["decision"]["actor"] = blank_actor["review"]["actor"] = " "; cases.append((blank_actor, "review actor is required"))
+        missing_id = copy.deepcopy(approved); missing_id["review"].pop("review_id"); cases.append((missing_id, "review_id is required"))
+        for field, message in (("plan_sha256", "review plan SHA-256 does not match"), ("candidate_manifest_sha256", "review candidate manifest SHA-256 does not match"), ("selected_asset_sha256", "review selected asset hashes do not match")):
+            tampered = copy.deepcopy(approved); tampered["review"][field] = [] if field == "selected_asset_sha256" else "0" * 64; cases.append((tampered, message))
+        for plan, message in cases:
+            with self.subTest(message=message): self.assertIn(message, broll_plan.validate_plan(plan, self.timeline, self.transcript))
+        human = broll_plan.apply_review(self.plan, self.review(explicit_user_action=True), mode="human", actor="person", rationale="I chose it.")
+        self.assertTrue(human["decision"]["explicit_user_action"]); self.assertTrue(human["review"]["explicit_user_action"])
+        human["review"].pop("explicit_user_action")
+        self.assertIn("human review requires explicit_user_action true", broll_plan.validate_plan(human, self.timeline, self.transcript))
+
+    def test_review_subject_is_stable_across_post_review_lifecycle(self):
+        selected = broll_plan.apply_review(self.plan, self.review(), mode="agent", actor="agent", rationale="Relevant footage.")
+        normalized = copy.deepcopy(selected); normalized["shots"][0].update({"status": "normalized", "normalized": {"path": "asset.mp4"}})
+        verified = copy.deepcopy(normalized); verified["shots"][0].update({"status": "verified", "verification": {"status": "pass"}})
+        self.assertEqual(broll_plan.review_subject(selected), broll_plan.review_subject(normalized))
+        self.assertEqual(broll_plan.review_subject(selected), broll_plan.review_subject(verified))
+        self.assertEqual([], broll_plan.validate_plan(verified, self.timeline, self.transcript))
+
+    def test_shots_must_be_chronological_even_without_overlap(self):
+        later = copy.deepcopy(self.plan["shots"][0]); later.update({"id": "later", "program_range": {"start_s": 3, "end_s": 4}, "source_ranges": [{"start_s": 3, "end_s": 4}], "candidates": []})
+        plan = copy.deepcopy(self.plan); plan["shots"] = [later, plan["shots"][0]]
+        self.assertIn("shots must be in chronological program order", broll_plan.validate_plan(plan, self.timeline, self.transcript))
+
+    def test_review_entry_id_must_be_a_nonblank_string(self):
+        for shot_id in (None, "", []):
+            review = self.review(); review["shots"][0]["id"] = shot_id
+            with self.subTest(shot_id=shot_id):
+                with self.assertRaisesRegex(ValueError, "review shot id is required"): broll_plan.apply_review(self.plan, review, mode="agent", actor="agent", rationale="reason")
+
+    def test_failed_atomic_receipt_replace_removes_temporary_file(self):
+        before = set(self.root.iterdir())
+        with mock.patch.object(broll_plan.os, "replace", side_effect=OSError("replace failed")):
+            with self.assertRaisesRegex(OSError, "replace failed"):
+                broll_plan.apply_review(self.plan, self.review(), mode="agent", actor="agent", rationale="reason", interaction_path=self.root / "receipt.json")
+        self.assertEqual(before, set(self.root.iterdir()))
 
 
 if __name__ == "__main__": unittest.main()

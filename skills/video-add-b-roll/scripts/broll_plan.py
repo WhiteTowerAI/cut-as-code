@@ -43,7 +43,52 @@ def review_subject(plan):
                 clean(child)
 
     clean(value)
+    for shot in value.get("shots", []):
+        if isinstance(shot, dict) and shot.get("status") in {"normalized", "verified"}:
+            shot["status"] = "selected"
     return value
+
+
+def _review_errors(plan, shots):
+    review, decision = plan.get("review"), plan.get("decision")
+    trust_required = (isinstance(review, dict) and review.get("status") == "approved") or any(
+        isinstance(shot, dict) and shot.get("status") in {"selected", "normalized", "verified"}
+        for shot in shots
+    )
+    if not trust_required:
+        return []
+    errors = []
+    if not isinstance(decision, dict): errors.append("review trust requires decision object")
+    if not isinstance(review, dict): errors.append("review trust requires review object")
+    if not isinstance(decision, dict) or not isinstance(review, dict): return errors
+    if review.get("status") != "approved": errors.append("review status must be approved")
+    if not isinstance(review.get("review_id"), str) or not review["review_id"].strip(): errors.append("review_id is required")
+    mode, actor, rationale = decision.get("mode"), decision.get("actor"), decision.get("rationale")
+    if mode not in {"human", "agent"}: errors.append("review mode must be human or agent")
+    if not isinstance(actor, str) or not actor.strip(): errors.append("review actor is required")
+    if not isinstance(rationale, str) or not rationale.strip(): errors.append("review rationale is required")
+    if any(review.get(key) != decision.get(key) for key in ("mode", "actor", "rationale")):
+        errors.append("decision and review authority do not match")
+    if mode == "human" and (decision.get("explicit_user_action") is not True or review.get("explicit_user_action") is not True):
+        errors.append("human review requires explicit_user_action true")
+    if review.get("plan_sha256") != canonical_sha256(review_subject(plan)):
+        errors.append("review plan SHA-256 does not match")
+    candidates_valid = all(
+        isinstance(shot, dict)
+        and isinstance(shot.get("candidates", []), list)
+        and all(isinstance(candidate, dict) for candidate in shot.get("candidates", []))
+        for shot in shots
+    )
+    if candidates_valid and review.get("candidate_manifest_sha256") != canonical_sha256(candidate_manifest(plan)):
+        errors.append("review candidate manifest SHA-256 does not match")
+    selected_hashes = []
+    for shot in shots:
+        if not isinstance(shot, dict) or shot.get("status") not in {"selected", "normalized", "verified"} or not isinstance(shot.get("selected"), dict): continue
+        candidate = next((item for item in shot.get("candidates", []) if isinstance(item, dict) and item.get("id") == shot["selected"].get("candidate_id")), None)
+        if isinstance(candidate, dict) and isinstance(candidate.get("sha256"), str): selected_hashes.append(candidate["sha256"])
+    if review.get("selected_asset_sha256") != sorted(set(selected_hashes)):
+        errors.append("review selected asset hashes do not match")
+    return errors
 
 
 def _range(value):
@@ -140,6 +185,7 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
         source_duration = None
     mapped = _mapped_words(transcript, timeline)
     seen_shots, ranges, candidate_ids = set(), [], set()
+    previous_program_start = None
     shots = plan.get("shots", [])
     if not isinstance(shots, list): return errors + ["shots must be a list"]
     for shot in shots:
@@ -153,7 +199,11 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
         program = _range(shot.get("program_range"))
         if not program or program[0] < 0 or program[1] <= program[0] or program[1] > duration:
             errors.append(f"{shot_id} program range is outside timeline")
-        else: ranges.append((program[0], program[1], shot_id))
+        else:
+            if previous_program_start is not None and program[0] < previous_program_start:
+                errors.append("shots must be in chronological program order")
+            previous_program_start = program[0]
+            ranges.append((program[0], program[1], shot_id))
         source_ranges = shot.get("source_ranges", [])
         if not isinstance(source_ranges, list): errors.append(f"{shot_id} source_ranges must be a list")
         else:
@@ -206,6 +256,7 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
         for previous_start, previous_end, previous_id in ranges:
             if previous_id != shot_id and previous_start < end and start < previous_end:
                 errors.append(f"{shot_id} program range overlaps {previous_id}"); break
+    errors.extend(_review_errors(plan, shots))
     if project is not None:
         if not isinstance(project, dict): return errors + ["project must be an object"]
         operation_values = project.get("operations")
@@ -267,6 +318,7 @@ def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None)
     seen = set()
     for entry in entries:
         shot_id = entry.get("id")
+        if not isinstance(shot_id, str) or not shot_id.strip(): raise ValueError("review shot id is required")
         if shot_id in seen: raise ValueError(f"duplicate review shot id: {shot_id}")
         seen.add(shot_id)
         if shot_id not in shots: raise ValueError(f"review has unknown shots: {shot_id}")
@@ -284,9 +336,15 @@ def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None)
         if not isinstance(entry.get(option), dict): raise ValueError(f"{shot['id']} select requires {option}")
         shot["selected"], shot["status"] = {"candidate_id": candidate["id"], option: copy.deepcopy(entry[option])}, "selected"; selected_hashes.append(candidate["sha256"])
     result["decision"] = {"mode": mode, "actor": actor, "rationale": rationale}
+    if mode == "human": result["decision"]["explicit_user_action"] = True
     result["review"] = {"status": "approved", "review_id": review["review_id"], "mode": mode, "actor": actor, "rationale": rationale, "plan_sha256": canonical_sha256(review_subject(result)), "candidate_manifest_sha256": canonical_sha256(candidate_manifest(result)), "selected_asset_sha256": sorted(set(selected_hashes))}
+    if mode == "human": result["review"]["explicit_user_action"] = True
     if interaction_path:
         target = Path(interaction_path); target.parent.mkdir(parents=True, exist_ok=True)
-        with tempfile.NamedTemporaryFile("w", delete=False, dir=target.parent, suffix=".json", encoding="utf-8") as handle: temp = Path(handle.name)
-        projectlib.write_json(temp, result["review"]); os.replace(temp, target)
+        temp = None
+        try:
+            with tempfile.NamedTemporaryFile("w", delete=False, dir=target.parent, suffix=".json", encoding="utf-8") as handle: temp = Path(handle.name)
+            projectlib.write_json(temp, result["review"]); os.replace(temp, target)
+        finally:
+            if temp is not None: temp.unlink(missing_ok=True)
     return result
