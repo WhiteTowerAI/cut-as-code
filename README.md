@@ -12,6 +12,30 @@
 - 🃏 **Graphic motion cards** — titles, lower thirds, stats, quotes, and calls to action.
 - 📱 **To TikTok/YouTube shorts** — extract moments and reframe them for 9:16 vertical.
 
+## How It Works
+
+Watch this 2-minute walkthrough to see how to interact with an AI coding agent and use cut-as-code skills to complete a video-editing workflow.
+
+<p align="center">
+  <a href="https://youtu.be/3yFPOC8kFxU">
+    <img
+      src="https://img.youtube.com/vi/3yFPOC8kFxU/maxresdefault.jpg"
+      alt="How to Use cut-as-code Skills with an AI Coding Agent"
+      width="640"
+    >
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://youtu.be/3yFPOC8kFxU">
+    <img
+      src="https://img.shields.io/badge/Watch%20on-YouTube-FF0000?logo=youtube&logoColor=white"
+      alt="Watch on YouTube"
+    >
+  </a>
+</p>
+
+
 ## Demos
 
 ### 1. 2h video to TikTok/YouTube shorts
