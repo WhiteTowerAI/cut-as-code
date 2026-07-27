@@ -108,14 +108,12 @@ Install the skills into your agent:
 npx skills add WhiteTowerAI/cut-as-code
 ```
 
-Then with a prompt, point your agent at a video and name the skills you want:
+Then with a prompt, point your agent at a video and name the skills you want. For example:
 
 > For [video-path], use /video-understand, /video-cut, /video-add-b-roll, /video-add-captions, and /video-add-content-cards.
 
 `/video-add-b-roll` needs a Pexels API key for stock footage. Put it in
-`skills/video-add-b-roll/.env` as `PEXELS_API_KEY=<key>` — the skill reads it from there and
-never prints it. Skip the key and use `import-local` if you only want to cut in your own
-footage.
+`skills/video-add-b-roll/.env` as `PEXELS_API_KEY=<key>`.
 
 ## Project Layout
 
