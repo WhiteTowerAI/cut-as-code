@@ -26,6 +26,11 @@ alignment, dead-air reclaim, memory-safe render, self-check).
   diagnosis + produce a solid cut.
 
 ## Dependencies
+`/video-understand` is a prerequisite. Run it first and use its validated media,
+transcript, analysis, and timeline instead of recreating them in this skill.
+Before starting, verify that it is installed. If it is not, warn the user that
+this prerequisite is missing and stop before processing media.
+
 Activate any environment that has these (do NOT assume a specific conda env name):
 - `yt-dlp` (download), `ffmpeg`/`ffprobe` (cut/render/probe) on PATH
 - Python with `faster-whisper` (CPU works: `device=cpu, compute_type=int8`)

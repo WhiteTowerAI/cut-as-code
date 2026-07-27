@@ -11,6 +11,11 @@ description: >
 
 ## Dependencies
 
+`/video-understand` is a prerequisite. Run it first so captions use the validated
+word-level transcript and canonical timeline.
+Before starting, verify that it is installed. If it is not, warn the user that
+this prerequisite is missing and stop before processing media.
+
 Require `ffmpeg`/`ffprobe` on PATH, Python with `Pillow`, and Node.js >= 22 (for the `.mjs` scripts and `npx hyperframes`, fetched on demand). `hyperframes render`/`snapshot` drives a headless Chrome — it manages its own `chrome-headless-shell`, and falls back to a system Chrome (set `CHROME` to override) when the cached one is unusable. Check these before processing media.
 
 ## Scope

@@ -9,6 +9,11 @@ Turn approved semantic moments into one coherent HyperFrames graphics overlay. U
 
 ## Dependencies
 
+`/video-understand` is a prerequisite. Run it first so cards use validated
+semantic evidence and the canonical timeline.
+Before starting, verify that it is installed. If it is not, warn the user that
+this prerequisite is missing and stop before processing media.
+
 Require `ffmpeg` on PATH, Python, and Node.js >= 22 (for `npx hyperframes`, fetched on demand). `hyperframes render`/`snapshot` drives a headless Chrome — it manages its own `chrome-headless-shell`, and falls back to a system Chrome (set `CHROME` to override) when the cached one is unusable. Check these before processing media.
 
 ## Inputs

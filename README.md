@@ -13,6 +13,30 @@
 - 🃏 **Graphic motion cards** — titles, lower thirds, stats, quotes, and calls to action.
 - 📱 **To TikTok/YouTube shorts** — extract moments and reframe them for 9:16 vertical.
 
+## How It Works
+
+Watch this 2-minute walkthrough to see how to interact with an AI coding agent and use cut-as-code skills to complete a video-editing workflow.
+
+<p align="center">
+  <a href="https://youtu.be/3yFPOC8kFxU">
+    <img
+      src="https://img.youtube.com/vi/3yFPOC8kFxU/maxresdefault.jpg"
+      alt="How to Use cut-as-code Skills with an AI Coding Agent"
+      width="640"
+    >
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://youtu.be/3yFPOC8kFxU">
+    <img
+      src="https://img.shields.io/badge/Watch%20on-YouTube-FF0000?logo=youtube&logoColor=white"
+      alt="Watch on YouTube"
+    >
+  </a>
+</p>
+
+
 ## Demos
 
 ### 1. 2h video to TikTok/YouTube shorts
@@ -54,7 +78,7 @@
 
 Original video: [Jensen Huang: NVIDIA GTC Taipei 2026 Keynote](https://www.youtube.com/watch?v=wSp6AiNIrsY)
 
-### 2. Cut, caption & card an interview
+### 2. Cut, caption & add graphics to a raw interview
 
 > **Prompt:** For [video-path], use /video-understand, /video-cut, /video-add-captions, and /video-add-content-cards.
 >
@@ -102,17 +126,32 @@ Each directory under `skills/` is a self-contained agent skill. Its `SKILL.md` i
 
 ## Quick Start
 
+### Installation
+
 Install the skills into your agent:
 
 ```bash
 npx skills add WhiteTowerAI/cut-as-code
 ```
 
-Then with a prompt, point your agent at a video and name the skills you want. For example:
+Or install them individually from ClawHub:
+
+```bash
+npm install -g clawhub
+clawhub install @whitetowerai/<skill-name>
+```
+
+### Prompting
+
+With a prompt, point your agent at a video and name the skills you want. For example:
 
 > For [video-path], use /video-understand, /video-cut, /video-add-b-roll, /video-add-captions, and /video-add-content-cards.
 
-`/video-add-b-roll` needs a Pexels API key for stock footage. Put it in
+### Note
+- `/video-understand` is a **prerequisite** for `/video-cut`, `/video-to-shorts`,
+`/video-add-captions`, and `/video-add-content-cards`. Run it first so downstream
+skills share the same media metadata, transcript, analysis, and timeline.
+- `/video-add-b-roll` needs a Pexels API key for stock footage. Put it in
 `skills/video-add-b-roll/.env` as `PEXELS_API_KEY=<key>`.
 
 ## Project Layout
