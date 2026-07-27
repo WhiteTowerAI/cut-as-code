@@ -8,6 +8,7 @@
 
 - ✂️ **Cut** — reviewed keep/drop decisions and a compact first cut.
 - 🎨 **Color grade** — candidate looks to review, then a baked LUT.
+- 🎬 **B-roll** — reviewed visual cutaways from local media or Pexels.
 - 💬 **Captions** — word-timed, preset styles with optional karaoke.
 - 🃏 **Graphic motion cards** — titles, lower thirds, stats, quotes, and calls to action.
 - 📱 **To TikTok/YouTube shorts** — extract moments and reframe them for 9:16 vertical.
@@ -93,6 +94,7 @@ Each directory under `skills/` is a self-contained agent skill. Its `SKILL.md` i
 | `/video-understand` | Probe media, generate a word-level transcript, analyze speech, and build reusable evidence for downstream skills. |
 | `/video-cut` | Create reviewed keep/drop decisions, generate the canonical timeline, render a compact first cut, and verify its boundaries. |
 | `/video-color-grade` | Assess footage, generate named looks, review the alternatives, record a selection, and bake or apply a portable LUT. |
+| `/video-add-b-roll` | Add selective transcript-timed visual cutaways from your own footage or Pexels, with reviewed candidates and recorded provenance. |
 | `/video-add-captions` | Render preset-driven, word-timed captions with optional karaoke highlighting. |
 | `/video-add-content-cards` | Add selective transcript-timed titles, lower thirds, statistics, lists, quotes, chapter cards, and calls to action. |
 | `/video-to-shorts` | Find and extract approved horizontal shorts, then optionally create reviewed 9:16 vertical deliveries. |
@@ -108,7 +110,12 @@ npx skills add WhiteTowerAI/cut-as-code
 
 Then with a prompt, point your agent at a video and name the skills you want:
 
-> For [video-path], use /video-understand, /video-cut, /video-add-captions, and /video-add-content-cards.
+> For [video-path], use /video-understand, /video-cut, /video-add-b-roll, /video-add-captions, and /video-add-content-cards.
+
+`/video-add-b-roll` needs a Pexels API key for stock footage. Put it in
+`skills/video-add-b-roll/.env` as `PEXELS_API_KEY=<key>` — the skill reads it from there and
+never prints it. Skip the key and use `import-local` if you only want to cut in your own
+footage.
 
 ## Project Layout
 
@@ -121,6 +128,7 @@ my-video-project/
 |   |-- 00-video-understanding/
 |   |-- 01-cut/
 |   |-- 02-color-grade/
+|   |-- 03-b-roll/
 |   |-- 03-content-cards/
 |   |-- 04-edit-compare/
 |   |-- 05-captions/
@@ -136,6 +144,7 @@ my-video-project/
     |-- understand/
     |-- cut/
     |-- color-grade/
+    |-- b-roll/
     |-- content-cards/
     |-- edit-compare/
     |-- captions/
