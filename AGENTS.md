@@ -216,6 +216,10 @@ Prefer `python -m unittest` over `pytest` — the suites use `unittest` fixtures
 - `work/`, `docs/`, `/tests/`, and `.env` are gitignored — only `skills/` plus the root docs
   are tracked. A video project lives *outside* the repo and is addressed by an explicit
   project root, so scripts take paths, never assume cwd is the project.
+- **Never commit `docs/` — including `docs/superpowers/` — under any circumstance.** It is
+  local scratch and vendored material. Never stage it, never force-add it (`git add -f`),
+  and never remove it from `.gitignore`. If a commit or PR would include anything under
+  `docs/`, drop those paths and say so instead of committing them.
 - `.github/workflows/clawhub-publish.yml` publishes `skills/` to ClawHub (dry-run on PRs,
   real publish on `main`). A skill directory's `SKILL.md` frontmatter `name` is its published
   slug and slash-command trigger — renaming a directory renames the command.
