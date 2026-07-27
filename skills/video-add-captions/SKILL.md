@@ -24,8 +24,8 @@ This skill owns caption grouping, style selection, review, and the transparent
 caption track. It does not transcribe, cut, retime, grade, reframe, or choose the
 delivery audio policy.
 
-If a cut exists, caption the active program timeline; do not treat source
-transcript seconds as program seconds.
+Use `video-understand` first. If a cut exists, caption the active program
+timeline; do not treat source transcript seconds as program seconds.
 
 ## Protocol Inputs
 

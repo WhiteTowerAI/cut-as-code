@@ -43,6 +43,7 @@ slash-command trigger for that skill.
 | `video-cut` | Raw long video → compact first cut (download, transcribe, diagnose, hand-written JSON cut plan, varispeed, render, self-check) | Python · yt-dlp · ffmpeg · faster-whisper |
 | `video-edit-compare` | Original versus actual final pixels projected onto the source clock | Python · ffmpeg · Pillow |
 | `video-color-grade` | Assess footage → corrective base + named looks → human picks → bake `.cube` LUT + apply | Python · ffmpeg · numpy · Pillow |
+| `video-add-b-roll` | Selective transcript-timed visual cutaways from local media or Pexels, with provenance, review, and normalized overlays | Python · ffmpeg · Pillow · Pexels API |
 | `video-add-captions` | Preset-driven, word-timed captions with optional karaoke | HyperFrames · ffmpeg |
 | `video-add-content-cards` | Add selective transcript-timed titles, lower-thirds, statistics, quotes, and chapter cards | HyperFrames · ffmpeg |
 | `video-to-shorts` | Find, review, and render short vertical clips from long-form video | Python · ffmpeg |
@@ -62,8 +63,17 @@ slash-command trigger for that skill.
 - Render contribution kinds are `timeline-transform`, `video-filter`, `audio-filter`,
   `overlay`, `precomputed-asset`, and `output-constraint`.
 - Domain decisions remain in `work/cut/edit-plan.json`,
-  `work/color-grade/grade-plan.json`, `work/content-cards/cards-plan.json`,
-  `work/captions/captions-plan.json`, and `work/shorts/shorts-plan.json`.
+  `work/color-grade/grade-plan.json`, `work/b-roll/broll-plan.json`,
+  `work/content-cards/cards-plan.json`, `work/captions/captions-plan.json`, and
+  `work/shorts/shorts-plan.json`.
+- When several pixel operations are active on one sequence, the canonical order is
+  `cut -> color-grade -> b-roll -> content-cards -> captions`.
+- B-roll adds a `b-roll` track and changes video pixels only; it leaves timeline, geometry,
+  and audio untouched. Shots carry real probe/byte/SHA-256/provenance records, are normalized
+  to timeline dimensions and exact rational FPS with the selected LUT pre-applied when color
+  grade is active, and pass a two-stage gate: exact-candidate review, then a completed
+  visual review bound to the final delivery. Missing or weak media becomes `skipped` — an
+  approved all-skipped plan is a valid no-op. Never substitute fallback media.
 - Caption cues use program time mapped from the canonical source transcript through
   `timeline.json`; they preserve source evidence and contribute a transparent PNG sequence
   overlay at the exact rational timeline FPS. Browser runtime assets must be local and hashed.
@@ -115,6 +125,12 @@ These conventions are shared and load-bearing — match them in any new skill:
 - **`work/` for intermediates, deliverable to project root / `out/`.** Outputs go to the
   passed `--out` dirs (durable), never a system temp dir.
 
+- **API keys come from skill-local `.env`, never from chat or argv.** `video-add-b-roll`
+  reads `PEXELS_API_KEY` from the environment first, then
+  `skills/video-add-b-roll/.env` (gitignored). If both are blank, stop and ask the user to
+  add it to that file. Never put a key in a command argument, plan, URL, log, review
+  artifact, or response.
+
 - **Self-check is non-negotiable.** Every skill ends by verifying its own output
   (re-transcribe the cut, screenshot stills, eyeball a card/skin strip) before declaring
   done. Don't skip it.
@@ -142,7 +158,13 @@ These conventions are shared and load-bearing — match them in any new skill:
 
 ## Common commands
 
-There is no aggregate runner; commands live inside each `SKILL.md` pipeline. Canonical ones:
+There is no root build, package manifest, or aggregate runner. Pipeline commands live inside
+each `SKILL.md`; the checks below are the repo-wide ones. Run everything from the repo root.
+
+Sanity-check tool availability before running a pipeline:
+`ffmpeg -version`, `ffprobe -version`, `yt-dlp --version`,
+`python -c "import faster_whisper"`, `python -c "import PIL"`, `node --version` (>= 22, for
+the HyperFrames `.mjs` scripts in `video-add-captions`).
 
 ```bash
 # transcribe (the shared step) — produces transcript.json + .srt
@@ -150,5 +172,50 @@ ffmpeg -y -i work/source.mp4 -ac 1 -ar 16000 work/audio16k.wav
 python skills/video-understand/scripts/transcribe.py work/audio16k.wav work/transcript
 ```
 
-Sanity-check tool availability before running a pipeline:
-`yt-dlp --version`, `ffmpeg -version`, `python -c "import faster_whisper"`.
+### Tests and checks
+
+Tests are plain `unittest` modules under `skills/<name>/tests/`; each puts its own
+`scripts/` and `video-understand/scripts/` on `sys.path`, so no install or `PYTHONPATH` is
+needed. There is no discover root that covers them all — run them per skill:
+
+```bash
+python -m unittest skills/video-add-b-roll/tests/test_broll.py          # 154 tests, ~50s
+python -m unittest skills/video-cut/tests/test_inspect_bounds.py
+python -m unittest skills/video-edit-compare/tests/test_make_compare.py
+
+# one test case / one test
+python -m unittest skills.video-cut.tests.test_inspect_bounds.InspectBoundsTests -v
+python -m unittest skills/video-add-b-roll/tests/test_broll.py -k pexels -v
+```
+
+`check_*.py` scripts are self-contained regression harnesses with fixtures baked in — they
+take no project argument and print a `passed` line per check:
+
+```bash
+python skills/video-understand/scripts/check_protocol_extensions.py   # shared protocol
+python skills/video-cut/scripts/check_project_protocol.py
+python skills/video-add-captions/scripts/check_project_protocol.py
+python skills/video-to-shorts/scripts/check_project_protocol.py      # wraps check_review_ui.py
+node skills/video-add-captions/scripts/check_caption_style_config.mjs
+node skills/video-add-captions/scripts/check_caption_interaction.mjs
+```
+
+Some b-roll tests shell out to ffmpeg and print `UnicodeDecodeError` tracebacks from
+subprocess reader threads on Windows (non-UTF-8 ffmpeg output). Those are noise — trust the
+final `OK`/`FAILED` line. As of this writing `video-to-shorts/scripts/check_review_ui.py`
+has 2 pre-existing failures (`fake_render()` missing `video_preset`); everything else above
+passes.
+
+Prefer `python -m unittest` over `pytest` — the suites use `unittest` fixtures and
+`mock.patch` throughout, and no pytest config exists.
+
+## Repo conventions
+
+- **`CLAUDE.md` and `AGENTS.md` must stay byte-identical.** They were once hardlinked but
+  are now separate files; apply every edit to both.
+- `work/`, `docs/`, `/tests/`, and `.env` are gitignored — only `skills/` plus the root docs
+  are tracked. A video project lives *outside* the repo and is addressed by an explicit
+  project root, so scripts take paths, never assume cwd is the project.
+- `.github/workflows/clawhub-publish.yml` publishes `skills/` to ClawHub (dry-run on PRs,
+  real publish on `main`). A skill directory's `SKILL.md` frontmatter `name` is its published
+  slug and slash-command trigger — renaming a directory renames the command.
