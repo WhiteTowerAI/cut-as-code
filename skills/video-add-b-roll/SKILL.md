@@ -24,14 +24,27 @@ Follow every editorial, provenance, still, review, recovery, and delivery rule i
 
 ## Requirements And Inputs
 
-Require Python, `ffmpeg`, `ffprobe`, and Pillow. For Pexels, read `PEXELS_API_KEY` from the
-environment; never place it in a command argument, plan, URL, log, or review artifact.
+Require Python, `ffmpeg`, `ffprobe`, and Pillow. For Pexels, first use `PEXELS_API_KEY` from
+the environment, then look for it in `skills/video-add-b-roll/.env`. If both are missing or
+blank, stop and ask the user to add `PEXELS_API_KEY=<key>` to that file, then retry after they
+confirm. Ask them to provide the key through the local `.env` file, never through chat. Never
+place or print it in a command argument, plan, URL, log, review artifact, or response.
+
+`/video-understand` is a prerequisite. Run it first so B-roll use the validated
+word-level transcript and canonical timeline.
+Before starting, verify that it is installed. If it is not, warn the user that
+this prerequisite is missing and stop before processing media.
 
 Run from the repository root and resolve the separate project root:
 
 ```powershell
 $RepoRoot = (Resolve-Path '.').Path
 $ProjectRoot = (Resolve-Path 'path/to/video-project').Path
+$BrollEnv = Join-Path $RepoRoot 'skills/video-add-b-roll/.env'
+if ([string]::IsNullOrWhiteSpace($env:PEXELS_API_KEY) -and (Test-Path -LiteralPath $BrollEnv)) {
+  $PexelsKeyLine = Get-Content -LiteralPath $BrollEnv | Where-Object { $_ -match '^\s*PEXELS_API_KEY\s*=' } | Select-Object -Last 1
+  if ($PexelsKeyLine) { $env:PEXELS_API_KEY = ($PexelsKeyLine -split '=', 2)[1].Trim().Trim('"').Trim("'") }
+}
 $BrollScripts = Join-Path $RepoRoot 'skills/video-add-b-roll/scripts'
 $ProjectLib = Join-Path $RepoRoot 'skills/video-understand/scripts'
 $ReviewVideo = & python -c "import sys; from pathlib import Path; sys.path.insert(0,sys.argv[2]); import projectlib; root=Path(sys.argv[1]); project=projectlib.load_json(root/'work/project.json'); assert project.get('render',{}).get('status') == 'verified', 'current upstream delivery is not verified'; path=projectlib.resolve_project_path(root,project['render']['output']); assert path.is_file(), 'current upstream delivery is missing'; print(path)" $ProjectRoot $ProjectLib
@@ -265,22 +278,11 @@ python "$RepoRoot/skills/video-understand/scripts/render_project.py" `
   "$ProjectRoot/work/render/render-plan.json"
 ```
 
-Generate the required source-time comparison from actual final pixels, not an intermediate:
-
-```powershell
-python "$RepoRoot/skills/video-edit-compare/scripts/make_compare.py" `
-  "$ProjectRoot/work/timeline.json" `
-  "$ProjectRoot/input/original-video.mp4" `
-  "$ProjectRoot/final/final-video.mp4" `
-  "$ProjectRoot/review/04-edit-compare/original-vs-final-source-time.mp4"
-```
-
-Open and inspect the final delivery, source-time comparison, contact sheet, boundary reel,
-and representative first/middle/last stills:
+Open and inspect the final delivery, contact sheet, boundary reel, and representative
+first/middle/last stills:
 
 ```powershell
 Start-Process "$ProjectRoot/final/final-video.mp4"
-Start-Process "$ProjectRoot/review/04-edit-compare/original-vs-final-source-time.mp4"
 $ContactSheet = "$ProjectRoot/review/03-b-roll/contact-sheet.jpg"
 $BoundaryReel = "$ProjectRoot/review/03-b-roll/boundary-reel.mp4"
 $Stills = "$ProjectRoot/review/03-b-roll/stills"
@@ -300,11 +302,11 @@ After actual inspection, create an Agent- or human-authored JSON export containi
 
 Complete the visual review before final registration. This writes the durable receipt and
 completed report, binding the plan UUID/hash, verifier stills, contact sheet, boundary reel,
-pending machine summary, final video, and source-time comparison by SHA-256:
+pending machine summary, and final video by SHA-256:
 
 ```powershell
 $VisualReviewExport = "$ProjectRoot/work/b-roll/b-roll-visual-review-export.json"
-python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]).resolve(); sys.path.insert(0,sys.argv[2]); import check_broll,projectlib; check_broll.complete_visual_review(root/'work/b-roll/broll-plan.json',root,projectlib.load_json(sys.argv[3]),root/'final/final-video.mp4',root/'review/04-edit-compare/original-vs-final-source-time.mp4')" $ProjectRoot $BrollScripts $VisualReviewExport
+python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]).resolve(); sys.path.insert(0,sys.argv[2]); import check_broll,projectlib; check_broll.complete_visual_review(root/'work/b-roll/broll-plan.json',root,projectlib.load_json(sys.argv[3]),root/'final/final-video.mp4')" $ProjectRoot $BrollScripts $VisualReviewExport
 ```
 
 Run registration again. It finalizes the exact pre-registered operation in place as
@@ -314,12 +316,11 @@ request another render:
 
 ```powershell
 python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]); sys.path.insert(0,sys.argv[2]); import broll_plan,projectlib; project_path=root/'work/project.json'; project=projectlib.load_json(project_path); plan=projectlib.load_json(root/'work/b-roll/broll-plan.json'); projectlib.write_json(project_path,broll_plan.register_operation(project,plan))" $ProjectRoot $BrollScripts
-python "$RepoRoot/skills/video-understand/scripts/build_render_plan.py" $ProjectRoot
 ```
 
-For an all-skipped no-op, only the summary, final delivery, and source-time comparison are
-required; contact sheets, boundary reels, and stills do not exist.
+For an all-skipped no-op, only the summary and final delivery are required; contact sheets,
+boundary reels, and stills do not exist.
 
 For selected B-roll, completion is blocked until the completed visual-review receipt,
-final-pixel checks, and compiler validation pass. Successful render or machine-verification
+final-pixel checks, and registration validation pass. Successful render or machine-verification
 commands alone are not a self-check.

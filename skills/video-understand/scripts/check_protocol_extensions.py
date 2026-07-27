@@ -486,9 +486,6 @@ def check_broll_compiler_consistency():
         boundary = binding("review/03-b-roll/boundary-reel.mp4", b"boundary")
         summary = binding("review/03-b-roll/b-roll-summary.md", b"summary")
         final_video = binding("final/final-video.mp4", b"final")
-        comparison = binding(
-            "review/04-edit-compare/original-vs-final-source-time.mp4", b"comparison"
-        )
         stills = []
         for shot in shots:
             shot_stills = {}
@@ -527,7 +524,6 @@ def check_broll_compiler_consistency():
             "artifacts": {
                 "stills": stills, "contact_sheet": contact, "boundary_reel": boundary,
                 "machine_summary": summary, "final_video": final_video,
-                "comparison": comparison,
             },
         }
         projectlib.write_json(receipt_path, receipt)

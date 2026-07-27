@@ -2655,7 +2655,6 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
         )
         summary_bytes = artifacts["summary"].read_bytes()
         final_video = self.root / "final/final-video.mp4"
-        comparison = self.root / "review/04-edit-compare/original-vs-final-source-time.mp4"
         plan_sha256 = broll_plan.canonical_sha256(broll_plan.visual_review_subject(verified))
 
         source = self.root / "input/source.mp4"
@@ -2706,15 +2705,12 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
             if item.get("operation") == "b-roll"
         ]
         final_video.write_bytes(video.read_bytes())
-        comparison.parent.mkdir(parents=True)
-        comparison.write_bytes(b"source-time comparison")
         registered["render"]["status"] = "verified"
         projectlib.write_json(self.project_path, registered)
         resolved_root = self.root.resolve()
         completed, published = check_broll.complete_visual_review(
             self.plan_path, self.root, self._visual_review(plan_sha256),
             resolved_root / "final/final-video.mp4",
-            resolved_root / "review/04-edit-compare/original-vs-final-source-time.mp4",
         )
 
         self.assertEqual(summary_bytes, artifacts["summary"].read_bytes())
@@ -2732,7 +2728,6 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
             artifacts["boundary_reel"].relative_to(self.root).as_posix(): broll_plan.sha256_file(artifacts["boundary_reel"]),
             artifacts["summary"].relative_to(self.root).as_posix(): broll_plan.sha256_file(artifacts["summary"]),
             final_video.relative_to(self.root).as_posix(): broll_plan.sha256_file(final_video),
-            comparison.relative_to(self.root).as_posix(): broll_plan.sha256_file(comparison),
             **{path.relative_to(self.root).as_posix(): broll_plan.sha256_file(path) for path in artifacts["stills"]},
         }
         bound_hashes = {
@@ -2744,8 +2739,7 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
             self.assertEqual(digest, bound_hashes[path])
         report_text = published["report"].read_text(encoding="utf-8")
         for value in ("Visual review status: completed", "Codex", plan_sha256,
-                      expected_hashes[final_video.relative_to(self.root).as_posix()],
-                      expected_hashes[comparison.relative_to(self.root).as_posix()]):
+                      expected_hashes[final_video.relative_to(self.root).as_posix()]):
             self.assertIn(value, report_text)
         duplicate = copy.deepcopy(registered)
         duplicate["sequences"]["alternate"] = {"operations": ["b-roll"]}
@@ -2779,10 +2773,7 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
             self.plan_path, self.timeline_path, self.root, video
         )
         final_video = self.root / "final/final-video.mp4"
-        comparison = self.root / "review/04-edit-compare/original-vs-final-source-time.mp4"
         final_video.write_bytes(video.read_bytes())
-        comparison.parent.mkdir(parents=True)
-        comparison.write_bytes(b"source-time comparison")
         original_plan = self.plan_path.read_bytes()
         current_plan = projectlib.load_json(self.plan_path)
         plan_sha256 = broll_plan.canonical_sha256(broll_plan.visual_review_subject(current_plan))
@@ -2802,7 +2793,7 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
                     mutation.write_bytes(original_artifact + b"changed")
                 with self.assertRaisesRegex(ValueError, message):
                     check_broll.complete_visual_review(
-                        self.plan_path, self.root, review, final_video, comparison,
+                        self.plan_path, self.root, review, final_video,
                     )
                 if mutation:
                     mutation.write_bytes(original_artifact)
@@ -2814,10 +2805,7 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
         video, _ = self._normalized_for_check()
         check_broll.verify_plan(self.plan_path, self.timeline_path, self.root, video)
         final_video = self.root / "final/final-video.mp4"
-        comparison = self.root / "review/04-edit-compare/original-vs-final-source-time.mp4"
         final_video.write_bytes(video.read_bytes())
-        comparison.parent.mkdir(parents=True)
-        comparison.write_bytes(b"source-time comparison")
         original_plan = self.plan_path.read_bytes()
         current_plan = projectlib.load_json(self.plan_path)
         review = self._visual_review(
@@ -2835,7 +2823,7 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
         with mock.patch.object(check_broll.os, "replace", side_effect=fail_plan_replace):
             with self.assertRaisesRegex(OSError, "plan replace failed"):
                 check_broll.complete_visual_review(
-                    self.plan_path, self.root, review, final_video, comparison,
+                    self.plan_path, self.root, review, final_video,
                 )
         self.assertEqual(original_plan, self.plan_path.read_bytes())
         self.assertFalse((self.root / "work/b-roll/b-roll-visual-review.json").exists())
@@ -3363,7 +3351,7 @@ class AcquisitionTests(unittest.TestCase):
         def opener(request, timeout=None): requests.append(request); return Response()
         records = pexels.search_videos("factory & safety", api_key="secret-key", opener=opener)
         self.assertEqual(1, len(records)); self.assertEqual(2, records[0]["file_id"])
-        self.assertIn("factory+%26+safety", requests[0].full_url); self.assertEqual("secret-key", requests[0].get_header("Authorization"))
+        self.assertIn("factory+%26+safety", requests[0].full_url); self.assertEqual("secret-key", requests[0].get_header("Authorization")); self.assertEqual(pexels.USER_AGENT, requests[0].get_header("User-agent"))
         self.assertNotIn("secret-key", json.dumps(records))
 
     def test_download_resumes_and_publishes_only_after_probe(self):
@@ -3382,7 +3370,7 @@ class AcquisitionTests(unittest.TestCase):
         candidate = {"id": "7-2", "download_url": "https://videos.pexels.com/clip.mp4", "provider_id": 7, "file_id": 2, "provenance": {"source_type": "pexels", "creator": "Maker", "license": "Pexels License", "retrieval_time": "2026-07-23T00:00:00Z", "source_url": "https://www.pexels.com/video/7/"}}
         with mock.patch.object(pexels, "probe_media", return_value={"duration_s": 1.0, "width": 2, "height": 2}):
             result = pexels.download_candidate(candidate, target, opener=opener)
-        self.assertEqual(b"oldnew", target.read_bytes()); self.assertEqual("bytes=3-", requests[0].get_header("Range")); self.assertEqual(target, result["path"])
+        self.assertEqual(b"oldnew", target.read_bytes()); self.assertEqual("bytes=3-", requests[0].get_header("Range")); self.assertEqual(pexels.USER_AGENT, requests[0].get_header("User-agent")); self.assertEqual(target, result["path"])
 
     def test_download_same_host_redirect_updates_pexels_provenance_immutably(self):
         fixture = _BrollFixture()

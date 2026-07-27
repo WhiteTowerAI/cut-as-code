@@ -18,7 +18,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "video-understand" 
 import projectlib
 
 
-PEXELS_API = "https://api.pexels.com/videos/search"
+PEXELS_API = "https://api.pexels.com/v1/videos/search"
+USER_AGENT = "cut-as-code-video-add-b-roll/1.0"
 LICENSE_URL = "https://www.pexels.com/license/"
 TERMS_URL = "https://www.pexels.com/terms-of-service/"
 VIDEO_HOSTS = {"videos.pexels.com"}
@@ -73,7 +74,7 @@ def search_videos(query, *, orientation="landscape", per_page=10, api_key=None, 
     if not isinstance(per_page, int) or isinstance(per_page, bool) or not 1 <= per_page <= 80: raise ValueError("per_page must be 1..80")
     key = api_key or os.environ.get("PEXELS_API_KEY")
     if not key: raise ValueError("Pexels API key is required")
-    request = Request(f"{PEXELS_API}?{urlencode({'query': query, 'orientation': orientation, 'per_page': per_page})}", headers={"Authorization": key, "Accept": "application/json"})
+    request = Request(f"{PEXELS_API}?{urlencode({'query': query, 'orientation': orientation, 'per_page': per_page})}", headers={"Authorization": key, "Accept": "application/json", "User-Agent": USER_AGENT})
     with _open(opener, request, API_HOSTS) as response:
         validate_url(response.geturl(), API_HOSTS)
         try: payload = json.loads(response.read().decode("utf-8"))
@@ -160,7 +161,8 @@ def download_candidate(candidate, destination, *, opener=None, max_bytes=250_000
         target.unlink()
     for attempt in range(retries):
         offset = part.stat().st_size if part.exists() else 0
-        request = Request(url, headers={"Range": f"bytes={offset}-"} if offset else {})
+        headers = {"User-Agent": USER_AGENT, **({"Range": f"bytes={offset}-"} if offset else {})}
+        request = Request(url, headers=headers)
         try:
             with _open(opener, request, VIDEO_HOSTS) as response:
                 final_url = validate_url(response.geturl(), VIDEO_HOSTS)

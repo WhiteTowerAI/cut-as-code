@@ -241,7 +241,7 @@ def _delivery_artifact(path, expected, root, label):
     return {"path": _relative(resolved, root), "sha256": broll_plan.sha256_file(resolved)}
 
 
-def _visual_review_artifacts(plan, root, final_video, comparison):
+def _visual_review_artifacts(plan, root, final_video):
     stills, shared = [], {}
     selected = [shot for shot in plan["shots"] if shot.get("status") != "skipped"]
     if not selected:
@@ -269,11 +269,6 @@ def _visual_review_artifacts(plan, root, final_video, comparison):
         "final_video": _delivery_artifact(
             final_video, root / "final/final-video.mp4", root, "final video"
         ),
-        "comparison": _delivery_artifact(
-            comparison,
-            root / "review/04-edit-compare/original-vs-final-source-time.mp4",
-            root, "source-time comparison",
-        ),
     }
 
 
@@ -300,7 +295,7 @@ def _visual_review_report(receipt):
         lines.append(
             f"- {still['shot_id']} {still['position']} still: `{still['path']}` (`{still['sha256']}`)"
         )
-    for key in ("contact_sheet", "boundary_reel", "machine_summary", "final_video", "comparison"):
+    for key in ("contact_sheet", "boundary_reel", "machine_summary", "final_video"):
         binding = artifacts[key]
         lines.append(
             f"- {key.replace('_', ' ').title()}: `{binding['path']}` (`{binding['sha256']}`)"
@@ -326,7 +321,7 @@ def _publish_visual_review(parts, snapshots):
             part.unlink(missing_ok=True)
 
 
-def complete_visual_review(plan_path, project_root, review, final_video, comparison):
+def complete_visual_review(plan_path, project_root, review, final_video):
     """Bind an actual visual inspection to verified evidence and publish its receipt."""
     root, plan_path = Path(project_root).resolve(), Path(plan_path).resolve()
     if plan_path != (root / "work/b-roll/broll-plan.json").resolve():
@@ -366,7 +361,7 @@ def complete_visual_review(plan_path, project_root, review, final_video, compari
     if (not isinstance(checks, dict) or set(checks) != set(broll_plan.VISUAL_REVIEW_CHECKS)
             or any(checks[key] is not True for key in broll_plan.VISUAL_REVIEW_CHECKS)):
         raise ValueError("all visual checks must be true booleans")
-    artifacts = _visual_review_artifacts(plan, root, final_video, comparison)
+    artifacts = _visual_review_artifacts(plan, root, final_video)
     receipt = {
         "schema_version": 1, "status": "completed", "review_id": active["review_id"],
         "plan_sha256": plan_sha256, "mode": mode, "actor": actor.strip(),

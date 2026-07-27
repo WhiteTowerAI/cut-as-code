@@ -965,7 +965,7 @@ def _validate_broll_plan(plan, operation, contributions, timeline, errors, proje
         artifacts = receipt.get("artifacts")
         artifact_keys = {
             "stills", "contact_sheet", "boundary_reel", "machine_summary",
-            "final_video", "comparison",
+            "final_video",
         }
         if not isinstance(artifacts, dict) or set(artifacts) != artifact_keys:
             errors.append(prefix + "visual review receipt artifacts are invalid")
@@ -1006,10 +1006,6 @@ def _validate_broll_plan(plan, operation, contributions, timeline, errors, proje
                 errors.append(prefix + "visual review receipt artifact bindings do not match plan")
             bound_file(
                 artifacts.get("final_video"), "final video", "final/final-video.mp4"
-            )
-            bound_file(
-                artifacts.get("comparison"), "source-time comparison",
-                "review/04-edit-compare/original-vs-final-source-time.mp4",
             )
 
     if not isinstance(contributions, list):
