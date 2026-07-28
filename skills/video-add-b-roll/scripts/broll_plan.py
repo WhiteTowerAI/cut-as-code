@@ -649,7 +649,7 @@ def register_operation(project, plan, *, plan_path="b-roll/broll-plan.json", rep
     if anchors:
         index = anchors[-1] + 1
     else:
-        index = next((index for index, item in enumerate(ids) if item in {"content-cards", "captions"}), len(ids))
+        index = next((index for index, item in enumerate(ids) if item in {"graphic-motion", "content-cards", "captions"}), len(ids))
     ids.insert(index, "b-roll")
     result.setdefault("render", {})["status"] = "draft"
     return result

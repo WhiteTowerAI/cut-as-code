@@ -1,11 +1,13 @@
 """Shared Open Recut project protocol helpers."""
 
 import hashlib
+import importlib.util
 import json
 import math
 import os
 import re
 import subprocess
+import sys
 from datetime import datetime
 from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
@@ -20,6 +22,9 @@ CONTRIBUTION_KINDS = {
     "precomputed-asset",
     "output-constraint",
 }
+CANONICAL_PIXEL_ORDER = (
+    "cut", "color-grade", "b-roll", "graphic-motion", "content-cards", "captions",
+)
 POINT_WORD_DURATION_S = 0.001
 
 
@@ -261,9 +266,19 @@ def validate_project(project, project_root, check_files=True, check_media=False)
     if active not in sequences:
         errors.append(f"active_sequence does not exist: {active!r}")
     else:
-        for operation_id in sequences[active].get("operations", []):
+        active_operations = sequences[active].get("operations", [])
+        for operation_id in active_operations:
             if operation_id not in nodes:
                 errors.append(f"active sequence references unknown operation: {operation_id}")
+        pixel_operations = [
+            operation_id for operation_id in active_operations
+            if operation_id in CANONICAL_PIXEL_ORDER
+        ]
+        if pixel_operations != [
+            operation_id for operation_id in CANONICAL_PIXEL_ORDER
+            if operation_id in pixel_operations
+        ]:
+            errors.append("active sequence operations violate canonical pixel order")
 
     for review in project.get("reviews", []):
         _validate_node(review, nodes, errors, allow_render=True)
@@ -1082,6 +1097,88 @@ def _validate_image_sequence(contribution, asset_path, expected_fps, operation_i
             errors.append(f"{operation_id} image-sequence first frame is missing")
 
 
+def _graphic_motion_module():
+    module = sys.modules.get("graphic_motion_plan")
+    if module is not None and hasattr(module, "validate_plan"):
+        return module
+    path = Path(__file__).resolve().parents[2] / "video-add-graphic-motion/scripts/graphic_motion_plan.py"
+    spec = importlib.util.spec_from_file_location("_projectlib_graphic_motion_plan", path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"cannot load graphic-motion validator: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _validate_graphic_motion_plan(
+    plan, operation, contributions, timeline, errors, project_root, *, project=None,
+):
+    """Recheck the immutable plan and file bindings at delivery compilation."""
+    operation_id = operation.get("id") if isinstance(operation, dict) else None
+    operation_id = operation_id or "graphic-motion"
+    prefix = f"{operation_id} "
+    if not isinstance(plan, dict):
+        errors.append(prefix + "plan must be an object")
+        return
+    if not isinstance(operation, dict) or not isinstance(timeline, dict):
+        errors.append(prefix + "compiler inputs are invalid")
+        return
+    try:
+        domain_errors = _graphic_motion_module().validate_plan(
+            plan, timeline, project=project, project_root=project_root, verify_files=True,
+        )
+    except Exception as exc:
+        errors.append(prefix + f"domain validation failed: {exc}")
+    else:
+        errors.extend(prefix + error for error in domain_errors)
+    payload = json.dumps(plan, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    if operation.get("plan_sha256") != hashlib.sha256(payload.encode("utf-8")).hexdigest():
+        errors.append(prefix + "plan SHA-256 is stale")
+    if plan.get("timeline_id") != timeline.get("timeline_id"):
+        errors.append(prefix + "plan timeline_id does not match timeline")
+    if plan.get("program_duration_s") != timeline.get("program_duration_s"):
+        errors.append(prefix + "plan duration does not match timeline")
+    if plan.get("fps") != timeline.get("fps"):
+        errors.append(prefix + "plan fps does not match timeline")
+    if operation.get("depends_on") != plan.get("dependencies") or operation.get("based_on") != plan.get("based_on"):
+        errors.append(prefix + "plan dependencies do not match operation")
+    cues = plan.get("cues") if isinstance(plan.get("cues"), list) else []
+    expected = [
+        cue.get("render") for cue in cues
+        if isinstance(cue, dict) and cue.get("status") == "verified"
+    ]
+    if contributions != expected:
+        errors.append(prefix + "render contributions do not match verified cues")
+    bindings = plan.get("delivery_bindings")
+    if operation.get("delivery_bindings") != bindings or not isinstance(bindings, list):
+        errors.append(prefix + "delivery bindings do not match operation")
+        return
+    root = Path(project_root).resolve()
+    for binding in bindings:
+        if (
+            not isinstance(binding, dict)
+            or set(binding) != {"path", "sha256"}
+            or not isinstance(binding.get("path"), str)
+            or not binding["path"].strip()
+            or not re.fullmatch(r"[0-9a-f]{64}", str(binding.get("sha256", "")))
+        ):
+            errors.append(prefix + "bound file binding is invalid")
+            continue
+        if Path(binding["path"]).is_absolute():
+            errors.append(prefix + "bound file path must be project-relative")
+            continue
+        try:
+            path = (root / binding["path"]).resolve()
+            path.relative_to(root)
+        except (OSError, ValueError, TypeError, RuntimeError):
+            errors.append(prefix + "bound file path escapes project root")
+            continue
+        if not path.is_file():
+            errors.append(prefix + "bound file is missing")
+        elif _sha256_file(path) != binding["sha256"]:
+            errors.append(prefix + "bound file SHA-256 is stale")
+
+
 def build_render_plan(project, project_root):
     """Compile approved active operations into a render-relative delivery plan."""
     errors = validate_project(project, project_root, check_files=True)
@@ -1141,6 +1238,43 @@ def build_render_plan(project, project_root):
             errors.append(f"{operation_id} has no render contribution")
             continue
         contributions = declared if isinstance(declared, list) else [declared]
+        if (
+            operation_id == "graphic-motion"
+            or operation.get("skill") == "video-add-graphic-motion"
+        ):
+            before = len(errors)
+            if operation_id != "graphic-motion":
+                errors.append(f"{operation_id} operation id is invalid")
+            if operation.get("skill") != "video-add-graphic-motion":
+                errors.append(f"{operation_id} operation skill is invalid")
+            target = operation.get("target")
+            if not isinstance(target, dict) or target.get("sequence") != sequence_name:
+                errors.append(f"{operation_id} target sequence does not match active_sequence")
+            required_dependencies = [
+                "understanding",
+                *[
+                    dependency for dependency in ("cut", "color-grade", "b-roll")
+                    if dependency in sequence.get("operations", []) and dependency in operations
+                ],
+            ]
+            if operation.get("depends_on") != required_dependencies:
+                errors.append(f"{operation_id} dependencies do not match active upstream operations")
+            plan_value = operation.get("plan")
+            if not plan_value:
+                errors.append(f"{operation_id} plan is required")
+            elif timeline:
+                try:
+                    motion_path = resolve_project_path(project_root, plan_value)
+                    motion_plan = load_json(motion_path)
+                except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                    errors.append(f"{operation_id} invalid plan: {exc}")
+                else:
+                    _validate_graphic_motion_plan(
+                        motion_plan, operation, contributions, timeline, errors, project_root,
+                        project=project,
+                    )
+            if len(errors) != before:
+                continue
         if operation.get("skill") == "video-add-b-roll":
             before = len(errors)
             target = operation.get("target")

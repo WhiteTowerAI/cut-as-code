@@ -907,17 +907,76 @@ def check_verified_durable_outputs():
         assert not [error for error in errors if "output" in error]
 
 
+def check_graphic_motion_compiler_consistency():
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        source = root / "work/cache/graphic-motion/source/gm-001/original.html"
+        source.parent.mkdir(parents=True)
+        source.write_text("<div class='signal'></div>", encoding="utf-8")
+        binding = {
+            "path": "work/cache/graphic-motion/source/gm-001/original.html",
+            "sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+        }
+        render = {
+            "kind": "overlay",
+            "asset": "cache/graphic-motion/rendered/gm-001",
+            "asset_type": "image-sequence",
+            "pattern": "frame_%06d.png",
+            "start_number": 1,
+            "fps": {"num": 30, "den": 1},
+            "start_s": 1.0,
+            "duration_s": 1.0,
+        }
+        plan = {
+            "timeline_id": "main",
+            "program_duration_s": 3.0,
+            "fps": {"num": 30, "den": 1},
+            "dependencies": ["understanding"],
+            "based_on": {"understanding": 1},
+            "delivery_bindings": [binding],
+            "cues": [{"id": "gm-001", "status": "verified", "render": render}],
+        }
+        payload = json.dumps(plan, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        operation = {
+            "id": "graphic-motion",
+            "depends_on": ["understanding"],
+            "based_on": {"understanding": 1},
+            "plan_sha256": hashlib.sha256(payload.encode("utf-8")).hexdigest(),
+            "delivery_bindings": [binding],
+        }
+        timeline = {
+            "timeline_id": "main",
+            "program_duration_s": 3.0,
+            "fps": {"num": 30, "den": 1},
+        }
+        errors = []
+        projectlib._validate_graphic_motion_plan(
+            plan, operation, [render], timeline, errors, root, project={},
+        )
+        assert "graphic-motion plan schema_version must be 1" in errors, errors
+        assert "graphic-motion decision receipt is invalid" in errors, errors
+
+        source.write_text("mutated", encoding="utf-8")
+        errors = []
+        projectlib._validate_graphic_motion_plan(
+            plan, operation, [render], timeline, errors, root, project={},
+        )
+        assert "graphic-motion bound file SHA-256 is stale" in errors
+
+
 def main():
     check_program_transcript_mapping()
     check_image_sequence_overlay()
     check_precomputed_overlay_compatibility()
     check_broll_compiler_consistency()
+    check_graphic_motion_compiler_consistency()
     check_dependency_revision_coverage()
     check_verified_durable_outputs()
     print("[protocol-extensions] program transcript mapping passed")
     print("[protocol-extensions] image-sequence overlay passed")
     print("[protocol-extensions] precomputed overlay compatibility passed")
     print("[protocol-extensions] B-roll compiler consistency passed")
+    print("[protocol-extensions] graphic-motion compiler consistency passed")
     print("[protocol-extensions] dependency revision coverage passed")
     print("[protocol-extensions] verified durable outputs passed")
 

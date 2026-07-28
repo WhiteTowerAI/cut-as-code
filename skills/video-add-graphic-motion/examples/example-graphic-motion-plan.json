@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "timeline_id": "main",
+  "timebase": "program",
+  "program_duration_s": 30.0,
+  "fps": {"num": 24, "den": 1},
+  "dependencies": ["understanding", "cut", "color-grade", "b-roll"],
+  "based_on": {"understanding": 1, "cut": 2, "color-grade": 1, "b-roll": 1},
+  "input_hashes": {
+    "timeline_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "transcript_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "understanding_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "media_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "contact_sheet_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "decision": {
+    "mode": "agent",
+    "actor": "Example Agent",
+    "rationale": "The signal transformation needs a brief visual explanation."
+  },
+  "delivery_bindings": [
+    {"path": "work/timeline.json", "sha256": "1111111111111111111111111111111111111111111111111111111111111111"},
+    {"path": "work/understand/transcript.json", "sha256": "2222222222222222222222222222222222222222222222222222222222222222"},
+    {"path": "work/understand/understanding.json", "sha256": "3333333333333333333333333333333333333333333333333333333333333333"},
+    {"path": "work/understand/media.json", "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
+    {"path": "review/00-video-understanding/contact-sheet.jpg", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+    {"path": "work/cache/graphic-motion/source/gm-001/original.html", "sha256": "4444444444444444444444444444444444444444444444444444444444444444"},
+    {"path": "work/cache/graphic-motion/source/gm-001/LICENSE", "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"},
+    {"path": "work/cache/graphic-motion/hyperframes/gm-001/index.html", "sha256": "5555555555555555555555555555555555555555555555555555555555555555"},
+    {"path": "work/cache/graphic-motion/hyperframes/gm-001/adaptation.patch", "sha256": "6666666666666666666666666666666666666666666666666666666666666666"},
+    {"path": "work/cache/graphic-motion/hyperframes/gm-001/gsap.min.js", "sha256": "7777777777777777777777777777777777777777777777777777777777777777"},
+    {"path": "work/cache/graphic-motion/rendered/gm-001/frame_000001.png", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+    {"path": "work/cache/graphic-motion/rendered/gm-001/frame_000002.png", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+    {"path": "work/cache/graphic-motion/rendered/gm-001/frame_000003.png", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+    {"path": "work/cache/graphic-motion/rendered/gm-001/frame_000004.png", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+    {"path": "work/cache/graphic-motion/rendered/gm-001/frame_000005.png", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+    {"path": "work/cache/graphic-motion/rendered/gm-001/frame_000006.png", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+    {"path": "work/cache/graphic-motion/rendered/gm-001/frame_000007.png", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+    {"path": "work/cache/graphic-motion/rendered/gm-001/frame_000008.png", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+    {"path": "work/cache/graphic-motion/rendered/gm-001/frame_000009.png", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+    {"path": "work/cache/graphic-motion/rendered/gm-001/frame_000010.png", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+    {"path": "work/cache/graphic-motion/rendered/gm-001/frame_000011.png", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+    {"path": "work/cache/graphic-motion/rendered/gm-001/frame_000012.png", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+    {"path": "review/04-graphic-motion/source-fidelity.png", "sha256": "9999999999999999999999999999999999999999999999999999999999999999"},
+    {"path": "review/04-graphic-motion/composite-first.png", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+    {"path": "review/04-graphic-motion/composite-middle.png", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+    {"path": "review/04-graphic-motion/composite-last.png", "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
+    {"path": "review/04-graphic-motion/hyperframes-check.json", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+    {"path": "review/04-graphic-motion/snapshot-1.png", "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"},
+    {"path": "review/04-graphic-motion/snapshot-2.png", "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},
+    {"path": "review/04-graphic-motion/snapshot-3.png", "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"},
+    {"path": "review/04-graphic-motion/snapshot-4.png", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+    {"path": "review/04-graphic-motion/gm-001-review.json", "sha256": "7777777777777777777777777777777777777777777777777777777777777777"}
+  ],
+  "cues": [
+    {
+      "id": "gm-001",
+      "status": "verified",
+      "program_range": {"start_s": 12.5, "end_s": 13.0},
+      "source_ranges": [{"clip_id": "clip-002", "start_s": 14.0, "end_s": 14.5}],
+      "intent": {
+        "authored_at": "2026-07-28T00:00:00Z",
+        "content": "An abstract signal becomes ordered.",
+        "purpose": "Show an abstract signal becoming organized.",
+        "motion_family": "converging pulse",
+        "interaction_model": "finite activation",
+        "timing_rationale": "The cue starts on the spoken word signal and resolves before the next idea.",
+        "compositing_mode": "transparent-overlay",
+        "search_queries": ["MIT HTML CSS converging signal pulse animation"]
+      },
+      "evidence": {
+        "transcript_words": [
+          {
+            "word": "signal",
+            "start": 14.0,
+            "end": 14.4,
+            "source_range": {"start_s": 14.0, "end_s": 14.4},
+            "program_range": {"start_s": 12.5, "end_s": 12.9},
+            "clip_id": "clip-002"
+          }
+        ],
+        "visual_refs": [
+          {
+            "path": "review/00-video-understanding/contact-sheet.jpg",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "note": "The center-safe region is clear throughout the cue."
+          }
+        ]
+      },
+      "search": {
+        "searched_at": "2026-07-28T00:05:00Z",
+        "queries": ["MIT HTML CSS converging signal pulse animation"],
+        "candidates": [
+          {
+            "id": "candidate-selected",
+            "catalog_id": "motion-anything",
+            "url": "https://github.com/nexu-io/motion-anything/blob/0123456789abcdef/recipes/signal/recipe.html",
+            "license": "MIT",
+            "popularity_evidence": "Curated recipe with a verified upstream source.",
+            "decision": "selected",
+            "reason": "Best semantic and visual match with only deterministic timing changes."
+          },
+          {
+            "id": "candidate-rejected",
+            "catalog_id": "anime-examples",
+            "url": "https://github.com/juliangarnier/anime/blob/abcdef0123456789/examples/particles.html",
+            "license": "MIT",
+            "popularity_evidence": "Popular upstream animation library with 71,539 stars at research time.",
+            "decision": "rejected",
+            "reason": "Its particle field would cover the speaker's face."
+          }
+        ],
+        "selected_candidate_id": "candidate-selected",
+        "selection_rationale": "The selected recipe preserves the clear safe area and communicates ordering."
+      },
+      "source": {
+        "candidate_id": "candidate-selected",
+        "catalog_id": "motion-anything",
+        "url": "https://github.com/nexu-io/motion-anything/blob/0123456789abcdef/recipes/signal/recipe.html",
+        "revision": "0123456789abcdef",
+        "license": "MIT",
+        "license_url": "https://github.com/nexu-io/motion-anything/blob/0123456789abcdef/recipes/signal/LICENSE",
+        "license_file": {"path": "work/cache/graphic-motion/source/gm-001/LICENSE", "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"},
+        "attribution": "MIT License, copyright nexu-io contributors.",
+        "retrieved_at": "2026-07-28T00:06:00Z",
+        "files": [
+          {"path": "work/cache/graphic-motion/source/gm-001/original.html", "sha256": "4444444444444444444444444444444444444444444444444444444444444444"},
+          {"path": "work/cache/graphic-motion/source/gm-001/LICENSE", "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}
+        ]
+      },
+      "port": {
+        "composition_id": "gm-001",
+        "motion_model": "gsap",
+        "files": [
+          {"path": "work/cache/graphic-motion/hyperframes/gm-001/index.html", "sha256": "5555555555555555555555555555555555555555555555555555555555555555"}
+        ],
+        "adaptation_patch": {"path": "work/cache/graphic-motion/hyperframes/gm-001/adaptation.patch", "sha256": "6666666666666666666666666666666666666666666666666666666666666666"},
+        "change_categories": ["content", "timing", "local-assets"],
+        "runtime_assets": [
+          {"path": "work/cache/graphic-motion/hyperframes/gm-001/gsap.min.js", "sha256": "7777777777777777777777777777777777777777777777777777777777777777"}
+        ]
+      },
+      "render": {
+        "kind": "overlay",
+        "asset": "cache/graphic-motion/rendered/gm-001",
+        "asset_type": "image-sequence",
+        "pattern": "frame_%06d.png",
+        "start_number": 1,
+        "fps": {"num": 24, "den": 1},
+        "start_s": 12.5,
+        "duration_s": 0.5,
+        "frames": [
+          {"path": "work/cache/graphic-motion/rendered/gm-001/frame_000001.png", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+          {"path": "work/cache/graphic-motion/rendered/gm-001/frame_000002.png", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+          {"path": "work/cache/graphic-motion/rendered/gm-001/frame_000003.png", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+          {"path": "work/cache/graphic-motion/rendered/gm-001/frame_000004.png", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+          {"path": "work/cache/graphic-motion/rendered/gm-001/frame_000005.png", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+          {"path": "work/cache/graphic-motion/rendered/gm-001/frame_000006.png", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+          {"path": "work/cache/graphic-motion/rendered/gm-001/frame_000007.png", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+          {"path": "work/cache/graphic-motion/rendered/gm-001/frame_000008.png", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+          {"path": "work/cache/graphic-motion/rendered/gm-001/frame_000009.png", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+          {"path": "work/cache/graphic-motion/rendered/gm-001/frame_000010.png", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+          {"path": "work/cache/graphic-motion/rendered/gm-001/frame_000011.png", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+          {"path": "work/cache/graphic-motion/rendered/gm-001/frame_000012.png", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"}
+        ]
+      },
+      "review": {
+        "status": "approved",
+        "mode": "agent",
+        "actor": "Example Agent",
+        "rationale": "The port preserves the source and reads cleanly over the active video.",
+        "evidence": {
+          "source_fidelity": {"path": "review/04-graphic-motion/source-fidelity.png", "sha256": "9999999999999999999999999999999999999999999999999999999999999999"},
+          "composite_first": {"path": "review/04-graphic-motion/composite-first.png", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+          "composite_middle": {"path": "review/04-graphic-motion/composite-middle.png", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+          "composite_last": {"path": "review/04-graphic-motion/composite-last.png", "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
+          "hyperframes_check": {"path": "review/04-graphic-motion/hyperframes-check.json", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+          "hyperframes_snapshots": [
+            {"pose": "first-visible", "at_s": 0.04, "file": {"path": "review/04-graphic-motion/snapshot-1.png", "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}},
+            {"pose": "key-interaction", "at_s": 0.16, "file": {"path": "review/04-graphic-motion/snapshot-2.png", "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}},
+            {"pose": "final-minus-hold", "at_s": 0.36, "file": {"path": "review/04-graphic-motion/snapshot-3.png", "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}},
+            {"pose": "final", "at_s": 0.46, "file": {"path": "review/04-graphic-motion/snapshot-4.png", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"}}
+          ]
+        },
+        "receipt": {"path": "review/04-graphic-motion/gm-001-review.json", "sha256": "7777777777777777777777777777777777777777777777777777777777777777"}
+      }
+    }
+  ]
+}

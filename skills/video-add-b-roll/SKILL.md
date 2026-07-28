@@ -74,7 +74,7 @@ shot.
 The canonical sequence order is:
 
 ```text
-cut -> color-grade -> b-roll -> content-cards -> captions
+cut -> color-grade -> b-roll -> graphic-motion -> content-cards -> captions
 ```
 
 The registered operation must have `changes_video_pixels: true`, add the `b-roll` track, and

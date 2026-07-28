@@ -1444,6 +1444,17 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             with self.subTest(change=change):
                 with self.assertRaises(ValueError): broll_plan.register_operation(project, plan)
 
+    def test_register_operation_stays_before_graphic_motion_without_upstream_anchors(self):
+        project = self._registration_project(["graphic-motion", "content-cards", "captions"])
+        result = broll_plan.register_operation(
+            project,
+            self._registered_plan((2, 3), dependencies=["understanding"]),
+        )
+        self.assertEqual(
+            ["b-roll", "graphic-motion", "content-cards", "captions"],
+            result["sequences"]["main"]["operations"],
+        )
+
     def test_register_operation_removes_old_registration_for_no_selected_shots(self):
         project = self._registration_project(["cut", "b-roll", "b-roll", "captions"])
         project["operations"].append({"id": "b-roll", "revision": 7})
