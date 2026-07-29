@@ -52,23 +52,41 @@ frame names rather than card IDs as paths.
 Each candidate is one row with:
 
 - selection checkbox, ID, type, and time;
-- editable copy and a native placement select;
+- editable copy plus native visual-treatment and placement selects;
+- a collapsible chart editor for chart layouts;
 - the corresponding video frame with an overlaid gray placement proxy.
 
-Every candidate starts unselected at `bottom`. Changing placement immediately moves the proxy
+Every candidate starts unselected at `bottom`. `stat` candidates suggest `metric-spotlight`,
+`list` candidates suggest `side-by-side`, and the reviewer can select only treatments supported
+by the canonical card type. Changing placement immediately moves the proxy
 to `top`, `bottom`, `left`, `right`, or `center`. Changing copy updates the proxy label;
 `Unplaced` hides it. The proxy is deliberately neutral: it previews occupied space and
 collision risk, not the final theme treatment.
 
-The page copies a readable selected-card summary back to the agent. The agent materializes the
-existing review JSON schema and runs the existing validator. No server, framework, CDN, or new
-package is introduced.
+For `bar-chart`, `pie-chart`, and `line-chart`, the editor exposes dimension,
+metric, unit, period, point labels, point values, and evidence references. It
+enforces the active layout's point-count range and reports invalid labels,
+values, evidence, and chart-specific totals before the summary can be copied.
+The neutral proxy expands to the approximate chart footprint.
+
+When a captions plan is available, the review payload contains only caption
+cue ranges and their actual resolved top, center, or bottom region. The frame
+preview draws those occupied regions over the real source frame. This is a
+candidate-stage warning; final clearance still uses the rendered caption
+overlay composited with the footage and content card.
+
+The page copies a readable selected-card summary back to the agent. Chart cards
+add a deterministic `data={...}` line immediately after the normal card line.
+Card blocks are separated by a blank line, and summary text is written with
+`textContent`. The agent materializes the existing review JSON schema and runs
+the existing validator. No server, framework, CDN, or new package is introduced.
 
 ## Errors And Checks
 
 - Reject a missing video, template, payload marker, source range, invalid time range, or failed
   ffmpeg frame before replacing the current review artifacts.
 - Base64-encode injected JSON so user copy cannot terminate the template's script element.
+- Validate every review entry before copying and replacing the plan; never partially apply a review.
 - Unit-test template use, frame times, escaped payload data, five placement states, and skill
   workflow text.
 - Run the full Python suite, then generate the real Musk review page and inspect desktop and

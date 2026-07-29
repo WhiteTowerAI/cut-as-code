@@ -30,6 +30,7 @@ def _review_entries(plan, review):
     if len(plan_ids) != len(set(plan_ids)):
         raise ValueError("plan card ids must be unique")
 
+    plan_by_id = {card["id"]: card for card in plan_cards}
     by_id = {}
     for entry in entries:
         if not isinstance(entry, dict):
@@ -52,6 +53,31 @@ def _review_entries(plan, review):
             raise ValueError(f"selected card copy is blank: {card_id}")
         if entry["selected"] and not placement:
             raise ValueError(f"selected card placement is missing: {card_id}")
+        treatment = entry.get("visual_treatment")
+        if treatment is None:
+            plan_treatment = plan_by_id[card_id].get("visual_treatment", {})
+            if not isinstance(plan_treatment, dict):
+                raise ValueError(f"plan visual_treatment must be an object: {card_id}")
+            treatment = plan_treatment.get("layout") or "default"
+        if not isinstance(treatment, str):
+            raise ValueError(f"review visual_treatment must be a string: {card_id}")
+        build_cards_plan.validate_visual_treatment(
+            plan_by_id[card_id].get("card_type"), treatment
+        )
+        entry = {**entry, "visual_treatment": treatment}
+        if entry["selected"] and treatment in build_cards_plan.CHART_LAYOUTS:
+            candidate = copy.deepcopy(plan_by_id[card_id])
+            candidate["visual_treatment"] = {
+                **candidate.get("visual_treatment", {}),
+                "layout": treatment,
+            }
+            data = copy.deepcopy(entry.get("data"))
+            if not isinstance(data, dict):
+                raise ValueError(f"selected chart data is missing: {card_id}")
+            data.setdefault("status", "draft")
+            candidate["data"] = data
+            build_cards_plan.validate_chart_data(candidate, treatment)
+            entry["data"] = data
         by_id[card_id] = entry
 
     missing = set(plan_ids) - set(by_id)
@@ -72,17 +98,45 @@ def apply_review(plan, review):
         entry = entries[card["id"]]
         if not entry["selected"]:
             continue
+        approved_copy = entry["copy"].strip()
+        existing_copy = card.get("copy", {})
+        if not isinstance(existing_copy, dict):
+            existing_copy = {}
+        display = existing_copy.get("display", {})
+        if not isinstance(display, dict):
+            display = {}
         card["copy"] = {
-            **card.get("copy", {}),
+            **existing_copy,
             "status": "approved",
-            "text": entry["copy"].strip(),
+            "text": approved_copy,
+            "display": {**display, "title": approved_copy},
         }
-        card["placement"] = {"status": "approved", "region": entry["placement"]}
+        existing_placement = card.get("placement", {})
+        if not isinstance(existing_placement, dict):
+            existing_placement = {}
+        card["placement"] = {
+            **existing_placement,
+            "status": "approved",
+            "region": entry["placement"],
+            "face_clearance": "pending",
+            "caption_clearance": "pending",
+            "review_still": None,
+            "clearance_decision_mode": None,
+            "clearance_rationale": "",
+        }
         card["visual_treatment"] = {
             **card.get("visual_treatment", {}),
             "status": "approved",
             "theme": theme,
+            "layout": entry["visual_treatment"],
         }
+        if entry["visual_treatment"] in build_cards_plan.CHART_LAYOUTS:
+            card["data"] = {**copy.deepcopy(entry["data"]), "status": "approved"}
+            build_cards_plan.validate_chart_data(
+                card, entry["visual_treatment"], require_approved=True
+            )
+        else:
+            card.pop("data", None)
         selected_cards.append(card)
 
     selected_ids = [card["id"] for card in selected_cards]

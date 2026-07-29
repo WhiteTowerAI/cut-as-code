@@ -1,6 +1,6 @@
 ---
 name: video-add-content-cards
-description: Use when an understood video project needs selective transcript-timed titles, lower-thirds, statistics, lists, quotes, chapter cards, or calls to action authored as HyperFrames HTML graphics.
+description: Use when an understood video project needs selective transcript-timed titles, lower-thirds, statistics, metric spotlights, comparisons, lists, quotes, chapter cards, or calls to action authored as HyperFrames HTML graphics.
 ---
 
 # Video Add Content Cards
@@ -77,7 +77,7 @@ xdg-open skills/video-add-content-cards/examples/gallery-animated.html
 ```
 
 If the command fails, diagnose and retry it. Do not replace this action with a URI or ask the
-user to find and click the file. The gallery compares all five themes and can focus one column
+user to find and click the file. The gallery compares all six themes and can focus one column
 with its native picker:
 
 | Theme | Starting character |
@@ -87,6 +87,7 @@ with its native picker:
 | `editorial` | documentary, ink and amber |
 | `dotgrid` | pixel-mono, technical |
 | `apex` | high-energy sports, red accent |
+| `air` | transparent Lexend typography, no backing plates or scrims |
 
 Ask exactly one question at a time in this order:
 
@@ -112,7 +113,11 @@ python skills/video-add-content-cards/scripts/build_cards_plan.py `
   --notes "Keep product names verbatim"
 ```
 
-The script maps kept semantic moments into program time and omits moments removed by the cut. It preserves source ranges and evidence references, clamps duration to the containing clip, and marks copy/placement/visual treatment as `draft`.
+The script maps kept semantic moments into program time and omits moments removed by the cut. It
+preserves source ranges and evidence references, clamps duration to the containing clip, and
+marks copy/placement/visual treatment as `draft`. A `stat` starts with `metric-spotlight`; a
+`list` starts with `side-by-side`; the candidate review can retain the normal layout or switch
+a list to `parallel-columns`.
 The confirmed interview is stored as `brief` in `cards-plan.json`. Repeat
 `--must-include-type` for multiple values; omit flags that do not apply. Older optional brief
 fields remain accepted for compatibility but are not part of the normal interview.
@@ -139,6 +144,33 @@ Use these mappings as a starting point:
 
 `repetition`, `tangent`, and `risk` are editorial evidence, not automatic cards.
 
+Keep the five canonical card types. Store the following optional layouts under
+`visual_treatment.layout` rather than creating new top-level card types:
+
+| Canonical card type | Allowed layout |
+|---|---|
+| `stat` | `default`, `metric-spotlight`, `bar-chart`, `pie-chart`, `line-chart` |
+| `list` | `default`, `side-by-side`, `parallel-columns` |
+
+Use `metric-spotlight` only when one evidence-backed number, percentage, amount, multiple,
+year, or duration deserves emphasis. Put the number between concise upper and lower context,
+fit long values without overlap, and keep the number visually centered between those labels.
+Use `side-by-side` or `parallel-columns` for two to four short parallel, contrasting, opposing,
+or corresponding concepts. Prefer short phrases; use the review to choose the orientation that
+fits the available footage and clears the subject.
+
+Use a chart only when the retained transcript provides a complete, evidence-backed data set.
+Read `reference/chart-data.md` before authoring chart data. Manually store the dimension,
+metric, unit, period, ordered points, and each point's transcript evidence under `data`; never
+infer values from an analyzer summary or combine points from different videos. Use `bar-chart`
+for 2-6 comparable categories, `pie-chart` for 2-6 mutually exclusive parts of a proven whole,
+and `line-chart` for 3-8 meaningfully ordered points. When required values, labels, a denominator,
+time order, or units are missing, use `metric-spotlight`, a normal stat card, or no card.
+For chart layouts, compress long explanations into concise supporting copy without changing
+their meaning. The chart should primarily communicate the key values and their change or
+relationship. Do not enumerate or restate values, labels, periods, or units already visible in
+the chart.
+
 Keep all evidence-backed candidates at this stage. Aim for the brief's target card count, but
 allow a stronger or sparser set when the evidence warrants it.
 
@@ -154,8 +186,12 @@ python skills/video-add-content-cards/scripts/build_review_page.py `
   work/content-cards/cards-plan.json `
   review/03-content-cards/content-cards-review.html `
   --video input/source.mp4 `
-  --timeline work/timeline.json
+  --timeline work/timeline.json `
+  --captions-plan work/captions/captions-plan.json
 ```
+
+Omit `--captions-plan` when the project has no active captions operation. With an active
+captions plan, the review frame shows its actual occupied top, center, or bottom regions.
 
 Immediately open the populated review yourself with the native command for the current OS.
 Run exactly one:
@@ -174,17 +210,22 @@ xdg-open review/03-content-cards/content-cards-review.html
 ```
 
 If the command fails, diagnose and retry it; do not ask the user to locate the file. The page
-shows each source frame, card ID, program time, editable copy, and placement. Every candidate
+shows each source frame, card ID, program time, editable copy, visual treatment, and placement.
+Chart layouts also show editable structured data and the point evidence references. Review
+every value against its displayed evidence before approving it.
+Every candidate
 starts unselected with placement set to `bottom`. Changing placement moves a gray card proxy
 over the real frame so collision risk is visible before approval. The user selects cards,
-edits copy, chooses placement, clicks **Copy summary**, and pastes the visible summary back
+edits copy, chooses treatment and placement, clicks **Copy summary**, and pastes the visible
+summary back
 into the conversation.
 
 **Present + STOP.** Wait for the pasted selection summary. Do not author HTML from unchecked
 draft candidates. Convert the summary into
 `review/03-content-cards/content-cards-review.json`: write one entry for every plan card, mark
-summary IDs selected with their chosen copy and placement, and mark all other IDs unselected
-with their current draft copy and an empty placement. Then apply the validated review:
+summary IDs selected with their chosen copy, visual treatment, and placement, and mark all
+other IDs unselected with their current draft copy and an empty placement. Store the review
+choice as a string field named `visual_treatment`. Then apply the validated review:
 
 ```powershell
 python skills/video-add-content-cards/scripts/apply_cards_review.py `
@@ -192,14 +233,26 @@ python skills/video-add-content-cards/scripts/apply_cards_review.py `
   review/03-content-cards/content-cards-review.json
 ```
 
-The apply step rejects unknown, duplicate, or missing card IDs, blank selected copy, and
-invalid placement without changing the plan. On success it keeps selected cards and marks
+The apply step rejects unknown, duplicate, or missing card IDs, blank selected copy, invalid
+placement, and treatments incompatible with the canonical card type without changing the plan. On success it keeps selected cards and marks
 their copy, placement, visual treatment, and top-level review `approved`. Read the resulting
 selected count against the brief target before continuing.
+
+For selected chart layouts the apply step also validates the complete structured data and marks
+`data.status` approved. Any invalid selected chart rejects the whole review before the plan is
+copied. Choosing a non-chart layout removes unused draft chart data. After apply, face and
+caption clearance remain pending until the composition is checked against real composited frames.
 
 ### 5. Author one HyperFrames composition
 
 Use one `index.html` and a paused GSAP timeline. Each approved card becomes one `.clip` keyed by the plan's `program_start_s` and `duration_s`. Keep motion seek-safe and derive timing from data attributes rather than wall-clock timers.
+
+For chart cues, animate only through that paused timeline at absolute composition times. Bars
+reveal from one zero baseline; pie sectors reveal in point order with geometry proportional to
+values; line paths draw in X-axis order before their points appear. Use source-relative sizing
+and fixed layout boxes so seeking, labels, and dynamic values never cause layout jumps. Suggested
+durations are 5-6 seconds for bar and pie and 6-8 seconds for line, always clamped to the retained
+clip.
 
 Start from the closest repository example:
 
@@ -208,19 +261,27 @@ Start from the closest repository example:
 - `examples/index-dotgrid.html`
 - `examples/index-editorial.html`
 - `examples/index-teal.html`
+- `examples/index-air.html`
 
-Keep one visual language across all cards. Use edge anchoring, a card or scrim for legibility, source-relative sizing, and enough contrast against the selected grade. Do not cover the speaker or captions.
+Keep one visual language across all cards, use source-relative sizing, and maintain enough
+contrast against the selected grade. The five opaque-panel themes may use a card or scrim for
+legibility. `air` must keep scene and text containers transparent: no solid or translucent
+backing rectangles, pills, local color blocks, decorative color bars, or full-frame scrims.
+Use white for primary text and light gray for auxiliary small text. It may use Lexend weight,
+text shadow, a thin outline, spacing, and alignment, but no decorative rules, dots, or filled
+geometric accents. Do not cover the speaker or captions.
 
 Pass the source FPS explicitly; preserve fractional rates such as `24000/1001` rather than
 rounding to 24 or 30. On Windows use `npx.cmd`, a project-local npm cache, and local assets:
 
 ```powershell
 $env:npm_config_cache = "$PWD/work/cache/npm"
-npx.cmd hyperframes lint
-npx.cmd hyperframes validate
+npx.cmd hyperframes check
 ```
 
-Do not depend on remote fonts, images, scripts, or styles at render time.
+Do not depend on remote fonts, images, scripts, or styles at render time. For `air`, copy
+`assets/fonts/Lexend-VariableFont_wght.ttf` into the project composition assets and record its
+output path and SHA-256 in `renderer_recipe` like every other runtime asset.
 
 The approved plan must preserve the exact style and motion values used by the composition,
 not prose labels such as `edge-slide` alone. At minimum record panel geometry and padding,
@@ -240,6 +301,10 @@ Check:
 - copy is true to its `evidence_ref`;
 - source and program times map correctly;
 - text is legible and fits;
+- for chart cues, key values and their change remain the primary visual message, and supporting copy does not restate the plotted data set;
+- the approved visual treatment matches the canonical card type;
+- `air` has no backing plate, decorative rule, filled geometric accent, or full-frame scrim;
+- `air` uses white primary text and light-gray auxiliary text;
 - faces and captions remain clear;
 - animation lands on the spoken phrase;
 - alpha is transparent outside card regions.
@@ -250,6 +315,16 @@ wait for approval. Do not render the full overlay while copy, placement, or timi
 Every approved cue must have a matching composited still in
 `review/03-content-cards/card-stills/`, `face_clearance: "verified"`, and the still path in
 the plan. Record the review result in `review/03-content-cards/content-cards-summary.md`.
+
+Clearance happens after the user has selected cards and their initial placements. Sample the
+cue near its start, middle, and end, plus any frame where the speaker moves materially. Set
+`face_clearance: "verified"` only when the face outline, eyes, nose, mouth, and expression area
+remain unobstructed. With active captions, use stills containing the real rendered caption
+overlay and set `caption_clearance: "verified"`; without active captions use
+`caption_clearance: "not-applicable"`. Save the composited still path, decision mode, and a
+non-empty rationale. If any sampled frame collides, first move the card, then reduce its area or
+label density, then choose another layout; remove the card if no safe result exists. Never hide,
+move, rewrite, or reduce the readability of captions to make a card fit.
 
 ### 7. Render the transparent contribution
 
@@ -299,3 +374,10 @@ python skills/video-understand/scripts/render_project.py work/render/render-plan
 ## Combining With Captions
 
 Treat captions and cards as separate overlay contributions. Resolve their placement conflict before rendering, then composite them in declared sequence in the shared delivery pass. Keep captions at the bottom and move cards to the top when both would occupy the same safe area.
+
+When captions and cards are both being added, preserve the human gates in this order. First,
+finish the captions preset review and its existing **Present + STOP**. Then run the content-card
+candidate review and its **Present + STOP** so the user approves cards and chooses their initial
+positions. Only after that selection does the Agent author the combined composition and perform
+face/caption clearance. The later composited-still review remains required and presents the
+clearance evidence for final approval.

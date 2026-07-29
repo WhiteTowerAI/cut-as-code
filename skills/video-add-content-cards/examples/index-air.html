@@ -2,29 +2,39 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8">
-    <title>video-add-content-cards — teal composition</title>
+    <title>video-add-content-cards — air composition</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 
-    <!-- teal theme: font "serif" = system Georgia/Times (no webfont <link>).
-         The family is explicit on --serif. -->
+    <style>
+      @font-face {
+        font-family: "Lexend";
+        src: url("../assets/fonts/Lexend-VariableFont_wght.ttf") format("truetype");
+        font-style: normal;
+        font-weight: 100 900;
+        font-display: block;
+      }
+      /* ── Charts: transparent, data-bearing marks only (96–114s) ───────── */
+      .chart-scene { display: grid; place-items: center; padding: 6%; }
+      .chart-panel { --chart-ink: var(--ink); --chart-muted: var(--muted); --chart-accent: var(--ink); --chart-line: rgba(209, 220, 226, 0.52); width: min(78%, 1220px); height: min(72%, 720px); min-height: 420px; padding: 24px 20px; overflow: hidden; border: 0; background: transparent; color: var(--chart-ink); container-type: inline-size; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 24px; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.75); }
+      .chart-head { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 24px; } .chart-kicker { color: var(--chart-muted); font-size: 22.5px; font-weight: 650; text-transform: uppercase; } .chart-title { margin-top: 4px; font-size: clamp(37.5px, 6.25cqi, 72.5px); font-weight: 650; line-height: 1; } .chart-unit { color: var(--chart-muted); font-size: 22.5px; text-align: right; } .chart-body { min-height: 0; }
+      .bar-plot { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px; height: 100%; } .bar-item { display: grid; grid-template-rows: minmax(0, 1fr) 28px; gap: 8px; min-width: 0; text-align: center; } .bar-value { position: absolute; right: 0; bottom: calc(var(--bar-value) * 1% + 8px); left: 0; font-size: 31.25px; font-weight: 700; line-height: 40px; } .bar-track { position: relative; display: flex; align-items: flex-end; justify-content: center; min-height: 0; margin-top: 40px; border-bottom: 2px solid var(--chart-ink); } .bar-fill { width: min(72%, 118px); height: calc(var(--bar-value) * 1%); transform-origin: 50% 100%; border: 3px solid var(--chart-ink); background: transparent; } .bar-label { overflow-wrap: anywhere; color: var(--chart-muted); font-size: 21.25px; font-weight: 600; }
+      .pie-layout { display: grid; grid-template-columns: 360px max-content; align-items: center; justify-content: center; gap: 28px; height: 100%; } .pie-svg { display: block; width: min(100%, 360px); margin: auto; overflow: visible; } .pie-sector { transform-box: fill-box; transform-origin: center; stroke: rgba(255, 255, 255, 0.82); stroke-width: 4; stroke-linejoin: round; } .pie-sector:nth-child(1) { fill: rgba(255, 255, 255, 0.7); } .pie-sector:nth-child(2) { fill: rgba(255, 255, 255, 0.45); } .pie-sector:nth-child(3) { fill: rgba(255, 255, 255, 0.2); }
+      .chart-legend { display: grid; width: max-content; max-width: 100%; justify-self: start; gap: 14px; } .legend-item { display: grid; grid-template-columns: 14px 1fr auto; align-items: center; gap: 12px; min-width: 0; } .legend-swatch { width: 14px; height: 14px; border: 2px solid rgba(255, 255, 255, 0.82); background: var(--swatch); } .legend-label { min-width: 0; overflow-wrap: anywhere; font-size: 23.75px; } .legend-value { font-size: 27.5px; font-weight: 700; }
+      .line-layout { display: grid; height: 100%; } .line-svg { width: 100%; height: 100%; min-height: 250px; overflow: visible; filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.6)); } .line-grid { stroke: var(--chart-line); stroke-width: 1.5; } .line-path { fill: none; stroke: var(--chart-ink); stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; } .line-point { fill: transparent; stroke: var(--chart-muted); stroke-width: 5; transform-box: fill-box; transform-origin: center; } .line-axis-label { fill: var(--chart-muted); font: 600 21.25px var(--serif); text-anchor: middle; }
+      @container (max-width: 620px) { .chart-panel { min-height: 500px; padding: 18px 8px; } .chart-head { grid-template-columns: 1fr; gap: 8px; } .chart-unit { text-align: left; } .bar-plot { gap: 8px; } .pie-layout { grid-template-columns: 1fr; gap: 18px; } .pie-svg { width: min(100%, 260px); } .chart-legend { width: 100%; justify-self: stretch; grid-template-columns: 1fr 1fr; gap: 8px 14px; } }
+    </style>
 
     <style>
-      /* ── teal theme ────────────────────────────────────────────────────────
-         Dark overlay look. Light text rides a dark Scrim (full-width scenes) or
-         a dark semi-transparent card (small components). Teal accent. Change
-         these 5 vars + the fonts to re-color/re-font the whole piece. Sizes are
-         vh so the design reads at any output resolution — never hardcode px.
-         Background is transparent: the render is an OVERLAY, composited onto the
-         footage by ffmpeg. teal is NOT fullBleed — full-width scenes paint no
-         opaque fill; each drops a bottom-gradient .scrim behind its text so the
-         text stays legible on busy footage. */
+      /* ── air theme ──────────────────────────────────────────────────────────
+         Transparent Lexend typography with no text backing plates, decorative
+         color bars, or full-frame scrims. White and light-gray text plus shadow
+         keep the overlay readable. */
       :root {
-        --ink: #f5f8f9; /* light text on dark scrim/card */
-        --muted: #b7c6ce; /* muted secondary text */
-        --accent: #26caa8; /* teal accent */
-        --scrim-base: #0c141c; /* dark scrim base */
-        --card-bg: rgba(12, 20, 28, 0.82); /* dark semi-transparent card fill */
-        --serif: Georgia, "Times New Roman", serif;
+        --ink: #f7fbff;
+        --muted: #d1dce2;
+        --coral: #d1dce2;
+        --cream: #f7fbff;
+        --serif: "Lexend", Arial, sans-serif;
       }
       html,
       body {
@@ -44,19 +54,9 @@
         position: absolute;
         inset: 0;
       }
-      /* Scrim: bottom gradient (transparent → dark scrimBase) behind a full-width
-         scene's text, so light text stays legible on bright footage. teal is NOT
-         fullBleed, so .bleed paints NO opaque fill — this layer is what carries
-         legibility. Absolutely positioned bottom band, painted BEHIND the text
-         (inner wrappers are position:relative + z-index so they sit on top). */
-      .scrim {
-        position: absolute;
-        left: 0;
-        right: 0;
-        top: 55%;
-        bottom: 0;
-        background: linear-gradient(to bottom, rgba(12, 20, 28, 0) 0%, rgba(12, 20, 28, 0.9) 100%);
-        z-index: 0;
+      /* full-bleed cream takeover (a fullBleed scene) */
+      .bleed {
+        background: var(--cream);
       }
       /* Anchor wrappers. flex-direction:column is load-bearing: a plain flex div
          defaults to row and maps justify/align to the wrong axes, landing cards
@@ -74,17 +74,8 @@
         justify-content: center;
         align-items: center;
       }
-      /* Inner wrappers of full-width scenes ride ABOVE the .scrim layer. */
-      .intro,
-      .section,
-      .outro,
-      .tb,
-      .list {
-        position: relative;
-        z-index: 1;
-      }
 
-      /* ── Intro (Scrim): kicker → title → sub, left accent bar ─────────────── */
+      /* ── Intro (fullBleed): kicker → title → sub, left accent bar ─────────── */
       .intro-wrap {
         display: flex;
         gap: 2.4vh;
@@ -92,11 +83,11 @@
       }
       .accent-bar {
         width: 0.8vh;
-        background: var(--accent);
+        background: var(--coral);
         border-radius: 0.4vh;
       }
       .kicker {
-        color: var(--accent);
+        color: var(--coral);
         font-size: 2.6vh;
         font-weight: 600;
         letter-spacing: 0.18em;
@@ -119,7 +110,7 @@
         margin-top: 1.4vh;
       }
 
-      /* ── SectionCard (Scrim): kicker + title + teal rule bar ──────────────── */
+      /* ── SectionCard (fullBleed): kicker + title + coral rule bar ─────────── */
       .section-wrap {
         padding: 0 0 9vh 6vh;
       }
@@ -131,21 +122,21 @@
       .rule-bar {
         height: 0.6vh;
         width: 36vh;
-        background: var(--accent);
+        background: var(--coral);
         border-radius: 0.3vh;
         margin-top: 2vh;
         transform-origin: left center;
       }
 
-      /* ── LowerThird: dark semi-transparent card, teal left border, line1+line2 */
+      /* ── LowerThird: solid cream card, coral left border, line1 + line2 ───── */
       .lt-wrap {
         padding: 0 0 8vh 5vh;
       }
       .card {
-        background: var(--card-bg);
-        border-left: 0.8vh solid var(--accent);
-        border-radius: 1.2vh;
-        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+        background: var(--cream);
+        border-left: 0.9vh solid var(--coral);
+        border-radius: 1vh;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
       }
       .lt .line1 {
         color: var(--ink);
@@ -164,7 +155,7 @@
         padding: 2.2vh 3vh;
       }
 
-      /* ── StatCallout: dark card, teal bottom border, count-up + label ─────── */
+      /* ── StatCallout: solid cream card, coral bottom border, count-up + label */
       .stat-wrap {
         display: flex;
         flex-direction: column;
@@ -174,14 +165,14 @@
       }
       .stat .card {
         border-left: none;
-        border-bottom: 0.6vh solid var(--accent);
+        border-bottom: 0.6vh solid var(--coral);
         display: flex;
         align-items: baseline;
         gap: 1.6vh;
         padding: 1.8vh 3vh;
       }
       .stat .value {
-        color: var(--accent);
+        color: var(--coral);
         font-size: 9vh;
         font-weight: 600;
         letter-spacing: -1px;
@@ -193,7 +184,7 @@
         font-weight: 500;
       }
 
-      /* ── Outro (Scrim): centered teal diamond + wordmark lockup ───────────── */
+      /* ── Outro (fullBleed): centered coral diamond + wordmark lockup ──────── */
       .outro-wrap {
         display: flex;
         flex-direction: column;
@@ -203,7 +194,7 @@
       .diamond {
         width: 2.6vh;
         height: 2.6vh;
-        background: var(--accent);
+        background: var(--coral);
         border-radius: 0.3vh;
         transform: rotate(45deg);
         margin-bottom: 3vh;
@@ -223,7 +214,7 @@
         margin-top: 0.8vh;
       }
 
-      /* ── TitleBumper (Scrim): big kicker + huge title, bottom-left ────────── */
+      /* ── TitleBumper (fullBleed): big kicker + huge title, bottom-left ────── */
       .tb-wrap {
         padding: 0 0 12vh 8vh;
       }
@@ -237,7 +228,7 @@
         max-width: 72%;
       }
 
-      /* ── KeypointCallout: dark card, teal left, one big line ──────────────── */
+      /* ── KeypointCallout: solid cream card, coral left, one big line ─────── */
       .key-wrap {
         padding: 0 8vh 8vh 5vh;
       }
@@ -252,7 +243,7 @@
         line-height: 1.18;
       }
 
-      /* ── ReframeCard: avoid(strike) → INSTEAD SAY → teal instead ──────────── */
+      /* ── ReframeCard: avoid(strike) → INSTEAD SAY → coral instead ────────── */
       .reframe-wrap {
         padding: 0 6vh 8vh 6vh;
       }
@@ -279,13 +270,13 @@
         margin-bottom: 1vh;
       }
       .reframe .instead {
-        color: var(--accent);
+        color: var(--coral);
         font-size: 5vh;
         font-weight: 600;
         line-height: 1.15;
       }
 
-      /* ── PromptCard: dark card, quote body, teal highlight words ──────────── */
+      /* ── PromptCard: cream card, quote body, coral highlight words ───────── */
       .prompt-wrap {
         padding: 0 6vh 8vh 6vh;
       }
@@ -303,11 +294,11 @@
         color: var(--ink);
       }
       .prompt .hl {
-        color: var(--accent);
+        color: var(--coral);
         font-weight: 600;
       }
 
-      /* ── BeforeAfter: two columns split by a hairline divider ─────────────── */
+      /* ── BeforeAfter: two columns split by a hairline divider ────────────── */
       .ba-wrap {
         padding: 0 6vh 8vh 6vh;
       }
@@ -328,7 +319,7 @@
         margin-bottom: 1.2vh;
       }
       .ba .col-label.after {
-        color: var(--accent);
+        color: var(--coral);
       }
       .ba .value {
         font-size: 4.6vh;
@@ -349,7 +340,7 @@
         opacity: 0.35;
       }
 
-      /* ── Checklist: dark card, teal 01/02/03 numbers, rows ────────────────── */
+      /* ── Checklist: cream card, coral 01/02/03 numbers, staggered rows ───── */
       .checklist-wrap {
         padding: 0 0 8vh 6vh;
       }
@@ -368,7 +359,7 @@
         gap: 2vh;
       }
       .checklist .num {
-        color: var(--accent);
+        color: var(--coral);
         font-size: 3.4vh;
         font-weight: 600;
         font-variant-numeric: tabular-nums;
@@ -379,7 +370,7 @@
         font-weight: 500;
       }
 
-      /* ── CommandChips: monospace cmd chip + serif desc rows ───────────────── */
+      /* ── CommandChips: monospace cmd chip + serif desc, staggered rows ───── */
       .cmd-wrap {
         padding: 0 0 8vh 6vh;
       }
@@ -401,9 +392,9 @@
         font-family: ui-monospace, monospace;
         font-size: 2.8vh;
         font-weight: 500;
-        color: var(--accent);
-        background: rgba(38, 202, 168, 0.1);
-        border: 0.12vh solid rgba(38, 202, 168, 0.5);
+        color: var(--coral);
+        background: rgba(193, 95, 60, 0.1);
+        border: 0.12vh solid rgba(193, 95, 60, 0.5);
         border-radius: 0.6vh;
         padding: 0.6vh 1.2vh;
         white-space: nowrap;
@@ -414,7 +405,7 @@
         font-weight: 400;
       }
 
-      /* ── ListReveal (Scrim): teal title + numbered rows ───────────────────── */
+      /* ── ListReveal (fullBleed): coral title + numbered rows, staggered ──── */
       .list-wrap {
         display: flex;
         flex-direction: column;
@@ -422,7 +413,7 @@
         padding: 0 0 8vh 6vh;
       }
       .list .list-title {
-        color: var(--accent);
+        color: var(--coral);
         font-size: 3vh;
         font-weight: 600;
         letter-spacing: 0.3vh;
@@ -434,7 +425,7 @@
         gap: 2vh;
       }
       .list .num {
-        color: var(--accent);
+        color: var(--coral);
         font-size: 4vh;
         font-weight: 600;
       }
@@ -453,8 +444,8 @@
         position: absolute;
         inset: 0;
         background:
-          radial-gradient(circle at 50% 48%, rgba(12, 20, 28, 0.12) 0 24%, rgba(12, 20, 28, 0.68) 72%),
-          linear-gradient(180deg, rgba(12, 20, 28, 0.44), rgba(12, 20, 28, 0.16) 40%, rgba(12, 20, 28, 0.72));
+          radial-gradient(circle at 50% 48%, rgba(20, 18, 14, 0.18) 0 24%, rgba(20, 18, 14, 0.68) 72%),
+          linear-gradient(180deg, rgba(20, 18, 14, 0.42), rgba(20, 18, 14, 0.18) 40%, rgba(20, 18, 14, 0.68));
       }
       .metric-wrap {
         position: relative;
@@ -466,7 +457,7 @@
         text-align: center;
       }
       .metric .kicker {
-        color: var(--ink);
+        color: var(--cream);
         font-size: 2.8vh;
         font-weight: 500;
         letter-spacing: 0.24em;
@@ -476,26 +467,25 @@
         display: flex;
         align-items: flex-end;
         justify-content: center;
-        margin: 0 0 5.4vh;
-        transform: translateY(-1.6vh);
+        margin: 5.2vh 0 0.2vh;
       }
       .metric .value {
-        color: var(--ink);
+        color: var(--cream);
         font-size: 34vh;
-        font-weight: 600;
+        font-weight: 500;
         letter-spacing: -0.07em;
         line-height: 0.95;
-        text-shadow: 0 1.2vh 4vh rgba(0, 0, 0, 0.36);
+        text-shadow: 0 1.2vh 4vh rgba(0, 0, 0, 0.28);
       }
       .metric .unit {
-        color: var(--accent);
+        color: var(--coral);
         font-size: 9vh;
         font-weight: 600;
         line-height: 1;
         margin: 0 0 2.3vh 1.2vh;
       }
       .metric .title {
-        color: var(--ink);
+        color: var(--cream);
         font-size: 5.2vh;
         font-weight: 600;
         letter-spacing: 0.08em;
@@ -503,7 +493,7 @@
         text-transform: uppercase;
       }
       .metric .detail {
-        color: var(--muted);
+        color: rgba(249, 247, 243, 0.82);
         font-size: 3.2vh;
         line-height: 1.25;
         margin-top: 2.8vh;
@@ -518,7 +508,7 @@
         justify-content: flex-end;
         box-sizing: border-box;
         padding-right: 8vw;
-        background: linear-gradient(90deg, transparent 0 42%, rgba(12, 20, 28, 0.18) 58%, rgba(12, 20, 28, 0.68) 100%);
+        background: linear-gradient(90deg, transparent 0 42%, rgba(20, 18, 14, 0.16) 58%, rgba(20, 18, 14, 0.54) 100%);
       }
       .side .card {
         width: 31vw;
@@ -528,25 +518,18 @@
         flex-direction: column;
         justify-content: center;
         padding: 4.2vh 3.6vh;
-        border: 0.22vh solid rgba(38, 202, 168, 0.58);
-        border-left: 0.9vh solid var(--accent);
+        border: 0.22vh solid rgba(249, 247, 243, 0.9);
+        border-left: 0.9vh solid var(--coral);
         border-radius: 3vh;
-        background: rgba(12, 20, 28, 0.94);
+        background: rgba(249, 247, 243, 0.95);
       }
       .side .kicker {
-        color: var(--accent);
+        color: var(--coral);
         font-size: 2.1vh;
         font-weight: 600;
         letter-spacing: 0.18em;
         text-align: center;
         text-transform: uppercase;
-      }
-      .side .title-rule {
-        display: flex;
-        flex-direction: column;
-        width: fit-content;
-        max-width: 100%;
-        margin: 0 auto;
       }
       .side .title {
         color: var(--ink);
@@ -557,17 +540,10 @@
         text-align: center;
       }
       .side .rule {
-        width: fit-content;
+        width: 6vh;
         height: 0.4vh;
         margin: 2.2vh auto 3vh;
-        background: var(--accent);
-      }
-      .side .rule-measure {
-        display: inline-block;
-        visibility: hidden;
-        margin: 0;
-        line-height: 0;
-        white-space: nowrap;
+        background: var(--coral);
       }
       .side .items {
         display: flex;
@@ -577,9 +553,9 @@
       .side .item {
         color: var(--ink);
         padding: 2.1vh 2vh;
-        border: 0.16vh solid rgba(183, 198, 206, 0.34);
+        border: 0.16vh solid rgba(92, 87, 78, 0.4);
         border-radius: 0.8vh;
-        background: rgba(38, 202, 168, 0.05);
+        background: rgba(255, 255, 255, 0.34);
         font-size: 3.8vh;
         font-weight: 600;
         letter-spacing: 0.04em;
@@ -596,17 +572,16 @@
         align-items: flex-end;
         justify-content: center;
         padding: 0 5vw 7vh;
-        background: linear-gradient(180deg, transparent 0 54%, rgba(12, 20, 28, 0.66) 100%);
+        background: linear-gradient(180deg, transparent 0 54%, rgba(20, 18, 14, 0.52) 100%);
       }
       .parallel .card {
         width: 100%;
         box-sizing: border-box;
         padding: 3.2vh 3.6vh 3.4vh;
-        border: 0.22vh solid rgba(38, 202, 168, 0.58);
-        border-top: 0.8vh solid var(--accent);
+        border-top: 0.8vh solid var(--coral);
         border-radius: 2.4vh;
-        background: rgba(12, 20, 28, 0.94);
-        box-shadow: 0 2vh 5vh rgba(0, 0, 0, 0.36);
+        background: rgba(249, 247, 243, 0.96);
+        box-shadow: 0 2vh 5vh rgba(0, 0, 0, 0.28);
       }
       .parallel .header {
         display: flex;
@@ -615,7 +590,7 @@
         gap: 4vw;
       }
       .parallel .kicker {
-        color: var(--accent);
+        color: var(--coral);
         font-size: 2.1vh;
         font-weight: 600;
         letter-spacing: 0.18em;
@@ -637,9 +612,9 @@
       .parallel .item {
         color: var(--ink);
         padding: 2.4vh 2vh;
-        border: 0.16vh solid rgba(183, 198, 206, 0.34);
+        border: 0.16vh solid rgba(92, 87, 78, 0.4);
         border-radius: 0.8vh;
-        background: rgba(38, 202, 168, 0.06);
+        background: rgba(255, 255, 255, 0.4);
         font-size: 4vh;
         font-weight: 600;
         letter-spacing: 0.04em;
@@ -647,44 +622,135 @@
         text-align: center;
         text-transform: uppercase;
       }
-      /* ── Charts: structured stat layouts (96–114s) ─────────────────────── */
-      .chart-scene { display: grid; place-items: center; padding: 6%; }
-      .chart-panel { --chart-ink: var(--ink); --chart-muted: var(--muted); --chart-accent: var(--accent); --chart-line: rgba(183, 198, 206, 0.44); width: min(78%, 1220px); height: min(72%, 720px); min-height: 420px; padding: 42px 50px 36px; overflow: hidden; border: 1px solid rgba(38, 202, 168, 0.62); background: var(--card-bg); color: var(--chart-ink); container-type: inline-size; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 24px; }
-      .chart-head { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 24px; }
-      .chart-kicker { color: var(--chart-accent); font-size: 22.5px; font-weight: 700; text-transform: uppercase; }
-      .chart-title { margin-top: 4px; font-size: clamp(37.5px, 6.25cqi, 72.5px); font-weight: 600; line-height: 1; }
-      .chart-unit { color: var(--chart-muted); font-size: 22.5px; text-align: right; }
-      .chart-body { min-height: 0; }
-      .bar-plot { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px; height: 100%; }
-      .bar-item { display: grid; grid-template-rows: minmax(0, 1fr) 28px; gap: 8px; min-width: 0; text-align: center; }
-      .bar-value { position: absolute; right: 0; bottom: calc(var(--bar-value) * 1% + 8px); left: 0; color: var(--chart-ink); font-size: 31.25px; font-weight: 700; line-height: 40px; }
-      .bar-track { position: relative; display: flex; align-items: flex-end; justify-content: center; min-height: 0; margin-top: 40px; border-bottom: 2px solid var(--chart-ink); }
-      .bar-fill { width: min(72%, 118px); height: calc(var(--bar-value) * 1%); transform-origin: 50% 100%; background: var(--chart-accent); }
-      .bar-label { overflow-wrap: anywhere; color: var(--chart-muted); font-size: 21.25px; font-weight: 650; }
-      .pie-layout { display: grid; grid-template-columns: 360px max-content; align-items: center; justify-content: center; gap: 28px; height: 100%; }
-      .pie-svg { display: block; width: min(100%, 360px); margin: auto; overflow: visible; }
-      .pie-sector { transform-box: fill-box; transform-origin: center; stroke: var(--scrim-base); stroke-width: 4; }
-      .pie-sector:nth-child(1) { fill: var(--chart-accent); } .pie-sector:nth-child(2) { fill: #7fa5b2; } .pie-sector:nth-child(3) { fill: #dce7eb; }
-      .chart-legend { display: grid; width: max-content; max-width: 100%; justify-self: start; gap: 14px; } .legend-item { display: grid; grid-template-columns: 14px 1fr auto; align-items: center; gap: 12px; min-width: 0; }
-      .legend-swatch { width: 14px; height: 14px; background: var(--swatch); } .legend-label { min-width: 0; overflow-wrap: anywhere; font-size: 23.75px; } .legend-value { font-size: 27.5px; font-weight: 700; }
-      .line-layout { display: grid; height: 100%; } .line-svg { width: 100%; height: 100%; min-height: 250px; overflow: visible; }
-      .line-grid { stroke: var(--chart-line); stroke-width: 1.5; } .line-path { fill: none; stroke: var(--chart-accent); stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; }
-      .line-point { fill: var(--scrim-base); stroke: var(--chart-accent); stroke-width: 6; transform-box: fill-box; transform-origin: center; }
-      .line-axis-label { fill: var(--chart-muted); font: 650 21.25px var(--serif); text-anchor: middle; }
-      @container (max-width: 620px) { .chart-panel { min-height: 500px; padding: 28px 24px; } .chart-head { grid-template-columns: 1fr; gap: 8px; } .chart-unit { text-align: left; } .bar-plot { gap: 8px; } .pie-layout { grid-template-columns: 1fr; gap: 18px; } .pie-svg { width: min(100%, 260px); } .chart-legend { width: 100%; justify-self: stretch; grid-template-columns: 1fr 1fr; gap: 8px 14px; } }
+
+      /* ── Air transparency overrides ──────────────────────────────────────── */
+      .bleed,
+      .card,
+      .metric-scrim,
+      .side,
+      .side .card,
+      .side .item,
+      .parallel,
+      .parallel .card,
+      .parallel .item,
+      .cmd .chip {
+        background: transparent;
+        box-shadow: none;
+      }
+      .title,
+      .sub,
+      .line1,
+      .line2,
+      .label,
+      .text,
+      .body,
+      .value,
+      .item,
+      .desc,
+      .small,
+      .avoid,
+      .instead,
+      .instead-label,
+      .col-label,
+      .kicker {
+        text-shadow: 0 0.35vh 1.1vh rgba(0, 0, 0, 0.82), 0 0 0.25vh rgba(0, 0, 0, 0.75);
+      }
+      .card {
+        border-radius: 0;
+      }
+      .accent-bar,
+      .rule-bar,
+      .side .rule,
+      .diamond,
+      .ba .divider {
+        display: none;
+      }
+      .lt .card,
+      .key .card,
+      .reframe .card,
+      .prompt .card,
+      .ba .card,
+      .checklist .card,
+      .cmd .card {
+        border: 0;
+      }
+      .stat .card {
+        border: 0;
+      }
+      .cmd .chip {
+        border: 0;
+        border-radius: 0;
+      }
+      .metric-scrim {
+        display: none;
+      }
+      .metric .kicker,
+      .metric .value,
+      .metric .title,
+      .metric .detail {
+        color: var(--ink);
+      }
+      .metric-wrap {
+        padding: 8vh 5vw;
+        box-sizing: border-box;
+      }
+      .metric .hero-number {
+        margin: 3.2vh 0 1.6vh;
+      }
+      .metric .value {
+        font-size: min(31vh, 28vw);
+        font-weight: 700;
+        letter-spacing: -0.06em;
+      }
+      .metric .unit {
+        color: var(--coral);
+      }
+      .side {
+        padding-right: 9vw;
+      }
+      .side .card {
+        width: 34vw;
+        min-height: 0;
+        padding: 3vh 0;
+        border: 0;
+        border-radius: 0;
+        text-align: center;
+      }
+      .side .items {
+        width: 100%;
+        transform: translateY(4.4vh);
+      }
+      .side .item {
+        padding: 1.6vh 0;
+        border: 0;
+        border-radius: 0;
+        text-align: center;
+      }
+      .parallel {
+        padding-bottom: 7vh;
+      }
+      .parallel .card {
+        padding: 2.8vh 0 0;
+        border: 0;
+        border-radius: 0;
+      }
+      .parallel .item {
+        padding: 2vh 1.6vh;
+        border: 0;
+        border-radius: 0;
+      }
     </style>
   </head>
   <body>
     <!-- Worked example: all 16 cards packed back-to-back at 6s each (96s) so
-         every card is eyeballable in one render — the teal port of the almanac
-         card catalog. teal is NOT fullBleed: full-width scenes drop a .scrim
-         gradient (not an opaque fill) behind light text. In production, keep
-         each cue's approved timing (from work/content-cards/cards-plan.json) and set the
-         stage data-duration to the SOURCE length; scenes fire on the spoken word. -->
-    <div data-hf-id="hf-r0kp" id="stage" data-composition-id="v2hf-teal" data-start="0" data-duration="114" data-fps="24" data-width="1920" data-height="1080">
-      <!-- cue 1: Intro (0–6s) — Scrim -->
+         every card is eyeballable in one render — the full air card catalog.
+         In production, keep each cue's
+         approved timing (from work/content-cards/cards-plan.json) and set the stage
+         data-duration to the SOURCE length; scenes fire on the spoken word.
+         Set data-width/height/fps to the source metadata. -->
+    <div data-hf-id="hf-r0kp" id="stage" data-composition-id="v2hf-air" data-start="0" data-duration="114" data-fps="24" data-width="1920" data-height="1080">
+      <!-- cue 1: Intro (0–6s) — fullBleed -->
       <div data-hf-id="hf-n4ne" id="intro" class="scene bleed anchor-bl clip" data-start="0" data-duration="6" data-track-index="0">
-        <div data-hf-id="hf-scr1" class="scrim"></div>
         <div data-hf-id="hf-hdnq" class="intro">
           <div data-hf-id="hf-xgk7" class="intro-wrap">
             <div data-hf-id="hf-ty56" class="accent-bar"></div>
@@ -697,9 +763,8 @@
         </div>
       </div>
 
-      <!-- cue 2: SectionCard (6–12s) — Scrim -->
+      <!-- cue 2: SectionCard (6–12s) — fullBleed -->
       <div data-hf-id="hf-eqkj" id="section" class="scene bleed anchor-bl clip" data-start="6" data-duration="6" data-track-index="0">
-        <div data-hf-id="hf-scr2" class="scrim"></div>
         <div data-hf-id="hf-pvpx" class="section">
           <div data-hf-id="hf-ysym" class="section-wrap">
             <div data-hf-id="hf-hra9" class="kicker">PART 1</div>
@@ -710,7 +775,7 @@
       </div>
 
       <!-- cue 3: LowerThird (12–18s) — solid card over footage -->
-      <div data-hf-id="hf-ht2y" id="lt" class="scene anchor-bl clip" data-start="12" data-duration="6" data-track-index="1" data-hidden="">
+      <div data-hf-id="hf-ht2y" id="lt" class="scene anchor-bl clip" data-start="12" data-duration="6" data-track-index="1">
         <div data-hf-id="hf-156o" class="lt">
           <div data-hf-id="hf-ofa5" class="lt-wrap">
             <div data-hf-id="hf-vn2y" class="card">
@@ -722,7 +787,7 @@
       </div>
 
       <!-- cue 4: StatCallout (18–24s) — count-up; data-stat-value drives it -->
-      <div data-hf-id="hf-i5av" id="stat" class="scene stat-wrap clip" data-start="18" data-duration="6" data-track-index="1" data-hidden="">
+      <div data-hf-id="hf-i5av" id="stat" class="scene stat-wrap clip" data-start="18" data-duration="6" data-track-index="1">
         <div data-hf-id="hf-xa0m" class="stat">
           <div data-hf-id="hf-i08u" class="card">
             <div data-hf-id="hf-pt07" class="value" data-stat-value="62">0</div>
@@ -731,9 +796,8 @@
         </div>
       </div>
 
-      <!-- cue 5: Outro (24–30s) — Scrim -->
+      <!-- cue 5: Outro (24–30s) — fullBleed -->
       <div data-hf-id="hf-ul5o" id="outro" class="scene bleed anchor-center clip" data-start="24" data-duration="6" data-track-index="0">
-        <div data-hf-id="hf-scr3" class="scrim"></div>
         <div data-hf-id="hf-e0lx" class="outro">
           <div data-hf-id="hf-qq1q" class="outro-wrap">
             <div data-hf-id="hf-k2l8" class="diamond"></div>
@@ -744,9 +808,8 @@
         </div>
       </div>
 
-      <!-- cue 6: TitleBumper (30–36s) — Scrim full-screen title takeover -->
+      <!-- cue 6: TitleBumper (30–36s) — fullBleed full-screen title takeover -->
       <div data-hf-id="hf-1okx" id="tb" class="scene bleed anchor-bl clip" data-start="30" data-duration="6" data-track-index="0">
-        <div data-hf-id="hf-scr4" class="scrim"></div>
         <div data-hf-id="hf-ash2" class="tb">
           <div data-hf-id="hf-b7br" class="tb-wrap">
             <div data-hf-id="hf-3f9t" class="kicker">EPISODE 14</div>
@@ -756,7 +819,7 @@
       </div>
 
       <!-- cue 7: KeypointCallout (36–42s) — solid card, one pinned line -->
-      <div data-hf-id="hf-npod" id="key" class="scene anchor-bl clip" data-start="36" data-duration="6" data-track-index="1" data-hidden="">
+      <div data-hf-id="hf-npod" id="key" class="scene anchor-bl clip" data-start="36" data-duration="6" data-track-index="1">
         <div data-hf-id="hf-l8jp" class="key">
           <div data-hf-id="hf-h2q6" class="key-wrap">
             <div data-hf-id="hf-iejv" class="card">
@@ -766,8 +829,8 @@
         </div>
       </div>
 
-      <!-- cue 8: ReframeCard (42–48s) — avoid → INSTEAD SAY → teal instead -->
-      <div data-hf-id="hf-xoxn" id="reframe" class="scene anchor-bl clip" data-start="42" data-duration="6" data-track-index="1" data-hidden="">
+      <!-- cue 8: ReframeCard (42–48s) — avoid → INSTEAD SAY → coral instead -->
+      <div data-hf-id="hf-xoxn" id="reframe" class="scene anchor-bl clip" data-start="42" data-duration="6" data-track-index="1">
         <div data-hf-id="hf-og1i" class="reframe">
           <div data-hf-id="hf-fqhz" class="reframe-wrap">
             <div data-hf-id="hf-isuw" class="card">
@@ -780,8 +843,8 @@
         </div>
       </div>
 
-      <!-- cue 9: PromptCard (48–54s) — quote body, teal highlight words -->
-      <div data-hf-id="hf-rbmj" id="prompt" class="scene anchor-bl clip" data-start="48" data-duration="6" data-track-index="1" data-hidden="">
+      <!-- cue 9: PromptCard (48–54s) — quote body, coral highlight words -->
+      <div data-hf-id="hf-rbmj" id="prompt" class="scene anchor-bl clip" data-start="48" data-duration="6" data-track-index="1">
         <div data-hf-id="hf-3k5u" class="prompt">
           <div data-hf-id="hf-f4gb" class="prompt-wrap">
             <div data-hf-id="hf-byql" class="card">
@@ -793,7 +856,7 @@
       </div>
 
       <!-- cue 10: BeforeAfter (54–60s) — two-column strike vs clean -->
-      <div data-hf-id="hf-58or" id="ba" class="scene anchor-bl clip" data-start="54" data-duration="6" data-track-index="1" data-hidden="">
+      <div data-hf-id="hf-58or" id="ba" class="scene anchor-bl clip" data-start="54" data-duration="6" data-track-index="1">
         <div data-hf-id="hf-hhlj" class="ba">
           <div data-hf-id="hf-6sb8" class="ba-wrap">
             <div data-hf-id="hf-cd1m" class="card">
@@ -811,8 +874,8 @@
         </div>
       </div>
 
-      <!-- cue 11: Checklist (60–66s) — teal 01/02/03 rows on a card -->
-      <div data-hf-id="hf-ilkl" id="checklist" class="scene anchor-bl clip" data-start="60" data-duration="6" data-track-index="1" data-hidden="">
+      <!-- cue 11: Checklist (60–66s) — coral 01/02/03 rows on a card -->
+      <div data-hf-id="hf-ilkl" id="checklist" class="scene anchor-bl clip" data-start="60" data-duration="6" data-track-index="1">
         <div data-hf-id="hf-g1yo" class="checklist">
           <div data-hf-id="hf-q8el" class="checklist-wrap">
             <div data-hf-id="hf-crcn" class="card">
@@ -826,7 +889,7 @@
       </div>
 
       <!-- cue 12: CommandChips (66–72s) — mono chip + serif desc rows -->
-      <div data-hf-id="hf-mz8b" id="cmd" class="scene anchor-bl clip" data-start="66" data-duration="6" data-track-index="1" data-hidden="">
+      <div data-hf-id="hf-mz8b" id="cmd" class="scene anchor-bl clip" data-start="66" data-duration="6" data-track-index="1">
         <div data-hf-id="hf-03wg" class="cmd">
           <div data-hf-id="hf-wba5" class="cmd-wrap">
             <div data-hf-id="hf-d5no" class="card">
@@ -839,9 +902,8 @@
         </div>
       </div>
 
-      <!-- cue 13: ListReveal (72–78s) — Scrim numbered enumeration -->
+      <!-- cue 13: ListReveal (72–78s) — fullBleed numbered enumeration -->
       <div data-hf-id="hf-josl" id="list" class="scene bleed anchor-bl clip" data-start="72" data-duration="6" data-track-index="0">
-        <div data-hf-id="hf-scr5" class="scrim"></div>
         <div data-hf-id="hf-33o8" class="list">
           <div data-hf-id="hf-95qt" class="list-wrap">
             <div data-hf-id="hf-8kx6" class="list-title">THREE THINGS TO WATCH</div>
@@ -853,7 +915,7 @@
       </div>
 
       <!-- cue 14: MetricSpotlight (78–84s) — full-frame hero number -->
-      <div data-hf-id="hf-mt00" id="metric" class="scene clip" data-start="78" data-duration="6" data-track-index="1" data-hidden="">
+      <div data-hf-id="hf-mt00" id="metric" class="scene clip" data-start="78" data-duration="6" data-track-index="1">
         <div data-hf-id="hf-mt01" class="metric">
           <div data-hf-id="hf-mt02" class="metric-scrim"></div>
           <div data-hf-id="hf-mt03" class="metric-wrap">
@@ -866,14 +928,12 @@
       </div>
 
       <!-- cue 15: SideBySide (84–90s) — vertical parallel semantic terms -->
-      <div data-hf-id="hf-sb00" id="side" class="scene clip" data-start="84" data-duration="6" data-track-index="1" data-hidden="">
+      <div data-hf-id="hf-sb00" id="side" class="scene clip" data-start="84" data-duration="6" data-track-index="1">
         <div data-hf-id="hf-sb01" class="side">
           <div data-hf-id="hf-sb02" class="card">
             <div data-hf-id="hf-sb03" class="kicker">PLAYER PROFILE</div>
-            <div class="title-rule">
-              <div data-hf-id="hf-sb04" class="title">Three ways to impact</div>
-              <div data-hf-id="hf-sb05" class="rule"><span class="title rule-measure" aria-hidden="true">Three ways to</span></div>
-            </div>
+            <div data-hf-id="hf-sb04" class="title">Three ways to impact</div>
+            <div data-hf-id="hf-sb05" class="rule"></div>
             <div data-hf-id="hf-sb06" class="items">
               <div data-hf-id="hf-sb07" class="item">Raw pace</div>
               <div data-hf-id="hf-sb08" class="item">Game vision</div>
@@ -884,7 +944,7 @@
       </div>
 
       <!-- cue 16: ParallelColumns (90–96s) — horizontal parallel semantic terms -->
-      <div data-hf-id="hf-pc00" id="parallel" class="scene clip" data-start="90" data-duration="6" data-track-index="1" data-hidden="">
+      <div data-hf-id="hf-pc00" id="parallel" class="scene clip" data-start="90" data-duration="6" data-track-index="1">
         <div data-hf-id="hf-pc01" class="parallel">
           <div data-hf-id="hf-pc02" class="card">
             <div data-hf-id="hf-pc03" class="header">
@@ -900,63 +960,88 @@
         </div>
       </div>
 
-      <div data-hf-id="te-chart-bar" id="bar-chart" class="scene chart-scene clip" data-start="96" data-duration="6" data-track-index="1">
-        <section class="chart-panel"><header class="chart-head"><div><div class="chart-kicker">FY2025</div><div class="chart-title">Revenue by quarter</div></div><div class="chart-unit">USD millions</div></header><div class="chart-body bar-plot"><div class="bar-item"><div class="bar-track" style="--bar-value:39"><span class="bar-value">12</span><div class="bar-fill"></div></div><span class="bar-label">Q1</span></div><div class="bar-item"><div class="bar-track" style="--bar-value:58"><span class="bar-value">18</span><div class="bar-fill"></div></div><span class="bar-label">Q2</span></div><div class="bar-item"><div class="bar-track" style="--bar-value:77"><span class="bar-value">24</span><div class="bar-fill"></div></div><span class="bar-label">Q3</span></div><div class="bar-item"><div class="bar-track" style="--bar-value:100"><span class="bar-value">31</span><div class="bar-fill"></div></div><span class="bar-label">Q4</span></div></div></section>
-      </div>
-      <div data-hf-id="te-chart-pie" id="pie-chart" class="scene chart-scene clip" data-start="102" data-duration="6" data-track-index="1">
-        <section class="chart-panel"><header class="chart-head"><div><div class="chart-kicker">REVENUE MIX</div><div class="chart-title">One complete whole</div></div><div class="chart-unit">Share of total</div></header><div class="chart-body pie-layout"><svg class="pie-svg" viewBox="0 0 360 360" role="img" aria-label="Revenue mix: Product 60 percent, Services 25 percent, Partners 15 percent"><path class="pie-sector" d="M180 180 L180 40 A140 140 0 1 1 97.71 293.26 Z"></path><path class="pie-sector" d="M180 180 L97.71 293.26 A140 140 0 0 1 66.74 97.71 Z"></path><path class="pie-sector" d="M180 180 L66.74 97.71 A140 140 0 0 1 180 40 Z"></path></svg><div class="chart-legend"><div class="legend-item"><span class="legend-swatch" style="--swatch:var(--chart-accent)"></span><span class="legend-label">Product</span><span class="legend-value">60%</span></div><div class="legend-item"><span class="legend-swatch" style="--swatch:#7fa5b2"></span><span class="legend-label">Services</span><span class="legend-value">25%</span></div><div class="legend-item"><span class="legend-swatch" style="--swatch:#dce7eb"></span><span class="legend-label">Partners</span><span class="legend-value">15%</span></div></div></div></section>
-      </div>
-      <div data-hf-id="te-chart-line" id="line-chart" class="scene chart-scene clip" data-start="108" data-duration="6" data-track-index="1">
-        <section class="chart-panel"><header class="chart-head"><div><div class="chart-kicker">JAN–MAY 2025</div><div class="chart-title">Monthly revenue trend</div></div><div class="chart-unit">USD millions</div></header><div class="chart-body line-layout"><svg class="line-svg" viewBox="0 0 560 320" role="img" aria-label="Monthly revenue rises from 12 to 31 million"><path class="line-grid" d="M50 260 H520 M50 180 H520 M50 100 H520"></path><path class="line-path" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" d="M60 245 L170 190 L280 208 L390 132 L500 72"></path><g><circle class="line-point" cx="60" cy="245" r="9"></circle><circle class="line-point" cx="170" cy="190" r="9"></circle><circle class="line-point" cx="280" cy="208" r="9"></circle><circle class="line-point" cx="390" cy="132" r="9"></circle><circle class="line-point" cx="500" cy="72" r="9"></circle></g><g><text class="line-axis-label" x="60" y="298">Jan</text><text class="line-axis-label" x="170" y="298">Feb</text><text class="line-axis-label" x="280" y="298">Mar</text><text class="line-axis-label" x="390" y="298">Apr</text><text class="line-axis-label" x="500" y="298">May</text></g></svg></div></section>
-      </div>
+      <div data-hf-id="air-chart-bar" id="bar-chart" class="scene chart-scene clip" data-start="96" data-duration="6" data-track-index="1"><section class="chart-panel"><header class="chart-head"><div><div class="chart-kicker">FY2025</div><div class="chart-title">Revenue by quarter</div></div><div class="chart-unit">USD millions</div></header><div class="chart-body bar-plot"><div class="bar-item"><div class="bar-track" style="--bar-value:39"><span class="bar-value">12</span><div class="bar-fill"></div></div><span class="bar-label">Q1</span></div><div class="bar-item"><div class="bar-track" style="--bar-value:58"><span class="bar-value">18</span><div class="bar-fill"></div></div><span class="bar-label">Q2</span></div><div class="bar-item"><div class="bar-track" style="--bar-value:77"><span class="bar-value">24</span><div class="bar-fill"></div></div><span class="bar-label">Q3</span></div><div class="bar-item"><div class="bar-track" style="--bar-value:100"><span class="bar-value">31</span><div class="bar-fill"></div></div><span class="bar-label">Q4</span></div></div></section></div>
+      <div data-hf-id="air-chart-pie" id="pie-chart" class="scene chart-scene clip" data-start="102" data-duration="6" data-track-index="1"><section class="chart-panel"><header class="chart-head"><div><div class="chart-kicker">REVENUE MIX</div><div class="chart-title">One complete whole</div></div><div class="chart-unit">Share of total</div></header><div class="chart-body pie-layout"><svg class="pie-svg" viewBox="0 0 360 360" role="img" aria-label="Revenue mix: Product 60 percent, Services 25 percent, Partners 15 percent"><path class="pie-sector" d="M180 180 L180 40 A140 140 0 1 1 97.71 293.26 Z"></path><path class="pie-sector" d="M180 180 L97.71 293.26 A140 140 0 0 1 66.74 97.71 Z"></path><path class="pie-sector" d="M180 180 L66.74 97.71 A140 140 0 0 1 180 40 Z"></path></svg><div class="chart-legend"><div class="legend-item"><span class="legend-swatch" style="--swatch:rgba(255, 255, 255, 0.7)"></span><span class="legend-label">Product</span><span class="legend-value">60%</span></div><div class="legend-item"><span class="legend-swatch" style="--swatch:rgba(255, 255, 255, 0.45)"></span><span class="legend-label">Services</span><span class="legend-value">25%</span></div><div class="legend-item"><span class="legend-swatch" style="--swatch:rgba(255, 255, 255, 0.2)"></span><span class="legend-label">Partners</span><span class="legend-value">15%</span></div></div></div></section></div>
+      <div data-hf-id="air-chart-line" id="line-chart" class="scene chart-scene clip" data-start="108" data-duration="6" data-track-index="1"><section class="chart-panel"><header class="chart-head"><div><div class="chart-kicker">JAN–MAY 2025</div><div class="chart-title">Monthly revenue trend</div></div><div class="chart-unit">USD millions</div></header><div class="chart-body line-layout"><svg class="line-svg" viewBox="0 0 560 320" role="img" aria-label="Monthly revenue rises from 12 to 31 million"><path class="line-grid" d="M50 260 H520 M50 180 H520 M50 100 H520"></path><path class="line-path" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" d="M60 245 L170 190 L280 208 L390 132 L500 72"></path><g><circle class="line-point" cx="60" cy="245" r="9"></circle><circle class="line-point" cx="170" cy="190" r="9"></circle><circle class="line-point" cx="280" cy="208" r="9"></circle><circle class="line-point" cx="390" cy="132" r="9"></circle><circle class="line-point" cx="500" cy="72" r="9"></circle></g><g><text class="line-axis-label" x="60" y="298">Jan</text><text class="line-axis-label" x="170" y="298">Feb</text><text class="line-axis-label" x="280" y="298">Mar</text><text class="line-axis-label" x="390" y="298">Apr</text><text class="line-axis-label" x="500" y="298">May</text></g></svg></div></section></div>
 
       <script>
         // ────────────────────────────────────────────────────────────────────
         // One paused GSAP timeline, keyed in SECONDS (HF seeks it per frame).
-        // teal is a FADE theme (themes.ts motion:"fade"): NO per-element stagger.
-        // Each scene's inner wrapper does ONE slide+fade entrance as a unit
-        // (mirrors anim.tsx useFade + the outer translateY over TIMING.overlayIn).
-        //   fade 0.292s · reveal 0.542s · overlay-in slide 0.417s
-        // Two motion-independent exceptions survive fade mode:
-        //   • StatCallout count-up (0→N) — tween a counter, write textContent.
-        //   • SectionCard rule-bar draw (scaleX 0→1) — no stagger offset.
+        // Timing mirrors the almanac design language (was anim.tsx @24fps):
+        //   fade 0.292s · reveal 0.542s · stagger beat 0.167s · rule-draw 0.417s
+        // EASE_OUT bezier(0.16,1,0.3,1) ≈ power4.out. stagger entrance = title
+        // clip-wipe + kicker/sub fade-rise; each scene's inner wrapper fades.
         //
         // Two seek-safety rules the HF linter enforces (learned the hard way):
-        //   1. Fade/animate an INNER wrapper, never the .clip div — the runtime
-        //      owns clip visibility; animating it leaves stale state on seeks.
-        //   2. Animate a CSS-initialized transform (scaleX) with fromTo (not to),
-        //      so GSAP owns the whole transform (no scaleX clobber).
+        //   1. Fade an INNER wrapper, never the .clip div — the runtime owns clip
+        //      visibility; animating it leaves stale state on non-linear seeks.
+        //   2. Animate a transform with fromTo (not to) when CSS sets its initial
+        //      value, so GSAP owns the whole transform (no scaleX/rotate clobber).
         // ────────────────────────────────────────────────────────────────────
         const EO = "power4.out";
         const FADE = 0.292,
           REVEAL = 0.542,
+          STAG = 0.167,
           IN = 0.417;
 
         const tl = gsap.timeline({ paused: true });
 
-        // fade-motion entrance: inner wrapper fades in + slides up, holds, fades out.
-        function slideFade(sel, start, dur, dy = "1.6vh") {
+        // Fade a scene's inner wrapper in at `start`, out over its last FADE s.
+        function sceneFade(sel, start, dur) {
           const el = document.querySelector(sel);
-          tl.fromTo(el, { opacity: 0, y: dy }, { opacity: 1, y: 0, duration: REVEAL, ease: EO }, start);
+          tl.fromTo(el, { opacity: 0 }, { opacity: 1, duration: FADE, ease: "none" }, start);
           tl.to(el, { opacity: 0, duration: FADE, ease: "none" }, start + dur - FADE);
           tl.set(el, { opacity: 0 }, start + dur); // hard kill (seek-safe)
         }
+        // title entrance: clip-path wipe L→R + fade, over REVEAL after `at`.
+        function titleIn(el, at) {
+          tl.fromTo(
+            el,
+            { opacity: 0, clipPath: "inset(0 100% 0 0)" },
+            { opacity: 1, clipPath: "inset(0 0% 0 0)", duration: REVEAL, ease: EO },
+            at,
+          );
+        }
+        // kicker/sub entrance: fade + translateY(1.2vh→0), over REVEAL after `at`.
+        function riseIn(el, at) {
+          tl.fromTo(el, { opacity: 0, y: "1.2vh" }, { opacity: 1, y: 0, duration: REVEAL, ease: EO }, at);
+        }
+        // list-row entrance: fade + translateX(2vh→0). Rows stagger per index —
+        // the almanac port of Checklist/CommandChips/ListReveal's per-item reveal.
+        function rowIn(el, at) {
+          tl.fromTo(el, { opacity: 0, x: "2vh" }, { opacity: 1, x: 0, duration: REVEAL, ease: EO }, at);
+        }
+        // stagger a list of rows: first at REVEAL after scene start, then +STAG each.
+        function rowsIn(rows, sceneStart) {
+          rows.forEach((el, i) => rowIn(el, sceneStart + REVEAL + i * STAG));
+        }
 
-        // ─── cue 1: Intro ────────────────────────────────────────────────────
-        slideFade("#intro .intro", 0, 6);
+        // ─── cue 1: Intro (kicker@0, title@1, sub@3 beats) ───────────────────
+        sceneFade("#intro .intro", 0, 6);
+        const intro = document.querySelector("#intro");
+        riseIn(intro.querySelector(".kicker"), 0 + 0 * STAG);
+        titleIn(intro.querySelector(".title"), 0 + 1 * STAG);
+        riseIn(intro.querySelector(".sub"), 0 + 3 * STAG);
 
-        // ─── cue 2: SectionCard — rule-bar draws with the scene (no stagger) ──
-        slideFade("#section .section", 6, 6);
-        tl.fromTo(document.querySelector("#section .rule-bar"), { scaleX: 0 }, { scaleX: 1, duration: IN, ease: EO }, 6);
+        // ─── cue 2: SectionCard (kicker@0, title@1, rule drawn@2 beats) ──────
+        sceneFade("#section .section", 6, 6);
+        const section = document.querySelector("#section");
+        riseIn(section.querySelector(".kicker"), 6 + 0 * STAG);
+        titleIn(section.querySelector(".title"), 6 + 1 * STAG);
+        tl.fromTo(section.querySelector(".rule-bar"), { scaleX: 0 }, { scaleX: 1, duration: IN, ease: EO }, 6 + 2 * STAG);
 
-        // ─── cue 3: LowerThird ────────────────────────────────────────────────
-        slideFade("#lt .lt", 12, 6);
+        // ─── cue 3: LowerThird (line1 clip-wipe, line2 rise) ─────────────────
+        sceneFade("#lt .lt", 12, 6);
+        const lt = document.querySelector("#lt");
+        titleIn(lt.querySelector(".line1"), 12);
+        riseIn(lt.querySelector(".line2"), 12 + 3 * STAG);
 
-        // ─── cue 4: StatCallout — value counts 0→N (motion-independent) ───────
+        // ─── cue 4: StatCallout (value counts 0→N over REVEAL) ───────────────
         // Count-up = tween a counter object, write textContent on update.
         // power3.out provides cubic ease-out; onUpdate fires per seeked frame.
-        slideFade("#stat .stat", 18, 6);
-        const valueEl = document.querySelector("#stat .value");
+        sceneFade("#stat .stat", 18, 6);
+        const stat = document.querySelector("#stat");
+        const valueEl = stat.querySelector(".value");
         const counter = { v: 0 };
         tl.to(
           counter,
@@ -970,38 +1055,70 @@
           },
           18,
         );
+        riseIn(stat.querySelector(".label"), 18 + 3 * STAG);
 
-        // ─── cue 5: Outro ─────────────────────────────────────────────────────
-        slideFade("#outro .outro", 24, 6);
+        // ─── cue 5: Outro (diamond rise, title wipe, sub/small rise) ─────────
+        sceneFade("#outro .outro", 24, 6);
+        const outro = document.querySelector("#outro");
+        riseIn(outro.querySelector(".diamond"), 24 + 0 * STAG);
+        titleIn(outro.querySelector(".title"), 24 + 1 * STAG);
+        riseIn(outro.querySelector(".sub"), 24 + 3 * STAG);
+        riseIn(outro.querySelector(".small"), 24 + 3 * STAG);
 
-        // ─── cue 6: TitleBumper ───────────────────────────────────────────────
-        slideFade("#tb .tb", 30, 6);
+        // ─── cue 6: TitleBumper (kicker@0, title wipe@1) — fullBleed takeover ─
+        sceneFade("#tb .tb", 30, 6);
+        const tb = document.querySelector("#tb");
+        riseIn(tb.querySelector(".kicker"), 30 + 0 * STAG);
+        titleIn(tb.querySelector(".title"), 30 + 1 * STAG);
 
-        // ─── cue 7: KeypointCallout ───────────────────────────────────────────
-        slideFade("#key .key", 36, 6);
+        // ─── cue 7: KeypointCallout (text clip-wipe) ─────────────────────────
+        sceneFade("#key .key", 36, 6);
+        titleIn(document.querySelector("#key .text"), 36);
 
-        // ─── cue 8: ReframeCard ───────────────────────────────────────────────
-        slideFade("#reframe .reframe", 42, 6);
+        // ─── cue 8: ReframeCard (avoid rise, label, instead wipe) ────────────
+        sceneFade("#reframe .reframe", 42, 6);
+        const reframe = document.querySelector("#reframe");
+        riseIn(reframe.querySelector(".kicker"), 42 + 0 * STAG);
+        riseIn(reframe.querySelector(".avoid"), 42 + 1 * STAG);
+        riseIn(reframe.querySelector(".instead-label"), 42 + 2 * STAG);
+        titleIn(reframe.querySelector(".instead"), 42 + 3 * STAG);
 
-        // ─── cue 9: PromptCard ────────────────────────────────────────────────
-        slideFade("#prompt .prompt", 48, 6);
+        // ─── cue 9: PromptCard (kicker rise, body wipe) ──────────────────────
+        sceneFade("#prompt .prompt", 48, 6);
+        const prompt = document.querySelector("#prompt");
+        riseIn(prompt.querySelector(".kicker"), 48 + 0 * STAG);
+        titleIn(prompt.querySelector(".body"), 48 + 1 * STAG);
 
-        // ─── cue 10: BeforeAfter ──────────────────────────────────────────────
-        slideFade("#ba .ba", 54, 6);
+        // ─── cue 10: BeforeAfter (two columns rise together) ─────────────────
+        sceneFade("#ba .ba", 54, 6);
+        const ba = document.querySelector("#ba");
+        ba.querySelectorAll(".col").forEach((el, i) => riseIn(el, 54 + i * STAG));
 
-        // ─── cue 11: Checklist — rows appear with the card (no per-row stagger)─
-        slideFade("#checklist .checklist", 60, 6);
+        // ─── cue 11: Checklist (kicker rise, rows stagger in) ────────────────
+        sceneFade("#checklist .checklist", 60, 6);
+        const checklist = document.querySelector("#checklist");
+        riseIn(checklist.querySelector(".kicker"), 60);
+        rowsIn(checklist.querySelectorAll(".row"), 60);
 
-        // ─── cue 12: CommandChips — rows appear with the card ─────────────────
-        slideFade("#cmd .cmd", 66, 6);
+        // ─── cue 12: CommandChips (kicker rise, rows stagger in) ─────────────
+        sceneFade("#cmd .cmd", 66, 6);
+        const cmd = document.querySelector("#cmd");
+        riseIn(cmd.querySelector(".kicker"), 66);
+        rowsIn(cmd.querySelectorAll(".row"), 66);
 
-        // ─── cue 13: ListReveal — rows appear with the card ───────────────────
-        slideFade("#list .list", 72, 6);
+        // ─── cue 13: ListReveal (title rise, rows stagger in) — fullBleed ────
+        sceneFade("#list .list", 72, 6);
+        const list = document.querySelector("#list");
+        riseIn(list.querySelector(".list-title"), 72);
+        rowsIn(list.querySelectorAll(".row"), 72);
 
-        // ─── cue 14: MetricSpotlight — full-frame hero number ───────────────
-        slideFade("#metric .metric", 78, 6);
-        const metricValueEl = document.querySelector("#metric .value");
+        // ─── cue 14: MetricSpotlight (full-frame hero count-up) ─────────────
+        sceneFade("#metric .metric", 78, 6);
+        const metric = document.querySelector("#metric");
+        const metricValueEl = metric.querySelector(".value");
         const metricCounter = { v: 0 };
+        riseIn(metric.querySelector(".kicker"), 78);
+        riseIn(metric.querySelector(".hero-number"), 78 + 1 * STAG);
         tl.to(
           metricCounter,
           {
@@ -1012,32 +1129,46 @@
               metricValueEl.textContent = Math.round(metricCounter.v).toLocaleString();
             },
           },
-          78,
+          78 + 1 * STAG,
         );
+        riseIn(metric.querySelector(".title"), 78 + 2 * STAG);
+        riseIn(metric.querySelector(".detail"), 78 + 3 * STAG);
 
-        // ─── cue 15: SideBySide — parallel semantic stack ───────────────────
-        slideFade("#side .side", 84, 6);
+        // ─── cue 15: SideBySide (parallel semantic stack) ──────────────────
+        sceneFade("#side .side", 84, 6);
+        const side = document.querySelector("#side");
+        riseIn(side.querySelector(".kicker"), 84);
+        riseIn(side.querySelector(".title"), 84 + 1 * STAG);
+        riseIn(side.querySelector(".rule"), 84 + 2 * STAG);
+        side.querySelectorAll(".item").forEach((el, i) => riseIn(el, 84 + (i + 3) * STAG));
 
-        // ─── cue 16: ParallelColumns — horizontal semantic rail ────────────
-        slideFade("#parallel .parallel", 90, 6);
+        // ─── cue 16: ParallelColumns (horizontal semantic rail) ──────────────
+        sceneFade("#parallel .parallel", 90, 6);
+        const parallel = document.querySelector("#parallel");
+        riseIn(parallel.querySelector(".kicker"), 90);
+        titleIn(parallel.querySelector(".title"), 90 + 1 * STAG);
+        parallel.querySelectorAll(".item").forEach((el, i) => rowIn(el, 90 + (i + 2) * STAG));
 
-        slideFade("#bar-chart .chart-panel", 96, 6);
+        sceneFade("#bar-chart .chart-panel", 96, 6);
         const barChart = document.querySelector("#bar-chart");
+        riseIn(barChart.querySelector(".chart-head"), 96.1);
         tl.fromTo(barChart.querySelectorAll(".bar-fill"), { scaleY: 0 }, { scaleY: 1, duration: 0.8, stagger: 0.12, ease: EO }, 96.45);
         tl.fromTo(barChart.querySelectorAll(".bar-value, .bar-label"), { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.45, stagger: 0.06, ease: EO }, 96.75);
-        slideFade("#pie-chart .chart-panel", 102, 6);
+        sceneFade("#pie-chart .chart-panel", 102, 6);
         const pieChart = document.querySelector("#pie-chart");
+        riseIn(pieChart.querySelector(".chart-head"), 102.1);
         tl.fromTo(pieChart.querySelectorAll(".pie-sector"), { opacity: 0, scale: 0.82 }, { opacity: 1, scale: 1, duration: 0.55, stagger: 0.2, ease: EO }, 102.45);
         tl.fromTo(pieChart.querySelectorAll(".legend-item"), { opacity: 0, x: 18 }, { opacity: 1, x: 0, duration: 0.45, stagger: 0.1, ease: EO }, 102.8);
-        slideFade("#line-chart .chart-panel", 108, 6);
+        sceneFade("#line-chart .chart-panel", 108, 6);
         const lineChart = document.querySelector("#line-chart");
+        riseIn(lineChart.querySelector(".chart-head"), 108.1);
         tl.fromTo(lineChart.querySelector(".line-path"), { strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: 1.1, ease: "power2.inOut" }, 108.45);
         tl.fromTo(lineChart.querySelectorAll(".line-point"), { opacity: 0, scale: 0 }, { opacity: 1, scale: 1, duration: 0.35, stagger: 0.14, ease: EO }, 108.72);
         tl.fromTo(lineChart.querySelectorAll(".line-axis-label"), { opacity: 0 }, { opacity: 1, duration: 0.35, stagger: 0.08, ease: "none" }, 108.8);
 
         // Register the timeline — key MUST equal the stage's data-composition-id.
         window.__timelines = window.__timelines || {};
-        window.__timelines["v2hf-teal"] = tl;
+        window.__timelines["v2hf-air"] = tl;
 
         // Gallery loop driver — dormant unless the URL hash asks for it, so
         // direct-open / shoot.mjs / the HF runtime are unaffected. The animated
