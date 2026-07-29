@@ -25,10 +25,10 @@ const usage = `Usage:
   node caption_interaction.mjs start --state <json> --source <video> --captions <json> [--review-dir <dir>] [--decision-mode human|agent] [--delegation-note <text>] [--no-open true] [--force true]
   node caption_interaction.mjs select --state <json> --response <combination-id|跳过>
   node caption_interaction.mjs agent-select --state <json> --choice <combination-id> --rationale <text>
-  node caption_interaction.mjs preview-ready --state <json> --project-meta <json> --evidence <png1,png2,png3,png4,...> [--review-page <html> --timeline <timeline.json>]
+  node caption_interaction.mjs preview-ready --state <json> --project-meta <json> --evidence <png1,png2,png3,png4,...> [--comparison-evidence <semantic.png,karaoke.png>] [--review-page <html> --timeline <timeline.json>]
   node caption_interaction.mjs adjust --state <json> --response <user-feedback>
   node caption_interaction.mjs confirm --state <json> --response 确认渲染
-  node caption_interaction.mjs agent-confirm --state <json> --rationale <text>
+  node caption_interaction.mjs agent-confirm --state <json> [--karaoke on|off] --rationale <text>
   node caption_interaction.mjs status --state <json>`;
 
 const parseArgs = (args) => {
@@ -222,7 +222,9 @@ const requireRationale = (options) => {
   return rationale;
 };
 
-const readCaptionReviewPage = (pagePath, state, evidencePaths, timelineBinding) => {
+const readCaptionReviewPage = (
+  pagePath, state, evidencePaths, comparisonEvidencePaths, timelineBinding, projectMetaPath,
+) => {
   const path = resolve(pagePath);
   if (!existsSync(path) || extname(path).toLowerCase() !== ".html") {
     throw new Error(`Caption preview review page must be an existing HTML file: ${path}`);
@@ -246,22 +248,85 @@ const readCaptionReviewPage = (pagePath, state, evidencePaths, timelineBinding) 
     || payload.timeline_sha256 !== timelineBinding.sha256) {
     throw new Error("Caption preview review page timeline differs from --timeline.");
   }
-  const labels = ["early", "middle", "late", "no-caption"];
-  if (!Array.isArray(payload.samples) || payload.samples.length !== labels.length
-    || payload.samples.some((sample, index) => sample.label !== labels[index])) {
-    throw new Error("Caption preview review page must bind early, middle, late, and no-caption evidence.");
+  if (payload.plan_sha256 && payload.plan_sha256 !== state.captions.sha256) {
+    throw new Error("Caption preview review page plan differs from the current interaction.");
+  }
+  const presentationMode = payload.presentation_mode ?? "standard";
+  const approvalEvidence = payload.approval_evidence ?? "standard-four";
+  if (!Array.isArray(payload.samples) || payload.samples.length !== evidencePaths.length) {
+    throw new Error("Caption preview review page evidence count differs from --evidence.");
+  }
+  if (payload.primary_evidence_count !== undefined
+    && payload.primary_evidence_count !== payload.samples.length) {
+    throw new Error("Caption preview review page primary evidence count is invalid.");
+  }
+  if (presentationMode === "standard") {
+    const labels = ["early", "middle", "late", "no-caption"];
+    if (approvalEvidence !== "standard-four" || payload.samples.length !== labels.length
+      || payload.samples.some((sample, index) => sample.label !== labels[index])
+      || comparisonEvidencePaths.length) {
+      throw new Error("Caption preview review page must bind early, middle, late, and no-caption evidence.");
+    }
+  } else if (presentationMode === "expressive") {
+    const plan = JSON.parse(readFileSync(state.captions.path, "utf8"));
+    const beats = plan.presentation?.mode === "expressive" ? plan.presentation.layout_beats : null;
+    if (approvalEvidence !== "expressive-layout-beats" || !Array.isArray(beats)
+      || payload.samples.length !== beats.length + 1 || payload.samples.at(-1)?.label !== "no-caption") {
+      throw new Error("Expressive caption preview page must bind one sample per layout beat plus no-caption.");
+    }
+    beats.forEach((beat, index) => {
+      const sample = payload.samples[index];
+      if (sample.kind !== "layout-beat" || sample.label !== beat.id || sample.beat_id !== beat.id
+        || sample.variant !== beat.variant || JSON.stringify(sample.cue_ids) !== JSON.stringify(beat.cue_ids)) {
+        throw new Error(`Expressive caption preview page differs at layout beat ${beat.id}.`);
+      }
+    });
+    const comparison = payload.experimental_comparison;
+    if (!comparison?.experimental || comparisonEvidencePaths.length !== 2
+      || comparison.samples?.length !== 2
+      || comparison.samples[0]?.mode !== "semantic-only" || comparison.samples[0]?.karaoke !== false
+      || comparison.samples[1]?.mode !== "semantic-plus-karaoke" || comparison.samples[1]?.karaoke !== true) {
+      throw new Error("Expressive caption preview page must bind the separate coexistence comparison pair.");
+    }
+    const projectBinding = comparison.project_binding;
+    if (!projectBinding
+      || resolve(projectBinding.primary_project_meta) !== projectMetaPath
+      || projectBinding.primary_project_meta_sha256 !== hashFile(projectMetaPath)
+      || !existsSync(projectBinding.comparison_project_meta)
+      || projectBinding.comparison_project_meta_sha256 !== hashFile(projectBinding.comparison_project_meta)) {
+      throw new Error("Expressive comparison project metadata binding is invalid.");
+    }
+  } else {
+    throw new Error(`Unsupported caption preview presentation mode: ${presentationMode}`);
   }
   const evidence = payload.samples.map((sample, index) => {
     const evidencePath = evidencePaths[index];
     if (resolve(dirname(path), sample.preview) !== evidencePath || sample.sha256 !== hashFile(evidencePath)) {
       throw new Error(`Caption preview review page evidence differs at ${sample.label}.`);
     }
-    return { label: sample.label, path: evidencePath, sha256: sample.sha256 };
+    return {
+      label: sample.label,
+      path: evidencePath,
+      sha256: sample.sha256,
+      ...(sample.beat_id ? { beatId: sample.beat_id, variant: sample.variant } : {}),
+    };
   });
+  const comparisonEvidence = presentationMode === "expressive"
+    ? payload.experimental_comparison.samples.map((sample, index) => {
+      const evidencePath = comparisonEvidencePaths[index];
+      if (resolve(dirname(path), sample.preview) !== evidencePath || sample.sha256 !== hashFile(evidencePath)) {
+        throw new Error(`Caption preview comparison evidence differs at ${sample.mode}.`);
+      }
+      return { mode: sample.mode, path: evidencePath, sha256: sample.sha256 };
+    })
+    : null;
   return {
     path,
     sha256: hashFile(path),
     evidence,
+    comparisonEvidence,
+    presentationMode,
+    approvalEvidence,
     timelineId: payload.timeline_id,
     timelineSha256: payload.timeline_sha256,
   };
@@ -428,11 +493,16 @@ try {
       .split(",")
       .map((value) => resolve(value.trim()))
       .filter(Boolean);
+    const comparisonEvidencePaths = String(options.comparisonEvidence ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .map((value) => resolve(value));
     const boundReview = Boolean(state.reviewPage);
-    if ((boundReview && evidencePaths.length !== 4) || (!boundReview && evidencePaths.length < 4)) {
+    if ((boundReview && evidencePaths.length < 1) || (!boundReview && evidencePaths.length < 4)) {
       throw new Error("At least four preview screenshots are required: early, middle, late, and no-caption.");
     }
-    const dimensions = evidencePaths.map((evidencePath) => {
+    const dimensions = [...evidencePaths, ...comparisonEvidencePaths].map((evidencePath) => {
       if (!existsSync(evidencePath) || extname(evidencePath).toLowerCase() !== ".png") {
         throw new Error(`Preview evidence must be an existing PNG: ${evidencePath}`);
       }
@@ -477,7 +547,8 @@ try {
     if (boundReview) {
       assertReviewPageBinding(state);
       reviewBinding = readCaptionReviewPage(
-        requireOption(options, "reviewPage"), state, evidencePaths, timelineBinding,
+        requireOption(options, "reviewPage"), state, evidencePaths, comparisonEvidencePaths,
+        timelineBinding, projectMetaPath,
       );
       evidenceBindings = reviewBinding.evidence;
     } else {
@@ -496,9 +567,17 @@ try {
       reviewPageSha256: reviewBinding?.sha256 ?? null,
       evidence: evidenceBindings,
       evidenceSignature: hashJson(evidenceBindings),
+      presentationMode: reviewBinding?.presentationMode ?? "standard",
+      approvalEvidence: reviewBinding?.approvalEvidence ?? "standard-four",
+      comparisonEvidence: reviewBinding?.comparisonEvidence ?? null,
+      comparisonEvidenceSignature: reviewBinding?.comparisonEvidence
+        ? hashJson(reviewBinding.comparisonEvidence) : null,
     };
     state.approval = null;
-    appendHistory(state, "preview_presented", { evidenceCount: evidencePaths.length });
+    appendHistory(state, "preview_presented", {
+      evidenceCount: evidencePaths.length,
+      comparisonEvidenceCount: comparisonEvidencePaths.length,
+    });
     writeState(statePath, state);
     console.log(nextQuestion(state));
   } else if (command === "adjust") {
@@ -530,12 +609,15 @@ try {
       throw new Error(`Render confirmation is only accepted after preview evidence. Current phase: ${state.phase}`);
     }
     const response = requireOption(options, "response").trim();
+    let approvalDecision = null;
     if (state.preview?.reviewPagePath) {
-      parseCaptionPreviewApproval(response, state.reviewId);
+      approvalDecision = parseCaptionPreviewApproval(
+        response, state.reviewId, state.preview.approvalEvidence,
+      );
     } else if (response !== "确认渲染") {
       throw new Error('Render approval requires the exact user response "确认渲染".');
     }
-    assertPreviewBindings(state.preview);
+    assertPreviewBindings(state.preview, state);
     state.phase = "render_approved";
     state.updatedAt = now();
     state.approval = {
@@ -544,6 +626,10 @@ try {
       recordedAt: now(),
       selectionId: state.selection.choiceId,
       previewEvidenceSignature: state.preview.evidenceSignature,
+      ...(approvalDecision?.karaoke !== undefined ? {
+        karaoke: approvalDecision.karaoke,
+        comparisonEvidenceSignature: state.preview.comparisonEvidenceSignature,
+      } : {}),
     };
     appendHistory(state, "render_approved", { response });
     writeState(statePath, state);
@@ -556,7 +642,15 @@ try {
       throw new Error(`Agent render approval requires preview evidence. Current phase: ${state.phase}`);
     }
     const rationale = requireRationale(options);
-    assertPreviewBindings(state.preview);
+    let karaoke = null;
+    if (state.preview?.presentationMode === "expressive") {
+      const karaokeOption = requireOption(options, "karaoke").trim();
+      if (!new Set(["on", "off"]).has(karaokeOption)) {
+        throw new Error('--karaoke must be exactly "on" or "off" for Expressive approval.');
+      }
+      karaoke = karaokeOption === "on";
+    }
+    assertPreviewBindings(state.preview, state);
     state.phase = "render_approved";
     state.updatedAt = now();
     state.approval = {
@@ -565,6 +659,10 @@ try {
       recordedAt: now(),
       selectionId: state.selection.choiceId,
       previewEvidenceSignature: state.preview.evidenceSignature,
+      ...(karaoke !== null ? {
+        karaoke,
+        comparisonEvidenceSignature: state.preview.comparisonEvidenceSignature,
+      } : {}),
     };
     appendHistory(state, "render_approved", { actor: "agent", rationale });
     writeState(statePath, state);

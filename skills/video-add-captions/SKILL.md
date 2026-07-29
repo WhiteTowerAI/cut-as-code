@@ -71,7 +71,7 @@ are cache. The plan, SRT, decision receipt, and review evidence are durable.
 
 ## Caption Plan
 
-`work/captions/captions-plan.json` is schema V1, targets `overlay`, and uses
+`work/captions/captions-plan.json` is the canonical caption plan, targets `overlay`, and uses
 program time. It records:
 
 - `timeline_id`, `program_duration_s`, and the source transcript path;
@@ -87,6 +87,18 @@ The generator also accepts the old top-level cue array. That is a standalone
 compatibility adapter only; it cannot express timeline provenance or regenerate an
 approved protocol contribution.
 
+Standard is the default presentation mode. Standard plans do not need a
+`presentation` field and must not be migrated merely to add one. Expressive is an
+explicit presentation mode, not a preset: request it with
+`--presentation-mode expressive`. The build step then adds stable cue IDs, default
+word `semantic_role` values, and a draft `presentation` planning shell; it does not
+guess layout variants.
+
+Expressive supports only `bottom-standard` and `center-emphasis`. Read
+`reference/caption-rules.md` before filling the shell. The
+existing renderer consumes only completed `presentation.layout_beats`; it does not
+infer positions or change layout inside a beat.
+
 ## Styles
 
 Maintained presets are `clean`, `minimal`, `social-bold`, `pill`, `boxed`,
@@ -97,6 +109,20 @@ not a separate preset.
 Default delegated choice: `clean`, Karaoke off. Choose a more expressive preset
 only when the destination or footage justifies it. Store job-specific changes in
 an overrides JSON; do not edit the generator for ordinary style feedback.
+
+Expressive supports both `semantic-only` (Karaoke off) and
+`semantic-plus-karaoke` (Karaoke on). Semantic emphasis persists for the full cue
+in both configurations. In coexistence mode, semantic emphasis and the active
+Karaoke word use `style.wordHighlight.activeColor` as their foreground color in
+every highlight mode; a background highlight remains an additional effect. The
+effective scale is `max(semantic scale, karaoke active scale)`, never their
+product. Expressive never renders an underline, including for the compatible
+`contrast` semantic role.
+
+The existing review contract continues to use semantic-only as the primary
+Expressive evidence and binds semantic-plus-karaoke separately. The compatibility
+payload field remains named `experimental_comparison`; do not rename it without an
+approval-protocol migration.
 
 Read:
 
@@ -134,10 +160,31 @@ $Receipt = Join-Path $Work "captions\caption-interaction.json"
 $Review = Join-Path $ProjectRoot "review\05-captions"
 $Cache = Join-Path $Work "cache\captions"
 $PreviewProject = Join-Path $Cache "preview-project"
+$ComparisonProject = Join-Path $Cache "preview-project-expressive-karaoke"
 $OverlayProject = Join-Path $Cache "overlay-project"
 $OverlayFrames = Join-Path $Cache "overlay-frames"
 New-Item -ItemType Directory -Force -Path (Split-Path $Plan),$Review,$Cache | Out-Null
 ```
+
+Before building the caption plan, ask the user to choose the presentation mode
+unless the current request already explicitly selects one. Render the question in
+the user's current conversation language while keeping the `Standard` and
+`Expressive` identifiers untranslated. Keep the English source prompt below in
+this file, present the localized choice in the current session, then
+**Present + STOP**:
+
+```text
+Choose the caption presentation mode:
+
+1. Standard: Uses stable conventional placement and suits most content.
+2. Expressive: Switches between bottom and center placement based on meaning and emphasizes keywords and numbers.
+
+Reply with Standard, Expressive, or "Use the default (Standard)."
+```
+
+Do not run `build_captions.py` until the user responds. If the user explicitly
+delegates the choice in any wording, select Standard. State that Standard was
+selected as the compatibility-preserving default before building the plan.
 
 Build program-time cues and the review SRT:
 
@@ -150,6 +197,34 @@ python "$SkillRoot\scripts\build_captions.py" `
   --source-transcript "understand/transcript.json" `
   --max-chars 42 --max-lines 2 --max-dur 6 --gap 0.6
 ```
+
+After the user selects Standard, the command above produces the unchanged Standard
+plan. After the user selects Expressive, run the same command with:
+
+```powershell
+  --presentation-mode expressive
+```
+
+Before starting style selection or generating a preview, the Agent must plan the
+entire Expressive program in one pass:
+
+1. Read the transcript, available understanding artifacts, canonical timeline,
+   generated caption cues, and any real source-frame evidence needed to justify
+   layout changes.
+2. Fill all `presentation.layout_beats`, annotate exceptional word
+   `semantic_role` values, write one rationale per beat, and write the overall
+   `presentation.planner.rationale`.
+3. Set `presentation.planning_status` to `complete` only after every cue is covered
+   exactly once.
+4. Validate the completed plan before preview generation:
+
+```powershell
+python "$SkillRoot\scripts\build_captions.py" --validate-plan $Plan
+```
+
+Do not ask the user to choose a position cue by cue. The user reviews the existing
+HTML evidence and corrects only a small number of anomalous beats. Starting the
+interaction after planning keeps the existing caption-plan hash binding authoritative.
 
 Start one decision mode. For human mode, publish the maintained offline gallery
 into the project review directory without asking the user to locate a file:
@@ -248,7 +323,18 @@ node "$SkillRoot\scripts\generate_caption_project.mjs" `
 npx.cmd hyperframes check $PreviewProject --at 1 --timeout 10000 --no-contrast
 ```
 
-Build mapped early/middle/late/no-caption evidence. This command captures
+For the primary Expressive review, append `--karaoke false`. Generate the supported
+coexistence comparison from the same source, plan, interaction selection, and timing by changing
+only the output directory and appending `--karaoke true`:
+
+```powershell
+node "$SkillRoot\scripts\generate_caption_project.mjs" `
+  --video $SourceVideo --captions $Plan --out $ComparisonProject `
+  --interaction-state $Receipt --project-root $ProjectRoot `
+  --karaoke true --mode preview
+```
+
+For Standard, build mapped early/middle/late/no-caption evidence. This command captures
 transparent HyperFrames snapshots, maps each program time through
 `timeline.json`, extracts the matching original source frame, and composites the
 two with Pillow:
@@ -260,7 +346,20 @@ python "$SkillRoot\scripts\build_caption_review.py" `
   --interaction-state $Receipt
 ```
 
-The builder writes `captions-review.html` with the four source-backed images. The
+For Expressive, the same builder emits one primary midpoint sample per layout beat,
+one no-caption sample, and a separately bound semantic-only/Karaoke comparison:
+
+```powershell
+python "$SkillRoot\scripts\build_caption_review.py" `
+  --source $SourceVideo --timeline "$Work\timeline.json" --plan $Plan `
+  --project $PreviewProject --comparison-project $ComparisonProject `
+  --cache "$Cache\review-cache" --out $Review --interaction-state $Receipt
+```
+
+The builder writes `captions-review.html` as the one authoritative page. Standard contains
+exactly the four maintained evidence labels. Expressive contains the dynamic layout
+beat evidence, filter controls, image enlargement, no-caption evidence, and the
+separately bound coexistence comparison outside the primary approval count. The
 Agent must open that page with the native command for the host OS; for example,
 set `$EvidenceReviewPage = "$Review\captions-review.html"` and run one of:
 
@@ -276,9 +375,9 @@ open "$EvidenceReviewPage"
 xdg-open "$EvidenceReviewPage"
 ```
 
-If opening fails, diagnose and retry. Inspect all four actual images for
-readability, safe-area placement, clipping, word wrapping, and unwanted pixels in
-`preview-no-caption.png`. Then bind the page and evidence to the receipt:
+If opening fails, diagnose and retry. Inspect every primary image for readability,
+safe-area placement, clipping, word wrapping, stable beat placement, and unwanted
+pixels in `preview-no-caption.png`. Standard binds the maintained four images:
 
 ```powershell
 $Evidence = @(
@@ -294,6 +393,24 @@ node "$SkillRoot\scripts\caption_interaction.mjs" preview-ready `
   --timeline "$Work\timeline.json"
 ```
 
+Expressive binds the dynamic primary count and the separate coexistence pair from
+`captions-evidence.json`:
+
+```powershell
+$EvidenceDocument = Get-Content "$Review\captions-evidence.json" -Raw | ConvertFrom-Json
+$Evidence = @($EvidenceDocument.samples | ForEach-Object {
+  Join-Path $Review $_.preview
+}) -join ","
+$ComparisonEvidence = @($EvidenceDocument.experimental_comparison.samples | ForEach-Object {
+  Join-Path $Review $_.preview
+}) -join ","
+
+node "$SkillRoot\scripts\caption_interaction.mjs" preview-ready `
+  --state $Receipt --project-meta "$PreviewProject\project-meta.json" `
+  --evidence $Evidence --comparison-evidence $ComparisonEvidence `
+  --review-page "$Review\captions-review.html" --timeline "$Work\timeline.json"
+```
+
 In human mode, present the opened page and its images, then **Present + STOP**.
 The human copies one of these structured summaries from the page:
 
@@ -302,6 +419,17 @@ Caption preview review
 Review: <UUID from the opened page>
 Decision: approve
 Evidence: early, middle, late, no-caption
+```
+
+Expressive approval uses the dynamic evidence token and requires the explicit
+Karaoke choice made after inspecting the bound comparison evidence:
+
+```text
+Caption preview review
+Review: <UUID from the opened page>
+Decision: approve
+Evidence: expressive-layout-beats
+Karaoke: on|off
 ```
 
 ```text
@@ -337,16 +465,27 @@ all evidence before presenting the gate again. Never convert human feedback into
 an Agent decision.
 
 In delegated mode, the Agent must inspect the same `captions-review.html` page and
-all four images before recording its own rationale:
+all primary evidence plus any coexistence comparison before recording its own rationale.
+For Standard, keep the existing command unchanged:
 
 ```powershell
 node "$SkillRoot\scripts\caption_interaction.mjs" agent-confirm `
   --state $Receipt `
-  --rationale "Early, middle, late, and no-caption frames are readable and collision-free."
+  --rationale "All bound primary frames are readable and collision-free; coexistence comparison evidence was inspected separately when present."
+```
+
+For Expressive, pass the explicit Karaoke choice made from the comparison:
+
+```powershell
+node "$SkillRoot\scripts\caption_interaction.mjs" agent-confirm `
+  --state $Receipt --karaoke off `
+  --rationale "The semantic-only comparison is clearer for this footage."
 ```
 
 Generate the approved overlay project. This formal render is the only step that
-finalizes `style`, `review`, and hashed runtime assets in the canonical plan:
+finalizes `style`, `review`, and hashed runtime assets in the canonical plan.
+Expressive overlay generation uses the preview-approved Karaoke choice; an
+explicit `--karaoke` value must match that approval:
 
 ```powershell
 node "$SkillRoot\scripts\generate_caption_project.mjs" `

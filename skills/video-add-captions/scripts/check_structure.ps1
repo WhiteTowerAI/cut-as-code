@@ -130,26 +130,37 @@ Assert-CommandOptions $canonical 'caption_interaction.mjs" preview-ready' @(
     '--timeline "$Work\timeline.json"'
 ) "preview-ready"
 
+$presentationStart = $canonical.IndexOf('Before building the caption plan')
+$planStart = $canonical.IndexOf('Build program-time cues and the review SRT:')
 $styleStart = $canonical.IndexOf('`start` prints the authoritative')
 $evidenceStart = $canonical.IndexOf('The builder writes `captions-review.html`')
 $renderStart = $canonical.IndexOf('Generate the approved overlay project.')
-if ($styleStart -lt 0 -or $evidenceStart -le $styleStart -or $renderStart -le $evidenceStart) {
-    Fail-Contract "cannot locate distinct style, evidence, and render workflow segments"
+if ($presentationStart -lt 0 -or $planStart -le $presentationStart -or $styleStart -le $planStart -or
+    $evidenceStart -le $styleStart -or $renderStart -le $evidenceStart) {
+    Fail-Contract "cannot locate distinct presentation, plan, style, evidence, and render workflow segments"
 }
+$presentationFlow = $canonical.Substring($presentationStart, $planStart - $presentationStart)
 $styleFlow = $canonical.Substring($styleStart, $evidenceStart - $styleStart)
 $evidenceFlow = $canonical.Substring($evidenceStart, $renderStart - $evidenceStart)
 
+$presentationStopCount = [regex]::Matches($presentationFlow, 'Present\s*\+\s*STOP').Count
+if ($presentationStopCount -ne 1) {
+    Fail-Contract "presentation mode flow must contain exactly one Present + STOP gate; found $presentationStopCount"
+}
 Assert-NativeOpenFlow $styleFlow 'captions-style-review-<UUID>.html' '$StyleReviewPage' "style review"
 Assert-NativeOpenFlow $evidenceFlow 'captions-review.html' '$EvidenceReviewPage' "evidence review"
-if ([regex]::Matches($canonical, 'Present\s*\+\s*STOP').Count -ne 2) {
-    Fail-Contract "canonical workflow must contain exactly two distinct Present + STOP gates"
+if ([regex]::Matches($canonical, 'Present\s*\+\s*STOP').Count -ne 3) {
+    Fail-Contract "canonical workflow must contain exactly three distinct Present + STOP gates"
 }
 
+Assert-SectionRegex $presentationFlow '(?s)current conversation language.*`Standard`.*`Expressive`.*Reply with Standard, Expressive, or "Use the default \(Standard\)\."' "presentation flow must localize the runtime question while preserving the Standard and Expressive identifiers and English prompt ending"
 Assert-SectionRegex $styleFlow '(?s)authoritative.*captions-style-review-<UUID>\.html.*captions-style-review\.html.*non-authoritative.*latest convenience alias' "style flow must distinguish the authoritative UUID page from the latest alias"
 Assert-SectionRegex $styleFlow '(?s)Caption style review.*Decision:\s*select.*Choice:.*--response\s+\$StyleResponse' "style flow must preserve and pass the structured human summary"
 Assert-SectionRegex $styleFlow '(?s)--decision-mode\s+agent.*--delegation-note.*--no-open\s+true.*agent-select.*--rationale' "style flow must keep delegated Agent selection separate"
 Assert-SectionRegex $evidenceFlow '(?s)Caption preview review.*Decision:\s*approve.*Evidence:\s*early, middle, late, no-caption.*Decision:\s*revise.*--response\s+\$PreviewResponse' "evidence flow must preserve approve and revise summaries"
-Assert-SectionRegex $evidenceFlow '(?s)same `captions-review\.html` page.*agent-confirm.*--rationale' "evidence flow must keep Agent confirmation bound to inspected evidence"
+Assert-SectionRegex $evidenceFlow '(?ms)^```text\s*\r?\nCaption preview review\s*\r?\nReview: <UUID from the opened page>\s*\r?\nDecision: approve\s*\r?\nEvidence: early, middle, late, no-caption\s*\r?\n```' "Standard preview approval summary must remain unchanged"
+Assert-SectionRegex $evidenceFlow '(?s)Evidence:\s*expressive-layout-beats\s*Karaoke:\s*on\|off' "Expressive preview approval must include the strict Karaoke on|off field"
+Assert-SectionRegex $evidenceFlow '(?s)same `captions-review\.html` page.*agent-confirm.*--state\s+\$Receipt.*--karaoke\s+(?:on|off).*--rationale' "Expressive Agent confirmation must bind an explicit Karaoke choice to inspected evidence"
 Assert-SectionRegex $decisionModes '(?s)source,\s*plan,\s*timeline,\s*style,\s*override,\s*project metadata,\s*review page,\s*or evidence.*invalidates approval' "Decision Modes must state complete approval invalidation"
 Assert-SectionRegex $compatibility 'Standalone exact ID and skip responses are legacy compatibility only\.' "legacy ID/skip behavior must remain in Compatibility"
 Assert-SectionRegex $selfCheck '(?s)HTML generation alone is not success.*Inspect actual pixels and the final delivery' "Self Check must require pixel and delivery inspection"

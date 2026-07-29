@@ -29,6 +29,7 @@
     #review-status { color: var(--muted); white-space: nowrap; }
     #review-form { display: grid; gap: 1px; margin-top: 24px; background: var(--line); border: 1px solid var(--line); }
     .evidence-row { display: grid; grid-template-columns: minmax(150px, .55fr) minmax(320px, 1.45fr); gap: 20px; padding: 20px; background: var(--surface); }
+    .evidence-row[hidden] { display: none; }
     .evidence-meta { display: grid; align-content: start; gap: 10px; }
     .check-label { display: flex; align-items: center; gap: 10px; font-weight: 700; text-transform: capitalize; }
     .check-label input { inline-size: 20px; block-size: 20px; accent-color: var(--accent); }
@@ -37,6 +38,18 @@
     dd { margin: 0; overflow-wrap: anywhere; }
     .preview-button { min-height: 0; padding: 0; border: 0; background: #000; aspect-ratio: 16 / 9; overflow: hidden; }
     .preview-button img { display: block; width: 100%; height: 100%; object-fit: contain; }
+    .expressive-review .preview-button { aspect-ratio: auto; }
+    .expressive-review .preview-button img { height: auto; max-height: 720px; }
+    .expressive-controls, .comparison { margin-top: 24px; padding: 18px; border: 1px solid var(--line); background: var(--band); }
+    .expressive-controls h2, .comparison h2 { margin: 0 0 6px; font-size: 17px; }
+    .expressive-controls p, .comparison p { margin: 0; color: var(--muted); }
+    .filters { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .filter-button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+    .variant-chip { width: max-content; border: 1px solid var(--line); padding: 2px 7px; color: var(--accent); font-size: 12px; font-weight: 800; }
+    .warning-text { color: var(--warning); }
+    .comparison-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+    .comparison-card { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--line); background: var(--surface); }
+    .comparison-card h3 { margin: 0; font-size: 15px; }
     .decision { display: grid; grid-template-columns: minmax(240px, .7fr) minmax(320px, 1.3fr); gap: 24px; padding: 24px 0; }
     fieldset { min-width: 0; margin: 0; border: 1px solid var(--line); padding: 16px; }
     legend { padding: 0 6px; font-weight: 700; }
@@ -59,6 +72,7 @@
       .toolbar { align-items: flex-start; flex-direction: column; gap: 2px; }
       .actions { flex-direction: column; }
       #copy-summary, #summary-output { width: 100%; }
+      .comparison-grid { grid-template-columns: 1fr; }
     }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }
   </style>
@@ -71,9 +85,31 @@
     </header>
   </div>
   <main class="shell">
+    <section id="expressive-controls" class="expressive-controls" hidden>
+      <h2>Expressive layout beat evidence</h2>
+      <p>Review the complete Agent plan, then request only the beat-specific corrections that are needed.</p>
+      <div class="filters" aria-label="Filter layout beat evidence">
+        <button class="filter-button" type="button" data-filter="all" aria-pressed="true">All</button>
+        <button class="filter-button" type="button" data-filter="bottom-standard" aria-pressed="false">Bottom standard</button>
+        <button class="filter-button" type="button" data-filter="center-emphasis" aria-pressed="false">Center emphasis</button>
+        <button class="filter-button" type="button" data-filter="warnings" aria-pressed="false">Warnings</button>
+      </div>
+    </section>
     <form id="review-form">
       <div id="evidence-list"></div>
     </form>
+    <section id="comparison" class="comparison" hidden>
+      <h2>Semantic + Karaoke comparison</h2>
+      <p id="comparison-summary"></p>
+      <div id="comparison-grid" class="comparison-grid"></div>
+      <fieldset id="karaoke-choice">
+        <legend>Final Karaoke</legend>
+        <div class="radio-row">
+          <label><input type="radio" name="karaoke" value="off"> Karaoke off</label>
+          <label><input type="radio" name="karaoke" value="on"> Karaoke on</label>
+        </div>
+      </fieldset>
+    </section>
     <section class="decision">
       <fieldset>
         <legend>Decision</legend>
@@ -99,7 +135,8 @@
   <script>
     const REVIEW_DATA_B64 = "__CAPTION_EVIDENCE_REVIEW_DATA__";
     const reviewData = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(REVIEW_DATA_B64), c => c.charCodeAt(0))));
-    const labels = ["early", "middle", "late", "no-caption"];
+    const isExpressive = reviewData.presentation_mode === "expressive";
+    const labels = reviewData.samples.map(sample => sample.label);
     const form = document.querySelector("#review-form");
     const list = document.querySelector("#evidence-list");
     const status = document.querySelector("#review-status");
@@ -109,12 +146,41 @@
     const errors = document.querySelector("#review-errors");
     const dialog = document.querySelector("#preview-dialog");
     const dialogImage = document.querySelector("#dialog-image");
+    const expressiveControls = document.querySelector("#expressive-controls");
+    const comparisonSection = document.querySelector("#comparison");
+    const comparisonSummary = document.querySelector("#comparison-summary");
+    const comparisonGrid = document.querySelector("#comparison-grid");
     let lastTrigger = null;
 
     const time = value => `${Number(value).toFixed(3)}s`;
+    const addDetail = (details, name, value, className = "") => {
+      const term = document.createElement("dt");
+      term.textContent = name;
+      const description = document.createElement("dd");
+      description.textContent = value;
+      if (className) description.className = className;
+      details.append(term, description);
+    };
+    const bindPreview = (preview, image, source, alt) => {
+      image.src = source;
+      image.alt = alt;
+      preview.append(image);
+      preview.addEventListener("click", () => {
+        lastTrigger = preview;
+        dialogImage.src = source;
+        dialogImage.alt = alt;
+        dialog.showModal();
+      });
+    };
+    if (isExpressive) {
+      document.body.classList.add("expressive-review");
+      expressiveControls.hidden = false;
+    }
     for (const sample of reviewData.samples) {
       const row = document.createElement("article");
       row.className = "evidence-row";
+      row.dataset.variant = sample.variant || "none";
+      row.dataset.warning = sample.warnings?.length ? "true" : "false";
       const meta = document.createElement("div");
       meta.className = "evidence-meta";
       const checkLabel = document.createElement("label");
@@ -123,14 +189,29 @@
       checkbox.type = "checkbox";
       checkbox.name = "evidence";
       checkbox.value = sample.label;
-      checkLabel.append(checkbox, document.createTextNode(sample.label));
+      checkLabel.append(checkbox, document.createTextNode(sample.beat_id || sample.label));
+      if (sample.variant) {
+        const chip = document.createElement("span");
+        chip.className = "variant-chip";
+        chip.textContent = sample.variant;
+        meta.append(chip);
+      }
       const details = document.createElement("dl");
-      for (const [name, value] of [["Program", time(sample.program_s)], ["Source", time(sample.source_s)], ["Cue", sample.cue_text || "None"]]) {
-        const term = document.createElement("dt");
-        term.textContent = name;
-        const description = document.createElement("dd");
-        description.textContent = value;
-        details.append(term, description);
+      if (isExpressive && sample.kind === "layout-beat") {
+        addDetail(details, "Beat", sample.beat_id);
+        addDetail(details, "Variant", sample.variant);
+        addDetail(details, "Cue IDs", sample.cue_ids.join(", "));
+        addDetail(details, "Program", time(sample.program_s));
+        addDetail(details, "Source", time(sample.source_s));
+        addDetail(details, "Displayed", sample.displayed_text || "None");
+        addDetail(details, "Emphasized", sample.emphasized_words?.join(", ") || "None");
+        addDetail(details, "Warnings", sample.warnings?.join(" ") || "None", sample.warnings?.length ? "warning-text" : "");
+        addDetail(details, "SHA-256", sample.sha256);
+      } else {
+        addDetail(details, "Program", time(sample.program_s));
+        addDetail(details, "Source", time(sample.source_s));
+        addDetail(details, "Cue", sample.cue_text || "None");
+        addDetail(details, "SHA-256", sample.sha256);
       }
       meta.append(checkLabel, details);
       const preview = document.createElement("button");
@@ -138,34 +219,71 @@
       preview.className = "preview-button";
       preview.setAttribute("aria-label", `Enlarge ${sample.label} preview`);
       const image = document.createElement("img");
-      image.src = sample.preview;
-      image.alt = `${sample.label} composited caption evidence`;
-      preview.append(image);
-      preview.addEventListener("click", () => {
-        lastTrigger = preview;
-        dialogImage.src = sample.preview;
-        dialogImage.alt = image.alt;
-        dialog.showModal();
-      });
+      bindPreview(preview, image, sample.preview, `${sample.label} composited caption evidence`);
       row.append(meta, preview);
       list.append(row);
     }
 
+    if (isExpressive && reviewData.experimental_comparison) {
+      const comparison = reviewData.experimental_comparison;
+      comparisonSection.hidden = false;
+      comparisonSummary.textContent = `Supported coexistence evidence; separately bound from the ${labels.length}-frame primary approval count. Beat ${comparison.beat_id}, ${comparison.variant}, ${time(comparison.program_s)} program / ${time(comparison.source_s)} source.`;
+      for (const sample of comparison.samples) {
+        const card = document.createElement("article");
+        card.className = "comparison-card";
+        const heading = document.createElement("h3");
+        heading.textContent = sample.karaoke ? "Semantic emphasis + Karaoke on" : "Semantic emphasis only (Karaoke off)";
+        const hash = document.createElement("code");
+        hash.textContent = sample.sha256;
+        const preview = document.createElement("button");
+        preview.type = "button";
+        preview.className = "preview-button";
+        preview.setAttribute("aria-label", `Enlarge ${sample.mode} comparison`);
+        const image = document.createElement("img");
+        bindPreview(preview, image, sample.preview, `${sample.mode} comparison`);
+        card.append(heading, preview, hash);
+        comparisonGrid.append(card);
+      }
+    }
+
+    for (const button of document.querySelectorAll(".filter-button")) {
+      button.addEventListener("click", () => {
+        const filter = button.dataset.filter;
+        for (const candidate of document.querySelectorAll(".filter-button")) {
+          candidate.setAttribute("aria-pressed", String(candidate === button));
+        }
+        for (const row of document.querySelectorAll(".evidence-row")) {
+          row.hidden = filter !== "all"
+            && !(filter === "warnings" ? row.dataset.warning === "true" : row.dataset.variant === filter);
+        }
+      });
+    }
+
     const summary = () => {
       const decision = form.ownerDocument.querySelector('input[name="decision"]:checked').value;
-      return decision === "approve"
-        ? `Caption preview review\nReview: ${reviewData.review_id}\nDecision: approve\nEvidence: early, middle, late, no-caption`
-        : `Caption preview review\nReview: ${reviewData.review_id}\nDecision: revise\nChanges: ${changes.value.trim()}`;
+      if (decision === "revise") {
+        return `Caption preview review\nReview: ${reviewData.review_id}\nDecision: revise\nChanges: ${changes.value.trim()}`;
+      }
+      const approval = `Caption preview review\nReview: ${reviewData.review_id}\nDecision: approve\nEvidence: ${isExpressive ? "expressive-layout-beats" : "early, middle, late, no-caption"}`;
+      const karaokeChoice = document.querySelector('input[name="karaoke"]:checked');
+      return isExpressive && karaokeChoice ? `${approval}\nKaraoke: ${karaokeChoice.value}` : approval;
     };
     const update = () => {
       const checked = [...form.querySelectorAll('input[name="evidence"]:checked')];
       const decision = document.querySelector('input[name="decision"]:checked').value;
-      const valid = decision === "approve" ? checked.length === labels.length : Boolean(changes.value.trim());
+      const karaokeChoice = document.querySelector('input[name="karaoke"]:checked');
+      const valid = decision === "approve"
+        ? checked.length === labels.length && (!isExpressive || Boolean(karaokeChoice))
+        : Boolean(changes.value.trim());
       status.textContent = `${checked.length}/${labels.length} checked`;
       changes.disabled = decision !== "revise";
       copyButton.disabled = !valid;
       output.textContent = summary();
-      errors.textContent = valid ? "" : decision === "approve" ? "Check all four evidence frames to approve." : "Describe the requested changes.";
+      errors.textContent = valid ? "" : decision === "revise"
+        ? "Describe the requested changes."
+        : checked.length !== labels.length
+          ? `Check all ${labels.length} primary evidence frames to approve.`
+          : "Choose Karaoke off or on to approve the Expressive preview.";
     };
     document.addEventListener("input", update);
     document.addEventListener("change", update);
