@@ -383,7 +383,7 @@ def _asset_references(path, text):
         ))
     if path.suffix.lower() in {".js", ".mjs", ".html", ".htm"}:
         references.extend(re.findall(
-            r"(?:\bimport\s+(?:[^;]*?\s+from\s+)?|\brequire\s*\()[\s\"']*([^\s\"')]+)",
+            r"(?:\bimport\s+(?:[^;]*?\s+from\s+)?|\brequire\s*\()\s*[\"']([^\"']+)[\"']",
             text,
         ))
         references.extend(re.findall(

@@ -953,7 +953,10 @@ def check_graphic_motion_compiler_consistency():
         projectlib._validate_graphic_motion_plan(
             plan, operation, [render], timeline, errors, root, project={},
         )
-        assert "graphic-motion plan schema_version must be 1" in errors, errors
+        assert (
+            "graphic-motion plan schema_version must be 2; regenerate and re-review schema v1 plans"
+            in errors
+        ), errors
         assert "graphic-motion decision receipt is invalid" in errors, errors
 
         source.write_text("mutated", encoding="utf-8")

@@ -786,6 +786,16 @@ class GraphicMotionPlanTests(unittest.TestCase):
                 )
         self.assertTrue(outside.is_file())
 
+    def test_port_preflight_ignores_import_word_inside_runtime_strings(self):
+        cue = copy.deepcopy(self.plan["cues"][0])
+        runtime_path = self.root / cue["port"]["runtime_assets"][0]["path"]
+        runtime_path.write_text(
+            'console.warn("import splitText() directly")', encoding="utf-8",
+        )
+        cue["port"]["runtime_assets"][0] = self._binding(runtime_path)
+
+        self.assertEqual([], graphic_motion_plan.validate_port(cue, self.root))
+
     def test_bindings_must_use_project_relative_paths(self):
         cue = copy.deepcopy(self.plan["cues"][0])
         cue["port"]["files"][0]["path"] = str(
