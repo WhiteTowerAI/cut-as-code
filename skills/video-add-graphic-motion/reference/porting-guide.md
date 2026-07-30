@@ -5,6 +5,11 @@ changes are content binding, timeline sizing/placement, transparency, local asse
 deterministic timing, recorded random seeds, selector namespacing, and uniform retiming.
 Record them in `adaptation.patch` and `change_categories`.
 
+The selected source owns the runtime. Record it as `source.runtime`; `port.motion_model` must
+match its HyperFrames adapter (`canvas`, `webgl`, `lottie`, and `typegpu` use `hf-seek`). Do not translate Anime.js to WAAPI/GSAP/CSS or otherwise replace the source runtime. If
+the original runtime cannot become deterministic without losing signature structure or
+choreography, reject that candidate and search again.
+
 | Source behavior | Native HyperFrames mapping |
 | --- | --- |
 | Finite CSS animation | Finite CSS adapter animation with explicit fill state; add `data-no-timeline` to a CSS-only root |
@@ -44,12 +49,20 @@ Run `graphic_motion_plan.validate_port(cue, project_root)` before HyperFrames op
 This is a static fail-closed preflight, not an execution sandbox.
 
 Run `npx hyperframes check`, snapshot the first visible, key interaction, final-minus-hold,
-and final poses at strictly increasing cue-local times, save a normalized
+and final poses at strictly increasing cue-local times, run `npx hyperframes keyframes` and one
+focused `--shot`, save a normalized
 `{status: "pass", composition_id: cue-id}` check receipt,
 then render the transparent sequence. Bind every contiguous RGBA PNG at the media-probe
 dimensions; frame count is `ceil(duration * fps_num / fps_den)`. Review those pixels over the actual
 upstream video, not on transparency alone. Source fidelity, three composites, and four snapshots
 must be eight distinct files with distinct SHA-256 values.
+
+Freeze an actual official or isolated-browser source screenshot as `source.preview` beside the
+source files. Build the source-fidelity comparison from that image and a port snapshot at the
+same normalized cue time: source pixels unscaled on the left, port pixels unscaled on the right,
+RGB PNG, top-aligned, with black padding below the shorter image. Bind those two inputs and the
+normalized time in `review.evidence.source_fidelity_inputs`. Metadata text or port pixels alone
+are not source evidence.
 
 Use [the CSS port fixture](../examples/hyperframes-port/index.html) only as a technical
 contract example: sized transparent root, rational FPS, finite seekable animation, and local

@@ -10,8 +10,9 @@ intent before search; generic entrances, loaders, and decorations are invalid. H
 owns seeking, alpha, exact FPS, checks, snapshots, and PNG rendering.
 
 **REQUIRED SUB-SKILLS:** Use `video-understand` first. Use `hyperframes`,
-`hyperframes-core`, `hyperframes-animation`, `hyperframes-creative`, and
-`hyperframes-cli` for every port and render.
+`hyperframes-core`, `hyperframes-animation`, `hyperframes-keyframes`, and
+`hyperframes-cli` for every port and render. Use `hyperframes-creative` only before
+source selection; the selected source owns the later visual design and runtime.
 
 Read [source-catalog.md](reference/source-catalog.md),
 [porting-guide.md](reference/porting-guide.md), and
@@ -32,16 +33,21 @@ Read [source-catalog.md](reference/source-catalog.md),
    `work/cache/graphic-motion/source/<cue-id>/`. Missing/disallowed license means skip; never
    infer it from a parent. Require an immutable hex revision, official
    catalog URL, hashed local `LICENSE`/`NOTICE` whose bytes match the declared SPDX license,
-   and attribution. For `motion-anything`, the license URL must be beside the selected recipe.
+   and attribution. Freeze a real official or isolated-browser source preview; never synthesize
+   it from metadata or port pixels. For `motion-anything`, the license URL must be beside the selected recipe.
 5. Statically inspect; never execute downloaded code. Minimally port under
    `work/cache/graphic-motion/hyperframes/<cue-id>/`. Keep runtime assets local and hashed.
+   Load the selected runtime's `hyperframes-animation` adapter. Preserve that runtime, DOM/SVG
+   hierarchy, easing, and choreography; if determinism requires replacing them, reject the source.
    Before browser use, run `validate_port`; reject remote/undeclared code or redesigns.
 6. Follow [hyperframes-port/index.html](examples/hyperframes-port/index.html). Run HyperFrames
-   `check` and representative `snapshot` checks. Render an RGBA PNG sequence at timeline
+   `check`, `keyframes`, one focused `--shot`, and representative `snapshot` checks. Render an RGBA PNG sequence at timeline
    dimensions and exact rational FPS; bind every contiguous frame. Do not add a custom
    ready gate, iframe bridge, clock, copier, or renderer. CSS-only roots declare
    `data-no-timeline`; every browser asset is local and hashed.
-7. Bind a source-versus-port image, first/middle/last composites, normalized HyperFrames check
+7. Build the source-versus-port image from the frozen `source.preview` and an actual port
+   snapshot at the same normalized cue time using the exact side-by-side format in the porting
+   guide. Bind it with first/middle/last composites and the normalized HyperFrames check
    receipt, and distinct `first-visible`, `key-interaction`, `final-minus-hold`, and `final`
    snapshots. Store each snapshot's strictly increasing cue-local time; all eight review images
    require unique paths and SHA-256 values. Record truthful human or delegated Agent authority,
@@ -60,3 +66,5 @@ cut -> color-grade -> b-roll -> graphic-motion -> content-cards -> captions
 ```
 
 The compiler re-hashes the plan and bindings. Mutations require re-review and a new revision.
+Schema v2 deliberately rejects v1 plans because v1 lacks source-runtime and source-pixel
+provenance; regenerate and re-review them rather than migrating approval receipts.

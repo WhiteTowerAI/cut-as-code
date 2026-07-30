@@ -128,6 +128,9 @@ class GraphicMotionPlanTests(unittest.TestCase):
             "work/cache/graphic-motion/source/gm-001/LICENSE",
             MIT_LICENSE,
         )
+        source_preview = self._image(
+            "work/cache/graphic-motion/source/gm-001/source-preview.png"
+        )
         port = self._file(
             "work/cache/graphic-motion/hyperframes/gm-001/index.html",
             b"<div data-composition-id='gm-001'><div class='signal'></div></div>",
@@ -141,7 +144,6 @@ class GraphicMotionPlanTests(unittest.TestCase):
             )
             for index in range(1, 61)
         ]
-        source_fidelity = self._image("review/04-graphic-motion/source-fidelity.png")
         composite_first = self._image("review/04-graphic-motion/composite-first.png")
         composite_middle = self._image("review/04-graphic-motion/composite-middle.png")
         composite_last = self._image("review/04-graphic-motion/composite-last.png")
@@ -149,6 +151,9 @@ class GraphicMotionPlanTests(unittest.TestCase):
             "status": "pass", "composition_id": "gm-001",
         })
         snapshots = [self._image(f"review/04-graphic-motion/snapshot-{index}.png") for index in range(1, 5)]
+        source_fidelity = self._source_fidelity(
+            "review/04-graphic-motion/source-fidelity.png", source_preview, snapshots[1],
+        )
         review_evidence = {
             "source_fidelity": self._binding(source_fidelity),
             "composite_first": self._binding(composite_first),
@@ -163,6 +168,11 @@ class GraphicMotionPlanTests(unittest.TestCase):
                     snapshots,
                 )
             ],
+            "source_fidelity_inputs": {
+                "source_preview": self._binding(source_preview),
+                "port_snapshot": self._binding(snapshots[1]),
+                "normalized_time": 0.4,
+            },
         }
         review_rationale = "The port matches the source and reads over final pixels."
         receipt = self._json("review/04-graphic-motion/review.json", {
@@ -181,7 +191,9 @@ class GraphicMotionPlanTests(unittest.TestCase):
         ]
         bindings = [
             *input_bindings,
-            *[self._binding(item) for item in (source, license_file, port, patch, runtime)],
+            *[self._binding(item) for item in (
+                source, license_file, source_preview, port, patch, runtime,
+            )],
             *[self._binding(item) for item in frames],
             *[review_evidence[key] for key in graphic_motion_plan.REVIEW_IMAGE_KEYS],
             review_evidence["hyperframes_check"],
@@ -190,7 +202,7 @@ class GraphicMotionPlanTests(unittest.TestCase):
         ]
 
         self.plan = {
-            "schema_version": 1,
+            "schema_version": 2,
             "timeline_id": "main",
             "timebase": "program",
             "program_duration_s": 8.0,
@@ -258,14 +270,20 @@ class GraphicMotionPlanTests(unittest.TestCase):
                 "source": {
                     "candidate_id": "candidate-selected",
                     "catalog_id": "motion-anything",
+                    "runtime": "css",
                     "url": "https://github.com/nexu-io/motion-anything/blob/0123456789abcdef/recipes/signal/original.html",
                     "revision": "0123456789abcdef",
                     "license": "MIT",
                     "license_url": "https://github.com/nexu-io/motion-anything/blob/0123456789abcdef/recipes/signal/LICENSE",
                     "license_file": self._binding(license_file),
+                    "preview": self._binding(source_preview),
                     "attribution": "MIT License, copyright nexu-io contributors.",
                     "retrieved_at": "2026-07-28T00:06:00Z",
-                    "files": [self._binding(source), self._binding(license_file)],
+                    "files": [
+                        self._binding(source),
+                        self._binding(license_file),
+                        self._binding(source_preview),
+                    ],
                 },
                 "port": {
                     "composition_id": "gm-001",
@@ -316,6 +334,20 @@ class GraphicMotionPlanTests(unittest.TestCase):
         if rgba:
             image.putpixel((8, 4), (255, 255, 255, 192))
         image.save(path)
+        return path
+
+    def _source_fidelity(self, relative, source_path, port_path):
+        path = self.root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with Image.open(source_path) as source_image, Image.open(port_path) as port_image:
+            source = source_image.convert("RGB")
+            port = port_image.convert("RGB")
+            image = Image.new(
+                "RGB", (source.width + port.width, max(source.height, port.height)), "black",
+            )
+            image.paste(source, (0, 0))
+            image.paste(port, (source.width, 0))
+            image.save(path)
         return path
 
     @staticmethod
@@ -407,6 +439,83 @@ class GraphicMotionPlanTests(unittest.TestCase):
         plan["cues"][0]["source"]["license"] = "Hippocratic-2.1"
         with self.assertRaisesRegex(ValueError, "source license is not permitted"):
             graphic_motion_plan.register_operation(self.project, plan, self.timeline, self.root)
+
+    def test_port_must_preserve_selected_source_runtime(self):
+        plan = copy.deepcopy(self.plan)
+        plan["cues"][0]["source"]["runtime"] = "anime"
+        plan["cues"][0]["port"]["motion_model"] = "waapi"
+        self.assertIn(
+            "gm-001 port motion model does not match source runtime adapter",
+            graphic_motion_plan.validate_plan(plan, self.timeline),
+        )
+
+    def test_source_runtime_maps_to_hyperframes_adapter(self):
+        plan = copy.deepcopy(self.plan)
+        plan["cues"][0]["source"]["runtime"] = "canvas"
+        plan["cues"][0]["port"]["motion_model"] = "hf-seek"
+        self.assertEqual([], graphic_motion_plan.validate_plan(plan, self.timeline))
+
+    def test_schema_v1_plan_requires_regeneration(self):
+        plan = copy.deepcopy(self.plan)
+        plan["schema_version"] = 1
+        self.assertIn(
+            "plan schema_version must be 2; regenerate and re-review schema v1 plans",
+            graphic_motion_plan.validate_plan(plan, self.timeline),
+        )
+
+    def test_source_fidelity_requires_bound_inputs(self):
+        plan = copy.deepcopy(self.plan)
+        plan["cues"][0]["review"]["evidence"].pop("source_fidelity_inputs")
+        self.assertIn(
+            "gm-001 source fidelity inputs are invalid",
+            graphic_motion_plan.validate_plan(
+                plan, self.timeline, project=self.project,
+                project_root=self.root, verify_files=True,
+            ),
+        )
+
+    def test_source_fidelity_must_match_bound_pixels(self):
+        fidelity_path = self.root / self.plan["cues"][0]["review"]["evidence"]["source_fidelity"]["path"]
+        Image.new("RGB", (32, 9), "white").save(fidelity_path)
+        self.assertIn(
+            "gm-001 source fidelity comparison does not match bound pixels",
+            graphic_motion_plan.validate_plan(
+                self.plan, self.timeline, project=self.project,
+                project_root=self.root, verify_files=True,
+            ),
+        )
+
+    def test_source_runtime_and_preview_are_required(self):
+        plan = copy.deepcopy(self.plan)
+        plan["cues"][0]["source"].pop("runtime")
+        plan["cues"][0]["source"].pop("preview")
+        errors = graphic_motion_plan.validate_plan(
+            plan, self.timeline, project=self.project,
+            project_root=self.root, verify_files=True,
+        )
+        self.assertIn("gm-001 source runtime is required", errors)
+        self.assertIn("gm-001 frozen source preview is required", errors)
+
+    def test_source_preview_must_be_a_real_image(self):
+        plan = copy.deepcopy(self.plan)
+        source = plan["cues"][0]["source"]
+        preview_path = self.root / source["preview"]["path"]
+        preview_path.write_bytes(b"not an image")
+        preview = self._binding(preview_path)
+        source["preview"] = preview
+        source["files"][-1] = preview
+        source_index = next(
+            index for index, item in enumerate(plan["delivery_bindings"])
+            if item["path"] == preview["path"]
+        )
+        plan["delivery_bindings"][source_index] = preview
+        self.assertIn(
+            "gm-001 frozen source preview is invalid",
+            graphic_motion_plan.validate_plan(
+                plan, self.timeline, project=self.project,
+                project_root=self.root, verify_files=True,
+            ),
+        )
 
     def test_rejects_unlicensed_remote_or_nondeterministic_ports(self):
         plan = copy.deepcopy(self.plan)
@@ -996,6 +1105,9 @@ class GraphicMotionPlanTests(unittest.TestCase):
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn("Do not ask the user to find candidates", skill)
         self.assertIn("high-craft", skill)
+        self.assertIn("hyperframes-keyframes", skill)
+        self.assertIn("only before\nsource selection", skill)
+        self.assertIn("Load the selected runtime's `hyperframes-animation` adapter", skill)
 
     def test_shipped_hyperframes_port_fixture_declares_seekable_rgba_contract(self):
         fixture = ROOT / "examples/hyperframes-port/index.html"
@@ -1024,6 +1136,7 @@ class GraphicMotionPlanTests(unittest.TestCase):
             [binding["path"] for binding in example["delivery_bindings"][:5]],
         )
         cue = example["cues"][0]
+        self.assertEqual(2, example["schema_version"])
         self.assertEqual(
             example["input_hashes"]["contact_sheet_sha256"],
             cue["evidence"]["visual_refs"][0]["sha256"],
@@ -1034,12 +1147,17 @@ class GraphicMotionPlanTests(unittest.TestCase):
         )
         self.assertEqual(2, len(cue["search"]["candidates"]))
         self.assertIn(cue["source"]["license_file"], cue["source"]["files"])
+        self.assertIn(cue["source"]["preview"], cue["source"]["files"])
+        self.assertEqual(
+            cue["source"]["preview"],
+            cue["review"]["evidence"]["source_fidelity_inputs"]["source_preview"],
+        )
         self.assertIn("/recipes/signal/LICENSE", cue["source"]["license_url"])
         self.assertEqual(12, len(cue["render"]["frames"]))
         self.assertEqual(
             {
                 *graphic_motion_plan.REVIEW_IMAGE_KEYS,
-                "hyperframes_check", "hyperframes_snapshots",
+                "hyperframes_check", "hyperframes_snapshots", "source_fidelity_inputs",
             },
             set(cue["review"]["evidence"]),
         )

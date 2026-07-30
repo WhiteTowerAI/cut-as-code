@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "timeline_id": "main",
   "timebase": "program",
   "program_duration_s": 30.0,
@@ -26,6 +26,7 @@
     {"path": "review/00-video-understanding/contact-sheet.jpg", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
     {"path": "work/cache/graphic-motion/source/gm-001/original.html", "sha256": "4444444444444444444444444444444444444444444444444444444444444444"},
     {"path": "work/cache/graphic-motion/source/gm-001/LICENSE", "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"},
+    {"path": "work/cache/graphic-motion/source/gm-001/source-preview.png", "sha256": "abababababababababababababababababababababababababababababababab"},
     {"path": "work/cache/graphic-motion/hyperframes/gm-001/index.html", "sha256": "5555555555555555555555555555555555555555555555555555555555555555"},
     {"path": "work/cache/graphic-motion/hyperframes/gm-001/adaptation.patch", "sha256": "6666666666666666666666666666666666666666666666666666666666666666"},
     {"path": "work/cache/graphic-motion/hyperframes/gm-001/gsap.min.js", "sha256": "7777777777777777777777777777777777777777777777777777777777777777"},
@@ -116,16 +117,19 @@
       "source": {
         "candidate_id": "candidate-selected",
         "catalog_id": "motion-anything",
+        "runtime": "gsap",
         "url": "https://github.com/nexu-io/motion-anything/blob/0123456789abcdef/recipes/signal/recipe.html",
         "revision": "0123456789abcdef",
         "license": "MIT",
         "license_url": "https://github.com/nexu-io/motion-anything/blob/0123456789abcdef/recipes/signal/LICENSE",
         "license_file": {"path": "work/cache/graphic-motion/source/gm-001/LICENSE", "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"},
+        "preview": {"path": "work/cache/graphic-motion/source/gm-001/source-preview.png", "sha256": "abababababababababababababababababababababababababababababababab"},
         "attribution": "MIT License, copyright nexu-io contributors.",
         "retrieved_at": "2026-07-28T00:06:00Z",
         "files": [
           {"path": "work/cache/graphic-motion/source/gm-001/original.html", "sha256": "4444444444444444444444444444444444444444444444444444444444444444"},
-          {"path": "work/cache/graphic-motion/source/gm-001/LICENSE", "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}
+          {"path": "work/cache/graphic-motion/source/gm-001/LICENSE", "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"},
+          {"path": "work/cache/graphic-motion/source/gm-001/source-preview.png", "sha256": "abababababababababababababababababababababababababababababababab"}
         ]
       },
       "port": {
@@ -180,7 +184,12 @@
             {"pose": "key-interaction", "at_s": 0.16, "file": {"path": "review/04-graphic-motion/snapshot-2.png", "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}},
             {"pose": "final-minus-hold", "at_s": 0.36, "file": {"path": "review/04-graphic-motion/snapshot-3.png", "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}},
             {"pose": "final", "at_s": 0.46, "file": {"path": "review/04-graphic-motion/snapshot-4.png", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"}}
-          ]
+          ],
+          "source_fidelity_inputs": {
+            "source_preview": {"path": "work/cache/graphic-motion/source/gm-001/source-preview.png", "sha256": "abababababababababababababababababababababababababababababababab"},
+            "port_snapshot": {"path": "review/04-graphic-motion/snapshot-2.png", "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},
+            "normalized_time": 0.32
+          }
         },
         "receipt": {"path": "review/04-graphic-motion/gm-001-review.json", "sha256": "7777777777777777777777777777777777777777777777777777777777777777"}
       }

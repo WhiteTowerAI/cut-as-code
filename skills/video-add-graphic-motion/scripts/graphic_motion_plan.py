@@ -49,6 +49,20 @@ LICENSE_MARKERS = {
     "CC0-1.0": ("cc0 1.0 universal", "copyright and related rights", "affirmer"),
 }
 MOTION_MODELS = {"css", "waapi", "anime", "gsap", "three", "hf-seek"}
+SOURCE_RUNTIMES = {
+    "css", "waapi", "anime", "gsap", "lottie", "three", "typegpu", "canvas", "webgl",
+}
+SOURCE_RUNTIME_ADAPTERS = {
+    "css": "css",
+    "waapi": "waapi",
+    "anime": "anime",
+    "gsap": "gsap",
+    "lottie": "hf-seek",
+    "three": "three",
+    "typegpu": "hf-seek",
+    "canvas": "hf-seek",
+    "webgl": "hf-seek",
+}
 CHANGE_CATEGORIES = {"content", "geometry", "transparency", "local-assets", "timing", "seed", "selectors"}
 REMOTE_CODE_PATTERN = (
     r"https?://|//[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?:[/:]|\b)|\bfetch\s*\(|"
@@ -414,6 +428,28 @@ def _valid_image(path, *, size=None, rgba=False):
         return False, None
 
 
+def _source_fidelity_matches(comparison_path, source_path, port_path):
+    try:
+        with Image.open(source_path) as source_image, Image.open(port_path) as port_image:
+            source = source_image.convert("RGB")
+            port = port_image.convert("RGB")
+            expected = Image.new(
+                "RGB", (source.width + port.width, max(source.height, port.height)), "black",
+            )
+            expected.paste(source, (0, 0))
+            expected.paste(port, (source.width, 0))
+        with Image.open(comparison_path) as comparison:
+            comparison.load()
+            return (
+                comparison.format == "PNG"
+                and comparison.mode == "RGB"
+                and comparison.size == expected.size
+                and comparison.tobytes() == expected.tobytes()
+            )
+    except (OSError, UnidentifiedImageError, ValueError):
+        return False
+
+
 def _timestamp(value):
     return _parsed_timestamp(value) is not None
 
@@ -749,10 +785,13 @@ def _frame_errors(cue_id, cue, render, program, timeline, project_root, verify_f
 
 def _review_evidence_errors(
     cue_id, evidence, project_root, verify_files, media_size, duration_s=None,
+    source_preview=None,
 ):
-    if not isinstance(evidence, dict) or set(evidence) != {
-        *REVIEW_IMAGE_KEYS, "hyperframes_check", "hyperframes_snapshots",
-    }:
+    required_evidence = {*REVIEW_IMAGE_KEYS, "hyperframes_check", "hyperframes_snapshots"}
+    if (
+        not isinstance(evidence, dict)
+        or set(evidence) - {"source_fidelity_inputs"} != required_evidence
+    ):
         return [f"{cue_id} review evidence contract is invalid"]
     snapshots = evidence.get("hyperframes_snapshots")
     if (
@@ -770,6 +809,22 @@ def _review_evidence_errors(
         or any(left >= right for left, right in zip(times, times[1:]))
     ):
         errors.append(f"{cue_id} HyperFrames snapshot poses or times are invalid")
+    fidelity_inputs = evidence.get("source_fidelity_inputs")
+    key_snapshot = snapshots[1] if len(snapshots) == 4 else {}
+    key_time = times[1] if len(times) == 4 else None
+    normalized_time = _number(fidelity_inputs.get("normalized_time")) if isinstance(fidelity_inputs, dict) else None
+    fidelity_inputs_invalid = (
+        not isinstance(fidelity_inputs, dict)
+        or set(fidelity_inputs) != {"source_preview", "port_snapshot", "normalized_time"}
+        or fidelity_inputs.get("source_preview") != source_preview
+        or fidelity_inputs.get("port_snapshot") != key_snapshot.get("file")
+        or duration_s is None
+        or key_time is None
+        or normalized_time is None
+        or abs(normalized_time - key_time / duration_s) > RANGE_EPSILON
+    )
+    if fidelity_inputs_invalid:
+        errors.append(f"{cue_id} source fidelity inputs are invalid")
     snapshot_bindings = [snapshot.get("file") for snapshot in snapshots]
     image_bindings = [*[evidence.get(key) for key in REVIEW_IMAGE_KEYS], *snapshot_bindings]
     paths = [binding.get("path") for binding in image_bindings if isinstance(binding, dict)]
@@ -790,6 +845,15 @@ def _review_evidence_errors(
             valid, _ = _valid_image(path, size=expected_size) if path else (False, None)
             if not valid:
                 errors.append(f"{cue_id} review image is invalid")
+    if verify_files and project_root is not None and not fidelity_inputs_invalid:
+        comparison_path = _bound_path(evidence.get("source_fidelity"), project_root)
+        source_path = _bound_path(fidelity_inputs.get("source_preview"), project_root)
+        port_path = _bound_path(fidelity_inputs.get("port_snapshot"), project_root)
+        if not (
+            comparison_path and source_path and port_path
+            and _source_fidelity_matches(comparison_path, source_path, port_path)
+        ):
+            errors.append(f"{cue_id} source fidelity comparison does not match bound pixels")
     check = evidence.get("hyperframes_check")
     errors.extend(_binding_errors(check, f"{cue_id} HyperFrames check", project_root, verify_files))
     if verify_files and project_root is not None:
@@ -814,8 +878,8 @@ def validate_plan(plan, timeline, project=None, project_root=None, verify_files=
         return ["plan must be an object"]
     if not isinstance(timeline, dict):
         return ["timeline must be an object"]
-    if plan.get("schema_version") != 1:
-        errors.append("plan schema_version must be 1")
+    if plan.get("schema_version") != 2:
+        errors.append("plan schema_version must be 2; regenerate and re-review schema v1 plans")
     if plan.get("timebase") != "program":
         errors.append("plan timebase must be program")
     if plan.get("timeline_id") != timeline.get("timeline_id"):
@@ -945,6 +1009,9 @@ def validate_plan(plan, timeline, project=None, project_root=None, verify_files=
             source = {}
         if not _one_of(source.get("catalog_id"), CATALOGS):
             errors.append(f"{cue_id} source catalog is not permitted")
+        source_runtime = source.get("runtime")
+        if not _one_of(source_runtime, SOURCE_RUNTIMES):
+            errors.append(f"{cue_id} source runtime is required")
         if not _one_of(source.get("license"), LICENSES):
             errors.append(f"{cue_id} source license is not permitted")
         if not _https(source.get("url")) or not _https(source.get("license_url")):
@@ -981,6 +1048,14 @@ def validate_plan(plan, timeline, project=None, project_root=None, verify_files=
             errors.append(f"{cue_id} source requires an HTML entry point")
         for binding in source_files:
             errors.extend(_binding_errors(binding, f"{cue_id} source file", project_root, verify_files))
+        source_preview = source.get("preview")
+        if not isinstance(source_preview, dict) or source_preview not in source_files:
+            errors.append(f"{cue_id} frozen source preview is required")
+        elif verify_files and project_root is not None:
+            preview_path = _bound_path(source_preview, project_root)
+            valid_preview, _ = _valid_image(preview_path) if preview_path else (False, None)
+            if not valid_preview:
+                errors.append(f"{cue_id} frozen source preview is invalid")
         if verify_files and project_root is not None:
             root = Path(project_root).resolve()
             source_root = (root / f"work/cache/graphic-motion/source/{cue_id}").resolve()
@@ -1014,6 +1089,11 @@ def validate_plan(plan, timeline, project=None, project_root=None, verify_files=
             port = {}
         if port.get("composition_id") != cue_id or not _one_of(port.get("motion_model"), MOTION_MODELS):
             errors.append(f"{cue_id} port composition or motion model is invalid")
+        elif (
+            _one_of(source_runtime, SOURCE_RUNTIMES)
+            and port.get("motion_model") != SOURCE_RUNTIME_ADAPTERS[source_runtime]
+        ):
+            errors.append(f"{cue_id} port motion model does not match source runtime adapter")
         files = port.get("files", [])
         if not isinstance(files, list) or not files:
             errors.append(f"{cue_id} port files are required")
@@ -1070,6 +1150,7 @@ def validate_plan(plan, timeline, project=None, project_root=None, verify_files=
         evidence = review.get("evidence")
         errors.extend(_review_evidence_errors(
             cue_id, evidence, project_root, verify_files, media_size, expected_duration,
+            source_preview,
         ))
         receipt_binding = review.get("receipt")
         errors.extend(_binding_errors(receipt_binding, f"{cue_id} review receipt", project_root, verify_files))
