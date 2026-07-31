@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -27,8 +28,25 @@ DEFAULT_DURATION_S = {
     "list": 8.0,
     "outro": 5.0,
 }
-THEMES = {"almanac", "teal", "editorial", "dotgrid", "apex"}
+THEMES = {"almanac", "teal", "editorial", "dotgrid", "apex", "air"}
 CARD_TYPE_NAMES = set(DEFAULT_DURATION_S)
+CHART_LAYOUTS = {"bar-chart", "pie-chart", "line-chart"}
+CHART_POINT_LIMITS = {
+    "bar-chart": (2, 6),
+    "pie-chart": (2, 6),
+    "line-chart": (3, 8),
+}
+VISUAL_TREATMENTS_BY_CARD_TYPE = {
+    "intro": {"default"},
+    "key-quote": {"default"},
+    "stat": {"default", "metric-spotlight", *CHART_LAYOUTS},
+    "list": {"default", "side-by-side", "parallel-columns"},
+    "outro": {"default"},
+}
+DEFAULT_VISUAL_TREATMENT = {
+    "stat": "metric-spotlight",
+    "list": "side-by-side",
+}
 REGIONS = {"top", "bottom", "left", "right", "center"}
 BRIEF_FIELDS = {
     "purpose",
@@ -81,6 +99,135 @@ def _containing_clip(timeline, source_s):
     )
 
 
+def default_visual_treatment(card_type):
+    return DEFAULT_VISUAL_TREATMENT.get(card_type, "default")
+
+
+def validate_visual_treatment(card_type, treatment):
+    allowed = VISUAL_TREATMENTS_BY_CARD_TYPE.get(card_type)
+    if allowed is None or treatment not in allowed:
+        raise ValueError(
+            f"invalid visual treatment for {card_type!r}: {treatment!r}"
+        )
+    return treatment
+
+
+def _nonempty_string(value, label):
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{label} must be a non-empty string")
+    return value
+
+
+def _finite_number(value, label):
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise ValueError(f"{label} must be a finite number")
+    return value
+
+
+def validate_chart_data(card, layout, require_approved=False):
+    if layout not in CHART_LAYOUTS:
+        return None
+    if not isinstance(card, dict) or card.get("card_type") != "stat":
+        raise ValueError(f"{layout} is valid only for stat cards")
+    data = card.get("data")
+    if not isinstance(data, dict):
+        raise ValueError(f"{layout} requires a data object")
+
+    status = data.get("status")
+    if status is not None and status not in {"draft", "approved", "verified"}:
+        raise ValueError(f"invalid chart data status: {status!r}")
+    if require_approved and status not in {"approved", "verified"}:
+        raise ValueError("chart data is not approved")
+
+    for field in ("dimension_label", "metric_label", "unit", "period"):
+        _nonempty_string(data.get(field), f"chart data {field}")
+
+    points = data.get("points")
+    minimum, maximum = CHART_POINT_LIMITS[layout]
+    if not isinstance(points, list) or not minimum <= len(points) <= maximum:
+        raise ValueError(f"{layout} points must contain {minimum} to {maximum} items")
+
+    card_evidence = card.get("evidence_refs")
+    if not isinstance(card_evidence, list) or any(
+        not isinstance(ref, str) or not ref.strip() for ref in card_evidence
+    ):
+        raise ValueError("chart card evidence_refs must be a list of non-empty strings")
+    evidence_scope = set(card_evidence)
+    labels = set()
+    values = []
+    for index, item in enumerate(points, 1):
+        if not isinstance(item, dict):
+            raise ValueError(f"chart point {index} must be an object")
+        label = _nonempty_string(item.get("label"), f"chart point {index} label").strip()
+        label_key = label.casefold()
+        if label_key in labels:
+            raise ValueError(f"chart point labels must be unique: {label!r}")
+        labels.add(label_key)
+        values.append(_finite_number(item.get("value"), f"chart point {index} value"))
+        evidence_refs = item.get("evidence_refs")
+        if not isinstance(evidence_refs, list) or not evidence_refs or any(
+            not isinstance(ref, str) or not ref.strip() for ref in evidence_refs
+        ):
+            raise ValueError(f"chart point {index} evidence_refs must be non-empty")
+        outside_scope = set(evidence_refs) - evidence_scope
+        if outside_scope:
+            raise ValueError(
+                f"chart point {index} evidence_refs are outside the card evidence scope: "
+                + ", ".join(sorted(outside_scope))
+            )
+
+    if layout == "bar-chart":
+        if any(value < 0 for value in values):
+            raise ValueError("bar-chart values must be non-negative")
+        if not any(value > 0 for value in values):
+            raise ValueError("bar-chart must contain at least one value greater than zero")
+    elif layout == "pie-chart":
+        if any(value < 0 for value in values):
+            raise ValueError("pie-chart values must be non-negative")
+        total = sum(values)
+        if total <= 0:
+            raise ValueError("pie-chart values must sum to more than zero")
+        unit = data["unit"].strip().casefold()
+        if ("%" in unit or unit in {"percent", "percentage", "pct"}) and not math.isclose(
+            total, 100.0, rel_tol=1e-9, abs_tol=1e-6
+        ):
+            raise ValueError("percentage pie-chart values must sum to 100")
+    return data
+
+
+def validate_clearance(placement, captions_active=None, require_verified=False):
+    if not isinstance(placement, dict):
+        raise ValueError("placement must be an object")
+    region = placement.get("region")
+    if region is not None and region not in REGIONS:
+        raise ValueError(f"invalid placement region: {region!r}")
+    face = placement.get("face_clearance", "pending")
+    caption = placement.get("caption_clearance", "pending")
+    if face not in {"pending", "verified"}:
+        raise ValueError(f"invalid face_clearance: {face!r}")
+    if caption not in {"pending", "verified", "not-applicable"}:
+        raise ValueError(f"invalid caption_clearance: {caption!r}")
+    if captions_active is True and caption == "not-applicable":
+        raise ValueError("caption_clearance cannot be not-applicable with active captions")
+    if captions_active is False and caption == "verified":
+        raise ValueError("caption_clearance must be not-applicable without active captions")
+    if require_verified:
+        if face != "verified":
+            raise ValueError("face_clearance is not verified")
+        expected_caption = "verified" if captions_active else "not-applicable"
+        if captions_active is None:
+            if caption not in {"verified", "not-applicable"}:
+                raise ValueError("caption_clearance is not resolved")
+        elif caption != expected_caption:
+            raise ValueError(f"caption_clearance must be {expected_caption}")
+        if not isinstance(placement.get("review_still"), str) or not placement["review_still"].strip():
+            raise ValueError("clearance requires a composited review_still")
+        if placement.get("clearance_decision_mode") not in {"agent", "human"}:
+            raise ValueError("clearance_decision_mode must be agent or human")
+        _nonempty_string(placement.get("clearance_rationale"), "clearance_rationale")
+    return placement
+
+
 def build_cards(understanding, timeline):
     errors = projectlib.validate_timeline(timeline)
     if errors:
@@ -119,9 +266,16 @@ def build_cards(understanding, timeline):
                 },
                 "placement": {
                     "status": "draft", "region": None,
-                    "face_clearance": "pending", "review_still": None,
+                    "face_clearance": "pending",
+                    "caption_clearance": "pending",
+                    "review_still": None,
+                    "clearance_decision_mode": None,
+                    "clearance_rationale": "",
                 },
-                "visual_treatment": {"status": "draft"},
+                "visual_treatment": {
+                    "status": "draft",
+                    "layout": default_visual_treatment(card_type),
+                },
                 "renderer": {
                     "composition": "cache/content-cards/index.html",
                     "asset": None,

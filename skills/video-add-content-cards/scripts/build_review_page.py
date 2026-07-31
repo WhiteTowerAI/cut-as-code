@@ -2,6 +2,7 @@
 
 import argparse
 import base64
+import copy
 import json
 import math
 import shutil
@@ -18,6 +19,10 @@ PLACEMENTS = {"top", "bottom", "left", "right", "center"}
 UNDERSTAND_SCRIPTS = Path(__file__).resolve().parents[2] / "video-understand" / "scripts"
 sys.path.insert(0, str(UNDERSTAND_SCRIPTS))
 import projectlib  # noqa: E402
+
+CONTENT_CARD_SCRIPTS = Path(__file__).resolve().parent
+sys.path.insert(0, str(CONTENT_CARD_SCRIPTS))
+import build_cards_plan  # noqa: E402
 
 
 def _number(value, label):
@@ -89,7 +94,64 @@ def _extract_frame(video, time_s, output):
         raise RuntimeError(f"ffmpeg did not create review frame: {output}")
 
 
-def _payload(plan, timeline, output):
+def _caption_occupancy(captions_plan, card_start_s, card_duration_s):
+    if captions_plan is None:
+        return []
+    if not isinstance(captions_plan, dict):
+        raise ValueError("captions plan must be an object")
+    card_end_s = card_start_s + card_duration_s
+    presentation = captions_plan.get("presentation", {})
+    beats = presentation.get("layout_beats", []) if isinstance(presentation, dict) else []
+    candidates = []
+    if isinstance(beats, list) and beats:
+        region_by_variant = {
+            "bottom-standard": "bottom",
+            "center-emphasis": "center",
+            "top-statement": "top",
+        }
+        for beat in beats:
+            if not isinstance(beat, dict):
+                raise ValueError("every captions layout beat must be an object")
+            program_range = beat.get("program_range", {})
+            variant = beat.get("variant")
+            if variant not in region_by_variant or not isinstance(program_range, dict):
+                raise ValueError("captions layout beat requires a supported variant and program_range")
+            candidates.append(
+                {
+                    "start_s": _number(program_range.get("start_s"), "caption beat start_s"),
+                    "end_s": _number(program_range.get("end_s"), "caption beat end_s"),
+                    "region": region_by_variant[variant],
+                    "variant": variant,
+                }
+            )
+    else:
+        cues = captions_plan.get("cues", [])
+        if not isinstance(cues, list):
+            raise ValueError("captions plan cues must be a list")
+        for cue in cues:
+            if not isinstance(cue, dict):
+                raise ValueError("every caption cue must be an object")
+            program_range = cue.get("program_range", {})
+            start = program_range.get("start_s", cue.get("start")) if isinstance(program_range, dict) else cue.get("start")
+            end = program_range.get("end_s", cue.get("end")) if isinstance(program_range, dict) else cue.get("end")
+            candidates.append(
+                {
+                    "start_s": _number(start, "caption cue start_s"),
+                    "end_s": _number(end, "caption cue end_s"),
+                    "region": "bottom",
+                    "variant": "bottom-standard",
+                }
+            )
+    occupancy = []
+    for item in candidates:
+        if item["end_s"] <= item["start_s"]:
+            raise ValueError("caption occupancy must be a positive half-open range")
+        if item["start_s"] < card_end_s and item["end_s"] > card_start_s:
+            occupancy.append(item)
+    return occupancy
+
+
+def _payload(plan, timeline, output, captions_plan=None):
     errors = projectlib.validate_timeline(timeline)
     if errors:
         raise ValueError("invalid timeline: " + "; ".join(errors))
@@ -122,17 +184,30 @@ def _payload(plan, timeline, output):
         region = placement.get("region") or ""
         if region and region not in PLACEMENTS:
             raise ValueError(f"invalid card placement: {region!r}")
+        card_type = str(card.get("card_type", "unknown"))
+        treatment = card.get("visual_treatment", {})
+        if not isinstance(treatment, dict):
+            raise ValueError("card visual_treatment must be an object")
+        layout = treatment.get("layout") or "default"
+        build_cards_plan.validate_visual_treatment(card_type, layout)
+        build_cards_plan.validate_chart_data(card, layout)
+        program_start_s = _number(card.get("program_start_s"), "program_start_s")
+        duration_s = _number(card.get("duration_s"), "duration_s")
         payload_cards.append(
             {
                 "id": card["id"],
-                "card_type": str(card.get("card_type", "unknown")),
+                "card_type": card_type,
                 "evidence_ref": str(card.get("evidence_ref", "unknown")),
-                "program_start_s": _number(
-                    card.get("program_start_s"), "program_start_s"
-                ),
-                "duration_s": _number(card.get("duration_s"), "duration_s"),
+                "program_start_s": program_start_s,
+                "duration_s": duration_s,
                 "copy": _copy_text(card),
                 "placement": "bottom",
+                "visual_treatment": layout,
+                "data": copy.deepcopy(card.get("data")) if isinstance(card.get("data"), dict) else None,
+                "evidence_refs": copy.deepcopy(card.get("evidence_refs", [])),
+                "caption_occupancy": _caption_occupancy(
+                    captions_plan, program_start_s, duration_s
+                ),
                 "selected": False,
                 "screenshot": frame.relative_to(output.parent).as_posix(),
             }
@@ -140,7 +215,7 @@ def _payload(plan, timeline, output):
     return {"theme": theme, "target": target, "cards": payload_cards}, frame_specs
 
 
-def build_review_page(plan, timeline, video, output):
+def build_review_page(plan, timeline, video, output, captions_plan=None):
     video = Path(video).resolve()
     if not video.is_file():
         raise FileNotFoundError(f"review source video not found: {video}")
@@ -152,7 +227,7 @@ def build_review_page(plan, timeline, video, output):
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
     if template.count(PAYLOAD_MARKER) != 1:
         raise ValueError("review template must contain exactly one payload marker")
-    payload, frame_specs = _payload(plan, timeline, output)
+    payload, frame_specs = _payload(plan, timeline, output, captions_plan=captions_plan)
     data = json.dumps(
         payload, ensure_ascii=False, separators=(",", ":")
     ).encode("utf-8")
@@ -187,10 +262,25 @@ def main(argv=None):
     parser.add_argument("output")
     parser.add_argument("--video", required=True)
     parser.add_argument("--timeline", required=True)
+    parser.add_argument("--captions-plan")
     args = parser.parse_args(argv)
     plan = json.loads(Path(args.plan).read_text(encoding="utf-8"))
     timeline = json.loads(Path(args.timeline).read_text(encoding="utf-8"))
-    print(build_review_page(plan, timeline, args.video, args.output))
+    captions_plan = None
+    if args.captions_plan:
+        captions_path = Path(args.captions_plan)
+        if not captions_path.is_file():
+            raise FileNotFoundError(f"captions plan not found: {captions_path.resolve()}")
+        captions_plan = json.loads(captions_path.read_text(encoding="utf-8"))
+    print(
+        build_review_page(
+            plan,
+            timeline,
+            args.video,
+            args.output,
+            captions_plan=captions_plan,
+        )
+    )
 
 
 if __name__ == "__main__":

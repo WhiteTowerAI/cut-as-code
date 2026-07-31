@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>video-add-content-cards — 5 themes × 13 cards (animated)</title>
+<title>video-add-content-cards — 6 themes × 19 cards (animated)</title>
 <style>
   /* --scale is UNITLESS (CSS scale() rejects lengths); cell width derives from it. */
   :root { --scale: 0.1771; --cw: calc(1920px * var(--scale)); }
@@ -47,6 +47,7 @@
   body[data-theme="editorial"] [data-theme="editorial"] { display: table-cell; }
   body[data-theme="dotgrid"] [data-theme="dotgrid"] { display: table-cell; }
   body[data-theme="apex"] [data-theme="apex"] { display: table-cell; }
+  body[data-theme="air"] [data-theme="air"] { display: table-cell; }
   @media (max-width: 900px) {
     :root { --scale: 0.12; }
     body:not([data-theme="all"]) { --scale: 0.11; }
@@ -55,8 +56,8 @@
   }
 </style></head>
 <body data-theme="all">
-  <h1>video-add-content-cards — 5 themes × 13 cards (animated)</h1>
-  <p class="sub">Each cell is the live composition looping its 6s cue (entrance → hold → exit). 65 iframes driven by a shared master clock. Same content as the static gallery, just moving.</p>
+  <h1>video-add-content-cards — 6 themes × 19 cards (animated)</h1>
+  <p class="sub">Each cell is the live composition looping its 6s cue (entrance → hold → exit). 114 iframes driven by a shared master clock. Same content as the static gallery, just moving.</p>
 
   <fieldset class="theme-picker">
     <legend>Theme view</legend>
@@ -66,11 +67,12 @@
     <label><input type="radio" name="theme" value="editorial"> editorial</label>
     <label><input type="radio" name="theme" value="dotgrid"> dotgrid</label>
     <label><input type="radio" name="theme" value="apex"> apex</label>
+    <label><input type="radio" name="theme" value="air"> air</label>
   </fieldset>
   <table>
     <thead><tr>
       <th>Card ↓ / Theme →</th>
-      <th data-theme="almanac">almanac</th><th data-theme="teal">teal</th><th data-theme="editorial">editorial</th><th data-theme="dotgrid">dotgrid</th><th data-theme="apex">apex</th>
+      <th data-theme="almanac">almanac</th><th data-theme="teal">teal</th><th data-theme="editorial">editorial</th><th data-theme="dotgrid">dotgrid</th><th data-theme="apex">apex</th><th data-theme="air">air</th>
     </tr></thead>
     <tbody>
       <tr>
@@ -80,7 +82,8 @@
       src="index-teal.html#loop=0,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t3s"
       src="index-editorial.html#loop=0,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t3s"
       src="index-dotgrid.html#loop=0,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t3s"
-      src="index-apex.html#loop=0,6"></iframe></div></td>
+      src="index-apex.html#loop=0,6"></iframe></div></td><td data-theme="air"><div class="frame"><iframe loading="lazy" title="index-air.html t3s"
+      src="index-air.html#loop=0,6"></iframe></div></td>
       </tr>
       <tr>
         <th class="card">SectionCard<span class="t">t9s</span></th>
@@ -89,7 +92,8 @@
       src="index-teal.html#loop=6,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t9s"
       src="index-editorial.html#loop=6,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t9s"
       src="index-dotgrid.html#loop=6,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t9s"
-      src="index-apex.html#loop=6,6"></iframe></div></td>
+      src="index-apex.html#loop=6,6"></iframe></div></td><td data-theme="air"><div class="frame"><iframe loading="lazy" title="index-air.html t9s"
+      src="index-air.html#loop=6,6"></iframe></div></td>
       </tr>
       <tr>
         <th class="card">LowerThird<span class="t">t15s</span></th>
@@ -98,7 +102,8 @@
       src="index-teal.html#loop=12,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t15s"
       src="index-editorial.html#loop=12,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t15s"
       src="index-dotgrid.html#loop=12,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t15s"
-      src="index-apex.html#loop=12,6"></iframe></div></td>
+      src="index-apex.html#loop=12,6"></iframe></div></td><td data-theme="air"><div class="frame"><iframe loading="lazy" title="index-air.html t15s"
+      src="index-air.html#loop=12,6"></iframe></div></td>
       </tr>
       <tr>
         <th class="card">StatCallout<span class="t">t21s</span></th>
@@ -107,7 +112,8 @@
       src="index-teal.html#loop=18,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t21s"
       src="index-editorial.html#loop=18,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t21s"
       src="index-dotgrid.html#loop=18,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t21s"
-      src="index-apex.html#loop=18,6"></iframe></div></td>
+      src="index-apex.html#loop=18,6"></iframe></div></td><td data-theme="air"><div class="frame"><iframe loading="lazy" title="index-air.html t21s"
+      src="index-air.html#loop=18,6"></iframe></div></td>
       </tr>
       <tr>
         <th class="card">Outro<span class="t">t27s</span></th>
@@ -116,7 +122,8 @@
       src="index-teal.html#loop=24,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t27s"
       src="index-editorial.html#loop=24,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t27s"
       src="index-dotgrid.html#loop=24,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t27s"
-      src="index-apex.html#loop=24,6"></iframe></div></td>
+      src="index-apex.html#loop=24,6"></iframe></div></td><td data-theme="air"><div class="frame"><iframe loading="lazy" title="index-air.html t27s"
+      src="index-air.html#loop=24,6"></iframe></div></td>
       </tr>
       <tr>
         <th class="card">TitleBumper<span class="t">t33s</span></th>
@@ -125,7 +132,8 @@
       src="index-teal.html#loop=30,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t33s"
       src="index-editorial.html#loop=30,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t33s"
       src="index-dotgrid.html#loop=30,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t33s"
-      src="index-apex.html#loop=30,6"></iframe></div></td>
+      src="index-apex.html#loop=30,6"></iframe></div></td><td data-theme="air"><div class="frame"><iframe loading="lazy" title="index-air.html t33s"
+      src="index-air.html#loop=30,6"></iframe></div></td>
       </tr>
       <tr>
         <th class="card">KeypointCallout<span class="t">t39s</span></th>
@@ -134,7 +142,8 @@
       src="index-teal.html#loop=36,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t39s"
       src="index-editorial.html#loop=36,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t39s"
       src="index-dotgrid.html#loop=36,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t39s"
-      src="index-apex.html#loop=36,6"></iframe></div></td>
+      src="index-apex.html#loop=36,6"></iframe></div></td><td data-theme="air"><div class="frame"><iframe loading="lazy" title="index-air.html t39s"
+      src="index-air.html#loop=36,6"></iframe></div></td>
       </tr>
       <tr>
         <th class="card">ReframeCard<span class="t">t45s</span></th>
@@ -143,7 +152,8 @@
       src="index-teal.html#loop=42,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t45s"
       src="index-editorial.html#loop=42,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t45s"
       src="index-dotgrid.html#loop=42,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t45s"
-      src="index-apex.html#loop=42,6"></iframe></div></td>
+      src="index-apex.html#loop=42,6"></iframe></div></td><td data-theme="air"><div class="frame"><iframe loading="lazy" title="index-air.html t45s"
+      src="index-air.html#loop=42,6"></iframe></div></td>
       </tr>
       <tr>
         <th class="card">PromptCard<span class="t">t51s</span></th>
@@ -152,7 +162,8 @@
       src="index-teal.html#loop=48,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t51s"
       src="index-editorial.html#loop=48,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t51s"
       src="index-dotgrid.html#loop=48,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t51s"
-      src="index-apex.html#loop=48,6"></iframe></div></td>
+      src="index-apex.html#loop=48,6"></iframe></div></td><td data-theme="air"><div class="frame"><iframe loading="lazy" title="index-air.html t51s"
+      src="index-air.html#loop=48,6"></iframe></div></td>
       </tr>
       <tr>
         <th class="card">BeforeAfter<span class="t">t57s</span></th>
@@ -161,7 +172,8 @@
       src="index-teal.html#loop=54,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t57s"
       src="index-editorial.html#loop=54,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t57s"
       src="index-dotgrid.html#loop=54,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t57s"
-      src="index-apex.html#loop=54,6"></iframe></div></td>
+      src="index-apex.html#loop=54,6"></iframe></div></td><td data-theme="air"><div class="frame"><iframe loading="lazy" title="index-air.html t57s"
+      src="index-air.html#loop=54,6"></iframe></div></td>
       </tr>
       <tr>
         <th class="card">Checklist<span class="t">t63s</span></th>
@@ -170,7 +182,8 @@
       src="index-teal.html#loop=60,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t63s"
       src="index-editorial.html#loop=60,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t63s"
       src="index-dotgrid.html#loop=60,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t63s"
-      src="index-apex.html#loop=60,6"></iframe></div></td>
+      src="index-apex.html#loop=60,6"></iframe></div></td><td data-theme="air"><div class="frame"><iframe loading="lazy" title="index-air.html t63s"
+      src="index-air.html#loop=60,6"></iframe></div></td>
       </tr>
       <tr>
         <th class="card">CommandChips<span class="t">t69s</span></th>
@@ -179,7 +192,8 @@
       src="index-teal.html#loop=66,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t69s"
       src="index-editorial.html#loop=66,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t69s"
       src="index-dotgrid.html#loop=66,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t69s"
-      src="index-apex.html#loop=66,6"></iframe></div></td>
+      src="index-apex.html#loop=66,6"></iframe></div></td><td data-theme="air"><div class="frame"><iframe loading="lazy" title="index-air.html t69s"
+      src="index-air.html#loop=66,6"></iframe></div></td>
       </tr>
       <tr>
         <th class="card">ListReveal<span class="t">t75s</span></th>
@@ -188,7 +202,68 @@
       src="index-teal.html#loop=72,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t75s"
       src="index-editorial.html#loop=72,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t75s"
       src="index-dotgrid.html#loop=72,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t75s"
-      src="index-apex.html#loop=72,6"></iframe></div></td>
+      src="index-apex.html#loop=72,6"></iframe></div></td><td data-theme="air"><div class="frame"><iframe loading="lazy" title="index-air.html t75s"
+      src="index-air.html#loop=72,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">MetricSpotlight<span class="t">t81s</span></th>
+        <td data-theme="almanac"><div class="frame"><iframe loading="lazy" title="index-almanac.html t81s"
+      src="index-almanac.html#loop=78,6"></iframe></div></td><td data-theme="teal"><div class="frame"><iframe loading="lazy" title="index-teal.html t81s"
+      src="index-teal.html#loop=78,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t81s"
+      src="index-editorial.html#loop=78,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t81s"
+      src="index-dotgrid.html#loop=78,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t81s"
+      src="index-apex.html#loop=78,6"></iframe></div></td><td data-theme="air"><div class="frame"><iframe loading="lazy" title="index-air.html t81s"
+      src="index-air.html#loop=78,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">SideBySide<span class="t">t87s</span></th>
+        <td data-theme="almanac"><div class="frame"><iframe loading="lazy" title="index-almanac.html t87s"
+      src="index-almanac.html#loop=84,6"></iframe></div></td><td data-theme="teal"><div class="frame"><iframe loading="lazy" title="index-teal.html t87s"
+      src="index-teal.html#loop=84,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t87s"
+      src="index-editorial.html#loop=84,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t87s"
+      src="index-dotgrid.html#loop=84,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t87s"
+      src="index-apex.html#loop=84,6"></iframe></div></td><td data-theme="air"><div class="frame"><iframe loading="lazy" title="index-air.html t87s"
+      src="index-air.html#loop=84,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">ParallelColumns<span class="t">t93s</span></th>
+        <td data-theme="almanac"><div class="frame"><iframe loading="lazy" title="index-almanac.html t93s"
+      src="index-almanac.html#loop=90,6"></iframe></div></td><td data-theme="teal"><div class="frame"><iframe loading="lazy" title="index-teal.html t93s"
+      src="index-teal.html#loop=90,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t93s"
+      src="index-editorial.html#loop=90,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t93s"
+      src="index-dotgrid.html#loop=90,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t93s"
+      src="index-apex.html#loop=90,6"></iframe></div></td><td data-theme="air"><div class="frame"><iframe loading="lazy" title="index-air.html t93s"
+      src="index-air.html#loop=90,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">BarChart<span class="t">t99s</span></th>
+        <td data-theme="almanac"><div class="frame"><iframe loading="lazy" title="index-almanac.html t99s"
+      src="index-almanac.html#loop=96,6"></iframe></div></td><td data-theme="teal"><div class="frame"><iframe loading="lazy" title="index-teal.html t99s"
+      src="index-teal.html#loop=96,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t99s"
+      src="index-editorial.html#loop=96,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t99s"
+      src="index-dotgrid.html#loop=96,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t99s"
+      src="index-apex.html#loop=96,6"></iframe></div></td><td data-theme="air"><div class="frame"><iframe loading="lazy" title="index-air.html t99s"
+      src="index-air.html#loop=96,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">PieChart<span class="t">t105s</span></th>
+        <td data-theme="almanac"><div class="frame"><iframe loading="lazy" title="index-almanac.html t105s"
+      src="index-almanac.html#loop=102,6"></iframe></div></td><td data-theme="teal"><div class="frame"><iframe loading="lazy" title="index-teal.html t105s"
+      src="index-teal.html#loop=102,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t105s"
+      src="index-editorial.html#loop=102,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t105s"
+      src="index-dotgrid.html#loop=102,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t105s"
+      src="index-apex.html#loop=102,6"></iframe></div></td><td data-theme="air"><div class="frame"><iframe loading="lazy" title="index-air.html t105s"
+      src="index-air.html#loop=102,6"></iframe></div></td>
+      </tr>
+      <tr>
+        <th class="card">LineChart<span class="t">t111s</span></th>
+        <td data-theme="almanac"><div class="frame"><iframe loading="lazy" title="index-almanac.html t111s"
+      src="index-almanac.html#loop=108,6"></iframe></div></td><td data-theme="teal"><div class="frame"><iframe loading="lazy" title="index-teal.html t111s"
+      src="index-teal.html#loop=108,6"></iframe></div></td><td data-theme="editorial"><div class="frame"><iframe loading="lazy" title="index-editorial.html t111s"
+      src="index-editorial.html#loop=108,6"></iframe></div></td><td data-theme="dotgrid"><div class="frame"><iframe loading="lazy" title="index-dotgrid.html t111s"
+      src="index-dotgrid.html#loop=108,6"></iframe></div></td><td data-theme="apex"><div class="frame"><iframe loading="lazy" title="index-apex.html t111s"
+      src="index-apex.html#loop=108,6"></iframe></div></td><td data-theme="air"><div class="frame"><iframe loading="lazy" title="index-air.html t111s"
+      src="index-air.html#loop=108,6"></iframe></div></td>
       </tr>
     </tbody>
   </table>

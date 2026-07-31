@@ -1,31 +1,36 @@
-// build-gallery.mjs — assemble the 5-theme × 13-card contact sheets.
+// build-gallery.mjs — assemble the 6-theme × 19-card contact sheets.
 //
-// Writes TWO galleries, same 13-row × 5-column layout (one row per card type,
+// Writes TWO galleries, same 19-row × 6-column layout (one row per card type,
 // one column per theme):
-//   gallery.html          — static: the shoot.mjs stills (snapshots/*.png).
+//   gallery.html          — static: the shoot.mjs stills (snapshots/*.png),
+//                           redirected with GALLERY_STATIC_OUT when requested.
 //   gallery-animated.html  — live: each cell is an <iframe> of the composition
 //                            loaded with #loop=<start>,<dur>, so its card plays
 //                            on a loop. Identical content, just moving.
 // A file:// parent can't script a file:// iframe (opaque origins), so each
-// composition drives ITSELF via the dormant #loop hash handler baked into the 5
+// composition drives ITSELF via the dormant #loop hash handler baked into the 6
 // index*.html files. Stages are windowed by data-start/duration exactly as the
 // HF runtime and shoot.mjs do.
 // almanac stills have no prefix (t3s.png); other themes are <theme>-t3s.png.
-import { writeFileSync, existsSync } from "node:fs";
+import { writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const snap = (name) => join(here, "snapshots", name);
+const staticOut = process.env.GALLERY_STATIC_OUT
+  ? resolve(process.env.GALLERY_STATIC_OUT)
+  : join(here, "gallery.html");
 
-// card mid-window time → card name (matches the 13 cues in index.html).
+// card mid-window time → card name (matches the 19 cues in each theme file).
 // Each cue is data-start = t-3, duration 6s; the still is the mid-window.
 const DUR = 6;
 const CARDS = [
   [3, "Intro"], [9, "SectionCard"], [15, "LowerThird"], [21, "StatCallout"],
   [27, "Outro"], [33, "TitleBumper"], [39, "KeypointCallout"], [45, "ReframeCard"],
   [51, "PromptCard"], [57, "BeforeAfter"], [63, "Checklist"], [69, "CommandChips"],
-  [75, "ListReveal"],
+  [75, "ListReveal"], [81, "MetricSpotlight"], [87, "SideBySide"], [93, "ParallelColumns"],
+  [99, "BarChart"], [105, "PieChart"], [111, "LineChart"],
 ];
 // theme → [snapshot-prefix, composition-file]. "" prefix = almanac (shipped).
 const THEMES = [
@@ -34,6 +39,7 @@ const THEMES = [
   ["editorial", "editorial-", "index-editorial.html"],
   ["dotgrid", "dotgrid-", "index-dotgrid.html"],
   ["apex", "apex-", "index-apex.html"],
+  ["air", "air-", "index-air.html"],
 ];
 
 const HEAD = (title) => `<!doctype html>
@@ -143,9 +149,10 @@ const PICKER_SCRIPT = `
     selectTheme(initialTheme);
   <\/script>`;
 
+mkdirSync(dirname(staticOut), { recursive: true });
 writeFileSync(
-  join(here, "gallery.html"),
-  HEAD("video-add-content-cards — 5 themes × 13 cards (static)") +
+  staticOut,
+  HEAD("video-add-content-cards — 6 themes × 19 cards (static)") +
     table(
       "Each still is the mid-window of a 6s cue (composition resolution 1920×1080). Checkerboard = transparent (footage would show through); opaque = fullBleed / card.",
       staticCell,
@@ -172,9 +179,9 @@ const CLOCK = `
 
 writeFileSync(
   join(here, "gallery-animated.html"),
-  HEAD("video-add-content-cards — 5 themes × 13 cards (animated)") +
+  HEAD("video-add-content-cards — 6 themes × 19 cards (animated)") +
     table(
-      "Each cell is the live composition looping its 6s cue (entrance → hold → exit). 65 iframes driven by a shared master clock. Same content as the static gallery, just moving.",
+      "Each cell is the live composition looping its 6s cue (entrance → hold → exit). 114 iframes driven by a shared master clock. Same content as the static gallery, just moving.",
       animCell,
       PICKER_SCRIPT + CLOCK,
     ),
@@ -182,6 +189,6 @@ writeFileSync(
 
 const missing = CARDS.flatMap(([t]) =>
   THEMES.filter(([, p]) => !existsSync(snap(`${p}t${t}s.png`))).map(([n]) => `${n}/t${t}`));
-console.log(`wrote gallery.html + gallery-animated.html (${CARDS.length}×${THEMES.length} grid)`);
+console.log(`wrote ${staticOut} + gallery-animated.html (${CARDS.length}×${THEMES.length} grid)`);
 if (missing.length) console.log(`${missing.length} missing stills:`, missing.join(", "));
-else console.log("all 65 stills present");
+else console.log("all 114 stills present");
