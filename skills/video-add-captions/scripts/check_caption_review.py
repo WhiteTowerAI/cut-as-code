@@ -92,6 +92,58 @@ def make_fixture(root):
     return source, timeline, plan, state, snapshots
 
 
+def make_expressive_fixture(root):
+    source, timeline, plan, state, _ = make_fixture(root)
+    cues = [
+        {"id": "cue-001", "index": 1, "start": 0.5, "end": 1.5, "text": "Opening setup",
+         "words": [{"word": "Opening", "semantic_role": "normal"},
+                   {"word": "setup", "semantic_role": "normal"}]},
+        {"id": "cue-002", "index": 2, "start": 3.5, "end": 4.5, "text": "Three layouts",
+         "words": [{"word": "Three", "semantic_role": "number"},
+                   {"word": "layouts", "semantic_role": "keyword"}]},
+        {"id": "cue-003", "index": 3, "start": 6.5, "end": 7.5, "text": "Context first",
+         "words": [{"word": "Context", "semantic_role": "keyword"},
+                   {"word": "first", "semantic_role": "normal"}]},
+        {"id": "cue-004", "index": 4, "start": 8.5, "end": 9.5, "text": "Return to baseline",
+         "words": [{"word": "Return", "semantic_role": "normal"},
+                   {"word": "baseline", "semantic_role": "contrast"}]},
+    ]
+    write_json(plan, {
+        "timeline_id": "mapped",
+        "program_duration_s": 12,
+        "cues": cues,
+        "presentation": {
+            "mode": "expressive",
+            "layout_beats": [
+                {"id": "beat-001", "variant": "bottom-standard", "cue_ids": ["cue-001"],
+                 "program_range": {"start_s": 0.5, "end_s": 1.5}},
+                {"id": "beat-002", "variant": "center-emphasis", "cue_ids": ["cue-002"],
+                 "program_range": {"start_s": 3.5, "end_s": 4.5}},
+                {"id": "beat-003", "variant": "bottom-standard", "cue_ids": ["cue-003"],
+                 "program_range": {"start_s": 6.5, "end_s": 7.5}},
+                {"id": "beat-004", "variant": "center-emphasis", "cue_ids": ["cue-004"],
+                 "program_range": {"start_s": 8.5, "end_s": 9.5}},
+            ],
+        },
+    })
+    state_value = json.loads(state.read_text(encoding="utf-8"))
+    state_value["captions"]["sha256"] = file_sha256(plan)
+    write_json(state, state_value)
+    snapshots = root / "expressive-snapshots"
+    snapshots.mkdir()
+    for index in range(5):
+        image = Image.new("RGBA", (320, 180), (0, 0, 0, 0))
+        if index < 4:
+            ImageDraw.Draw(image).rectangle((80, 60 + index * 15, 240, 90 + index * 15), fill=(255, 225, 60, 230))
+        image.save(snapshots / f"frame-{index + 1:02d}.png")
+    comparison = root / "comparison-snapshots"
+    comparison.mkdir()
+    image = Image.new("RGBA", (320, 180), (0, 0, 0, 0))
+    ImageDraw.Draw(image).rectangle((75, 62, 245, 96), fill=(255, 190, 40, 230))
+    image.save(comparison / "frame-01.png")
+    return source, timeline, plan, state, snapshots, comparison
+
+
 def fake_ffmpeg(command, check):
     assert command[0] == "ffmpeg"
     Image.new("RGB", (320, 180), (42, 55, 63)).save(command[-1])
@@ -122,6 +174,21 @@ def check_template():
     assert "min-height: 38px" in html
     assert "@media (max-width: 1100px)" in html
     assert "@media (max-width: 780px)" in html
+    assert 'data-filter="center-emphasis"' in html
+    assert 'data-filter="top-statement"' not in html
+    assert "Top statement" not in html
+    assert '<section id="comparison" class="comparison" hidden>' in html
+    assert 'id="comparison-grid"' in html
+    assert 'id="karaoke-choice"' in html
+    karaoke_radios = html.split('<input type="radio" name="karaoke"')
+    assert len(karaoke_radios) - 1 == 2
+    assert 'value="off"' in html and 'value="on"' in html
+    assert not any("checked" in fragment.split(">", 1)[0] for fragment in karaoke_radios[1:])
+    assert 'Karaoke: ${karaokeChoice.value}' in html
+    assert "!isExpressive || Boolean(karaokeChoice)" in html
+    assert '<button id="copy-summary" type="button" disabled>' in html
+    assert "if (isExpressive && reviewData.experimental_comparison)" in html
+    assert "expressive-layout-beats" in html
     assert html.count(MARKER) == 1
 
 
@@ -181,6 +248,51 @@ def check_failure_is_atomic():
         assert not (out / "captions-review.html").exists()
         assert not (out / "captions-evidence.json").exists()
         assert not list(out.glob("preview-*.png"))
+
+
+def check_expressive_builder():
+    module = load_builder()
+    with tempfile.TemporaryDirectory(prefix="caption-review-expressive-") as temporary:
+        root = Path(temporary)
+        source, timeline, plan, state, snapshots, comparison = make_expressive_fixture(root)
+        out = root / "review"
+        with patch.object(module.subprocess, "run", side_effect=fake_ffmpeg):
+            module.main([
+                "--source", str(source), "--timeline", str(timeline), "--plan", str(plan),
+                "--interaction-state", str(state), "--snapshots", str(snapshots),
+                "--comparison-snapshots", str(comparison), "--comparison-beat-id", "beat-002",
+                "--out", str(out), "--cache", str(root / "cache"),
+            ])
+        evidence = json.loads((out / "captions-evidence.json").read_text(encoding="utf-8"))
+        assert evidence["presentation_mode"] == "expressive"
+        assert evidence["primary_evidence_count"] == 5
+        assert [sample.get("beat_id") for sample in evidence["samples"][:-1]] == [
+            "beat-001", "beat-002", "beat-003", "beat-004",
+        ]
+        assert evidence["samples"][-1]["label"] == "no-caption"
+        assert {sample["variant"] for sample in evidence["samples"][:-1]} == {
+            "bottom-standard", "center-emphasis",
+        }
+        comparison_payload = evidence["experimental_comparison"]
+        assert comparison_payload["beat_id"] == "beat-002"
+        assert [sample["mode"] for sample in comparison_payload["samples"]] == [
+            "semantic-only", "semantic-plus-karaoke",
+        ]
+        assert all((out / sample["preview"]).is_file() for sample in comparison_payload["samples"])
+        page = (out / "captions-review.html").read_text(encoding="utf-8")
+        payload = json.loads(base64.b64decode(module.REVIEW_PAYLOAD_PATTERN.search(page).group(1)))
+        assert payload["presentation_mode"] == "expressive"
+        assert payload["approval_evidence"] == "expressive-layout-beats"
+        assert payload["primary_evidence_count"] == 5
+
+        invalid = json.loads(plan.read_text(encoding="utf-8"))
+        invalid["presentation"]["layout_beats"][0]["variant"] = "top-statement"
+        try:
+            module.expressive_sample_times(invalid, 30)
+        except ValueError as error:
+            assert "invalid layout beat" in str(error)
+        else:
+            raise AssertionError("Expressive review must reject top-statement fixtures")
 
 
 def check_bound_inputs_cannot_be_substituted():
@@ -243,8 +355,10 @@ check_builder()
 print("[caption-review] PASS mapped evidence and safe payload")
 check_failure_is_atomic()
 print("[caption-review] PASS atomic failure")
+check_expressive_builder()
+print("[caption-review] PASS dynamic Expressive evidence and comparison")
 check_standalone_rebuild_removes_stale_page()
 print("[caption-review] PASS stale page removal")
 check_bound_inputs_cannot_be_substituted()
 print("[caption-review] PASS bound input integrity")
-print("[caption-review] 5 checks passed")
+print("[caption-review] 6 checks passed")

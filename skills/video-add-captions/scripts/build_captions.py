@@ -26,6 +26,9 @@ import projectlib  # noqa: E402
 
 ENDERS = (".", "?", "!", "…", "。", "！", "？")
 MIN_CUE_DUR = 0.6   # cues shorter than this (or 1 token) are merged into a neighbor
+PRESENTATION_MODES = {"standard", "expressive"}
+LAYOUT_VARIANTS = {"bottom-standard", "center-emphasis"}
+SEMANTIC_ROLES = {"normal", "keyword", "number", "contrast"}
 
 def _cjk(ch):
     return ("一" <= ch <= "鿿" or "぀" <= ch <= "ヿ"
@@ -166,16 +169,203 @@ def build(words, max_chars, max_lines, max_dur, gap):
     return cues
 
 
+def add_expressive_planning_shell(plan):
+    for cue in plan["cues"]:
+        cue["id"] = f"cue-{cue['index']:03d}"
+        for word in cue["words"]:
+            word.setdefault("semantic_role", "normal")
+    plan["presentation"] = {
+        "schema_version": 1,
+        "mode": "expressive",
+        "planning_status": "draft",
+        "planner": {
+            "actor": "agent",
+            "scope": "full-program",
+            "rationale": "",
+        },
+        "layout_beats": [],
+    }
+    return plan
+
+
+def _is_number(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _same_time(left, right):
+    return _is_number(left) and _is_number(right) and abs(float(left) - float(right)) <= 1e-6
+
+
+def validate_caption_plan(plan, *, require_complete=False):
+    if isinstance(plan, list):
+        if not plan:
+            raise ValueError("legacy top-level cue array must not be empty")
+        return {"mode": "standard", "cue_count": len(plan), "layout_beat_count": 0}
+    if not isinstance(plan, dict):
+        raise ValueError("caption plan must be an object or a legacy top-level cue array")
+
+    cues = plan.get("cues")
+    if not isinstance(cues, list) or not cues:
+        raise ValueError("canonical caption plan must contain a non-empty cues array")
+    presentation = plan.get("presentation")
+    if presentation is None:
+        return {"mode": "standard", "cue_count": len(cues), "layout_beat_count": 0}
+    if not isinstance(presentation, dict):
+        raise ValueError("presentation must be an object")
+
+    mode = presentation.get("mode")
+    if mode not in PRESENTATION_MODES:
+        raise ValueError("presentation mode must be standard or expressive")
+    if mode == "standard":
+        return {"mode": "standard", "cue_count": len(cues), "layout_beat_count": 0}
+    if presentation.get("schema_version") != 1:
+        raise ValueError("expressive presentation schema_version must be 1")
+
+    cue_by_id = {}
+    cue_positions = {}
+    cue_indices = set()
+    previous_index = 0
+    for position, cue in enumerate(cues):
+        if not isinstance(cue, dict):
+            raise ValueError(f"cue at position {position + 1} must be an object")
+        cue_index = cue.get("index")
+        if not isinstance(cue_index, int) or isinstance(cue_index, bool) or cue_index <= 0:
+            raise ValueError(f"expressive cue at position {position + 1} must have a positive integer index")
+        if cue_index in cue_indices:
+            raise ValueError(f"duplicate cue index: {cue_index}")
+        if cue_index <= previous_index:
+            raise ValueError("expressive cues must remain in ascending cue index order")
+        previous_index = cue_index
+        cue_indices.add(cue_index)
+
+        cue_id = cue.get("id")
+        if not isinstance(cue_id, str) or not cue_id.strip():
+            raise ValueError(f"expressive cue index {cue_index} must have a non-empty id")
+        if cue_id in cue_by_id:
+            raise ValueError(f"duplicate cue id: {cue_id}")
+        if not _is_number(cue.get("start")) or not _is_number(cue.get("end")) or cue["end"] <= cue["start"]:
+            raise ValueError(f"expressive cue index {cue_index} must have a positive time range")
+        cue_by_id[cue_id] = cue
+        cue_positions[cue_id] = position
+
+        words = cue.get("words")
+        if not isinstance(words, list) or not words:
+            raise ValueError(f"expressive cue index {cue_index} must contain words")
+        for word_index, word in enumerate(words, 1):
+            if not isinstance(word, dict):
+                raise ValueError(f"cue index {cue_index} word {word_index} must be an object")
+            semantic_role = word.get("semantic_role", "normal")
+            if semantic_role not in SEMANTIC_ROLES:
+                raise ValueError(
+                    f"cue index {cue_index} word {word_index} has invalid semantic_role: {semantic_role}"
+                )
+
+    planning_status = presentation.get("planning_status")
+    if planning_status not in {"draft", "complete"}:
+        raise ValueError("expressive planning_status must be draft or complete")
+    if require_complete and planning_status != "complete":
+        raise ValueError("expressive plan must be complete before preview generation")
+
+    planner = presentation.get("planner")
+    if not isinstance(planner, dict):
+        raise ValueError("expressive planner must be an object")
+    if planner.get("actor") != "agent" or planner.get("scope") != "full-program":
+        raise ValueError("expressive planner must use actor agent and scope full-program")
+    if planning_status == "complete" and not str(planner.get("rationale", "")).strip():
+        raise ValueError("completed expressive plan requires a whole-program planning rationale")
+
+    layout_beats = presentation.get("layout_beats")
+    if not isinstance(layout_beats, list):
+        raise ValueError("expressive layout_beats must be an array")
+    if planning_status == "complete" and not layout_beats:
+        raise ValueError("completed expressive plan requires layout beats")
+
+    beat_ids = set()
+    covered_cue_ids = set()
+    previous_start = None
+    previous_end = None
+    previous_last_position = -1
+    for beat_position, beat in enumerate(layout_beats, 1):
+        if not isinstance(beat, dict):
+            raise ValueError(f"layout beat {beat_position} must be an object")
+        beat_id = beat.get("id")
+        if not isinstance(beat_id, str) or not beat_id.strip():
+            raise ValueError(f"layout beat {beat_position} must have a non-empty id")
+        if beat_id in beat_ids:
+            raise ValueError(f"duplicate layout beat id: {beat_id}")
+        beat_ids.add(beat_id)
+
+        variant = beat.get("variant")
+        if variant == "top-statement":
+            raise ValueError(
+                f"layout beat {beat_id} uses removed variant top-statement; "
+                "the plan must be replanned as bottom-standard or center-emphasis"
+            )
+        if variant not in LAYOUT_VARIANTS:
+            raise ValueError(f"layout beat {beat_id} has invalid variant: {variant}")
+        cue_ids = beat.get("cue_ids")
+        if not isinstance(cue_ids, list) or not cue_ids:
+            raise ValueError(f"layout beat {beat_id} must reference one or more cue_ids")
+
+        positions = []
+        for cue_id in cue_ids:
+            if cue_id not in cue_by_id:
+                raise ValueError(f"layout beat {beat_id} references unknown cue id/index: {cue_id}")
+            if cue_id in covered_cue_ids:
+                raise ValueError(f"cue {cue_id} is referenced by more than one layout beat")
+            positions.append(cue_positions[cue_id])
+        if positions != list(range(positions[0], positions[-1] + 1)):
+            raise ValueError(f"layout beat {beat_id} cue_ids must be contiguous and ordered")
+
+        program_range = beat.get("program_range")
+        if not isinstance(program_range, dict):
+            raise ValueError(f"layout beat {beat_id} must have a program_range")
+        start_s = program_range.get("start_s")
+        end_s = program_range.get("end_s")
+        if not _is_number(start_s) or not _is_number(end_s) or end_s <= start_s:
+            raise ValueError(f"layout beat {beat_id} must have a positive program_range")
+        first_cue = cue_by_id[cue_ids[0]]
+        last_cue = cue_by_id[cue_ids[-1]]
+        if not _same_time(start_s, first_cue["start"]) or not _same_time(end_s, last_cue["end"]):
+            raise ValueError(f"layout beat {beat_id} starts or ends inside a cue")
+        if previous_start is not None and start_s < previous_start:
+            raise ValueError("layout beats must be sorted by time")
+        if previous_end is not None and start_s < previous_end:
+            raise ValueError(f"layout beat {beat_id} overlaps the previous layout beat")
+        if positions[0] <= previous_last_position:
+            raise ValueError("layout beats must follow cue order")
+        if planning_status == "complete" and not str(beat.get("rationale", "")).strip():
+            raise ValueError(f"completed layout beat {beat_id} requires a rationale")
+
+        covered_cue_ids.update(cue_ids)
+        previous_start = start_s
+        previous_end = end_s
+        previous_last_position = positions[-1]
+
+    if planning_status == "complete" and covered_cue_ids != set(cue_by_id):
+        missing = [cue_id for cue_id in cue_by_id if cue_id not in covered_cue_ids]
+        raise ValueError("completed expressive plan does not cover every cue: " + ", ".join(missing))
+
+    return {
+        "mode": "expressive",
+        "planning_status": planning_status,
+        "cue_count": len(cues),
+        "layout_beat_count": len(layout_beats),
+    }
+
+
 def build_plan(
     transcript, timeline, *, source_transcript, max_chars=42, max_lines=2,
-    max_dur=6.0, gap=0.6,
+    max_dur=6.0, gap=0.6, presentation_mode="standard",
 ):
+    if presentation_mode not in PRESENTATION_MODES:
+        raise ValueError("presentation mode must be standard or expressive")
     mapped = projectlib.map_transcript_to_timeline(transcript, timeline)
     words = flat_words(mapped)
     if not words:
         raise ValueError("no retained word-level timestamps in transcript")
     cues = build(words, max_chars, max_lines, max_dur, gap)
-    return {
+    plan = {
         "schema_version": 1,
         "target": "overlay",
         "timeline_id": timeline["timeline_id"],
@@ -206,15 +396,20 @@ def build_plan(
             "runtime_assets": [],
         },
     }
+    if presentation_mode == "expressive":
+        add_expressive_planning_shell(plan)
+    return plan
 
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("transcript")
+    parser.add_argument("transcript", nargs="?")
     parser.add_argument("out_json", nargs="?", default="captions.json")
     parser.add_argument("out_srt", nargs="?", default="captions.srt")
     parser.add_argument("--timeline")
     parser.add_argument("--source-transcript")
+    parser.add_argument("--presentation-mode", choices=sorted(PRESENTATION_MODES), default="standard")
+    parser.add_argument("--validate-plan")
     parser.add_argument("--max-chars", type=int, default=42)
     parser.add_argument("--max-lines", type=int, default=2)
     parser.add_argument("--max-dur", type=float, default=6.0)
@@ -222,11 +417,28 @@ def parse_args(argv=None):
     args = parser.parse_args(argv)
     if args.max_chars < 1 or args.max_lines < 1 or args.max_dur <= 0 or args.gap < 0:
         parser.error("caption grouping limits must be positive (gap may be zero)")
+    if not args.validate_plan and not args.transcript:
+        parser.error("transcript is required unless --validate-plan is used")
+    if args.presentation_mode == "expressive" and not args.timeline and not args.validate_plan:
+        parser.error("--presentation-mode expressive requires --timeline and a canonical caption plan")
     return args
 
 
 def main(argv=None):
     args = parse_args(argv)
+    if args.validate_plan:
+        with open(args.validate_plan, encoding="utf-8-sig") as handle:
+            plan = json.load(handle)
+        try:
+            summary = validate_caption_plan(plan, require_complete=True)
+        except ValueError as error:
+            raise SystemExit(f"[captions] invalid plan: {error}") from error
+        print(
+            f"[captions] plan validation passed: mode={summary['mode']} "
+            f"cues={summary['cue_count']} layout_beats={summary['layout_beat_count']}"
+        )
+        return
+
     with open(args.transcript, encoding="utf-8") as handle:
         transcript = json.load(handle)
     if args.timeline:
@@ -240,6 +452,7 @@ def main(argv=None):
             max_lines=args.max_lines,
             max_dur=args.max_dur,
             gap=args.gap,
+            presentation_mode=args.presentation_mode,
         )
         cues = output["cues"]
     else:

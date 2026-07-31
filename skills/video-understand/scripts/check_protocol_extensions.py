@@ -247,6 +247,37 @@ def check_image_sequence_overlay():
 
         caption_plan_path = root / "work/captions/captions-plan.json"
         caption_plan = projectlib.load_json(caption_plan_path)
+        caption_plan["review"]["evidence"] = evidence[:3]
+        projectlib.write_json(caption_plan_path, caption_plan)
+        try:
+            projectlib.build_render_plan(project, root)
+        except ValueError as error:
+            assert "caption review requires four evidence images" in str(error)
+        else:
+            raise AssertionError("standard caption review accepted fewer than four images")
+
+        caption_plan["presentation"] = {
+            "mode": "expressive",
+            "planning_status": "complete",
+            "layout_beats": [
+                {"id": "beat-001", "variant": "bottom-standard", "cue_ids": ["cue-001"]},
+            ],
+        }
+        caption_plan["review"]["evidence"] = evidence[:2]
+        projectlib.write_json(caption_plan_path, caption_plan)
+        projectlib.build_render_plan(project, root)
+
+        caption_plan["review"]["evidence"] = evidence[:1]
+        projectlib.write_json(caption_plan_path, caption_plan)
+        try:
+            projectlib.build_render_plan(project, root)
+        except ValueError as error:
+            assert "one image per layout beat plus no-caption (2 total)" in str(error)
+        else:
+            raise AssertionError("expressive caption review accepted incomplete evidence")
+
+        caption_plan.pop("presentation")
+        caption_plan["review"]["evidence"] = evidence
         caption_plan["style"]["status"] = "draft"
         projectlib.write_json(caption_plan_path, caption_plan)
         try:

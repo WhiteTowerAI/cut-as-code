@@ -131,11 +131,26 @@ const assertPreviewReview = (fields, expectedReviewId, decision) => {
   }
 };
 
-export const parseCaptionPreviewApproval = (response, expectedReviewId) => {
+export const parseCaptionPreviewApproval = (response, expectedReviewId, expectedEvidence = "standard-four") => {
+  const expressive = expectedEvidence === "expressive-layout-beats";
   const fields = parseSummaryFields(
-    response, "Caption preview review", ["review", "decision", "evidence"],
+    response, "Caption preview review",
+    expressive ? ["review", "decision", "evidence", "karaoke"] : ["review", "decision", "evidence"],
   );
   assertPreviewReview(fields, expectedReviewId, "approve");
+  if (expressive) {
+    if (fields.get("evidence").trim().toLowerCase() !== "expressive-layout-beats") {
+      throw new Error('Expressive caption preview approval Evidence must be exactly "expressive-layout-beats".');
+    }
+    const karaoke = fields.get("karaoke").trim();
+    if (!new Set(["on", "off"]).has(karaoke)) {
+      throw new Error('Expressive caption preview approval Karaoke must be exactly "on" or "off".');
+    }
+    return {
+      reviewId: fields.get("review"), decision: "approve",
+      evidence: ["expressive-layout-beats"], karaoke: karaoke === "on",
+    };
+  }
   const evidence = fields.get("evidence").split(",").map((value) => value.trim().toLowerCase());
   const required = ["early", "middle", "late", "no-caption"];
   if (evidence.length !== required.length || new Set(evidence).size !== required.length
@@ -219,12 +234,20 @@ export const assertStyleDefinitionBindings = (state) => {
   });
 };
 
-export const assertPreviewBindings = (preview) => {
+export const assertPreviewBindings = (preview, state = null) => {
   if (!preview || !preview.projectMetaPath || !preview.projectMetaSha256) {
     throw new Error("Preview project metadata binding is missing. Generate a new preview.");
   }
-  if (!Array.isArray(preview.evidence) || preview.evidence.length < 4) {
+  const minimumEvidence = preview.approvalEvidence === "expressive-layout-beats" ? 2 : 4;
+  if (!Array.isArray(preview.evidence) || preview.evidence.length < minimumEvidence) {
     throw new Error("Preview evidence bindings are incomplete. Generate a new preview.");
+  }
+
+  if (state) {
+    assertBoundFile(state.sourceVideo, state.sourceVideo.path, "Source video");
+    assertBoundFile(state.captions, state.captions.path, "Captions JSON");
+    if (state.reviewId || state.reviewPage || state.styleDefinitions) assertStyleDefinitionBindings(state);
+    if (state.reviewPage) assertReviewPageBinding(state);
   }
 
   assertBoundFile(
@@ -249,11 +272,21 @@ export const assertPreviewBindings = (preview) => {
     if (timeline.timeline_id !== preview.timeline.timelineId) {
       throw new Error("Caption preview timeline identity changed. Generate a new preview.");
     }
-    const requiredLabels = ["early", "middle", "late", "no-caption"];
     const labels = preview.evidence.map((binding) => binding.label);
-    if (labels.length !== requiredLabels.length || new Set(labels).size !== requiredLabels.length
-      || requiredLabels.some((label) => !labels.includes(label))) {
-      throw new Error("Caption preview evidence labels must be exactly early, middle, late, and no-caption.");
+    if (preview.approvalEvidence === "expressive-layout-beats") {
+      if (labels.length < 2 || labels.at(-1) !== "no-caption" || new Set(labels).size !== labels.length
+        || preview.evidence.slice(0, -1).some((binding) => !binding.beatId || !binding.variant)) {
+        throw new Error("Expressive caption preview evidence must bind unique layout beats followed by no-caption.");
+      }
+      if (!Array.isArray(preview.comparisonEvidence) || preview.comparisonEvidence.length !== 2) {
+        throw new Error("Expressive coexistence comparison evidence bindings are incomplete.");
+      }
+    } else {
+      const requiredLabels = ["early", "middle", "late", "no-caption"];
+      if (labels.length !== requiredLabels.length || new Set(labels).size !== requiredLabels.length
+        || requiredLabels.some((label) => !labels.includes(label))) {
+        throw new Error("Caption preview evidence labels must be exactly early, middle, late, and no-caption.");
+      }
     }
   }
   preview.evidence.forEach((binding, index) => {
@@ -261,6 +294,14 @@ export const assertPreviewBindings = (preview) => {
   });
   if (preview.evidenceSignature !== hashJson(preview.evidence)) {
     throw new Error("Preview evidence signature differs from the interaction state. Generate a new preview.");
+  }
+  if (preview.comparisonEvidence) {
+    preview.comparisonEvidence.forEach((binding, index) => {
+      assertBoundFile(binding, binding.path, `Coexistence comparison evidence ${index + 1}`);
+    });
+    if (preview.comparisonEvidenceSignature !== hashJson(preview.comparisonEvidence)) {
+      throw new Error("Coexistence comparison evidence signature differs from the interaction state.");
+    }
   }
 };
 
@@ -313,10 +354,23 @@ export const validateGenerationInteraction = ({
   if (state.reviewPage) assertReviewPageBinding(state);
 
   const expectedSelection = selectionOptionsFromState(state.selection);
+  const expressiveOverlay = mode === "overlay" && state.preview?.presentationMode === "expressive";
+  if (expressiveOverlay) {
+    if (typeof state.approval?.karaoke !== "boolean") {
+      throw new Error("Expressive overlay rendering requires an approved Karaoke on/off choice.");
+    }
+    if (!state.preview.comparisonEvidenceSignature
+      || state.approval.comparisonEvidenceSignature !== state.preview.comparisonEvidenceSignature) {
+      throw new Error("Expressive approval no longer matches the comparison evidence.");
+    }
+    expectedSelection.karaoke = String(state.approval.karaoke);
+  }
   for (const key of ["preset", "highlightTheme", "backgroundTheme", "strokeTheme", "karaoke"]) {
     if (normalizeNullable(requestedSelection[key]) !== normalizeNullable(expectedSelection[key])) {
       throw new Error(
-        `Requested ${key} does not match the user's recorded selection ${state.selection.choiceId}.`,
+        expressiveOverlay && key === "karaoke"
+          ? "Requested Karaoke does not match the preview-approved Expressive choice."
+          : `Requested ${key} does not match the user's recorded selection ${state.selection.choiceId}.`,
       );
     }
   }
@@ -326,7 +380,7 @@ export const validateGenerationInteraction = ({
     if (!state.preview || !state.approval) {
       throw new Error("The interaction state has no confirmed preview evidence.");
     }
-    assertPreviewBindings(state.preview);
+    assertPreviewBindings(state.preview, state);
     if (state.approval.actor && state.approval.actor !== state.decisionMode) {
       throw new Error("Render approval actor does not match the interaction decision mode.");
     }

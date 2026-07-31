@@ -584,9 +584,24 @@ def _validate_caption_plan(plan, contribution, operation_id, errors, project_roo
     if review.get("status") != "approved":
         errors.append(f"{operation_id} caption review is not approved")
     evidence = review.get("evidence")
-    if not isinstance(evidence, list) or len(evidence) < 4:
+    presentation = plan.get("presentation", {})
+    expressive = presentation.get("mode") == "expressive"
+    if not isinstance(evidence, list):
+        errors.append(f"{operation_id} caption review evidence must be a list")
+    elif expressive:
+        layout_beats = presentation.get("layout_beats")
+        if not isinstance(layout_beats, list) or not layout_beats:
+            errors.append(f"{operation_id} expressive caption review requires layout beats")
+        else:
+            expected_evidence = len(layout_beats) + 1
+            if len(evidence) != expected_evidence:
+                errors.append(
+                    f"{operation_id} expressive caption review requires one image per "
+                    f"layout beat plus no-caption ({expected_evidence} total)"
+                )
+    elif len(evidence) < 4:
         errors.append(f"{operation_id} caption review requires four evidence images")
-    else:
+    if isinstance(evidence, list):
         for value in evidence:
             try:
                 path = resolve_project_path(project_root, value)

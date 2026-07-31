@@ -53,6 +53,152 @@ const parseArgs = (args) => {
   return parsed;
 };
 
+const presentationModes = new Set(["standard", "expressive"]);
+const layoutVariants = new Set(["bottom-standard", "center-emphasis"]);
+const semanticRoles = new Set(["normal", "keyword", "number", "contrast"]);
+const isObject = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+const isNumber = (value) => typeof value === "number" && Number.isFinite(value);
+const sameTime = (left, right) => isNumber(left) && isNumber(right) && Math.abs(left - right) <= 1e-6;
+
+const validatePresentationPlan = (plan) => {
+  const presentation = plan.presentation;
+  if (presentation === undefined) {
+    return { mode: "standard", layoutBeatCount: 0 };
+  }
+  if (!isObject(presentation)) {
+    throw new Error("Caption presentation must be an object.");
+  }
+  if (!presentationModes.has(presentation.mode)) {
+    throw new Error("Caption presentation mode must be standard or expressive.");
+  }
+  if (presentation.mode === "standard") {
+    return { mode: "standard", layoutBeatCount: 0 };
+  }
+  if (presentation.schema_version !== 1) {
+    throw new Error("Expressive presentation schema_version must be 1.");
+  }
+  if (presentation.planning_status !== "complete") {
+    throw new Error("Expressive plan must be complete before preview generation.");
+  }
+  if (!isObject(presentation.planner)
+    || presentation.planner.actor !== "agent"
+    || presentation.planner.scope !== "full-program"
+    || !String(presentation.planner.rationale ?? "").trim()) {
+    throw new Error("Completed expressive plan requires an Agent full-program planning rationale.");
+  }
+
+  const cueById = new Map();
+  const cuePositions = new Map();
+  const cueIndexes = new Set();
+  let previousCueIndex = 0;
+  plan.cues.forEach((cue, position) => {
+    const cueIndex = cue?.index;
+    if (!Number.isInteger(cueIndex) || cueIndex <= 0) {
+      throw new Error(`Expressive cue at position ${position + 1} must have a positive integer index.`);
+    }
+    if (cueIndexes.has(cueIndex) || cueIndex <= previousCueIndex) {
+      throw new Error("Expressive cue indexes must be unique and ascending.");
+    }
+    previousCueIndex = cueIndex;
+    cueIndexes.add(cueIndex);
+    const cueId = cue.id;
+    if (!String(cueId ?? "").trim() || cueById.has(cueId)) {
+      throw new Error(`Expressive cue index ${cueIndex} must have a unique non-empty id.`);
+    }
+    if (!isNumber(cue.start) || !isNumber(cue.end) || cue.end <= cue.start) {
+      throw new Error(`Expressive cue index ${cueIndex} must have a positive time range.`);
+    }
+    if (!Array.isArray(cue.words) || cue.words.length === 0) {
+      throw new Error(`Expressive cue index ${cueIndex} must contain words.`);
+    }
+    cue.words.forEach((word, wordIndex) => {
+      const semanticRole = word?.semantic_role ?? "normal";
+      if (!semanticRoles.has(semanticRole)) {
+        throw new Error(`Cue index ${cueIndex} word ${wordIndex + 1} has invalid semantic_role: ${semanticRole}`);
+      }
+    });
+    cueById.set(cueId, cue);
+    cuePositions.set(cueId, position);
+  });
+
+  if (!Array.isArray(presentation.layout_beats) || presentation.layout_beats.length === 0) {
+    throw new Error("Completed expressive plan requires layout beats.");
+  }
+  const beatIds = new Set();
+  const coveredCueIds = new Set();
+  let previousStart = null;
+  let previousEnd = null;
+  let previousLastPosition = -1;
+  presentation.layout_beats.forEach((beat, beatPosition) => {
+    const beatId = beat?.id;
+    if (!String(beatId ?? "").trim() || beatIds.has(beatId)) {
+      throw new Error(`Layout beat ${beatPosition + 1} must have a unique non-empty id.`);
+    }
+    beatIds.add(beatId);
+    if (beat.variant === "top-statement") {
+      throw new Error(
+        `Layout beat ${beatId} uses removed variant top-statement; `
+        + "the plan must be replanned as bottom-standard or center-emphasis.",
+      );
+    }
+    if (!layoutVariants.has(beat.variant)) {
+      throw new Error(`Layout beat ${beatId} has invalid variant: ${beat.variant}`);
+    }
+    if (!Array.isArray(beat.cue_ids) || beat.cue_ids.length === 0) {
+      throw new Error(`Layout beat ${beatId} must reference one or more cue_ids.`);
+    }
+    const positions = beat.cue_ids.map((cueId) => {
+      if (!cueById.has(cueId)) {
+        throw new Error(`Layout beat ${beatId} references unknown cue id/index: ${cueId}`);
+      }
+      if (coveredCueIds.has(cueId)) {
+        throw new Error(`Cue ${cueId} is referenced by more than one layout beat.`);
+      }
+      return cuePositions.get(cueId);
+    });
+    const expectedPositions = Array.from(
+      { length: positions.at(-1) - positions[0] + 1 },
+      (_, index) => positions[0] + index,
+    );
+    if (positions.length !== expectedPositions.length
+      || positions.some((position, index) => position !== expectedPositions[index])) {
+      throw new Error(`Layout beat ${beatId} cue_ids must be contiguous and ordered.`);
+    }
+    if (!isObject(beat.program_range)
+      || !isNumber(beat.program_range.start_s)
+      || !isNumber(beat.program_range.end_s)
+      || beat.program_range.end_s <= beat.program_range.start_s) {
+      throw new Error(`Layout beat ${beatId} must have a positive program_range.`);
+    }
+    const firstCue = cueById.get(beat.cue_ids[0]);
+    const lastCue = cueById.get(beat.cue_ids.at(-1));
+    if (!sameTime(beat.program_range.start_s, firstCue.start)
+      || !sameTime(beat.program_range.end_s, lastCue.end)) {
+      throw new Error(`Layout beat ${beatId} starts or ends inside a cue.`);
+    }
+    if (previousStart !== null && beat.program_range.start_s < previousStart) {
+      throw new Error("Layout beats must be sorted by time.");
+    }
+    if (previousEnd !== null && beat.program_range.start_s < previousEnd) {
+      throw new Error(`Layout beat ${beatId} overlaps the previous layout beat.`);
+    }
+    if (positions[0] <= previousLastPosition) {
+      throw new Error("Layout beats must follow cue order.");
+    }
+    if (!String(beat.rationale ?? "").trim()) {
+      throw new Error(`Completed layout beat ${beatId} requires a rationale.`);
+    }
+    beat.cue_ids.forEach((cueId) => coveredCueIds.add(cueId));
+    previousStart = beat.program_range.start_s;
+    previousEnd = beat.program_range.end_s;
+    previousLastPosition = positions.at(-1);
+  });
+  if (coveredCueIds.size !== cueById.size || [...cueById.keys()].some((cueId) => !coveredCueIds.has(cueId))) {
+    throw new Error("Completed expressive plan must cover every cue exactly once.");
+  }
+  return { mode: "expressive", layoutBeatCount: presentation.layout_beats.length };
+};
+
 let options;
 try {
   options = parseArgs(rawArgs);
@@ -102,6 +248,16 @@ if (canonicalPlan && (
 )) {
   throw new Error("Canonical caption plan must be schema_version 1, target overlay, and program timebase");
 }
+const presentationSummary = canonicalPlan
+  ? validatePresentationPlan(canonicalPlan)
+  : { mode: "standard", layoutBeatCount: 0 };
+const expressiveEnabled = presentationSummary.mode === "expressive";
+const layoutBeatByCueId = new Map();
+if (expressiveEnabled) {
+  canonicalPlan.presentation.layout_beats.forEach((beat) => {
+    beat.cue_ids.forEach((cueId) => layoutBeatByCueId.set(cueId, beat));
+  });
+}
 if (approvedPlanMode && !canonicalPlan) {
   throw new Error("--approved-plan requires a canonical caption plan, not a legacy cue array.");
 }
@@ -129,19 +285,26 @@ if (approvedPlanMode) {
 } else {
   const interactionState = readInteractionState(options.interactionState);
   const recordedSelection = selectionOptionsFromState(interactionState.state.selection ?? {});
+  const approvedExpressiveKaraoke = mode === "overlay" && expressiveEnabled
+    ? interactionState.state.approval?.karaoke
+    : undefined;
   requestedSelection = {
     preset: options.preset ?? recordedSelection.preset,
     highlightTheme: options.highlightTheme ?? recordedSelection.highlightTheme,
     backgroundTheme: options.backgroundTheme ?? recordedSelection.backgroundTheme,
     strokeTheme: options.strokeTheme ?? recordedSelection.strokeTheme,
-    karaoke: options.karaoke ?? recordedSelection.karaoke,
+    karaoke: options.karaoke ?? (typeof approvedExpressiveKaraoke === "boolean"
+      ? String(approvedExpressiveKaraoke)
+      : recordedSelection.karaoke),
   };
   interaction = validateGenerationInteraction({
     statePath: options.interactionState,
     mode,
     sourceVideo,
     captionsPath,
-    requestedSelection,
+    requestedSelection: mode === "preview" && expressiveEnabled
+      ? { ...requestedSelection, karaoke: recordedSelection.karaoke }
+      : requestedSelection,
     overridesPath,
   });
   style = resolveCaptionStyle({
@@ -233,14 +396,31 @@ const toRgba = (color, opacity) => {
 const isShorts = style.preset === "shorts";
 const karaokeEnabled = karaoke && style.wordHighlight.enabled && style.wordHighlight.mode !== "none";
 const formatWord = (word) => isShorts ? word.toUpperCase() : word;
+const semanticScaleByRole = {
+  normal: 1,
+  keyword: 1.16,
+  number: 1.22,
+  contrast: 1.08,
+};
+const semanticRole = (word) => word.semantic_role ?? "normal";
+const semanticColor = (role) => role === "normal" ? style.font.color : style.wordHighlight.activeColor;
+const combinedScaleRule = "effective scale = max(semantic scale, karaoke active scale); active transform factor = effective / semantic";
 
 const cueMarkup = captions.map((cue, cueIndex) => {
   const cueId = `caption-cue-${cueIndex + 1}`;
-  const words = cue.words.map((word, wordIndex) => (
-    `<span id="${cueId}-word-${wordIndex + 1}" class="caption-word">${escapeHtml(formatWord(String(word.word).trim()))}</span>`
-  )).join(" ");
+  const beat = expressiveEnabled ? layoutBeatByCueId.get(cue.id) : null;
+  const words = cue.words.map((word, wordIndex) => {
+    const role = semanticRole(word);
+    const expressiveAttributes = expressiveEnabled
+      ? ` semantic-${role}" data-semantic-role="${role}" style="--semantic-scale:${semanticScaleByRole[role]};--semantic-color:${semanticColor(role)}`
+      : "";
+    return `<span id="${cueId}-word-${wordIndex + 1}" class="caption-word${expressiveAttributes}">${escapeHtml(formatWord(String(word.word).trim()))}</span>`;
+  }).join(" ");
   const cueDuration = Math.max(0.001, Number(cue.end) - Number(cue.start));
-  return `<div id="${cueId}" class="caption-cue clip" data-start="${Number(cue.start).toFixed(3)}" data-duration="${cueDuration.toFixed(3)}" data-track-index="2">${words}</div>`;
+  const expressiveAttributes = expressiveEnabled
+    ? ` expressive-cue layout-${beat.variant}" data-layout-beat-id="${escapeHtml(beat.id)}" data-layout-variant="${beat.variant}`
+    : "";
+  return `<div id="${cueId}" class="caption-cue clip${expressiveAttributes}" data-start="${Number(cue.start).toFixed(3)}" data-duration="${cueDuration.toFixed(3)}" data-track-index="2">${words}</div>`;
 }).join("\n        ");
 
 const cueAnimation = (cueId, start) => {
@@ -258,6 +438,28 @@ const activeWordProps = style.wordHighlight.mode === "background"
   ? `{ color: "${style.font.color}", opacity: 1, backgroundColor: "${toRgba(style.wordHighlight.backgroundColor, style.wordHighlight.backgroundOpacity)}" }`
   : `{ color: "${style.wordHighlight.activeColor}", opacity: 1, backgroundColor: "transparent" }`;
 const completedWordProps = `{ color: "${style.font.color}", opacity: 1, backgroundColor: "transparent" }`;
+const expressiveWordProps = (word, phase) => {
+  const role = semanticRole(word);
+  const scale = semanticScaleByRole[role];
+  if (phase === "active") {
+    const karaokeScale = Number(style.wordHighlight.activeScale ?? 1);
+    const effectiveScale = Math.max(scale, karaokeScale);
+    return JSON.stringify({
+      color: style.wordHighlight.activeColor,
+      opacity: 1,
+      backgroundColor: style.wordHighlight.mode === "background"
+        ? toRgba(style.wordHighlight.backgroundColor, style.wordHighlight.backgroundOpacity)
+        : "transparent",
+      scale: effectiveScale / scale,
+    });
+  }
+  return JSON.stringify({
+    color: semanticColor(role),
+    opacity: 1,
+    backgroundColor: "transparent",
+    scale: 1,
+  });
+};
 
 const timelineCode = captions.map((cue, cueIndex) => {
   const cueId = `caption-cue-${cueIndex + 1}`;
@@ -269,8 +471,10 @@ const timelineCode = captions.map((cue, cueIndex) => {
       const wordId = `${cueId}-word-${wordIndex + 1}`;
       const wordStart = Math.max(start, Number(word.start));
       const wordEnd = Math.max(wordStart + 0.001, Number(word.end));
-      lines.push(`timeline.set("#${wordId}", ${activeWordProps}, ${wordStart.toFixed(3)});`);
-      lines.push(`timeline.set("#${wordId}", ${completedWordProps}, ${wordEnd.toFixed(3)});`);
+      const wordActiveProps = expressiveEnabled ? expressiveWordProps(word, "active") : activeWordProps;
+      const wordCompletedProps = expressiveEnabled ? expressiveWordProps(word, "completed") : completedWordProps;
+      lines.push(`timeline.set("#${wordId}", ${wordActiveProps}, ${wordStart.toFixed(3)});`);
+      lines.push(`timeline.set("#${wordId}", ${wordCompletedProps}, ${wordEnd.toFixed(3)});`);
     });
   }
 
@@ -316,6 +520,41 @@ const compositionSuffix = [
   .replaceAll(/[^a-zA-Z0-9-]/g, "-");
 const compositionId = `video-add-captions-${compositionSuffix || style.preset}`;
 const pageBackground = "transparent";
+const expressiveCss = expressiveEnabled ? `
+      .caption-cue.expressive-cue {
+        width: 88%;
+        max-width: 88%;
+        text-align: center;
+      }
+
+      .caption-cue.layout-bottom-standard {
+        ${verticalPosition}
+        ${horizontalPosition}
+        translate: ${staticTranslateX} ${staticTranslateY};
+      }
+
+      .caption-cue.layout-center-emphasis {
+        top: 50%;
+        bottom: auto;
+        left: 50%;
+        right: auto;
+        translate: -50% -50%;
+        font-size: ${Math.max(1, Math.round(fontSize * 1.08))}px;
+        line-height: 1.1;
+      }
+
+      .expressive-cue .caption-word {
+        transform-origin: center center;
+        font-size: calc(1em * var(--semantic-scale, 1));
+        line-height: 1.35;
+        overflow: visible;
+        color: var(--semantic-color, ${style.font.color});
+      }
+
+      .expressive-cue .caption-word:not(.semantic-normal) {
+        text-shadow: 0 0 ${Math.max(2, Math.round(height * 0.012))}px ${toRgba(style.wordHighlight.activeColor, 0.72)}, 0 ${shadowOffset}px ${shadowBlur}px ${toRgba(style.effects.shadow.color, style.effects.shadow.opacity)};
+      }
+` : "";
 
 const html = `<!doctype html>
 <html lang="en">
@@ -393,6 +632,7 @@ const html = `<!doctype html>
         border-radius: ${Math.round(height * style.wordHighlight.backgroundRadiusRatio)}px;
         padding: ${style.wordHighlight.mode === "background" ? "0 0.08em" : "0"};
       }
+${expressiveCss}
     </style>
   </head>
   <body>
@@ -529,9 +769,23 @@ writeFileSync(join(projectDir, "project-meta.json"), JSON.stringify({
   interaction: interactionMeta,
   runtimeAssets,
   resolvedStyle: style,
+  ...(expressiveEnabled ? {
+    presentation: {
+      mode: "expressive",
+      layoutBeatCount: presentationSummary.layoutBeatCount,
+      layoutBeats: canonicalPlan.presentation.layout_beats,
+      semanticRoles: [...semanticRoles],
+      coexistenceMode: karaokeEnabled ? "semantic-plus-karaoke" : "semantic-only",
+      combinedScaleRule: karaokeEnabled ? combinedScaleRule : null,
+    },
+  } : {}),
 }, null, 2), "utf8");
 
 console.log(`[hyperframes-captions] generated ${captions.length} cues`);
 console.log(`[hyperframes-captions] selection=${selectionRecord.choiceId} style=${style.preset} karaoke=${karaoke} mode=${mode}`);
+if (presentationSummary.mode === "expressive") {
+  console.log(`[hyperframes-captions] presentation=expressive layout-beats=${presentationSummary.layoutBeatCount} coexistence=${karaokeEnabled ? "semantic-plus-karaoke" : "semantic-only"}`);
+  if (karaokeEnabled) console.log(`[hyperframes-captions] combined-scale-rule=${combinedScaleRule}`);
+}
 console.log(`[hyperframes-captions] ${width}x${height} @ ${fps}fps, ${duration.toFixed(3)}s`);
 console.log(`[hyperframes-captions] ${join(projectDir, "index.html")}`);
