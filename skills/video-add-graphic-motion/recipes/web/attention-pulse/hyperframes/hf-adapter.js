@@ -3,7 +3,7 @@
   "use strict";
   const FRAME_STEP = 0.016666666666666666;
   const TRACK_CSS = true;
-  const SOURCE_BODY = "\r\n  <div style=\"text-align:center\">\r\n    \r\n  </div>\r\n  <button class=\"cta\" data-pulse>Start free</button>\r\n  <div class=\"bell\">🔔<span class=\"dot\" data-pulse style=\"--pulse-color:#e0683c\"></span></div>\r\n";
+  const SOURCE_BODY = "\r\n  <div style=\"text-align:center\">\r\n    \r\n  </div>\r\n  <button class=\"cta\" data-pulse><span class=\"hf-pulse-ring\" aria-hidden=\"true\"></span>Start free</button>\r\n  <div class=\"bell\">🔔<span class=\"dot\" data-pulse style=\"--pulse-color:#e0683c\"><span class=\"hf-pulse-ring\" aria-hidden=\"true\"></span></span></div>\r\n";
   const nativeDocumentGetAnimations = typeof document.getAnimations === "function"
     ? document.getAnimations.bind(document)
     : null;

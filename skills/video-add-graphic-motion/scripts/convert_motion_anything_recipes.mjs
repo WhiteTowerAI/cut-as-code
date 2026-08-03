@@ -13,25 +13,20 @@ import {
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  discoverRecipes,
+  manifestList as list,
+  manifestScalar as scalar,
+} from "./recipe_library.mjs";
+
+export { discoverRecipes } from "./recipe_library.mjs";
+
 const DEFAULT_DURATION_SECONDS = 6;
 const FRAME_STEP_SECONDS = 1 / 60;
-
-function scalar(manifest, key) {
-  const match = manifest.match(new RegExp(`^\\s*${key}:\\s*([^#\\r\\n]+)`, "m"));
-  if (!match) return null;
-  return match[1].trim().replace(/^['"]|['"]$/g, "");
-}
-
-function list(manifest, key) {
-  const value = scalar(manifest, key);
-  if (!value) return [];
-  const bracketed = value.match(/^\[(.*)\]$/);
-  if (!bracketed) return [value];
-  return bracketed[1]
-    .split(",")
-    .map((item) => item.trim().replace(/^['"]|['"]$/g, ""))
-    .filter(Boolean);
-}
+const TRANSPARENT_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  "base64",
+);
 
 function durationSeconds(manifest, recipeDir) {
   const durationMatch = manifest.match(/^\s*duration_ms:\s*(\d+(?:\.\d+)?)/m);
@@ -63,29 +58,6 @@ async function walk(directory) {
     }
   }
   return files;
-}
-
-export async function discoverRecipes(recipesRoot) {
-  const manifestPaths = (await walk(recipesRoot))
-    .filter((file) => path.basename(file) === "recipe.motion.yaml")
-    .filter((file) => !file.split(path.sep).includes("hyperframes"))
-    .sort((a, b) => a.localeCompare(b));
-
-  return Promise.all(
-    manifestPaths.map(async (manifestPath) => {
-      const manifest = await readFile(manifestPath, "utf8");
-      const recipeDir = path.dirname(manifestPath);
-      return {
-        id: scalar(manifest, "id") || path.basename(recipeDir),
-        surface: path.basename(path.dirname(recipeDir)),
-        recipeDir,
-        manifestPath,
-        manifest,
-        runtime: list(manifest, "runtime"),
-        entry: scalar(manifest, "entry") || "preview.html",
-      };
-    }),
-  );
 }
 
 export async function writeLibraryAttribution({
@@ -296,7 +268,7 @@ ${rewriteLocalAssetPaths(head)}
 </head>
 <body data-composition-id="${safeId}" data-start="0" data-width="1920" data-height="1080" data-duration="${safeDuration}" data-no-timeline>
   <div id="lottie" class="clip" data-start="0" data-duration="${safeDuration}" data-track-index="1"></div>
-  <script src="source/_runtime/lottie.min.js"></script>
+  <script src="_runtime/lottie.min.js"></script>
   <script>
     const nativeGetRegisteredAnimations = lottie.getRegisteredAnimations.bind(lottie);
     const animation = lottie.loadAnimation({
@@ -598,9 +570,37 @@ async function copyLottieRuntime(recipesRoot, outputDir) {
   } catch {
     return;
   }
-  const destination = path.join(outputDir, "source", "_runtime", "lottie.min.js");
+  const destination = path.join(outputDir, "_runtime", "lottie.min.js");
   await mkdir(path.dirname(destination), { recursive: true });
   await cp(runtime, destination);
+}
+
+async function ensureLottieAssets(recipeDir, outputDir, jsonFile) {
+  const animation = JSON.parse(await readFile(path.join(recipeDir, jsonFile), "utf8"));
+  const layers = [
+    ...(Array.isArray(animation.layers) ? animation.layers : []),
+    ...(Array.isArray(animation.assets)
+      ? animation.assets.flatMap((asset) => Array.isArray(asset.layers) ? asset.layers : [])
+      : []),
+  ];
+  for (const asset of Array.isArray(animation.assets) ? animation.assets : []) {
+    if (!asset || typeof asset.p !== "string" || /^(?:data:|[a-z]+:|\/\/)/i.test(asset.p)) continue;
+    const relative = path.join(typeof asset.u === "string" ? asset.u : "", asset.p);
+    const source = path.resolve(recipeDir, relative);
+    const recipeRoot = path.resolve(recipeDir) + path.sep;
+    const destination = path.resolve(outputDir, "source", relative);
+    const outputRoot = path.resolve(outputDir, "source") + path.sep;
+    if (!source.startsWith(recipeRoot) || !destination.startsWith(outputRoot)) {
+      throw new Error(`Lottie asset escapes recipe directory: ${relative}`);
+    }
+    if (await fileExists(destination)) continue;
+    const references = layers.filter((layer) => layer && layer.refId === asset.id);
+    if (references.some((layer) => layer.hd !== true)) {
+      throw new Error(`Lottie visible asset is missing: ${relative}`);
+    }
+    await mkdir(path.dirname(destination), { recursive: true });
+    await writeFile(destination, TRANSPARENT_PNG);
+  }
 }
 
 async function copyReferencedAssets({ recipesRoot, recipeDir, outputDir, html }) {
@@ -631,14 +631,37 @@ export async function convertRecipe({ recipesRoot, recipeDir }) {
 
   const preview = await readFile(path.join(recipeDir, entry), "utf8");
   const { withoutScripts, blocks } = scriptBlocks(preview);
-  const { head, body: sourceBody } = documentParts(withoutScripts);
-  const body = stripDemoChrome(sourceBody);
+  let { head, body: sourceBody } = documentParts(withoutScripts);
+  let body = stripDemoChrome(sourceBody).replace(
+    /class=(["'])([^"']*\bui-sheet\b[^"']*)\1/,
+    (match) => `${match} data-layout-allow-overflow`,
+  );
+  if (id === "attention-pulse") {
+    body = body.replace(
+      /(<[a-z][^>]*\bdata-pulse\b[^>]*>)/gi,
+      '$1<span class="hf-pulse-ring" aria-hidden="true"></span>',
+    );
+    head += `<style>
+      [data-pulse]::after { display: none !important; }
+      .hf-pulse-ring {
+        display: block; position: absolute; inset: 0; border-radius: inherit;
+        border: 2px solid currentColor; color: transparent; opacity: 1; transform: scale(1);
+        animation: hf-ma-pulse 2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+        pointer-events: none; will-change: transform, color;
+      }
+      @keyframes hf-ma-pulse {
+        0% { color: color-mix(in srgb, var(--pulse-color, #8b7cf6) 50%, transparent); transform: scale(1); }
+        70%, 100% { color: transparent; transform: scale(1.5); }
+      }
+    </style>`;
+  }
   await copyReferencedAssets({ recipesRoot, recipeDir, outputDir, html: `${head}\n${body}` });
   let lottieJson = "animation.json";
   if (runtime.includes("lottie")) {
     const jsonFile = (await readdir(recipeDir)).find((name) => name.endsWith(".json"));
     if (jsonFile) lottieJson = jsonFile;
     await copyLottieRuntime(recipesRoot, outputDir);
+    await ensureLottieAssets(recipeDir, outputDir, lottieJson);
   } else {
     await writeFile(path.join(outputDir, "hf-recipe.js"), await bundleRecipeScripts(recipeDir, blocks), "utf8");
     await writeFile(path.join(outputDir, "hf-adapter.js"), adapterSource({ id, duration, body, runtime }), "utf8");

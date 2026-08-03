@@ -121,6 +121,60 @@ test("removes visible demo chrome from converted output while preserving the sou
   assert.match(sourcePreview, />Replay</);
 });
 
+test("marks bottom-sheet travel as intentional layout overflow", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "graphic-motion-sheet-"));
+  const recipeDir = await fixtureRecipe(
+    root,
+    "app",
+    "bottom-sheet",
+    "id: bottom-sheet\nruntime: [css, js]\nentry: preview.html\n",
+    {
+      "preview.html": [
+        "<!doctype html><style>.ui-sheet{transform:translateY(100%)}</style>",
+        '<div class="ui-phone"><div class="ui-sheet"></div></div>',
+        "<script>setTimeout(()=>document.querySelector('.ui-phone').classList.add('open'),300)</script>",
+      ].join(""),
+    },
+  );
+
+  await convertRecipe({ recipesRoot: root, recipeDir });
+  const html = await readFile(path.join(recipeDir, "hyperframes", "index.html"), "utf8");
+
+  assert.match(html, /class="ui-sheet" data-layout-allow-overflow/);
+});
+
+test("materializes pseudo-element-only pulse motion as seek-visible DOM", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "graphic-motion-pulse-"));
+  const recipeDir = await fixtureRecipe(
+    root,
+    "web",
+    "attention-pulse",
+    "id: attention-pulse\nruntime: [css]\nentry: preview.html\n",
+    {
+      "preview.html": [
+        "<!doctype html><head><style>",
+        "[data-pulse]::after{content:'';animation:ma-pulse 2s ease-out infinite}",
+        "@keyframes ma-pulse{from{opacity:.5;transform:scale(1)}to{opacity:0;transform:scale(1.5)}}",
+        "</style></head><body>",
+        '<button data-pulse>Start</button>',
+        '<span data-pulse style="--pulse-color:#e0683c"></span>',
+        "</body>",
+      ].join(""),
+    },
+  );
+
+  await convertRecipe({ recipesRoot: root, recipeDir });
+  const outputDir = path.join(recipeDir, "hyperframes");
+  const html = await readFile(path.join(outputDir, "index.html"), "utf8");
+  const adapter = await readFile(path.join(outputDir, "hf-adapter.js"), "utf8");
+
+  assert.equal((html.match(/class="hf-pulse-ring"/g) || []).length, 2);
+  assert.equal((adapter.match(/class=\\"hf-pulse-ring\\"/g) || []).length, 2);
+  assert.match(html, /\[data-pulse\]::after\s*\{\s*display:\s*none\s*!important/);
+  assert.match(html, /\.hf-pulse-ring[\s\S]*opacity:\s*1[\s\S]*animation:\s*hf-ma-pulse 2s cubic-bezier\(0\.16, 1, 0\.3, 1\) infinite/);
+  assert.match(html, /@keyframes hf-ma-pulse[\s\S]*color:\s*color-mix[\s\S]*color:\s*transparent/);
+});
+
 test("repeated seeks clean up resources and restore deterministic visual time", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "graphic-motion-lifecycle-"));
   const recipeDir = await fixtureRecipe(
@@ -261,7 +315,15 @@ test("repeated seeks clean up resources and restore deterministic visual time", 
 
 test("keeps Lottie JSON unchanged and registers a local non-autoplay player", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "graphic-motion-lottie-"));
-  const animation = '{"fr":30,"ip":0,"op":60,"layers":[]}';
+  await mkdir(path.join(root, "lottie", "_runtime"), { recursive: true });
+  await writeFile(path.join(root, "lottie", "_runtime", "lottie.min.js"), "window.lottie = {};", "utf8");
+  const animation = JSON.stringify({
+    fr: 30,
+    ip: 0,
+    op: 60,
+    assets: [{ id: "hidden-icon", w: 380, h: 380, u: "images/", p: "icon.png" }],
+    layers: [{ refId: "hidden-icon", hd: true }],
+  });
   const recipeDir = await fixtureRecipe(
     root,
     "lottie",
@@ -276,7 +338,7 @@ test("keeps Lottie JSON unchanged and registers a local non-autoplay player", as
       "",
     ].join("\n"),
     {
-      "preview.html": "<!doctype html><head><style>#lottie { width:220px; height:220px; }</style></head><body><div id=\"lottie\"></div></body>",
+      "preview.html": "<!doctype html><head><style>#lottie { width:220px; height:220px; }</style></head><body><div id=\"lottie\"></div><script src=\"../_runtime/lottie.min.js\"></script></body>",
       "animation.json": animation,
     },
   );
@@ -284,9 +346,15 @@ test("keeps Lottie JSON unchanged and registers a local non-autoplay player", as
   await convertRecipe({ recipesRoot: root, recipeDir });
   const outputDir = path.join(recipeDir, "hyperframes");
   const copied = await readFile(path.join(outputDir, "source", "animation.json"), "utf8");
+  const placeholder = await readFile(path.join(outputDir, "source", "images", "icon.png"));
+  const previewRuntime = await readFile(path.join(outputDir, "_runtime", "lottie.min.js"), "utf8");
   const html = await readFile(path.join(outputDir, "index.html"), "utf8");
 
   assert.equal(copied, animation);
+  assert.deepEqual([...placeholder.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+  assert.equal(previewRuntime, "window.lottie = {};");
+  assert.match(html, /src="_runtime\/lottie\.min\.js"/);
+  assert.doesNotMatch(html, /src="source\/_runtime\/lottie\.min\.js"/);
   assert.match(html, /window\.__hf\s*=\s*\{/);
   assert.match(html, /seek\(time\)\s*\{\s*seekLottie\(time\)/);
   assert.match(html, /addEventListener\("hf-seek",\s*\(event\)\s*=>\s*seekLottie\(event\.detail\.time\)\)/);

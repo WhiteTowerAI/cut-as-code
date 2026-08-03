@@ -20,7 +20,19 @@
       display:grid; place-items:center; font-size:20px; }
     .dot { position:absolute; top:-3px; right:-3px; width:12px; height:12px; border-radius:50%; background:#e0683c; }
   </style>
-
+<style>
+      [data-pulse]::after { display: none !important; }
+      .hf-pulse-ring {
+        display: block; position: absolute; inset: 0; border-radius: inherit;
+        border: 2px solid currentColor; color: transparent; opacity: 1; transform: scale(1);
+        animation: hf-ma-pulse 2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+        pointer-events: none; will-change: transform, color;
+      }
+      @keyframes hf-ma-pulse {
+        0% { color: color-mix(in srgb, var(--pulse-color, #8b7cf6) 50%, transparent); transform: scale(1); }
+        70%, 100% { color: transparent; transform: scale(1.5); }
+      }
+    </style>
   <style>
     html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; }
     body[data-composition-id] { position: relative; box-sizing: border-box; background: transparent !important; }
@@ -31,8 +43,8 @@
   <div style="text-align:center">
     
   </div>
-  <button class="cta" data-pulse>Start free</button>
-  <div class="bell">🔔<span class="dot" data-pulse style="--pulse-color:#e0683c"></span></div>
+  <button class="cta" data-pulse><span class="hf-pulse-ring" aria-hidden="true"></span>Start free</button>
+  <div class="bell">🔔<span class="dot" data-pulse style="--pulse-color:#e0683c"><span class="hf-pulse-ring" aria-hidden="true"></span></span></div>
 
   <script src="hf-recipe.js"></script>
   <script src="hf-adapter.js"></script>

@@ -3,7 +3,7 @@
   "use strict";
   const FRAME_STEP = 0.016666666666666666;
   const TRACK_CSS = true;
-  const SOURCE_BODY = "\r\n  <div class=\"ui-phone\"><div class=\"scrim\"></div><div class=\"ui-sheet\"><div class=\"grab\"></div><div class=\"ln\" style=\"width:60%\"></div><div class=\"ln\"></div></div></div>\r\n  \r\n";
+  const SOURCE_BODY = "\r\n  <div class=\"ui-phone\"><div class=\"scrim\"></div><div class=\"ui-sheet\" data-layout-allow-overflow><div class=\"grab\"></div><div class=\"ln\" style=\"width:60%\"></div><div class=\"ln\"></div></div></div>\r\n  \r\n";
   const nativeDocumentGetAnimations = typeof document.getAnimations === "function"
     ? document.getAnimations.bind(document)
     : null;
