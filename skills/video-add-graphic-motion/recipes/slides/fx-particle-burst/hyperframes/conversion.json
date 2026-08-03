@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "fx-particle-burst",
+  "surface": "slides",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "7d46026c3236a4f90f21c9ca0999f879bd4a09822de7077db26648e9212b8bf6"
+}

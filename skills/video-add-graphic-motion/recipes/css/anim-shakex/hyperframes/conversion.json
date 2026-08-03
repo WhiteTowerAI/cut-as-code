@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "anim-shakex",
+  "surface": "css",
+  "runtime": [
+    "css"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "css",
+  "source_manifest_sha256": "781486bddd0fd4163eff14f44190287d224724824e9b37e04d3d835049aedf18"
+}

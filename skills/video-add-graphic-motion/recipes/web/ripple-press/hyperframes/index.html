@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <title>ripple-press - HyperFrames</title>
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ripple · motion-anything recipe</title>
+  <link rel="stylesheet" href="source/ripple.css">
+  <style>
+    :root { color-scheme: light; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; gap: 22px; text-align: center;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: radial-gradient(120% 120% at 50% 0%, #fff, #f4f5f7); color: #1a1d24; }
+    .badge { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: #8b909a; }
+    .row { display: flex; gap: 14px; }
+    button.ripple { border: 0; color: #fff; background: #8b7cf6; font: 600 15px/1 ui-sans-serif, system-ui, sans-serif;
+      padding: 14px 22px; border-radius: 12px; cursor: pointer; }
+    button.ripple.alt { background: #1a1d24; }
+    .hint { font-size: 13px; color: #9aa0aa; }
+  </style>
+
+  <style>
+    html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; }
+    body[data-composition-id] { position: relative; box-sizing: border-box; background: transparent !important; }
+  </style>
+</head>
+<body data-composition-id="ripple-press" data-start="0" data-width="1920" data-height="1080" data-duration="6" data-no-timeline="">
+
+  
+  <div data-hf-id="hf-thy4" class="row">
+    <button data-hf-id="hf-94eq" class="ripple">✦ Get started</button>
+    <button data-hf-id="hf-g3ux" class="ripple alt">Learn more</button>
+  </div>
+  
+  
+
+  <script src="hf-recipe.js"></script>
+  <script src="hf-adapter.js"></script>
+</body>
+</html>

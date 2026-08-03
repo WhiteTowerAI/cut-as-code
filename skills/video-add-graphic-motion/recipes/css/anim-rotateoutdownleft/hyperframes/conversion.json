@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "anim-rotateoutdownleft",
+  "surface": "css",
+  "runtime": [
+    "css"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "css",
+  "source_manifest_sha256": "cb8200a4a9da757eaed831648669639ce1e2bbbc8a0fe0cd2f54e92bdfbb939c"
+}

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "anim-rotateinupleft",
+  "surface": "css",
+  "runtime": [
+    "css"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "css",
+  "source_manifest_sha256": "3f7ca5695588aa4be9f998e06f5642944234b62f070d2407bebed740909bad1e"
+}

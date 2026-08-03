@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "fx-galaxy-swirl",
+  "surface": "slides",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "9e9e25ba01826ef36678c3fe3102de8f4d02f4d08d4fbd3b3f84f63571efd7e2"
+}

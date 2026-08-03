@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "particles",
+  "surface": "web",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "100721a6a792c52c97d186ec6c4b796f35bdb554a960a401bfec9e41b633c6a9"
+}

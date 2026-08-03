@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "magnetic-button",
+  "surface": "web",
+  "runtime": [],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "ffd03c834360be5bd6b084768ee298eb3b0a5b718227cfb486a6aca6a4a11208"
+}

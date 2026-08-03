@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "lightning",
+  "surface": "web",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "e315edf569a2c65d00295c5d550dc9cc493f32dedf733afca56db312e6ffbe52"
+}

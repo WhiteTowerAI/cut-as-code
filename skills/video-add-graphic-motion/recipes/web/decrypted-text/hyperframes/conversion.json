@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "recipe_id": "decrypted-text",
+  "surface": "web",
+  "runtime": [
+    "css",
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "58a7ed6644a775947c8f2b5e3ccd6769477b07e1fccacb908fb9f58dac0462b7"
+}

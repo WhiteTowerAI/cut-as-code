@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "fx-constellation",
+  "surface": "slides",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "4b230d3488ebe88f708a94f9e932a58b44559e49c5afd0a0432ac78f921f8076"
+}

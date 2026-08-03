@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "anim-fadeinup",
+  "surface": "css",
+  "runtime": [
+    "css"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "css",
+  "source_manifest_sha256": "167ef7cd854204967b20834c23b888bec740f62384b9f9605c7091899af4568d"
+}

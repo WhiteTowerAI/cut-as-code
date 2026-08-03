@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "silk",
+  "surface": "web",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "66ac41b9555c20a0cff378c98b5d8314ab8bb7ed8cfe3c4dbd33e11da2840955"
+}

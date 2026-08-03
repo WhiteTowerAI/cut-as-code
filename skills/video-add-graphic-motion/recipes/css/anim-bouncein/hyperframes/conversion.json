@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "anim-bouncein",
+  "surface": "css",
+  "runtime": [
+    "css"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "css",
+  "source_manifest_sha256": "3e86bee024e8b969b8d7b02adc7009cb65c832684b169cb341486c2e77b7e0d8"
+}

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "pixel-blast",
+  "surface": "web",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "c1ae7360483f3cc653ef71cac033e70a3b755fa27ecd29396b78f114128bf68e"
+}

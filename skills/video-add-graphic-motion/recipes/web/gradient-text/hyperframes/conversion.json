@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "gradient-text",
+  "surface": "web",
+  "runtime": [
+    "css"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "css",
+  "source_manifest_sha256": "4c7bb9061233f64b0ec5da35062db4b2387a97b7d162e1c71c05e0dcfb150fd9"
+}

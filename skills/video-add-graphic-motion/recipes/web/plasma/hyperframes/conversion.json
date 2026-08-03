@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "plasma",
+  "surface": "web",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "1b188d15302c1eb3ca46f6e80bc4c64f407c418f185a5a63cb6ad3ed0e172a35"
+}

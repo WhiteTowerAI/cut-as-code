@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "card-lift-hover",
+  "surface": "web",
+  "runtime": [],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "a559ec8391f8dd1e38a7d7f89fb79bfcb03cbc8af5eb42407261b24bf68f3db8"
+}

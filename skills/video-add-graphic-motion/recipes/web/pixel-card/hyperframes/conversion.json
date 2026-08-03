@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "recipe_id": "pixel-card",
+  "surface": "web",
+  "runtime": [
+    "css",
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "3616f5a2f9504f421e99609cf9255068d653251a95d8df36d338836415a948ea"
+}

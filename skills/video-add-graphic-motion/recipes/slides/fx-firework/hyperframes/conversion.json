@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "fx-firework",
+  "surface": "slides",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "cd07755ea0f6a3b00564d6c125aee9a66bdd824e8436384d0bd00c2bace18017"
+}

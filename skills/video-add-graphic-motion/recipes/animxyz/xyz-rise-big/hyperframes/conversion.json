@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "xyz-rise-big",
+  "surface": "animxyz",
+  "runtime": [
+    "css"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "css",
+  "source_manifest_sha256": "eaf773f5412f8353dfb3dae9cc867b38c22528d4a5c79755dfdf45c5d2632956"
+}

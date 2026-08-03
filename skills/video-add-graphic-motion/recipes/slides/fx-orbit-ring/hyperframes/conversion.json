@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "fx-orbit-ring",
+  "surface": "slides",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "7150f1f7b9e51e2182e6acbd4a97e25341b69be9d322a63c3fa8ad196f495154"
+}
