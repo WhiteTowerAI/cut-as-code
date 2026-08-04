@@ -18,6 +18,9 @@ import projectlib
 
 RANGE_EPSILON = 1e-6
 KEN_BURNS_DIRECTIONS = {"zoom-in", "pan-left", "pan-right"}
+HUMAN_APPROVAL_RATIONALE = "Explicit user action approved the exact configuration shown in this review."
+REVIEW_INTENTS = {"approve", "request_revision"}
+PLAYBACK_RATES = (0.5, 1.0, 1.5, 2.0)
 VISUAL_REVIEW_CHECKS = (
     "semantic_fit", "unwanted_logos_or_text", "jump_cuts",
     "entry_exit_boundaries", "grade_match",
@@ -85,6 +88,257 @@ def _valid_ken_burns(value):
     return isinstance(value, dict) and isinstance(value.get("direction"), str) and value["direction"] in KEN_BURNS_DIRECTIONS
 
 
+def timeline_frame_duration(timeline):
+    fps = timeline.get("fps") if isinstance(timeline, dict) else None
+    num = fps.get("num") if isinstance(fps, dict) else None
+    den = fps.get("den") if isinstance(fps, dict) else None
+    if (not isinstance(num, int) or isinstance(num, bool) or num <= 0
+            or not isinstance(den, int) or isinstance(den, bool) or den <= 0):
+        raise ValueError("timeline fps num and den must be positive integers")
+    return den / num
+
+
+def _range_dict(value):
+    parsed = _range(value)
+    if not parsed:
+        return None
+    return {"start_s": parsed[0], "end_s": parsed[1]}
+
+
+def _ranges_equal(left, right, *, tolerance=RANGE_EPSILON):
+    left_range, right_range = _range(left), _range(right)
+    return bool(
+        left_range and right_range
+        and abs(left_range[0] - right_range[0]) <= tolerance
+        and abs(left_range[1] - right_range[1]) <= tolerance
+    )
+
+
+def _frame_index(value, frame_duration):
+    number = _strict_finite_number(value)
+    if number is _INVALID_NUMBER:
+        return None
+    frame = round(number / frame_duration)
+    return frame if abs(number - frame * frame_duration) <= RANGE_EPSILON else None
+
+
+def allocate_program_ranges(program_range, segment_count, timeline):
+    """Split a frame-aligned program range; the final segment absorbs the remainder."""
+    if (not isinstance(segment_count, int) or isinstance(segment_count, bool)
+            or segment_count < 1 or segment_count > 3):
+        raise ValueError("segment_count must be 1-3")
+    frame_duration = timeline_frame_duration(timeline)
+    program = _range(program_range)
+    if not program:
+        raise ValueError("program_range is invalid")
+    start_frame = _frame_index(program[0], frame_duration)
+    end_frame = _frame_index(program[1], frame_duration)
+    if start_frame is None or end_frame is None or end_frame - start_frame < segment_count:
+        raise ValueError("program_range must be frame-aligned with at least one frame per segment")
+    total_frames = end_frame - start_frame
+    base_frames = total_frames // segment_count
+    frame_counts = [base_frames] * segment_count
+    frame_counts[-1] += total_frames % segment_count
+    ranges = []
+    cursor = start_frame
+    for index, frame_count in enumerate(frame_counts):
+        following = cursor + frame_count
+        ranges.append({
+            "start_s": program[0] if index == 0 else round(cursor * frame_duration, 9),
+            "end_s": program[1] if index == segment_count - 1 else round(following * frame_duration, 9),
+        })
+        cursor = following
+    return ranges
+
+
+def _canonical_segment_errors(segment, candidate, program_range, frame_duration):
+    errors = []
+    if not isinstance(segment, dict):
+        return ["segment must be an object"]
+    candidate_id = candidate.get("id") if isinstance(candidate, dict) else None
+    if segment.get("candidate_id") != candidate_id:
+        errors.append("segment candidate_id does not match candidate")
+    rate = _strict_finite_number(segment.get("playback_rate"))
+    if rate is _INVALID_NUMBER or rate not in PLAYBACK_RATES:
+        errors.append("segment playback_rate must be one of 0.5, 1.0, 1.5, or 2.0")
+    source = _range(segment.get("source_range"))
+    program = _range(segment.get("program_range"))
+    expected_program = _range(program_range)
+    if not source or source[0] < 0 or source[1] <= source[0]:
+        errors.append("segment source_range is invalid")
+    elif not _valid_source_trim(segment.get("source_range"), candidate):
+        errors.append("segment source_range exceeds candidate duration")
+    if not program or program[1] <= program[0]:
+        errors.append("segment program_range is invalid")
+    elif not expected_program or not _ranges_equal(segment.get("program_range"), program_range):
+        errors.append("segment program_range must equal the shot program range")
+    if source and program and rate is not _INVALID_NUMBER and rate > 0:
+        source_duration = source[1] - source[0]
+        program_duration = program[1] - program[0]
+        if abs(source_duration / rate - program_duration) > frame_duration + RANGE_EPSILON:
+            errors.append("segment source and program durations must match within one timeline frame")
+    return errors
+
+
+def _canonical_segments_errors(segments, candidates, program_range, frame_duration):
+    if not isinstance(segments, list) or not 1 <= len(segments) <= 3:
+        return ["canonical selection requires 1-3 segments"]
+    if not isinstance(candidates, list):
+        return ["shot candidates must be a list"]
+    candidate_map = {
+        candidate.get("id"): candidate for candidate in candidates
+        if isinstance(candidate, dict) and isinstance(candidate.get("id"), str)
+    }
+    ranked_ids = {
+        candidate_id for candidate_id, candidate in candidate_map.items()
+        if (isinstance(candidate.get("ranking"), dict)
+            and isinstance(candidate["ranking"].get("rank"), int)
+            and not isinstance(candidate["ranking"].get("rank"), bool)
+            and 1 <= candidate["ranking"]["rank"] <= 3)
+    }
+    allowed_ids = ranked_ids if ranked_ids else set(candidate_map)
+    shot_program = _range(program_range)
+    shot_start = _frame_index(shot_program[0], frame_duration) if shot_program else None
+    shot_end = _frame_index(shot_program[1], frame_duration) if shot_program else None
+    errors = []
+    seen_ids = set()
+    previous_end = None
+    for index, segment in enumerate(segments):
+        if not isinstance(segment, dict):
+            errors.append(f"segment {index + 1} must be an object")
+            continue
+        candidate_id = segment.get("candidate_id")
+        if not isinstance(candidate_id, str) or not candidate_id.strip():
+            errors.append(f"segment {index + 1} candidate_id is required")
+            continue
+        if candidate_id in seen_ids:
+            errors.append("segment candidate IDs must be unique")
+        seen_ids.add(candidate_id)
+        candidate = candidate_map.get(candidate_id)
+        if candidate is None or candidate.get("media_type") != "video":
+            errors.append("segment candidate must belong to shot video candidates")
+            continue
+        if candidate_id not in allowed_ids:
+            errors.append("segment candidate must belong to the bound Top 3")
+        segment_program = _range(segment.get("program_range"))
+        errors.extend(_canonical_segment_errors(
+            segment, candidate, segment.get("program_range"), frame_duration,
+        ))
+        if not segment_program:
+            continue
+        start_frame = _frame_index(segment_program[0], frame_duration)
+        end_frame = _frame_index(segment_program[1], frame_duration)
+        if start_frame is None or end_frame is None:
+            errors.append("segment program ranges must align to timeline frames")
+            continue
+        if end_frame - start_frame < 1:
+            errors.append("each segment must occupy at least one timeline frame")
+        if previous_end is not None and start_frame != previous_end:
+            errors.append("segment program ranges must be continuous without gaps or overlaps")
+        previous_end = end_frame
+        if index == 0 and shot_start is not None and start_frame != shot_start:
+            errors.append("segment program ranges must completely cover the shot program range")
+    if (shot_start is None or shot_end is None):
+        errors.append("shot program_range must align to timeline frames")
+    elif previous_end is not None and previous_end != shot_end:
+        errors.append("segment program ranges must completely cover the shot program range")
+    return errors
+
+
+def selection_details(shot, candidate, timeline):
+    """Return canonical segment details while preserving legacy trim intent."""
+    if not isinstance(shot, dict):
+        raise ValueError("shot must be an object")
+    candidates = candidate if isinstance(candidate, list) else [candidate]
+    if not candidates or any(not isinstance(item, dict) for item in candidates):
+        raise ValueError("candidate must be an object or list of objects")
+    selected = shot.get("selected")
+    if not isinstance(selected, dict):
+        raise ValueError("shot selection is required")
+    frame = timeline_frame_duration(timeline)
+    program = _range(shot.get("program_range"))
+    if not program or program[1] <= program[0]:
+        raise ValueError("shot program_range is invalid")
+    program_range = {"start_s": program[0], "end_s": program[1]}
+    program_duration = program[1] - program[0]
+    segments = selected.get("segments")
+    if segments is not None:
+        errors = _canonical_segments_errors(segments, candidates, program_range, frame)
+        if errors:
+            raise ValueError("; ".join(errors))
+        canonical = copy.deepcopy(segments)
+        segment_details = []
+        for segment in canonical:
+            source = _range(segment["source_range"])
+            segment_program = _range(segment["program_range"])
+            rate = float(segment["playback_rate"])
+            segment_details.append({
+                "candidate_id": segment["candidate_id"],
+                "source_duration_s": source[1] - source[0],
+                "effective_duration_s": (source[1] - source[0]) / rate,
+                "program_duration_s": segment_program[1] - segment_program[0],
+                "playback_rate": rate,
+            })
+        return {
+            "format": "canonical",
+            "segments": canonical,
+            "segment_details": segment_details,
+            "source_duration_s": sum(item["source_duration_s"] for item in segment_details),
+            "effective_duration_s": sum(item["effective_duration_s"] for item in segment_details),
+            "program_duration_s": program_duration,
+        }
+    candidate = next((item for item in candidates if item.get("id") == selected.get("candidate_id")), None)
+    if candidate is None:
+        raise ValueError("legacy video selection does not match candidate")
+    if candidate.get("media_type") != "video" or selected.get("candidate_id") != candidate.get("id"):
+        raise ValueError("legacy video selection does not match candidate")
+    requested = _range(selected.get("source_trim"))
+    if not requested or not _valid_source_trim(selected.get("source_trim"), candidate):
+        raise ValueError("legacy video selection requires a valid source_trim")
+    requested_duration = requested[1] - requested[0]
+    if requested_duration + frame + RANGE_EPSILON < program_duration:
+        raise ValueError("legacy source_trim cannot cover the shot program duration")
+    effective_end = min(requested[1], requested[0] + program_duration)
+    segment = {
+        "candidate_id": candidate["id"],
+        "source_range": {"start_s": requested[0], "end_s": effective_end},
+        "program_range": program_range,
+        "playback_rate": 1.0,
+    }
+    return {
+        "format": "legacy",
+        "segments": [segment],
+        "segment_details": [{
+            "candidate_id": candidate["id"],
+            "source_duration_s": effective_end - requested[0],
+            "effective_duration_s": effective_end - requested[0],
+            "program_duration_s": program_duration,
+            "playback_rate": 1.0,
+        }],
+        "legacy_requested_source_range": {"start_s": requested[0], "end_s": requested[1]},
+        "source_duration_s": effective_end - requested[0],
+        "effective_duration_s": effective_end - requested[0],
+        "program_duration_s": program_duration,
+    }
+
+
+def selected_candidate_id(selected):
+    values = selected_candidate_ids(selected)
+    return values[0] if values else None
+
+
+def selected_candidate_ids(selected):
+    if not isinstance(selected, dict):
+        return []
+    segments = selected.get("segments")
+    if segments is not None:
+        if not isinstance(segments, list) or any(not isinstance(segment, dict) for segment in segments):
+            return []
+        return [segment.get("candidate_id") for segment in segments]
+    candidate_id = selected.get("candidate_id")
+    return [candidate_id] if candidate_id is not None else []
+
+
 def candidate_manifest(plan):
     return [{"id": shot.get("id"), "candidates": sorted(copy.deepcopy(shot.get("candidates", [])), key=lambda item: str(item.get("id")))} for shot in sorted(plan.get("shots", []), key=lambda item: str(item.get("id")))]
 
@@ -133,19 +387,34 @@ def _decision_manifest(shots):
         selected, candidates = shot.get("selected"), shot.get("candidates")
         if not isinstance(selected, dict) or not isinstance(candidates, list):
             return None
-        selected_id = selected.get("candidate_id")
-        if not isinstance(selected_id, str) or not selected_id.strip():
+        segments = selected.get("segments")
+        if segments is not None:
+            if (not isinstance(segments, list) or not 1 <= len(segments) <= 3
+                    or any(not isinstance(segment, dict) for segment in segments)):
+                return None
+            selected_ids = [segment.get("candidate_id") for segment in segments]
+        else:
+            selected_ids = [selected.get("candidate_id")]
+        if (any(not isinstance(candidate_id, str) or not candidate_id.strip()
+                for candidate_id in selected_ids)
+                or len(selected_ids) != len(set(selected_ids))):
             return None
-        candidate = None
-        for item in candidates:
-            if not isinstance(item, dict):
-                continue
-            candidate_id = item.get("id")
-            if isinstance(candidate_id, str) and candidate_id.strip() and candidate_id == selected_id:
-                candidate = item
-                break
-        if candidate is None:
+        selected_candidates = [
+            next((item for item in candidates
+                  if isinstance(item, dict) and item.get("id") == candidate_id), None)
+            for candidate_id in selected_ids
+        ]
+        if any(candidate is None for candidate in selected_candidates):
             return None
+        if segments is not None and all(candidate.get("media_type") == "video" for candidate in selected_candidates):
+            decisions.append({
+                "id": shot_id,
+                "decision": "select",
+                "program_range": copy.deepcopy(shot.get("program_range")),
+                "segments": copy.deepcopy(segments),
+            })
+            continue
+        candidate = selected_candidates[0]
         media_type = candidate.get("media_type")
         if media_type == "video":
             option, value = "source_trim", selected.get("source_trim")
@@ -157,7 +426,7 @@ def _decision_manifest(shots):
                 return None
         else:
             return None
-        decisions.append({"id": shot_id, "decision": "select", "candidate_id": selected_id, option: copy.deepcopy(value)})
+        decisions.append({"id": shot_id, "decision": "select", "candidate_id": selected_ids[0], option: copy.deepcopy(value)})
     return decisions
 
 
@@ -185,6 +454,11 @@ def _review_errors(plan, shots):
     if not isinstance(review, dict): errors.append("review trust requires review object")
     if not isinstance(decision, dict) or not isinstance(review, dict): return errors
     if review.get("status") != "approved": errors.append("review status must be approved")
+    persisted_intent = review.get("submission_intent")
+    if persisted_intent is not None and persisted_intent != "approve":
+        errors.append("approved review submission_intent must be approve")
+    if persisted_intent == "approve" and (not isinstance(review.get("revision_notes"), str) or review["revision_notes"].strip()):
+        errors.append("approved review revision_notes must be empty")
     if not isinstance(review.get("review_id"), str) or not review["review_id"].strip(): errors.append("review_id is required")
     elif not _is_uuid(review["review_id"]): errors.append("review_id must be a UUID")
     mode, actor, rationale = decision.get("mode"), decision.get("actor"), decision.get("rationale")
@@ -193,9 +467,17 @@ def _review_errors(plan, shots):
     if not isinstance(rationale, str) or not rationale.strip(): errors.append("review rationale is required")
     if any(review.get(key) != decision.get(key) for key in ("mode", "actor", "rationale")):
         errors.append("decision and review authority do not match")
+    if ("rationale_source" in review or "rationale_source" in decision) and review.get("rationale_source") != decision.get("rationale_source"):
+        errors.append("decision and review rationale_source do not match")
     if not _valid_timestamp(review.get("timestamp")): errors.append("review timestamp is invalid")
     if mode == "human" and (decision.get("explicit_user_action") is not True or review.get("explicit_user_action") is not True):
         errors.append("human review requires explicit_user_action true")
+    if persisted_intent == "approve" and mode == "human":
+        if rationale != HUMAN_APPROVAL_RATIONALE:
+            errors.append("new human review rationale must describe the explicit UI action")
+        if (decision.get("rationale_source") != "review_ui_explicit_action"
+                or review.get("rationale_source") != "review_ui_explicit_action"):
+            errors.append("new human review rationale_source is invalid")
     decisions = _decision_manifest(shots)
     if decisions is None:
         errors.append("review decision manifest cannot be reconstructed")
@@ -220,8 +502,11 @@ def _review_errors(plan, shots):
         if not isinstance(shot, dict) or not isinstance(shot.get("status"), str) or shot.get("status") not in ("selected", "normalized", "verified") or not isinstance(shot.get("selected"), dict): continue
         candidates = shot.get("candidates")
         if not isinstance(candidates, list): continue
-        candidate = next((item for item in candidates if isinstance(item, dict) and item.get("id") == shot["selected"].get("candidate_id")), None)
-        if isinstance(candidate, dict) and isinstance(candidate.get("sha256"), str): selected_hashes.append(candidate["sha256"])
+        selected = shot["selected"]
+        for selected_id in selected_candidate_ids(selected):
+            candidate = next((item for item in candidates if isinstance(item, dict) and item.get("id") == selected_id), None)
+            if isinstance(candidate, dict) and isinstance(candidate.get("sha256"), str):
+                selected_hashes.append(candidate["sha256"])
     if review.get("selected_asset_sha256") != sorted(set(selected_hashes)):
         errors.append("review selected asset hashes do not match")
     input_hashes = plan.get("input_hashes")
@@ -479,6 +764,177 @@ def _candidate_path(root, value):
     return candidate
 
 
+def _inside(root, target):
+    try:
+        Path(target).resolve().relative_to(Path(root).resolve())
+    except ValueError:
+        return False
+    return True
+
+
+def _candidate_ranking_errors(plan, shots, *, project_root=None, verify_files=False):
+    binding = plan.get("candidate_ranking")
+    if binding is None:
+        return []
+    errors = []
+    if not isinstance(binding, dict):
+        return ["candidate_ranking must be an object"]
+    path_value = binding.get("path")
+    raw_path = Path(path_value) if isinstance(path_value, str) else None
+    if (raw_path is None or raw_path.is_absolute() or ".." in raw_path.parts
+            or not raw_path.parts or raw_path.parts[0] != "b-roll"):
+        errors.append("candidate ranking path is invalid")
+    if not _is_sha256(binding.get("sha256")):
+        errors.append("candidate ranking SHA-256 is invalid")
+    if not _is_sha256(binding.get("analysis_sha256")):
+        errors.append("candidate ranking analysis SHA-256 is invalid")
+    shortlists = binding.get("shortlists")
+    if not isinstance(shortlists, list):
+        errors.append("candidate ranking shortlists must be a list")
+        shortlists = []
+    shortlist_map, seen = {}, set()
+    for shortlist in shortlists:
+        if not isinstance(shortlist, dict):
+            errors.append("candidate ranking shortlist must be an object")
+            continue
+        shot_id, candidate_ids = shortlist.get("shot_id"), shortlist.get("candidate_ids")
+        if not isinstance(shot_id, str) or not shot_id.strip() or shot_id in seen:
+            errors.append("candidate ranking shortlist shot ids must be unique nonblank strings")
+            continue
+        seen.add(shot_id)
+        if (not isinstance(candidate_ids, list) or len(candidate_ids) > 3
+                or any(not isinstance(item, str) or not item.strip() for item in candidate_ids)
+                or len(candidate_ids) != len(set(candidate_ids))):
+            errors.append(f"{shot_id} candidate ranking shortlist is invalid")
+            candidate_ids = []
+        shortlist_map[shot_id] = candidate_ids
+    shot_map = {shot.get("id"): shot for shot in shots if isinstance(shot, dict) and isinstance(shot.get("id"), str)}
+    if set(shortlist_map) != set(shot_map):
+        errors.append("candidate ranking shortlists do not match plan shots")
+    for shot_id, shot in shot_map.items():
+        candidate_ids = [item.get("id") for item in shot.get("candidates", []) if isinstance(item, dict)]
+        expected_ids = shortlist_map.get(shot_id, [])
+        if candidate_ids != expected_ids:
+            errors.append(f"{shot_id} candidates do not match ranked Top 3")
+        for index, candidate in enumerate(shot.get("candidates", []), 1):
+            if not isinstance(candidate, dict):
+                continue
+            candidate_id = candidate.get("id")
+            ranking = candidate.get("ranking")
+            if not isinstance(ranking, dict):
+                errors.append(f"{shot_id} candidate {candidate_id} ranking evidence is required")
+                continue
+            if ranking.get("rank") != index:
+                errors.append(f"{shot_id} candidate {candidate_id} rank does not match shortlist order")
+            scores = ranking.get("scores")
+            if not isinstance(scores, dict):
+                errors.append(f"{shot_id} candidate {candidate_id} ranking scores are invalid")
+            else:
+                for field in ("semantic_fit", "context_fit", "composition_fit", "style_fit"):
+                    value = scores.get(field)
+                    if not isinstance(value, int) or isinstance(value, bool) or not 0 <= value <= 4:
+                        errors.append(f"{shot_id} candidate {candidate_id} ranking {field} is invalid")
+                risk = scores.get("text_logo_risk")
+                if (not isinstance(risk, int) or isinstance(risk, bool) or not 0 <= risk <= 4) and risk != "uncertain":
+                    errors.append(f"{shot_id} candidate {candidate_id} ranking text_logo_risk is invalid")
+            if not isinstance(ranking.get("rationale"), str) or not ranking["rationale"].strip():
+                errors.append(f"{shot_id} candidate {candidate_id} ranking rationale is required")
+            for field in ("warnings", "duplicate_notes"):
+                value = ranking.get(field)
+                if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+                    errors.append(f"{shot_id} candidate {candidate_id} ranking {field} must contain strings")
+            similar = ranking.get("similar_footage")
+            if similar is not None and (not isinstance(similar, list) or any(
+                    not isinstance(item, dict) or not isinstance(item.get("shot_id"), str) or not item["shot_id"].strip()
+                    or not isinstance(item.get("candidate_id"), str) or not item["candidate_id"].strip()
+                    for item in similar)):
+                errors.append(f"{shot_id} candidate {candidate_id} ranking similar_footage is invalid")
+    if verify_files:
+        if project_root is None:
+            errors.append("candidate ranking file verification requires project root")
+        elif raw_path is not None and not raw_path.is_absolute() and ".." not in raw_path.parts:
+            root = Path(project_root).resolve()
+            ranking_path = (root / "work" / raw_path).resolve()
+            if not _inside(root / "work/b-roll", ranking_path):
+                errors.append("candidate ranking path escapes work/b-roll")
+            elif not ranking_path.is_file():
+                errors.append("candidate ranking file is missing")
+            else:
+                if binding.get("sha256") != sha256_file(ranking_path):
+                    errors.append("candidate ranking SHA-256 is stale")
+                try:
+                    ranking_document = projectlib.load_json(ranking_path)
+                except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                    errors.append("candidate ranking file is invalid")
+                    ranking_document = None
+                if isinstance(ranking_document, dict):
+                    if ranking_document.get("analysis_sha256") != binding.get("analysis_sha256"):
+                        errors.append("candidate ranking analysis SHA-256 does not match")
+                    ranked_shots = ranking_document.get("shots")
+                    if not isinstance(ranked_shots, list):
+                        errors.append("candidate ranking file shots are invalid")
+                    else:
+                        ranked_map = {item.get("shot_id"): item for item in ranked_shots if isinstance(item, dict) and isinstance(item.get("shot_id"), str)}
+                        ranked_refs = {
+                            (shot_id, candidate.get("candidate_id"))
+                            for shot_id, ranked_shot in ranked_map.items()
+                            for candidate in ranked_shot.get("candidates", [])
+                            if isinstance(candidate, dict) and isinstance(candidate.get("candidate_id"), str)
+                        }
+                        selected_refs = {
+                            (shot_id, candidate_id)
+                            for shot_id, ranked_shot in ranked_map.items()
+                            for candidate_id in ranked_shot.get("top3", [])
+                            if isinstance(candidate_id, str)
+                        }
+                        allocations = ranking_document.get("global_allocations")
+                        if allocations is not None:
+                            if not isinstance(allocations, list):
+                                errors.append("candidate ranking global allocations must be a list")
+                            else:
+                                seen_allocations = set()
+                                for allocation in allocations:
+                                    if not isinstance(allocation, dict):
+                                        errors.append("candidate ranking global allocation must be an object")
+                                        continue
+                                    allocation_id = allocation.get("allocation_id")
+                                    if not isinstance(allocation_id, str) or not allocation_id.strip() or allocation_id in seen_allocations:
+                                        errors.append("candidate ranking global allocation ids must be unique nonblank strings")
+                                    seen_allocations.add(allocation_id)
+                                    members = allocation.get("members")
+                                    member_refs = [(member.get("shot_id"), member.get("candidate_id")) for member in members] if isinstance(members, list) and all(isinstance(member, dict) for member in members) else []
+                                    kept = allocation.get("kept")
+                                    kept_ref = (kept.get("shot_id"), kept.get("candidate_id")) if isinstance(kept, dict) else None
+                                    suppressed = allocation.get("suppressed")
+                                    suppressed_refs = [(member.get("shot_id"), member.get("candidate_id")) for member in suppressed] if isinstance(suppressed, list) and all(isinstance(member, dict) for member in suppressed) else []
+                                    if (not isinstance(members, list) or len(member_refs) < 2 or len(member_refs) != len(set(member_refs))
+                                            or any(ref not in ranked_refs for ref in member_refs) or kept_ref not in member_refs
+                                            or set(suppressed_refs) != set(member_refs) - {kept_ref}):
+                                        errors.append(f"candidate ranking global allocation {allocation_id} members are invalid")
+                                        continue
+                                    selected_members = set(member_refs) & selected_refs
+                                    if len(selected_members) > 1 or selected_members and selected_members != {kept_ref}:
+                                        errors.append(f"candidate ranking global allocation {allocation_id} is not unique across shortlists")
+                        for shot_id, expected_ids in shortlist_map.items():
+                            ranked_shot = ranked_map.get(shot_id)
+                            if not isinstance(ranked_shot, dict) or ranked_shot.get("top3") != expected_ids:
+                                errors.append(f"{shot_id} ranked Top 3 does not match binding")
+                                continue
+                            details = {item.get("candidate_id"): item for item in ranked_shot.get("candidates", []) if isinstance(item, dict)}
+                            for index, candidate in enumerate(shot_map.get(shot_id, {}).get("candidates", []), 1):
+                                if not isinstance(candidate, dict):
+                                    continue
+                                detail, summary = details.get(candidate.get("id")), candidate.get("ranking")
+                                if (not isinstance(detail, dict) or not isinstance(summary, dict)
+                                        or detail.get("rank") != index
+                                        or detail.get("scores") != summary.get("scores")
+                                        or detail.get("warnings") != summary.get("warnings")
+                                        or detail.get("rationale") != summary.get("rationale")
+                                        or detail.get("similar_footage", []) != summary.get("similar_footage", [])):
+                                    errors.append(f"{shot_id} candidate {candidate.get('id')} ranking evidence does not match ranking file")
+    return errors
+
+
 def _project_parts(project):
     if not isinstance(project, dict):
         raise ValueError("project must be an object")
@@ -541,8 +997,13 @@ def _verified_overlays(plan):
         if not isinstance(verification, dict) or verification.get("status") != "pass":
             raise ValueError("verified shot verification must pass")
         selection = shot.get("selected")
-        candidate = next((item for item in shot.get("candidates", []) if isinstance(item, dict) and isinstance(selection, dict) and item.get("id") == selection.get("candidate_id")), None)
-        if candidate is None:
+        candidate_ids = selected_candidate_ids(selection)
+        candidates = [
+            next((item for item in shot.get("candidates", [])
+                  if isinstance(item, dict) and item.get("id") == candidate_id), None)
+            for candidate_id in candidate_ids
+        ]
+        if not candidate_ids or any(candidate is None for candidate in candidates):
             raise ValueError("verified shot selected candidate is invalid")
         normalized = shot.get("normalized")
         program = _range(shot.get("program_range"))
@@ -551,8 +1012,10 @@ def _verified_overlays(plan):
         digest = normalized.get("sha256")
         if not _is_sha256(digest):
             raise ValueError("verified shot normalized SHA-256 is invalid")
-        if "source_path" in normalized and normalized["source_path"] != candidate.get("cache_path"):
+        if "source_path" in normalized and len(candidates) == 1 and normalized["source_path"] != candidates[0].get("cache_path"):
             raise ValueError("verified shot normalized source path does not match selected candidate")
+        if "source_paths" in normalized and normalized["source_paths"] != [candidate.get("cache_path") for candidate in candidates]:
+            raise ValueError("verified shot normalized source paths do not match selected candidates")
         if not program or program[1] <= program[0]:
             raise ValueError("verified shot program range is invalid")
         overlays.append({"kind": "overlay", "asset": normalized["path"], "start_s": program[0], "duration_s": program[1] - program[0]})
@@ -667,6 +1130,11 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
     if plan.get("schema_version") != 1: errors.append("plan schema_version must be 1")
     if plan.get("timebase") != "program": errors.append("plan timebase must be program")
     if plan.get("timeline_id") != timeline.get("timeline_id"): errors.append("plan timeline_id does not match timeline")
+    try:
+        frame_duration = timeline_frame_duration(timeline)
+    except ValueError as exc:
+        errors.append(str(exc))
+        frame_duration = None
     timeline_duration = _strict_finite_number(timeline.get("program_duration_s"))
     if timeline_duration is _INVALID_NUMBER or timeline_duration < 0:
         errors.append("timeline program_duration_s is invalid")
@@ -764,13 +1232,52 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
         elif status in {"planned", "candidates_ready", "skipped"} and selected is not None: errors.append(f"{shot_id} {status} shot must not select a candidate")
         elif status in {"selected", "normalized", "verified"} and not isinstance(selected, dict): errors.append(f"{shot_id} {status} shot requires a selection")
         elif status in {"selected", "normalized", "verified"}:
-            candidate = next((item for item in candidates if isinstance(item, dict) and item.get("id") == selected.get("candidate_id")), None)
-            if candidate is None: errors.append(f"{shot_id} selected candidate does not belong to shot")
-            elif candidate.get("media_type") == "video":
+            selected_ids = selected_candidate_ids(selected)
+            selected_candidates = [
+                next((item for item in candidates
+                      if isinstance(item, dict) and item.get("id") == candidate_id), None)
+                for candidate_id in selected_ids
+            ]
+            candidate = selected_candidates[0] if len(selected_candidates) == 1 else None
+            if not selected_ids or any(item is None for item in selected_candidates):
+                errors.append(f"{shot_id} selected candidate does not belong to shot")
+            elif "segments" in selected:
+                if frame_duration is not None:
+                    try:
+                        selection_details(shot, candidates, timeline)
+                    except ValueError as exc:
+                        errors.append(f"{shot_id} {status} video {exc}")
+            elif candidate is not None and candidate.get("media_type") == "video":
                 if not _valid_source_trim(selected.get("source_trim"), candidate): errors.append(f"{shot_id} {status} video requires a valid source_trim")
-            elif candidate.get("media_type") == "image" and not _valid_ken_burns(selected.get("ken_burns")):
+            elif candidate is not None and candidate.get("media_type") == "image" and not _valid_ken_burns(selected.get("ken_burns")):
                 errors.append(f"{shot_id} {status} image requires a non-empty ken_burns")
                 errors.append(f"{shot_id} {status} image requires a valid ken_burns direction")
+        review_default = shot.get("review_default")
+        if review_default is not None:
+            if not isinstance(review_default, dict) or review_default.get("decision") not in ("select", "skip"):
+                errors.append(f"{shot_id} review_default is invalid")
+            elif review_default.get("decision") == "select":
+                segments = review_default.get("segments")
+                review_candidate_ids = (
+                    [segment.get("candidate_id") for segment in segments]
+                    if isinstance(segments, list) and all(isinstance(segment, dict) for segment in segments)
+                    else []
+                )
+                selected_candidates = [
+                    next((item for item in candidates
+                          if isinstance(item, dict) and item.get("id") == candidate_id), None)
+                    for candidate_id in review_candidate_ids
+                ]
+                if (not review_candidate_ids or any(candidate is None or candidate.get("media_type") != "video"
+                                                    for candidate in selected_candidates)):
+                    errors.append(f"{shot_id} review_default candidate is invalid")
+                elif frame_duration is not None:
+                    default_shot = copy.deepcopy(shot)
+                    default_shot["selected"] = {"segments": copy.deepcopy(segments)}
+                    try:
+                        selection_details(default_shot, candidates, timeline)
+                    except ValueError as exc:
+                        errors.append(f"{shot_id} review_default {exc}")
         if status in ("normalized", "verified"):
             normalized = shot.get("normalized")
             if not isinstance(normalized, dict):
@@ -792,6 +1299,9 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
         for previous_start, previous_end, previous_id in ranges:
             if previous_id != shot_id and previous_start < end and start < previous_end:
                 errors.append(f"{shot_id} program range overlaps {previous_id}"); break
+    errors.extend(_candidate_ranking_errors(
+        plan, shots, project_root=project_root, verify_files=verify_files
+    ))
     errors.extend(_review_errors(plan, shots))
     if "visual_review" in plan:
         errors.extend(_visual_review_errors(
@@ -907,9 +1417,229 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
     return errors
 
 
-def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None):
+def _mapped_word_records(transcript, timeline):
+    try:
+        mapped = projectlib.map_transcript_to_timeline(transcript, timeline)
+    except (AttributeError, KeyError, OverflowError, TypeError, ValueError) as exc:
+        raise ValueError("transcript cannot be mapped to timeline") from exc
+    records = []
+    segments = mapped.get("segments") if isinstance(mapped, dict) else None
+    if not isinstance(segments, list):
+        raise ValueError("mapped transcript segments are invalid")
+    for segment in segments:
+        words = segment.get("words") if isinstance(segment, dict) else None
+        if not isinstance(words, list):
+            continue
+        for word in words:
+            if not isinstance(word, dict):
+                continue
+            source = _range(word.get("source_range"))
+            program = _range(word.get("program_range"))
+            if (isinstance(word.get("word"), str) and isinstance(word.get("clip_id"), str)
+                    and source and program):
+                records.append(copy.deepcopy(word))
+    return records
+
+
+def revision_program_bounds(plan, timeline, shot_id):
+    shots = plan.get("shots") if isinstance(plan, dict) else None
+    if not isinstance(shots, list):
+        raise ValueError("plan shots must be a list")
+    index = next((index for index, shot in enumerate(shots)
+                  if isinstance(shot, dict) and shot.get("id") == shot_id), None)
+    if index is None:
+        raise ValueError(f"unknown shot: {shot_id}")
+    frame = timeline_frame_duration(timeline)
+    duration = _strict_finite_number(timeline.get("program_duration_s"))
+    original = _range(shots[index].get("program_range"))
+    if duration is _INVALID_NUMBER or duration <= 0 or not original:
+        raise ValueError("timeline or shot program range is invalid")
+    previous_end = 0.0
+    if index:
+        previous = _range(shots[index - 1].get("program_range"))
+        if not previous:
+            raise ValueError("previous shot program range is invalid")
+        previous_end = previous[1]
+    next_start = duration
+    if index + 1 < len(shots):
+        following = _range(shots[index + 1].get("program_range"))
+        if not following:
+            raise ValueError("next shot program range is invalid")
+        next_start = following[0]
+    return {
+        "start_s": {
+            "min": max(0.0, original[0] - 2.0, previous_end),
+            "max": min(duration - frame, original[0] + 2.0, next_start - frame),
+        },
+        "end_s": {
+            "min": max(frame, original[1] - 2.0, previous_end + frame),
+            "max": min(duration, original[1] + 2.0, next_start),
+        },
+    }
+
+
+def _frame_aligned(value, frame):
+    number = _strict_finite_number(value)
+    if number is _INVALID_NUMBER:
+        return False
+    return abs(number / frame - round(number / frame)) <= RANGE_EPSILON
+
+
+def validate_revision_request(plan, request, timeline, transcript):
+    """Validate a request without mutating the plan or creating approval state."""
+    errors = []
+    if not isinstance(plan, dict):
+        return ["plan must be an object"]
+    if not isinstance(request, dict):
+        return ["revision request must be an object"]
+    if request.get("submission_intent") != "request_revision":
+        errors.append("submission_intent must be request_revision")
+    if request.get("explicit_user_action") is not True:
+        errors.append("revision request requires explicit_user_action true")
+    if not _is_uuid(request.get("review_id")):
+        errors.append("review_id must be a UUID")
+    if not _valid_timestamp(request.get("timestamp")):
+        errors.append("revision request timestamp is invalid")
+    notes = request.get("revision_notes", "")
+    if not isinstance(notes, str):
+        errors.append("revision_notes must be a string")
+    input_hashes = plan.get("input_hashes")
+    if not isinstance(input_hashes, dict):
+        errors.append("plan input_hashes must be an object")
+        input_hashes = {}
+    expected_bindings = {
+        "plan_sha256": canonical_sha256(review_subject(plan)),
+        "candidate_manifest_sha256": canonical_sha256(candidate_manifest(plan)),
+        "review_video_sha256": input_hashes.get("review_video_sha256"),
+    }
+    for field, expected in expected_bindings.items():
+        if request.get(field) != expected:
+            errors.append(f"{field} does not match current review artifacts")
+    try:
+        frame = timeline_frame_duration(timeline)
+    except ValueError as exc:
+        errors.append(str(exc))
+        return errors
+    entries = request.get("shots")
+    plan_shots = plan.get("shots")
+    if not isinstance(entries, list):
+        return errors + ["revision request shots must be a list"]
+    if not isinstance(plan_shots, list):
+        return errors + ["plan shots must be a list"]
+    if any(not isinstance(entry, dict) for entry in entries):
+        return errors + ["revision request shot must be an object"]
+    ids = [entry.get("id") for entry in entries]
+    plan_ids = [shot.get("id") for shot in plan_shots if isinstance(shot, dict)]
+    ids_valid = all(isinstance(shot_id, str) and shot_id.strip() for shot_id in ids)
+    if not ids_valid:
+        errors.append("revision request shot id is required")
+    if ids_valid and len(ids) != len(set(ids)):
+        errors.append("revision request shot ids must be unique")
+    if ids_valid and sorted(ids) != sorted(plan_ids, key=str):
+        errors.append("revision request shots do not match plan shots")
+    entries_by_id = {entry.get("id"): entry for entry in entries}
+    requested_ranges = []
+    for shot in plan_shots:
+        if not isinstance(shot, dict) or shot.get("id") not in entries_by_id:
+            continue
+        shot_id = shot["id"]
+        entry = entries_by_id[shot_id]
+        decision = entry.get("decision")
+        if decision not in ("select", "skip"):
+            errors.append(f"{shot_id} decision must be select or skip")
+            continue
+        if shot.get("status") == "skipped" and decision != "skip":
+            errors.append(f"{shot_id} was already skipped and requires decision skip")
+        if decision == "skip":
+            continue
+        requested = _range(entry.get("requested_program_range"))
+        if not requested or requested[1] <= requested[0]:
+            errors.append(f"{shot_id} requested_program_range is invalid")
+            continue
+        bounds = revision_program_bounds(plan, timeline, shot_id)
+        if (requested[0] < bounds["start_s"]["min"] - RANGE_EPSILON
+                or requested[0] > bounds["start_s"]["max"] + RANGE_EPSILON
+                or requested[1] < bounds["end_s"]["min"] - RANGE_EPSILON
+                or requested[1] > bounds["end_s"]["max"] + RANGE_EPSILON):
+            errors.append(f"{shot_id} requested program range is outside allowed bounds")
+        if requested[1] - requested[0] + RANGE_EPSILON < frame:
+            errors.append(f"{shot_id} requested program range must be at least one timeline frame")
+        if not _frame_aligned(requested[0], frame) or not _frame_aligned(requested[1], frame):
+            errors.append(f"{shot_id} requested program range must align to timeline frames")
+        requested_ranges.append((requested[0], requested[1], shot_id))
+        mapped_ranges = _timeline_source_ranges(requested, timeline)
+        if not mapped_ranges:
+            errors.append(f"{shot_id} requested program range cannot be mapped to source")
+        segments = entry.get("segments")
+        candidates = shot.get("candidates")
+        errors.extend(f"{shot_id} {error}" for error in _canonical_segments_errors(
+            segments, candidates,
+            {"start_s": requested[0], "end_s": requested[1]}, frame,
+        ))
+    for index, (start, end, shot_id) in enumerate(sorted(requested_ranges)):
+        for other_start, other_end, other_id in sorted(requested_ranges)[index + 1:]:
+            if other_start < end - RANGE_EPSILON and start < other_end - RANGE_EPSILON:
+                errors.append(f"{shot_id} requested program range overlaps {other_id}")
+    return errors
+
+
+def rebuild_plan_from_revision(plan, request, timeline, transcript):
+    """Return an unapproved revised proposal after validating the bound request."""
+    errors = validate_revision_request(plan, request, timeline, transcript)
+    if errors:
+        raise ValueError("invalid revision request: " + "; ".join(errors))
+    result = copy.deepcopy(plan)
+    entries = {entry["id"]: entry for entry in request["shots"]}
+    words = _mapped_word_records(transcript, timeline)
+    result["decision"] = None
+    result["review"] = None
+    result.pop("review_status", None)
+    result.pop("visual_review", None)
+    for shot in result["shots"]:
+        entry = entries[shot["id"]]
+        shot.pop("normalized", None)
+        shot.pop("verification", None)
+        if entry["decision"] == "skip":
+            shot["selected"] = None
+            shot["status"] = "skipped"
+            shot.pop("review_default", None)
+            continue
+        requested = _range(entry["requested_program_range"])
+        shot["program_range"] = {"start_s": requested[0], "end_s": requested[1]}
+        shot["source_ranges"] = _timeline_source_ranges(requested, timeline)
+        inside = [word for word in words
+                  if (_range(word.get("program_range"))[0] >= requested[0] - RANGE_EPSILON
+                      and _range(word.get("program_range"))[1] <= requested[1] + RANGE_EPSILON)]
+        if not inside:
+            raise ValueError(f"{shot['id']} revised program range contains no complete transcript word")
+        shot["transcript_evidence"] = {"words": inside}
+        shot["review_default"] = {
+            "decision": "select",
+            "segments": copy.deepcopy(entry["segments"]),
+        }
+        shot["selected"] = None
+        shot["status"] = "candidates_ready"
+    validation = validate_plan(result, timeline, transcript)
+    if validation:
+        raise ValueError("rebuilt plan is invalid: " + "; ".join(validation))
+    return result
+
+
+def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None, timeline=None):
     if not isinstance(plan, dict): raise ValueError("plan must be an object")
     if not isinstance(review, dict): raise ValueError("review must be an object")
+    explicit_intent = "submission_intent" in review
+    intent = review.get("submission_intent", "approve")
+    if intent not in REVIEW_INTENTS:
+        raise ValueError("submission_intent must be approve or request_revision")
+    if intent == "request_revision":
+        raise ValueError("request_revision must be validated and rebuilt before apply_review")
+    if explicit_intent:
+        notes = review.get("revision_notes", "")
+        if not isinstance(notes, str):
+            raise ValueError("revision_notes must be a string")
+        if notes.strip():
+            raise ValueError("approve requires empty revision_notes")
     plan_shots, entries = plan.get("shots"), review.get("shots")
     if not isinstance(plan_shots, list): raise ValueError("plan shots must be a list")
     if not isinstance(entries, list): raise ValueError("review shots must be a list")
@@ -936,6 +1666,10 @@ def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None)
     if not _valid_timestamp(review.get("timestamp")):
         raise ValueError("review timestamp is invalid")
     if mode == "human" and review.get("explicit_user_action") is not True: raise ValueError("human review requires explicit_user_action true")
+    rationale_source = review.get("rationale_source")
+    if explicit_intent and mode == "human":
+        if rationale != HUMAN_APPROVAL_RATIONALE or rationale_source != "review_ui_explicit_action":
+            raise ValueError("new human approve requires the explicit review UI action rationale")
     if not isinstance(review.get("review_id"), str) or not review["review_id"].strip(): raise ValueError("review_id is required")
     if not _is_uuid(review["review_id"]): raise ValueError("review_id must be a UUID")
     input_hashes = plan.get("input_hashes")
@@ -973,11 +1707,52 @@ def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None)
         shot.pop("normalized", None)
         shot.pop("verification", None)
         if decision == "skip":
+            if isinstance(shot.get("review_default"), dict) and shot["review_default"].get("decision") != "skip":
+                raise ValueError(f"{shot['id']} approve does not match the exact review default")
             if shot.get("status") != "skipped": decision_skipped_ids.append(shot["id"])
             shot["selected"], shot["status"] = None, "skipped"
             continue
-        candidate = next((item for item in shot.get("candidates", []) if item.get("id") == entry.get("candidate_id")), None)
-        if not candidate: raise ValueError(f"{shot['id']} selected candidate does not belong to shot")
+        segments = entry.get("segments")
+        if segments is not None and (not isinstance(segments, list) or not 1 <= len(segments) <= 3):
+            raise ValueError(f"{shot['id']} select requires 1-3 segments")
+        candidate_ids = (
+            [segment.get("candidate_id") for segment in segments if isinstance(segment, dict)]
+            if isinstance(segments, list) else [entry.get("candidate_id")]
+        )
+        candidates = shot.get("candidates", [])
+        selected_candidates = [
+            next((item for item in candidates
+                  if isinstance(item, dict) and item.get("id") == candidate_id), None)
+            for candidate_id in candidate_ids
+        ]
+        if (not candidate_ids or len(candidate_ids) != len(segments or candidate_ids)
+                or any(candidate is None for candidate in selected_candidates)):
+            raise ValueError(f"{shot['id']} selected candidate does not belong to shot")
+        candidate = selected_candidates[0]
+        if explicit_intent:
+            if not _ranges_equal(entry.get("program_range"), shot.get("program_range")):
+                raise ValueError(f"{shot['id']} approve program_range does not match current review")
+            default = shot.get("review_default")
+            if isinstance(default, dict):
+                actual = {"decision": "select", "segments": copy.deepcopy(segments)}
+                if actual != default:
+                    raise ValueError(f"{shot['id']} approve does not match the exact review default")
+        if segments is not None:
+            if any(candidate.get("media_type") != "video" for candidate in selected_candidates):
+                raise ValueError(f"{shot['id']} canonical segments require a video candidate")
+            if not isinstance(timeline, dict):
+                raise ValueError("canonical segment approval requires the canonical timeline")
+            frame_duration = timeline_frame_duration(timeline)
+            if review.get("timeline_fps") != timeline.get("fps"):
+                raise ValueError("timeline_fps does not match canonical timeline")
+            segment_errors = _canonical_segments_errors(
+                segments, candidates, shot.get("program_range"), frame_duration,
+            )
+            if segment_errors:
+                raise ValueError(f"{shot['id']} " + "; ".join(segment_errors))
+            shot["selected"], shot["status"] = {"segments": copy.deepcopy(segments)}, "selected"
+            selected_hashes.extend(candidate["sha256"] for candidate in selected_candidates)
+            continue
         option = "source_trim" if candidate.get("media_type") == "video" else "ken_burns"
         if option == "source_trim" and not _valid_source_trim(entry.get(option), candidate):
             raise ValueError(f"{shot['id']} select requires a valid source_trim")
@@ -989,8 +1764,14 @@ def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None)
         raise ValueError("review decision manifest cannot be reconstructed")
     result["review_status"] = "approved"
     result["decision"] = {"mode": mode, "actor": actor, "rationale": rationale}
+    if rationale_source is not None:
+        result["decision"]["rationale_source"] = rationale_source
     if mode == "human": result["decision"]["explicit_user_action"] = True
     result["review"] = {"status": "approved", "review_id": review["review_id"], "mode": mode, "actor": actor, "rationale": rationale, "timestamp": review["timestamp"], **expected_bindings, "decisions": decisions, "decision_skipped_shot_ids": sorted(set(decision_skipped_ids)), "selected_asset_sha256": sorted(set(selected_hashes))}
+    if explicit_intent:
+        result["review"].update({"submission_intent": "approve", "revision_notes": ""})
+    if rationale_source is not None:
+        result["review"]["rationale_source"] = rationale_source
     if mode == "human": result["review"]["explicit_user_action"] = True
     if interaction_path:
         target = Path(interaction_path); target.parent.mkdir(parents=True, exist_ok=True)

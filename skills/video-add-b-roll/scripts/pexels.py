@@ -68,6 +68,15 @@ def _matches_orientation(width, height, orientation):
     return width > height if orientation == "landscape" else height > width if orientation == "portrait" else width == height
 
 
+def _variant(item, url):
+    return {
+        "file_id": item["id"],
+        "download_url": url,
+        "width": item["width"],
+        "height": item["height"],
+    }
+
+
 def search_videos(query, *, orientation="landscape", per_page=10, api_key=None, opener=None):
     if not isinstance(query, str) or not query.strip(): raise ValueError("query is required")
     if orientation not in {"landscape", "portrait", "square"}: raise ValueError("invalid orientation")
@@ -89,7 +98,7 @@ def search_videos(query, *, orientation="landscape", per_page=10, api_key=None, 
         if not isinstance(duration, (int, float)) or duration <= 0 or not isinstance(width, int) or not isinstance(height, int) or width <= 0 or height <= 0: continue
         try: source_url = validate_url(video.get("url"), PAGE_HOSTS)
         except ValueError: continue
-        choices = []
+        choices, local_file_ids = [], set()
         files = video.get("video_files", [])
         if not isinstance(files, list): continue
         for item in files:
@@ -97,17 +106,54 @@ def search_videos(query, *, orientation="landscape", per_page=10, api_key=None, 
             file_id = item.get("id")
             if not isinstance(file_id, int) or isinstance(file_id, bool) or file_id <= 0: continue
             file_key = (video_id, file_id)
-            if file_key in seen_files: continue
+            if file_key in seen_files or file_id in local_file_ids: continue
             try: url = validate_url(item.get("link"), VIDEO_HOSTS)
             except ValueError: continue
             iw, ih = item.get("width"), item.get("height")
-            if isinstance(iw, int) and isinstance(ih, int) and iw > 0 and ih > 0 and _matches_orientation(iw, ih, orientation): choices.append((iw * ih, item, url))
+            if isinstance(iw, int) and isinstance(ih, int) and iw > 0 and ih > 0 and _matches_orientation(iw, ih, orientation):
+                local_file_ids.add(file_id)
+                choices.append((iw * ih, file_id, item, url))
         if not choices: continue
-        _, item, url = max(choices, key=lambda value: value[0])
-        seen_videos.add(video_id); seen_files.add((video_id, item["id"]))
+        _, _, item, url = max(choices, key=lambda value: (value[0], value[1]))
+        qualifying = [choice for choice in choices if min(choice[2]["width"], choice[2]["height"]) >= 480]
+        analysis_choice = min(qualifying, key=lambda value: (value[0], value[1])) if qualifying else max(choices, key=lambda value: (value[0], value[1]))
+        _, _, analysis_item, analysis_url = analysis_choice
+        seen_videos.add(video_id); seen_files.update((video_id, choice[2]["id"]) for choice in choices)
         creator = video.get("user", {}).get("name") if isinstance(video.get("user"), dict) else None
-        records.append({"id": f"{video['id']}-{item['id']}", "provider_id": video["id"], "file_id": item["id"], "media_type": "video", "download_url": url, "width": item["width"], "height": item["height"], "duration_s": duration, "provenance": {"source_type": "pexels", "provider_id": video["id"], "source_url": source_url, "creator": creator or "Pexels creator", "license": "Pexels License", "license_url": LICENSE_URL, "terms_url": TERMS_URL, "retrieval_time": _now(), "download_url": url, "dimensions": {"width": item["width"], "height": item["height"]}, "duration_s": duration}})
+        delivery_variant = _variant(item, url)
+        analysis_variant = _variant(analysis_item, analysis_url)
+        records.append({"id": f"{video['id']}-{item['id']}", "provider_id": video["id"], "file_id": item["id"], "media_type": "video", "download_url": url, "width": item["width"], "height": item["height"], "duration_s": duration, "analysis_variant": analysis_variant, "delivery_variant": delivery_variant, "provenance": {"source_type": "pexels", "provider_id": video["id"], "source_url": source_url, "creator": creator or "Pexels creator", "license": "Pexels License", "license_url": LICENSE_URL, "terms_url": TERMS_URL, "retrieval_time": _now(), "download_url": url, "dimensions": {"width": item["width"], "height": item["height"]}, "duration_s": duration}})
     return records
+
+
+def variant_candidate(candidate, role):
+    if role not in {"analysis", "delivery"}:
+        raise ValueError("variant role must be analysis or delivery")
+    if not isinstance(candidate, dict) or candidate.get("provenance", {}).get("source_type") != "pexels":
+        raise ValueError("variant candidate must be a Pexels record")
+    variant = candidate.get(f"{role}_variant")
+    if not isinstance(variant, dict):
+        raise ValueError(f"candidate has no {role} variant")
+    required = ("file_id", "download_url", "width", "height")
+    if any(field not in variant for field in required):
+        raise ValueError(f"candidate {role} variant is incomplete")
+    provider_id, file_id = candidate.get("provider_id"), variant.get("file_id")
+    width, height = variant.get("width"), variant.get("height")
+    if any(not isinstance(value, int) or isinstance(value, bool) or value <= 0 for value in (provider_id, file_id, width, height)):
+        raise ValueError(f"candidate {role} variant identifiers or dimensions are invalid")
+    download_url = validate_url(variant.get("download_url"), VIDEO_HOSTS)
+    provenance = candidate.get("provenance")
+    if (not isinstance(provenance, dict) or provenance.get("provider_id") != provider_id
+            or validate_url(provenance.get("source_url"), PAGE_HOSTS) != provenance.get("source_url")
+            or provenance.get("license_url") != LICENSE_URL or provenance.get("terms_url") != TERMS_URL):
+        raise ValueError("candidate Pexels provenance is invalid")
+    result = copy.deepcopy(candidate)
+    result.update({field: variant[field] for field in required})
+    result["download_url"] = download_url
+    result["variant_role"] = role
+    result["provenance"]["download_url"] = result["download_url"]
+    result["provenance"]["dimensions"] = {"width": result["width"], "height": result["height"]}
+    return result
 
 
 def probe_media(path):
@@ -125,14 +171,17 @@ def probe_media(path):
     return {"duration_s": duration, "width": width, "height": height, "codec": stream.get("codec_name")}
 
 
-def _cache_destination(destination):
+def _cache_destination(destination, purpose="delivery"):
+    if purpose not in {"delivery", "analysis"}:
+        raise ValueError("invalid cache purpose")
     target = Path(destination).resolve()
+    expected = ("work", "cache", "b-roll", "candidates") if purpose == "delivery" else ("work", "cache", "b-roll", "candidate-analysis", "media")
     for parent in (target.parent, *target.parents):
-        if parent.parts[-4:] == ("work", "cache", "b-roll", "candidates"):
+        if parent.parts[-len(expected):] == expected:
             try: target.relative_to(parent)
             except ValueError: break
             if target.parent == parent and target.name and target.name not in {".", ".."}: return target
-    raise ValueError("destination must be directly beneath work/cache/b-roll/candidates")
+    raise ValueError(f"destination must be directly beneath {'/'.join(expected)}")
 
 
 def _sha256(path):
@@ -148,10 +197,10 @@ def _record(candidate, target, probe, digest=None):
     return result
 
 
-def download_candidate(candidate, destination, *, opener=None, max_bytes=250_000_000, retries=3):
+def download_candidate(candidate, destination, *, opener=None, max_bytes=250_000_000, retries=3, purpose="delivery"):
     if not isinstance(candidate, dict) or not isinstance(candidate.get("download_url"), str): raise ValueError("candidate download_url is required")
     if not isinstance(max_bytes, int) or max_bytes <= 0 or not isinstance(retries, int) or retries < 1: raise ValueError("invalid download limits")
-    target = _cache_destination(destination); target.parent.mkdir(parents=True, exist_ok=True); part = target.with_name(target.name + ".part")
+    target = _cache_destination(destination, purpose=purpose); target.parent.mkdir(parents=True, exist_ok=True); part = target.with_name(target.name + ".part")
     url = validate_url(candidate["download_url"], VIDEO_HOSTS)
     expected = candidate.get("sha256")
     if target.exists() and isinstance(expected, str) and _sha256(target) == expected:
@@ -250,11 +299,15 @@ def main(argv=None):
         raise SystemExit(2)
     parser = argparse.ArgumentParser(); commands = parser.add_subparsers(dest="command", required=True)
     search = commands.add_parser("search"); search.add_argument("query"); search.add_argument("--orientation", default="landscape"); search.add_argument("--per-page", type=int, default=10)
-    download = commands.add_parser("download"); download.add_argument("candidate_json"); download.add_argument("destination")
+    download = commands.add_parser("download"); download.add_argument("candidate_json"); download.add_argument("destination"); download.add_argument("--variant", choices=("analysis", "delivery"))
     local = commands.add_parser("import-local"); local.add_argument("source"); local.add_argument("destination"); local.add_argument("provenance_json")
     args = parser.parse_args(argv)
     if args.command == "search": value = search_videos(args.query, orientation=args.orientation, per_page=args.per_page)
-    elif args.command == "download": value = download_candidate(projectlib.load_json(args.candidate_json), args.destination)
+    elif args.command == "download":
+        candidate = projectlib.load_json(args.candidate_json)
+        if args.variant:
+            candidate = variant_candidate(candidate, args.variant)
+        value = download_candidate(candidate, args.destination, purpose="analysis" if args.variant == "analysis" else "delivery")
     else: value = import_local(args.source, args.destination, projectlib.load_json(args.provenance_json))
     print(_json(value))
 

@@ -83,18 +83,22 @@ def _selected_shots(plan, timeline, root, grade_hashes):
         if status not in ("normalized", "verified"):
             raise ValueError("verify_plan requires normalized, verified, or skipped shots")
         choice = shot.get("selected", {})
-        candidate = next((item for item in shot.get("candidates", [])
-                          if item.get("id") == choice.get("candidate_id")), None)
-        if candidate is None:
+        candidate_ids = broll_plan.selected_candidate_ids(choice)
+        candidates = [
+            next((item for item in shot.get("candidates", [])
+                  if isinstance(item, dict) and item.get("id") == candidate_id), None)
+            for candidate_id in candidate_ids
+        ]
+        if not candidate_ids or any(candidate is None for candidate in candidates):
             raise ValueError("selected candidate does not belong to shot")
         output = _inside(normalized_root / f"broll-{index:03d}.mp4", normalized_root, "normalized path")
         try:
             normalize_broll._validate_normalized(
-                shot.get("normalized"), candidate, shot, timeline, output, root, grade_hashes
+                shot.get("normalized"), candidates, shot, timeline, output, root, grade_hashes
             )
         except subprocess.CalledProcessError as exc:
             raise ValueError("normalized media decode failed") from exc
-        selected.append((index, shot, candidate, output))
+        selected.append((index, shot, candidates, output))
     return selected
 
 
@@ -419,7 +423,7 @@ def _summary(plan, selected, records, artifacts, root, stage, destination, path)
     ]
     if not selected:
         lines.extend(["No B-roll shots were selected; all approved decisions are skips.", ""])
-    for (_, shot, candidate, _), (_, _, times, stills) in zip(selected, records):
+    for (_, shot, candidates, _), (_, _, times, stills) in zip(selected, records):
         normalized = shot["normalized"]
         evidence = ", ".join(str(word.get("word", "")).strip() for word in shot["transcript_evidence"]["words"])
         lines.extend([
@@ -427,13 +431,41 @@ def _summary(plan, selected, records, artifacts, root, stage, destination, path)
             f"- Program range: `{json.dumps(shot['program_range'], sort_keys=True)}`",
             f"- Source ranges: `{json.dumps(shot['source_ranges'], sort_keys=True)}`",
             f"- Transcript evidence: {evidence}",
-            f"- Selected source: `{candidate.get('cache_path')}` (`{candidate.get('sha256')}`)",
-            f"- Source provenance: `{json.dumps(candidate.get('provenance', {}), sort_keys=True)}`",
+            f"- Selection format: `{normalized.get('selection_format', 'legacy')}`",
+            f"- Program duration: `{normalized.get('program_duration_s', 'legacy record')}s`",
             f"- Normalized SHA-256: `{normalized['sha256']}`",
+            f"- Concat SHA-256: `{normalized.get('concat_sha256', normalized['sha256'])}`",
             f"- Normalized probe: `{json.dumps(normalized.get('probe', {}), sort_keys=True)}`",
             f"- Grade plan SHA-256: `{normalized.get('grade_plan_sha256', 'not active')}`",
             f"- Selected LUT SHA-256: `{normalized.get('selected_lut_sha256', 'not active')}`",
         ])
+        component_records = normalized.get("segments")
+        if isinstance(component_records, list):
+            candidate_map = {candidate.get("id"): candidate for candidate in candidates}
+            for index, component in enumerate(component_records, 1):
+                candidate = candidate_map.get(component.get("candidate_id"), {})
+                lines.extend([
+                    f"- Segment {index}: `{component.get('candidate_id')}`",
+                    f"  - Selected source: `{candidate.get('cache_path')}` (`{candidate.get('sha256')}`)",
+                    f"  - Source provenance: `{json.dumps(candidate.get('provenance', {}), sort_keys=True)}`",
+                    f"  - Segment: `{json.dumps(component.get('segment', {}), sort_keys=True)}`",
+                    f"  - Source duration: `{component.get('source_duration_s')}s`",
+                    f"  - Effective duration: `{component.get('effective_duration_s')}s`",
+                    f"  - Program duration: `{component.get('program_duration_s')}s`",
+                    f"  - Playback rate: `{component.get('playback_rate')}x`",
+                    f"  - Normalized segment SHA-256: `{component.get('normalized_sha256')}`",
+                ])
+        else:
+            candidate = candidates[0]
+            lines.extend([
+                f"- Selected source: `{candidate.get('cache_path')}` (`{candidate.get('sha256')}`)",
+                f"- Source provenance: `{json.dumps(candidate.get('provenance', {}), sort_keys=True)}`",
+                f"- Segment: `{json.dumps(normalized.get('segment', {}), sort_keys=True)}`",
+                f"- Source duration: `{normalized.get('source_duration_s', 'legacy record')}s`",
+                f"- Effective duration: `{normalized.get('effective_duration_s', 'legacy record')}s`",
+            ])
+        if "legacy_requested_source_range" in normalized:
+            lines.append(f"- Legacy requested source range: `{json.dumps(normalized['legacy_requested_source_range'], sort_keys=True)}`")
         for label in ("first", "middle", "last"):
             published = destination / stills[label].relative_to(stage)
             lines.append(f"- {label.title()} (+{times[label]:.3f}s): `{_relative(published, root)}` (`{broll_plan.sha256_file(stills[label])}`)")

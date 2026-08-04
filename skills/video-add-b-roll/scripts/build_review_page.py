@@ -2,6 +2,7 @@
 
 import argparse
 import base64
+import copy
 import hashlib
 import json
 import math
@@ -69,15 +70,64 @@ def _review_id(value):
         raise ValueError("review_id must be a UUID") from error
 
 
-def _payload(plan, root, assets_dir):
+def _word_context(words, program_range):
+    program = broll_plan._range(program_range)
+    if not program:
+        raise ValueError("shot program range is invalid")
+    context_start, context_end = max(0.0, program[0] - 2.0), program[1] + 2.0
+    inside, context = [], []
+    for word in words:
+        mapped = broll_plan._range(word.get("program_range")) if isinstance(word, dict) else None
+        if not mapped:
+            continue
+        if mapped[0] < context_end - broll_plan.RANGE_EPSILON and mapped[1] > context_start + broll_plan.RANGE_EPSILON:
+            context.append(copy.deepcopy(word))
+        if (mapped[0] >= program[0] - broll_plan.RANGE_EPSILON
+                and mapped[1] <= program[1] + broll_plan.RANGE_EPSILON):
+            inside.append(copy.deepcopy(word))
+    return {"inside": inside, "context": context}
+
+
+def _candidate_default(shot, candidate):
+    program = broll_plan._range(shot.get("program_range"))
+    duration = program[1] - program[0]
+    review_default = shot.get("review_default")
+    segments = review_default.get("segments") if isinstance(review_default, dict) else None
+    if isinstance(segments, list):
+        match = next((segment for segment in segments
+                      if isinstance(segment, dict)
+                      and segment.get("candidate_id") == candidate.get("id")), None)
+        if match is not None:
+            return copy.deepcopy(match)
+    source_end = duration
+    return {
+        "candidate_id": candidate["id"],
+        "source_range": {"start_s": 0.0, "end_s": source_end},
+        "program_range": {"start_s": program[0], "end_s": program[1]},
+        "playback_rate": 1.0,
+    }
+
+
+def _payload(plan, timeline, transcript, root, assets_dir):
     payload_shots = []
     pre_skipped_ids = []
     candidate_specs = []
+    words = broll_plan._mapped_word_records(transcript, timeline)
     for shot_index, shot in enumerate(plan["shots"], 1):
         if shot["status"] == "skipped":
             pre_skipped_ids.append(shot["id"])
             continue
         frame = assets_dir / f"frame-{len(payload_shots) + 1:03d}.jpg"
+        frame_duration = broll_plan.timeline_frame_duration(timeline)
+        program = broll_plan._range(shot["program_range"])
+        total_frames = round((program[1] - program[0]) / frame_duration)
+        default_allocations = {}
+        for count in range(1, min(3, total_frames) + 1):
+            ranges = broll_plan.allocate_program_ranges(shot["program_range"], count, timeline)
+            default_allocations[str(count)] = [
+                round((item["end_s"] - item["start_s"]) / frame_duration)
+                for item in ranges
+            ]
         candidates = []
         for candidate_index, candidate in enumerate(shot["candidates"], 1):
             path = broll_plan._candidate_path(root, candidate["cache_path"])
@@ -87,14 +137,39 @@ def _payload(plan, root, assets_dir):
             basename = f"candidate-{shot_index:03d}-{candidate_index:03d}{suffix}"
             candidate_specs.append((path, basename, candidate["sha256"]))
             item = {"id": candidate["id"], "media_type": candidate["media_type"], "path": f"{assets_dir.name}/{basename}", "sha256": candidate["sha256"], "provenance": candidate["provenance"]}
+            if "ranking" in candidate:
+                item["ranking"] = copy.deepcopy(candidate["ranking"])
             if candidate["media_type"] == "video":
                 probe = candidate.get("probe")
                 duration = broll_plan._positive_duration(probe.get("duration_s")) if isinstance(probe, dict) else None
                 if duration is None:
                     raise ValueError(f"{shot['id']} candidate {candidate['id']} has no valid review duration")
                 item["duration_s"] = duration
+                item["source_bounds"] = {"start_s": 0.0, "end_s": duration}
+                item["default_segment"] = _candidate_default(shot, candidate)
+                item["default_segment"]["feasible"] = (
+                    item["default_segment"]["source_range"]["end_s"] <= duration + broll_plan.RANGE_EPSILON
+                )
             candidates.append(item)
-        payload_shots.append({"id": shot["id"], "program_range": shot["program_range"], "source_ranges": shot["source_ranges"], "transcript_evidence": shot["transcript_evidence"], "editorial_reason": shot["editorial_reason"], "visual_intent": shot["visual_intent"], "queries": shot["queries"], "source_frame": {"path": f"{assets_dir.name}/{frame.name}", "sha256": None}, "candidates": candidates})
+        payload_shots.append({
+            "id": shot["id"],
+            "program_range": copy.deepcopy(shot["program_range"]),
+            "original_program_range": copy.deepcopy(shot["program_range"]),
+            "allowed_program_range": broll_plan.revision_program_bounds(plan, timeline, shot["id"]),
+            "total_program_frames": total_frames,
+            "frame_duration_s": frame_duration,
+            "default_allocations": default_allocations,
+            "source_ranges": copy.deepcopy(shot["source_ranges"]),
+            "clip_ids": sorted({item.get("clip_id") for item in shot["source_ranges"] if isinstance(item, dict) and isinstance(item.get("clip_id"), str)}),
+            "transcript": _word_context(words, shot["program_range"]),
+            "transcript_evidence": copy.deepcopy(shot["transcript_evidence"]),
+            "editorial_reason": shot["editorial_reason"],
+            "visual_intent": shot["visual_intent"],
+            "queries": copy.deepcopy(shot["queries"]),
+            "review_default": copy.deepcopy(shot.get("review_default")),
+            "source_frame": {"path": f"{assets_dir.name}/{frame.name}", "sha256": None},
+            "candidates": candidates,
+        })
     return payload_shots, candidate_specs, pre_skipped_ids
 
 
@@ -159,7 +234,9 @@ def build_review_page(plan, timeline, transcript, video, output_dir, *, project_
     page, assets_dir = output_dir / f"b-roll-review-{identifier}.html", output_dir / f"b-roll-review-{identifier}-assets"
     if page.exists() or assets_dir.exists():
         raise FileExistsError(f"review publication already exists: {identifier}")
-    shots, candidate_specs, pre_skipped_ids = _payload(plan, root, assets_dir)
+    shots, candidate_specs, pre_skipped_ids = _payload(
+        plan, canonical_timeline, canonical_transcript, root, assets_dir,
+    )
     output_dir.parent.mkdir(parents=True, exist_ok=True)
     published_assets = False
     published_page = False
@@ -180,7 +257,7 @@ def build_review_page(plan, timeline, transcript, video, output_dir, *, project_
                 _validate_jpeg(frame)
                 shot["source_frame"]["sha256"] = _hash(frame)
             subject_hash = broll_plan.canonical_sha256(broll_plan.review_subject(plan))
-            payload = {"review_id": identifier, "plan_sha256": subject_hash, "plan_subject_sha256": subject_hash, "candidate_manifest_sha256": broll_plan.canonical_sha256(broll_plan.candidate_manifest(plan)), "review_video_sha256": expected_video_hash, "decision_modes": ["human", "agent"], "pre_skipped_ids": pre_skipped_ids, "shots": shots}
+            payload = {"review_id": identifier, "plan_sha256": subject_hash, "plan_subject_sha256": subject_hash, "candidate_manifest_sha256": broll_plan.canonical_sha256(broll_plan.candidate_manifest(plan)), "review_video_sha256": expected_video_hash, "timeline": {"fps": copy.deepcopy(canonical_timeline["fps"]), "program_duration_s": canonical_timeline["program_duration_s"], "clips": copy.deepcopy(canonical_timeline["clips"])}, "decision_modes": ["human", "agent"], "pre_skipped_ids": pre_skipped_ids, "shots": shots}
             document = template.replace(PAYLOAD_MARKER, base64.b64encode(json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")).decode("ascii"))
             staged_page = stage / page.name
             staged_page.write_text(document, encoding="utf-8")

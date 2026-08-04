@@ -5,7 +5,7 @@ description: Use when a talking-head, interview, documentary, or explanatory vid
 
 # Video Add B-Roll
 
-Add a small number of evidence-backed visual cutaways to an understood Project Protocol V1
+Add a small number of evidence-backed visual cutaways to an understood canonical Project Protocol
 sequence. Read [broll-rules.md](reference/broll-rules.md) before planning or acquiring any
 media. Use [example-broll-plan.json](examples/example-broll-plan.json) as the plan-shape
 reference.
@@ -86,8 +86,17 @@ contract; do not hand-build the operation.
 ```text
 work/b-roll/broll-plan.json                         # durable domain plan
 work/b-roll/broll-interaction.json                  # durable applied receipt
+work/b-roll/broll-revision-request-<UUID>.json      # durable unapproved request bytes
+work/b-roll/candidate-search.json                   # durable query and provider order
+work/b-roll/candidate-analysis.json                 # durable deterministic evidence
+work/b-roll/candidate-ranking.json                  # durable Agent ranking and Top 3
+work/cache/b-roll/candidate-analysis/media/         # disposable analysis variants
+work/cache/b-roll/candidate-analysis/frames/        # reproducible samples and crops
 work/cache/b-roll/candidates/                       # frozen acquired media
 work/cache/b-roll/normalized/                       # reproducible silent overlays
+review/03-b-roll/candidate-analysis-<UUID>/          # immutable analysis packet
+review/03-b-roll/candidate-analysis-<UUID>.md        # analysis and baseline summary
+review/03-b-roll/candidate-analysis-<UUID>/candidate-index.html
 review/03-b-roll/b-roll-review-<UUID>.html          # immutable candidate review
 review/03-b-roll/b-roll-review.html                 # latest convenience alias
 review/03-b-roll/stills/                            # first/middle/last verification frames
@@ -135,10 +144,13 @@ Validate the draft after every material edit:
 python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]); sys.path.insert(0,sys.argv[2]); import broll_plan,projectlib; plan=projectlib.load_json(root/'work/b-roll/broll-plan.json'); timeline=projectlib.load_json(root/'work/timeline.json'); transcript=projectlib.load_json(root/'work/understand/transcript.json'); project=projectlib.load_json(root/'work/project.json'); errors=broll_plan.validate_plan(plan,timeline,transcript,project=project,project_root=root,verify_files=True); print('\n'.join(errors) if errors else 'B-roll plan valid'); raise SystemExit(bool(errors))" $ProjectRoot $BrollScripts
 ```
 
-### 3. Acquire And Freeze Candidates
+### 3. Analyze, Rank, And Freeze Candidates
 
-For local video, write a provenance JSON object containing `source_type: "local"`, creator,
-license, and a timezone-aware retrieval time, then import it:
+Candidate analysis is advisory evidence before `candidates_ready`. It does not select media,
+approve a shot, add a receipt, or change the lifecycle. Keep the existing two or three literal
+queries for every shot.
+
+For local video, write truthful provenance and import it through the existing acquisition path:
 
 ```powershell
 python "$BrollScripts/pexels.py" import-local `
@@ -147,46 +159,137 @@ python "$BrollScripts/pexels.py" import-local `
   "$ProjectRoot/work/b-roll/example-local-provenance.json"
 ```
 
-Copy the returned acquisition record into the shot candidate, use a protocol-relative
-`cache_path` such as `cache/b-roll/candidates/example-owned-footage.mp4`, and retain its real
-probe, byte count, SHA-256, and provenance. The current local importer validates video; do
-not bypass it to force unsupported media into the plan.
+Copy the returned record into the shot's `candidates`. Candidate analysis reads that exact frozen
+cache file; it does not copy it into another provider or analysis system. Use `--local-only` when
+the plan should not query Pexels.
 
-For Pexels, search each of the shot's two or three literal queries through the one direct
-module:
-
-```powershell
-python "$BrollScripts/pexels.py" search "precision parts factory floor" `
-  --orientation landscape --per-page 10
-```
-
-Choose only a semantically accurate result. Save that single returned candidate object as
-JSON, add its intended protocol-relative `cache_path`, then use the provided downloader:
+Collect Pexels results with round-robin query merging, provider-ID deduplication, and a maximum
+of eight unique provider videos per shot. Choose the orientation that matches the timeline:
 
 ```powershell
-$PexelsRecord = "$ProjectRoot/work/b-roll/pexels-12345-acquired.json"
-$PexelsJson = & python "$BrollScripts/pexels.py" download `
-  "$ProjectRoot/work/b-roll/pexels-candidate.json" `
-  "$ProjectRoot/work/cache/b-roll/candidates/pexels-12345.mp4"
-if ($LASTEXITCODE -ne 0) { throw 'Pexels acquisition failed.' }
-[IO.File]::WriteAllText($PexelsRecord, ($PexelsJson -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
+$CandidateAnalysis = Join-Path $BrollScripts 'candidate_analysis.py'
+python $CandidateAnalysis search `
+  $ProjectRoot `
+  "$ProjectRoot/work/b-roll/broll-plan.json" `
+  "$ProjectRoot/work/b-roll/candidate-search.json" `
+  --orientation portrait `
+  --per-page 8
 ```
 
-`$PexelsRecord` is the authoritative acquisition record: it contains the final redirected
-URL, `path`, protocol-relative `cache_path`, SHA-256, bytes, probe, and synchronized
-provenance. Replace the shot's search-result candidate with this complete record, then
-revalidate the plan. Never rerun a successfully published download using the unhashed search
-record; only the acquired record binds the published bytes.
+For local-only analysis, add `--local-only`. The search record preserves every literal query,
+its original provider order, the round-robin order, and both Pexels variants. The analysis variant
+is the smallest orientation-matched file whose short edge is at least 480 pixels, or the largest
+valid matching file when none qualifies. The delivery variant remains the highest-resolution
+orientation-matched file.
 
-The downloader owns `.part` recovery. After a transient HTTP or network failure, rerun the
-exact `pexels.py download` command with the same candidate and destination and let it validate
-Range responses, redirects/hosts, size, media, and hash before atomic publication or cleanup.
-Never manually promote, rename, or delete a `.part` file. On downloader-declared validation
-failure, honestly skip the shot; do not substitute a generic clip or publish partial bytes.
+Download and fully decode only analysis variants, sample them at 10/30/50/70/90 percent, and
+write deterministic machine evidence:
 
-External generation follows the local import command with `source_type:
-"external-generated"` and complete truthful generation provenance. This is import only, not
-authorization to call a generation service.
+```powershell
+python $CandidateAnalysis analyze `
+  $ProjectRoot `
+  "$ProjectRoot/work/b-roll/broll-plan.json" `
+  "$ProjectRoot/work/b-roll/candidate-search.json" `
+  "$ProjectRoot/work/timeline.json" `
+  "$ProjectRoot/work/b-roll/candidate-analysis.json"
+```
+
+The analysis contains hard checks, objective warnings, sampled-frame and center-crop hashes,
+contact sheets, luma/clipping/edge/motion evidence, and duplicate evidence. It preserves the
+shot-local exact rejection and strict perceptual threshold, then adds project-wide exact identity,
+strict perceptual groups, and non-suppressing `possible_series` hints. Hard rejection is limited to
+the objective failures in `reference/broll-rules.md`.
+
+Inspect the exact transcript evidence, five frames, crop simulations, warnings, and duplicate
+evidence. Write `work/cache/b-roll/candidate-ranking-input.json` with this shape:
+
+```json
+{
+  "schema_version": 1,
+  "analysis_sha256": "<canonical SHA-256 of candidate-analysis.json>",
+  "mode": "agent",
+  "actor": "<real Agent name>",
+  "timestamp": "<timezone-aware timestamp>",
+  "overall_rationale": "<non-empty rationale>",
+  "near_duplicate_groups": [{
+    "group_id": "<stable group id>",
+    "match_type": "same_series",
+    "actor": "<real Agent name>",
+    "timestamp": "<timezone-aware timestamp>",
+    "members": [
+      {"shot_id": "<shot id>", "candidate_id": "<candidate id>"},
+      {"shot_id": "<other shot id>", "candidate_id": "<other candidate id>"}
+    ],
+    "rationale": "<specific visible repetition across the two transcript moments>"
+  }],
+  "shots": [{
+    "shot_id": "<shot id>",
+    "candidates": [{
+      "candidate_id": "<candidate id>",
+      "semantic_fit": 0,
+      "context_fit": 0,
+      "composition_fit": 0,
+      "style_fit": 0,
+      "text_logo_risk": "uncertain",
+      "avoid_violation": false,
+      "primary_subject_visible": true,
+      "near_duplicate_group": null,
+      "rationale": "<candidate-specific evidence>"
+    }]
+  }]
+}
+```
+
+Use integer fit scores from 0 through 4. `text_logo_risk` is 0 through 4 or `uncertain`; never
+claim OCR. Score every analyzable candidate, preserve the real Agent identity, and do not use
+`mode: "human"` for ranking. Confirm a project-wide near-duplicate group only after comparing the
+frozen frames, transcript evidence, visual intent, provider identity, creator, and source title.
+Do not confirm from creator identity alone. Omit `near_duplicate_groups` when none are confirmed;
+the per-candidate `near_duplicate_group` field remains accepted for older shot-local records.
+
+Validate and apply the fixed public ranking rules:
+
+```powershell
+python $CandidateAnalysis rank `
+  $ProjectRoot `
+  "$ProjectRoot/work/b-roll/candidate-analysis.json" `
+  "$ProjectRoot/work/cache/b-roll/candidate-ranking-input.json" `
+  "$ProjectRoot/work/b-roll/candidate-ranking.json"
+```
+
+See [example-candidate-ranking.json](examples/example-candidate-ranking.json) for the durable
+ranking shape. Exact project duplicates and Agent-confirmed near duplicates are allocated to the
+shot with the strongest semantic/context evidence, then each affected shot refills from its next
+independent eligible candidate. `possible_series` never suppresses automatically. A shortlist
+contains at most three candidates; fewer than three is valid and no eligible result must be
+`no_eligible_candidates`.
+
+Only after ranking, acquire the full delivery variants and bind their exact bytes plus the active
+analysis/ranking hashes into the plan:
+
+```powershell
+python $CandidateAnalysis acquire `
+  $ProjectRoot `
+  "$ProjectRoot/work/b-roll/broll-plan.json" `
+  "$ProjectRoot/work/b-roll/candidate-analysis.json" `
+  "$ProjectRoot/work/b-roll/candidate-ranking.json"
+```
+
+The acquire command moves a shot only to `candidates_ready` or `skipped`. It cannot select a
+candidate or approve a plan. The downloader owns `.part` recovery for both analysis and delivery
+variants. Never manually promote, rename, or delete a `.part` file.
+
+Publish the immutable analysis packet before exact-candidate review:
+
+```powershell
+python $CandidateAnalysis publish `
+  $ProjectRoot `
+  "$ProjectRoot/work/b-roll/candidate-analysis.json" `
+  "$ProjectRoot/work/b-roll/candidate-ranking.json"
+```
+
+External generation still follows `import-local` with `source_type: "external-generated"` and
+complete truthful provenance. This is import only, not authorization to call a generation service.
 
 ### 4. Publish And Complete Exact-Candidate Review
 
@@ -205,28 +308,83 @@ $ReviewPublication = & python "$BrollScripts/build_review_page.py" `
 Start-Process (Resolve-Path "$ProjectRoot/review/03-b-roll/b-roll-review.html")
 ```
 
-Apply the review checks in `reference/broll-rules.md`. The export must decide every shot
-exactly once. The browser downloads `b-roll-review-<UUID>.json`; after exporting, bind the
-actual operator-chosen download location rather than assuming it is in the review directory:
+Apply the review checks in `reference/broll-rules.md`. The page uses the readable mapped transcript
+as the primary A-roll context. It keeps word timing, clip mapping, search queries, and full
+provenance in the payload while placing technical details behind collapsed disclosures. Visible
+time values use at most two decimal places. Insert start/end move in explicit 0.5-second steps
+inside the displayed original-value plus-or-minus-two-second bounds, then snap exported values to
+the rational timeline frame grid. Select one to three ordered, unique candidates from the
+hash-bound Top 3 for a shot. The page divides a new multi-candidate choice by integer timeline
+frames, lets the user reorder segments or adjust an adjacent boundary, and keeps the total shot
+range unchanged. Choose only `0.5x`, `1x`, `1.5x`, or `2x` playback for each segment; the page
+calculates source end from the allocated program duration, exposes `remaining`/`overflow`, and
+requires a visible `Fit to A-roll` result before export. Copy and Download JSON remain disabled
+when no legal fit exists, and their JSON records every ordered segment, range, and playback rate.
+
+`Modification notes` is optional. A non-empty value, changed program timing, or a changed prefilled
+segment forces `submission_intent: request_revision`; an explicit Request changes action may use
+empty notes. `submission_intent: approve` means the exact current immutable page configuration.
+`Copy` is the primary handoff and places the complete JSON in both a readonly textarea and the
+clipboard when available. `Download JSON` downloads those same bytes for durable local transfer.
+Neither action applies or approves the review.
+
+After `Download JSON`, bind the actual operator-chosen download location rather than assuming it is
+in the review directory:
 
 ```powershell
 $ReviewExport = (Resolve-Path -LiteralPath "<browser-download-directory>/b-roll-review-$($ReviewPublication.review_id).json").Path
 ```
 
-For human mode, present the page and stop. Apply only the JSON the user explicitly exports;
-it must contain `explicit_user_action: true`. For Agent mode, proceed only when the user has
+For human mode, present the page and stop. Apply only the complete JSON the user explicitly copies
+or downloads; preserve copied JSON byte-for-byte in a file before validation. It must contain
+`explicit_user_action: true`. For Agent mode, proceed only when the user has
 explicitly delegated the decision or requested autonomous completion. Inspect the same exact
-assets, export truthful decisions under `mode: "agent"`, name the real Agent actor, and give
+assets, record truthful decisions under `mode: "agent"`, name the real Agent actor, and give
 a non-empty decision rationale. Never create a human-mode receipt from silence or inference.
 
-Apply the exported review and durably bind the interaction receipt:
+Present the candidate-analysis summary and this exact full-candidate page together, then stop.
+Do not apply review, normalize, build a render plan, or render delivery until the user explicitly
+copies, downloads, or approves exact candidate selections in a later turn. Agent ranking is not
+user approval.
+
+Inspect `submission_intent` before applying anything. For `request_revision`, preserve the exact
+export bytes under `work/b-roll`, validate them against the old immutable page, rebuild an
+unapproved proposal, and reclassify duration evidence without redownloading or resampling:
 
 ```powershell
-python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]); sys.path.insert(0,sys.argv[2]); import broll_plan,projectlib; path=root/'work/b-roll/broll-plan.json'; plan=projectlib.load_json(path); review=projectlib.load_json(sys.argv[3]); updated=broll_plan.apply_review(plan,review,mode=sys.argv[4],actor=sys.argv[5],rationale=sys.argv[6],interaction_path=root/'work/b-roll/broll-interaction.json'); projectlib.write_json(path,updated)" $ProjectRoot $BrollScripts $ReviewExport agent Codex "Selected literal process footage; skipped candidates that did not match the claim."
+$Revision = Get-Content -LiteralPath $ReviewExport -Raw -Encoding UTF8 | ConvertFrom-Json
+if ($Revision.submission_intent -ne 'request_revision') { throw 'Expected request_revision.' }
+$SavedRequest = Join-Path $ProjectRoot "work/b-roll/broll-revision-request-$($Revision.review_id).json"
+[IO.File]::Copy($ReviewExport, $SavedRequest, $false)
+
+python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]); sys.path.insert(0,sys.argv[2]); import broll_plan,projectlib; plan=projectlib.load_json(root/'work/b-roll/broll-plan.json'); request=projectlib.load_json(sys.argv[3]); timeline=projectlib.load_json(root/'work/timeline.json'); transcript=projectlib.load_json(root/'work/understand/transcript.json'); errors=broll_plan.validate_revision_request(plan,request,timeline,transcript); print('\n'.join(errors) if errors else 'Revision request valid'); raise SystemExit(bool(errors))" $ProjectRoot $BrollScripts $SavedRequest
+
+python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]); sys.path.insert(0,sys.argv[2]); import broll_plan,projectlib; path=root/'work/b-roll/broll-plan.json'; plan=projectlib.load_json(path); request=projectlib.load_json(sys.argv[3]); timeline=projectlib.load_json(root/'work/timeline.json'); transcript=projectlib.load_json(root/'work/understand/transcript.json'); projectlib.write_json(path,broll_plan.rebuild_plan_from_revision(plan,request,timeline,transcript))" $ProjectRoot $BrollScripts $SavedRequest
+
+python "$BrollScripts/candidate_analysis.py" reclassify `
+  $ProjectRoot `
+  "$ProjectRoot/work/b-roll/broll-plan.json" `
+  "$ProjectRoot/work/b-roll/candidate-analysis.json" `
+  "$ProjectRoot/work/timeline.json" `
+  "$ProjectRoot/work/b-roll/candidate-analysis.json"
 ```
 
-Use `human` and the actual human actor only after explicit user export. The command rationale
-must exactly match the exported rationale.
+Inspect every `agent_rescore_required` marker. When true, compare the revised transcript evidence
+against the same frozen frames and write a truthful Agent score update; never carry a semantic
+rationale across changed evidence by inference. Rerun `rank` and `acquire` so the plan binds the new
+analysis/ranking hashes. Existing SHA-256-identical analysis and delivery media are reused. Publish
+a new UUID review page with `build_review_page.py`, present it, and stop again. Never route a
+revision request to `apply_review()` or convert `revision_notes` into a human rationale.
+
+Apply the received review JSON and durably bind the interaction receipt:
+
+```powershell
+python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]); sys.path.insert(0,sys.argv[2]); import broll_plan,projectlib; path=root/'work/b-roll/broll-plan.json'; plan=projectlib.load_json(path); review=projectlib.load_json(sys.argv[3]); timeline=projectlib.load_json(root/'work/timeline.json'); updated=broll_plan.apply_review(plan,review,mode=sys.argv[4],actor=sys.argv[5],rationale=review['rationale'],interaction_path=root/'work/b-roll/broll-interaction.json',timeline=timeline); projectlib.write_json(path,updated)" $ProjectRoot $BrollScripts $ReviewExport human "Actual user name"
+```
+
+Use `human` and the actual human actor only after explicit user export. A new human approve uses
+the page's factual `review_ui_explicit_action` rationale; it does not claim to quote a user-authored
+reason. Agent mode still requires the real Agent actor and a specific exported Agent rationale.
 
 ### 5. Normalize Approved Selections
 
@@ -238,8 +396,9 @@ python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]); sys.pat
 
 Without active color grade, call the same API with `lut=None`. Never omit the LUT when color
 grade is active and never apply an unselected look. The normalizer produces silent H.264
-overlays at timeline dimensions and exact rational FPS, preserves aspect ratio, enforces the
-selected trim or Ken Burns direction, and publishes each validated result atomically.
+overlays at timeline dimensions and exact rational FPS, preserves aspect ratio, reads the complete
+canonical source range, permits at most one frame of final quantization adjustment, and publishes
+each validated result atomically. It never silently removes a multi-second canonical tail.
 
 Rerun `normalize_plan()` after interruption. It validates and preserves completed normalized
 shots before continuing; do not hand-promote `.part.mp4` or `.part.json` files.

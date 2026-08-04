@@ -5,6 +5,7 @@ import json
 import math
 import os
 import re
+import shutil
 import subprocess
 import sys
 from fractions import Fraction
@@ -173,20 +174,41 @@ def _check_probe(probe, width, height, num, den, duration):
 
 def _selection(candidate, shot, duration, num, den):
     selected = shot.get("selected")
-    if not isinstance(selected, dict) or selected.get("candidate_id") != candidate.get("id"):
+    candidates = candidate if isinstance(candidate, list) else [candidate]
+    if (not isinstance(selected, dict) or not candidates
+            or any(not isinstance(item, dict) for item in candidates)):
         raise ValueError("shot selection does not match candidate")
+    selected_ids = broll_plan.selected_candidate_ids(selected)
+    candidate_ids = [item.get("id") for item in candidates]
+    if not selected_ids or any(candidate_id not in candidate_ids for candidate_id in selected_ids):
+        raise ValueError("shot selection does not match candidate")
+    if "segments" in selected:
+        if any(next(item for item in candidates if item.get("id") == candidate_id).get("media_type") != "video"
+               for candidate_id in selected_ids):
+            raise ValueError("canonical segments require video candidates")
+        try:
+            details = broll_plan.selection_details(
+                shot, candidates, {"fps": {"num": num, "den": den}},
+            )
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
+        if abs(details["program_duration_s"] - duration) > den / num + 1e-6:
+            raise ValueError("selection program duration does not match shot")
+        return "video", details
+    if len(candidates) != 1 or selected_ids != candidate_ids:
+        raise ValueError("legacy selection requires exactly one candidate")
+    candidate = candidates[0]
     media_type = candidate.get("media_type")
     if media_type == "video":
-        trim = selected.get("source_trim")
-        if not isinstance(trim, dict):
-            raise ValueError("video selection requires explicit source_trim")
-        start = _number(trim.get("start_s"), "source_trim start_s")
-        end = _number(trim.get("end_s"), "source_trim end_s")
-        probe = candidate.get("probe")
-        source_duration = _number(probe.get("duration_s") if isinstance(probe, dict) else None, "candidate probe.duration_s")
-        if start < 0 or end <= start or end > source_duration:
-            raise ValueError("video selection requires a valid source_trim")
-        return media_type, (start, end)
+        try:
+            details = broll_plan.selection_details(
+                shot, candidate, {"fps": {"num": num, "den": den}},
+            )
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
+        if abs(details["program_duration_s"] - duration) > den / num + 1e-6:
+            raise ValueError("selection program duration does not match shot")
+        return media_type, details
     if media_type != "image":
         raise ValueError("candidate media_type must be video or image")
     motion = selected.get("ken_burns")
@@ -218,9 +240,16 @@ def normalize_shot(candidate, shot, timeline, destination, *, lut=None):
             f"crop={width}:{height}", "setsar=1",
         ]
         if media_type == "video":
-            start, end = option
-            inputs = ["-ss", f"{start:.9f}", "-t", f"{end - start:.9f}", "-i", str(source)]
-            filters = common + [f"fps={num}/{den}", f"trim=duration={duration:.9f}", "setpts=PTS-STARTPTS"]
+            segment = option["segments"][0]
+            start = segment["source_range"]["start_s"]
+            end = segment["source_range"]["end_s"]
+            requested = option.get("legacy_requested_source_range", segment["source_range"])
+            input_start, input_end = requested["start_s"], requested["end_s"]
+            inputs = ["-ss", f"{input_start:.9f}", "-t", f"{input_end - input_start:.9f}", "-i", str(source)]
+            rate = float(segment["playback_rate"])
+            filters = common + [f"setpts=(PTS-STARTPTS)/{rate:g}", f"fps={num}/{den}"]
+            if option["format"] == "legacy":
+                filters.append(f"trim=duration={duration:.9f}")
         else:
             zoom, x, y = option
             inputs = ["-loop", "1", "-i", str(source)]
@@ -229,8 +258,10 @@ def normalize_shot(candidate, shot, timeline, destination, *, lut=None):
             filters.append(f"lut3d={lut_path.name}")
         command = [
             "ffmpeg", "-y", "-loglevel", "error", *inputs,
+            "-map", "0:v:0",
             "-vf", ",".join(filters), "-t", f"{duration:.9f}",
-            "-an", "-sn", "-dn", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            "-an", "-sn", "-dn", "-map_metadata", "-1", "-write_tmcd", "0",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p",
             "-movflags", "+faststart", str(part),
         ]
         subprocess.run(command, cwd=lut_path.parent if lut_path else None, check=True, capture_output=True)
@@ -239,12 +270,146 @@ def normalize_shot(candidate, shot, timeline, destination, *, lut=None):
         subprocess.run(["ffmpeg", "-v", "error", "-i", str(part), "-map", "0:v:0", "-f", "null", "-"], check=True, capture_output=True)
         digest = broll_plan.sha256_file(part)
         os.replace(part, target)
-        return {
+        record = {
             "path": target,
             "source_path": candidate.get("cache_path"),
             "source_sha256": source_digest,
             "sha256": digest,
             "probe": probe,
+            **grade_hashes,
+        }
+        if media_type == "video":
+            record.update({
+                "selection_format": option["format"],
+                "segment": copy.deepcopy(option["segments"][0]),
+                "source_duration_s": option["source_duration_s"],
+                "effective_duration_s": option["effective_duration_s"],
+                "program_duration_s": option["program_duration_s"],
+            })
+            if "legacy_requested_source_range" in option:
+                record["legacy_requested_source_range"] = copy.deepcopy(
+                    option["legacy_requested_source_range"]
+                )
+        return record
+    except BaseException:
+        part.unlink(missing_ok=True)
+        raise
+
+
+def _segment_output(target, index):
+    return target.with_name(f"{target.stem}-segment-{index:02d}.mp4")
+
+
+def _segment_sidecar(output):
+    return output.with_suffix(".json")
+
+
+def _segment_shot(shot, segment, candidate):
+    return {
+        "id": shot.get("id"),
+        "status": "selected",
+        "program_range": copy.deepcopy(segment["program_range"]),
+        "candidates": [candidate],
+        "selected": {"segments": [copy.deepcopy(segment)]},
+    }
+
+
+def _load_reusable_segment(sidecar, candidate, shot, timeline, output, root, grade_hashes):
+    if not sidecar.is_file():
+        return None
+    try:
+        record = projectlib.load_json(sidecar)
+        _validate_normalized(record, candidate, shot, timeline, output, root, grade_hashes)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError, subprocess.CalledProcessError):
+        return None
+    return record
+
+
+def normalize_selection(candidates, shot, timeline, destination, *, lut=None):
+    """Normalize 1-3 canonical segments, then atomically publish their hard-cut concat."""
+    target, root = _destination(destination)
+    part = target.with_suffix(".part.mp4")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    part.unlink(missing_ok=True)
+    width, height, num, den = _timeline_spec(timeline)
+    duration = _shot_duration(shot, timeline)
+    media_type, details = _selection(candidates, shot, duration, num, den)
+    if media_type != "video" or details["format"] != "canonical":
+        if len(candidates) != 1:
+            raise ValueError("non-canonical selection requires exactly one candidate")
+        return normalize_shot(candidates[0], shot, timeline, target, lut=lut)
+    candidate_map = {candidate.get("id"): candidate for candidate in candidates}
+    lut_path, grade_hashes = _grade(lut, root)
+    segment_records = []
+    try:
+        for index, (segment, timing) in enumerate(zip(details["segments"], details["segment_details"]), 1):
+            candidate = candidate_map[segment["candidate_id"]]
+            output = _segment_output(target, index)
+            sidecar = _segment_sidecar(output)
+            segment_shot = _segment_shot(shot, segment, candidate)
+            record = _load_reusable_segment(
+                sidecar, candidate, segment_shot, timeline, output, root, grade_hashes,
+            )
+            if record is None:
+                record = normalize_shot(candidate, segment_shot, timeline, output, lut=lut_path)
+                record["path"] = output.relative_to(root / "work").as_posix()
+                sidecar_part = sidecar.with_suffix(".part.json")
+                try:
+                    projectlib.write_json(sidecar_part, record)
+                    os.replace(sidecar_part, sidecar)
+                finally:
+                    sidecar_part.unlink(missing_ok=True)
+            segment_records.append({
+                "candidate_id": candidate["id"],
+                "segment": copy.deepcopy(segment),
+                "source_path": record["source_path"],
+                "source_sha256": record["source_sha256"],
+                "normalized_path": record["path"],
+                "normalized_sha256": record["sha256"],
+                "probe": copy.deepcopy(record["probe"]),
+                "source_duration_s": timing["source_duration_s"],
+                "effective_duration_s": timing["effective_duration_s"],
+                "program_duration_s": timing["program_duration_s"],
+                "playback_rate": timing["playback_rate"],
+            })
+        segment_paths = [root / "work" / record["normalized_path"] for record in segment_records]
+        if len(segment_paths) == 1:
+            shutil.copyfile(segment_paths[0], part)
+        else:
+            inputs = [value for path in segment_paths for value in ("-i", str(path))]
+            labels = []
+            filters = []
+            for index in range(len(segment_paths)):
+                filters.append(f"[{index}:v]setpts=PTS-STARTPTS[v{index}]")
+                labels.append(f"[v{index}]")
+            filters.append(f"{''.join(labels)}concat=n={len(segment_paths)}:v=1:a=0[outv]")
+            command = [
+                "ffmpeg", "-y", "-loglevel", "error", *inputs,
+                "-filter_complex", ";".join(filters), "-map", "[outv]",
+                "-t", f"{duration:.9f}", "-r", f"{num}/{den}",
+                "-an", "-sn", "-dn", "-map_metadata", "-1", "-write_tmcd", "0",
+                "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+                str(part),
+            ]
+            subprocess.run(command, check=True, capture_output=True)
+        probe = _probe(part)
+        _check_probe(probe, width, height, num, den, duration)
+        subprocess.run(
+            ["ffmpeg", "-v", "error", "-i", str(part), "-map", "0:v:0", "-f", "null", "-"],
+            check=True, capture_output=True,
+        )
+        digest = broll_plan.sha256_file(part)
+        os.replace(part, target)
+        return {
+            "path": target,
+            "selection_format": "canonical",
+            "segments": segment_records,
+            "source_paths": [record["source_path"] for record in segment_records],
+            "source_sha256s": [record["source_sha256"] for record in segment_records],
+            "sha256": digest,
+            "concat_sha256": digest,
+            "probe": probe,
+            "program_duration_s": details["program_duration_s"],
             **grade_hashes,
         }
     except BaseException:
@@ -258,15 +423,95 @@ def _validate_normalized(record, candidate, shot, timeline, output, root, grade_
     expected_path = output.relative_to(root / "work").as_posix()
     if record.get("path") != expected_path or not output.is_file():
         raise ValueError("normalized output path is stale")
-    _, source_digest = _source(candidate, root)
-    if record.get("source_path") != candidate.get("cache_path") or record.get("source_sha256") != source_digest:
-        raise ValueError("normalized source identity is stale")
     if record.get("sha256") != broll_plan.sha256_file(output):
         raise ValueError("normalized output SHA-256 is stale")
     for key in ("grade_plan_sha256", "selected_lut_sha256"):
         if (key in record or key in grade_hashes) and record.get(key) != grade_hashes.get(key):
             raise ValueError("normalized grade identity is stale")
     width, height, num, den = _timeline_spec(timeline)
+    candidates = candidate if isinstance(candidate, list) else [candidate]
+    if any(not isinstance(item, dict) for item in candidates):
+        raise ValueError("normalized candidates are invalid")
+    component_records = record.get("segments")
+    if component_records is not None:
+        _, details = _selection(
+            candidates, shot, _shot_duration(shot, timeline), num, den,
+        )
+        if (details["format"] != "canonical" or not isinstance(component_records, list)
+                or len(component_records) != len(details["segments"])):
+            raise ValueError("normalized segments are stale")
+        candidate_map = {item.get("id"): item for item in candidates}
+        expected_source_paths = []
+        expected_source_hashes = []
+        for index, (component, segment, timing) in enumerate(zip(
+                component_records, details["segments"], details["segment_details"]), 1):
+            if not isinstance(component, dict) or component.get("segment") != segment:
+                raise ValueError("normalized segment is stale")
+            selected_candidate = candidate_map.get(segment["candidate_id"])
+            if selected_candidate is None:
+                raise ValueError("normalized segment candidate is stale")
+            _, source_digest = _source(selected_candidate, root)
+            expected_source_paths.append(selected_candidate.get("cache_path"))
+            expected_source_hashes.append(source_digest)
+            if (component.get("candidate_id") != selected_candidate.get("id")
+                    or component.get("source_path") != selected_candidate.get("cache_path")
+                    or component.get("source_sha256") != source_digest):
+                raise ValueError("normalized segment source identity is stale")
+            component_output = _segment_output(output, index)
+            expected_component_path = component_output.relative_to(root / "work").as_posix()
+            if (component.get("normalized_path") != expected_component_path
+                    or not component_output.is_file()
+                    or component.get("normalized_sha256") != broll_plan.sha256_file(component_output)):
+                raise ValueError("normalized segment output is stale")
+            for key in ("source_duration_s", "effective_duration_s", "program_duration_s", "playback_rate"):
+                actual = _number(component.get(key), f"normalized segment {key}")
+                if abs(actual - timing[key]) > den / num + 1e-6:
+                    raise ValueError(f"normalized segment {key} is stale")
+            component_probe = _probe(component_output)
+            _check_probe(component_probe, width, height, num, den, timing["program_duration_s"])
+            if component.get("probe") != component_probe:
+                raise ValueError("normalized segment probe is stale")
+            subprocess.run(
+                ["ffmpeg", "-v", "error", "-i", str(component_output), "-map", "0:v:0", "-f", "null", "-"],
+                check=True, capture_output=True,
+            )
+        if record.get("source_paths") != expected_source_paths or record.get("source_sha256s") != expected_source_hashes:
+            raise ValueError("normalized segment source bindings are stale")
+        if record.get("concat_sha256") != record.get("sha256"):
+            raise ValueError("normalized concat SHA-256 is stale")
+        actual_program_duration = _number(record.get("program_duration_s"), "normalized program_duration_s")
+        if abs(actual_program_duration - details["program_duration_s"]) > den / num + 1e-6:
+            raise ValueError("normalized program_duration_s is stale")
+        probe = _probe(output)
+        _check_probe(probe, width, height, num, den, _shot_duration(shot, timeline))
+        if record.get("probe") != probe:
+            raise ValueError("normalized probe is stale")
+        subprocess.run(
+            ["ffmpeg", "-v", "error", "-i", str(output), "-map", "0:v:0", "-f", "null", "-"],
+            check=True, capture_output=True,
+        )
+        return
+    if len(candidates) != 1:
+        raise ValueError("legacy normalized record requires one candidate")
+    candidate = candidates[0]
+    _, source_digest = _source(candidate, root)
+    if record.get("source_path") != candidate.get("cache_path") or record.get("source_sha256") != source_digest:
+        raise ValueError("normalized source identity is stale")
+    if candidate.get("media_type") == "video":
+        _, details = _selection(
+            candidate, shot, _shot_duration(shot, timeline), num, den,
+        )
+        if details["format"] == "canonical" or "selection_format" in record:
+            if record.get("selection_format") != details["format"]:
+                raise ValueError("normalized selection format is stale")
+            if record.get("segment") != details["segments"][0]:
+                raise ValueError("normalized segment is stale")
+            for key in ("source_duration_s", "effective_duration_s", "program_duration_s"):
+                actual = _number(record.get(key), f"normalized {key}")
+                if abs(actual - details[key]) > den / num + 1e-6:
+                    raise ValueError(f"normalized {key} is stale")
+            if record.get("legacy_requested_source_range") != details.get("legacy_requested_source_range"):
+                raise ValueError("normalized legacy requested source range is stale")
     probe = _probe(output)
     _check_probe(probe, width, height, num, den, _shot_duration(shot, timeline))
     if record.get("probe") != probe:
@@ -319,16 +564,26 @@ def normalize_plan(plan_path, timeline_path, project_root, *, lut=None):
         selected, candidates = shot.get("selected"), shot.get("candidates")
         if not isinstance(selected, dict) or not isinstance(candidates, list):
             raise ValueError("selected shot is invalid")
-        candidate = next((item for item in candidates if isinstance(item, dict) and item.get("id") == selected.get("candidate_id")), None)
-        if candidate is None:
+        selected_ids = broll_plan.selected_candidate_ids(selected)
+        selected_candidates = [
+            next((item for item in candidates
+                  if isinstance(item, dict) and item.get("id") == candidate_id), None)
+            for candidate_id in selected_ids
+        ]
+        if not selected_ids or any(candidate is None for candidate in selected_candidates):
             raise ValueError("selected candidate does not belong to shot")
         output = root / f"work/cache/b-roll/normalized/broll-{index:03d}.mp4"
         if shot.get("status") == "normalized":
-            _validate_normalized(shot.get("normalized"), candidate, shot, timeline, output, root, grade_hashes)
+            _validate_normalized(shot.get("normalized"), selected_candidates, shot, timeline, output, root, grade_hashes)
             continue
         if shot.get("status") != "selected":
             raise ValueError("normalize_plan requires selected, normalized, or skipped shots")
-        record = normalize_shot(candidate, shot, timeline, output, lut=lut_path)
+        if "segments" in selected:
+            record = normalize_selection(selected_candidates, shot, timeline, output, lut=lut_path)
+        else:
+            if len(selected_candidates) != 1:
+                raise ValueError("legacy selection requires exactly one candidate")
+            record = normalize_shot(selected_candidates[0], shot, timeline, output, lut=lut_path)
         record["path"] = output.relative_to(root / "work").as_posix()
         shot["normalized"], shot["status"] = record, "normalized"
         plan_part = plan_path.with_suffix(".part.json")
