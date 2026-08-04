@@ -7,6 +7,9 @@ description: Use when an understood Project Protocol V1 video needs selective tr
 
 Add selective, shot-designed motion-anything recipe adaptations without changing timeline,
 geometry, or audio.
+Face safety is absolute: no graphic, text, mask, particle, or transient animation may overlap
+any visible face in any frame. Reposition, scale down, redesign, or skip the cue when no
+face-safe placement exists.
 The bundled `recipes/` tree is the only effect library. Do not search the web, query a remote
 catalog, or author a substitute effect. Every bundled manifest recipe is supported through its
 preconverted `hyperframes/` directory.
@@ -24,7 +27,8 @@ Read [recipe-selection.md](reference/recipe-selection.md),
 1. Call `validate_prerequisite(project_root)` before effect selection. On error, finish
    `video-understand`; do not repeat media analysis.
 2. Read project/timeline, transcript, analysis, understanding, summary, and contact sheet.
-   Map transcript evidence with `projectlib.map_transcript_to_timeline`.
+   Map transcript evidence with `projectlib.map_transcript_to_timeline`. For the full cue range,
+   identify every visible face and reserve its occupied region before choosing overlay placement.
 3. Define each cue before recipe search: content, purpose, half-open program range, motion
    family, interaction model, compositing mode, timing rationale, and one or more literal
    `recipe_queries`. Reject filler and visual collisions. Zero cues is valid.
@@ -54,8 +58,9 @@ Read [recipe-selection.md](reference/recipe-selection.md),
 7. Set `authoring_mode: recipe-adaptation`. Author the real composition under
    `work/cache/graphic-motion/adapted/<cue-id>/`, using the recipe's recognizable motion mechanic
    as the template. Replace demo copy and adapt layout, scale, palette, timing, and choreography
-   to the actual shot. A centered web demo, recipe-name label, or unchanged 12-16px control is not
-   an acceptable adaptation.
+   to the actual shot. Keep every element and its complete animated path outside all visible faces,
+   including entrances, overshoot, settling, and exits. A centered web demo, recipe-name label, or
+   unchanged 12-16px control is not an acceptable adaptation.
 
    **Information budget:** Every visible element must earn its place by carrying the cue's
    narrative meaning, expressing the recipe's core motion mechanic, or keeping the overlay legible
@@ -86,7 +91,11 @@ Read [recipe-selection.md](reference/recipe-selection.md),
    first/middle/last composites, every event-time full-frame composite, a focused crop of the moving
    subject, and the moving clip over the actual video. Reject transient defects even when the
    settled pose is correct: overshooting the intended track or container, crossing the wrong target,
-   clipping, collision, occlusion, separation from a label, or a one-frame flash. The review must
+   clipping, collision, occlusion, separation from a label, or a one-frame flash. Reject any cue if
+   any overlay pixel intersects any visible face at any sampled or intervening frame; partial,
+   translucent, and one-frame face overlaps still fail. When a face is visible during the cue,
+   inspect every composited frame, not only snapshots, and record the face-safety result in
+   `footage_integration`. The review must
    record non-empty `semantic_clarity`, `composition`, `readability`, `motion_quality`, and
    `footage_integration` judgments. At each sampled pose, account for every visible text or UI-like
    element: reject the cue if an element has no narrative, motion-mechanic, or legibility purpose,
