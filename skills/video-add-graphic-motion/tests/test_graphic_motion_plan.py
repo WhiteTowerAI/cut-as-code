@@ -191,6 +191,31 @@ class GraphicMotionPlanTests(unittest.TestCase):
             self.transcript, self.timeline,
         )["segments"][0]["words"][0]
         recipe = self._materialize_recipe()
+        adaptation_files = [
+            self._file(
+                "work/cache/graphic-motion/adapted/gm-001/index.html",
+                b'<div data-composition-id="gm-001">ORDERED SIGNAL</div>',
+            ),
+            self._file(
+                "work/cache/graphic-motion/adapted/gm-001/motion.js",
+                b"/* Preserve the recipe's scramble-to-clear choreography. */",
+            ),
+        ]
+        adaptation = {
+            "composition_id": "gm-001",
+            "entry": self._binding(adaptation_files[0]),
+            "files": [self._binding(path) for path in adaptation_files],
+            "changes": {
+                "content": "Replace demo copy with the spoken concept.",
+                "layout": "Anchor the phrase in the shot's negative space.",
+                "scale": "Use video-scale typography.",
+                "palette": "Match the source's cool industrial neutrals.",
+                "timing": "Land the decode on the word signal.",
+                "choreography": "Add build, readable hold, and decisive resolve phases.",
+            },
+            "preserved_recipe_features": ["scramble-to-clear text progression"],
+            "rationale": "The recipe supplies the decode mechanic while the shot determines the design.",
+        }
         frames = [
             self._image(
                 f"work/cache/graphic-motion/rendered/gm-001/frame_{index:06d}.png",
@@ -200,13 +225,19 @@ class GraphicMotionPlanTests(unittest.TestCase):
             for index in range(1, 21)
         ]
         source_preview = self._image("review/04-graphic-motion/recipe-preview.png", (20, 30, 40))
+        base_recipe_snapshot = self._image(
+            "review/04-graphic-motion/base-recipe-snapshot.png", (35, 25, 15),
+        )
         snapshots = [
             self._image(f"review/04-graphic-motion/snapshot-{index}.png", (index * 20, 10, 10))
             for index in range(1, 5)
         ]
         evidence = {
             "source_fidelity": self._binding(self._source_fidelity(
-                "review/04-graphic-motion/source-fidelity.png", source_preview, snapshots[1],
+                "review/04-graphic-motion/source-fidelity.png", source_preview, base_recipe_snapshot,
+            )),
+            "adaptation_fidelity": self._binding(self._source_fidelity(
+                "review/04-graphic-motion/adaptation-fidelity.png", base_recipe_snapshot, snapshots[1],
             )),
             "composite_first": self._binding(self._image(
                 "review/04-graphic-motion/composite-first.png", (10, 20, 30),
@@ -219,7 +250,7 @@ class GraphicMotionPlanTests(unittest.TestCase):
             )),
             "hyperframes_check": self._binding(self._json(
                 "review/04-graphic-motion/hyperframes-check.json",
-                {"status": "pass", "composition_id": "decrypted-text"},
+                {"status": "pass", "composition_id": "gm-001"},
             )),
             "hyperframes_snapshots": [
                 {"pose": pose, "at_s": at_s, "file": self._binding(path)}
@@ -231,8 +262,12 @@ class GraphicMotionPlanTests(unittest.TestCase):
             ],
             "source_fidelity_inputs": {
                 "source_preview": self._binding(source_preview),
-                "port_snapshot": self._binding(snapshots[1]),
+                "port_snapshot": self._binding(base_recipe_snapshot),
                 "normalized_time": 0.4,
+            },
+            "adaptation_fidelity_inputs": {
+                "base_snapshot": self._binding(base_recipe_snapshot),
+                "adapted_snapshot": self._binding(snapshots[1]),
             },
         }
         review = {
@@ -240,6 +275,13 @@ class GraphicMotionPlanTests(unittest.TestCase):
             "mode": "agent",
             "actor": "test-agent",
             "rationale": "The converted recipe preserves its decode choreography and reads over final pixels.",
+            "aesthetic_review": {
+                "semantic_clarity": "The silent frame reads as a signal becoming ordered.",
+                "composition": "The headline is anchored in clear negative space with a supporting data rule.",
+                "readability": "The final phrase remains legible at normal playback size.",
+                "motion_quality": "The build accelerates into a stable hold and exits without a pop.",
+                "footage_integration": "Scale, color, and placement follow the industrial interview frame.",
+            },
             "evidence": evidence,
         }
         review["receipt"] = self._binding(self._json(
@@ -296,6 +338,7 @@ class GraphicMotionPlanTests(unittest.TestCase):
                 "avoid_when_review": "No avoid_when condition applies to the cue or its footage.",
             },
             "recipe": recipe,
+            "adaptation": adaptation,
             "render": {
                 "kind": "overlay",
                 "asset": "cache/graphic-motion/rendered/gm-001",
@@ -318,6 +361,7 @@ class GraphicMotionPlanTests(unittest.TestCase):
         ]
         return {
             "schema_version": 3,
+            "authoring_mode": "recipe-adaptation",
             "timeline_id": "main",
             "timebase": "program",
             "program_duration_s": 8.0,
@@ -404,6 +448,25 @@ class GraphicMotionPlanTests(unittest.TestCase):
         )
         self.assertIn("gm-001 materialized recipe file SHA-256 is stale", errors)
 
+    def test_rejects_stale_or_incomplete_project_adaptation(self):
+        plan = copy.deepcopy(self.plan)
+        plan["cues"][0]["adaptation"]["changes"].pop("layout")
+        self.assertIn(
+            "gm-001 adaptation must document all six project-level changes",
+            graphic_motion_plan.validate_plan(plan, self.timeline),
+        )
+
+        plan = copy.deepcopy(self.plan)
+        index = self.root / plan["cues"][0]["adaptation"]["entry"]["path"]
+        index.write_text("mutated", encoding="utf-8")
+        self.assertIn(
+            "gm-001 adaptation file SHA-256 is stale",
+            graphic_motion_plan.validate_plan(
+                plan, self.timeline, project=self.project,
+                project_root=self.root, verify_files=True,
+            ),
+        )
+
     def test_timing_evidence_dependencies_and_frames_fail_closed(self):
         plan = copy.deepcopy(self.plan)
         plan["fps"] = {"num": 24, "den": 1}
@@ -467,6 +530,9 @@ class GraphicMotionPlanTests(unittest.TestCase):
             self.assertIn(field, combined)
         self.assertIn("recipe_library.mjs search", combined)
         self.assertIn("recipe_library.mjs materialize", combined)
+        self.assertIn("recipe_library.mjs bind-adaptation", combined)
+        self.assertIn("recipe-adaptation", combined)
+        self.assertIn("semantic_clarity", combined)
         self.assertFalse((ROOT / "reference" / ("source" + "-catalog.md")).exists())
         self.assertNotIn("Search only the catalog", combined)
 

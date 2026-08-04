@@ -212,6 +212,28 @@ export async function materializeRecipe({ recipesRoot, recipeId, projectRoot, cu
   };
 }
 
+export async function bindAdaptation({ projectRoot, cueId }) {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(String(cueId || ""))) {
+    throw new Error("cue id must contain only letters, numbers, dot, underscore, or hyphen");
+  }
+  const root = path.resolve(projectRoot);
+  const target = path.join(root, "work", "cache", "graphic-motion", "adapted", cueId);
+  let copiedFiles;
+  try {
+    copiedFiles = (await walk(target)).sort((left, right) => left.localeCompare(right));
+  } catch (error) {
+    if (error?.code === "ENOENT") throw new Error(`adaptation directory is missing: ${target}`);
+    throw error;
+  }
+  const files = await Promise.all(copiedFiles.map(async (file) => {
+    const bytes = await readFile(file);
+    return projectBinding(root, file, bytes);
+  }));
+  const entry = files.find((binding) => binding.path.endsWith("/index.html"));
+  if (!entry) throw new Error("adaptation requires index.html");
+  return { composition_id: cueId, entry, files };
+}
+
 function option(args, name, fallback = null) {
   const index = args.indexOf(name);
   return index >= 0 ? args[index + 1] : fallback;
@@ -237,11 +259,17 @@ async function main(args) {
       projectRoot: option(args, "--project"),
       cueId: option(args, "--cue"),
     });
+  } else if (command === "bind-adaptation") {
+    result = await bindAdaptation({
+      projectRoot: option(args, "--project"),
+      cueId: option(args, "--cue"),
+    });
   } else {
     throw new Error(
       "usage: recipe_library.mjs search --query <text> [--category <id>] [--limit 8] --json\n"
       + "       recipe_library.mjs show <recipe-id> --json\n"
-      + "       recipe_library.mjs materialize <recipe-id> --project <root> --cue <cue-id> --json",
+      + "       recipe_library.mjs materialize <recipe-id> --project <root> --cue <cue-id> --json\n"
+      + "       recipe_library.mjs bind-adaptation --project <root> --cue <cue-id> --json",
     );
   }
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

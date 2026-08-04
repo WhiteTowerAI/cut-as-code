@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import {
+  bindAdaptation,
   discoverRecipes,
   manifestList,
   materializeRecipe,
@@ -141,4 +142,29 @@ test("materialize copies the preconverted recipe and returns project-relative ha
     "work", "cache", "graphic-motion", "hyperframes", "gm-001", "source", "credit.js",
   );
   assert.match(await readFile(copiedCredit, "utf8"), /Credit: Original Author/);
+});
+
+test("bind adaptation returns a complete editable composition without mutating the recipe", async () => {
+  const projectRoot = await mkdtemp(path.join(os.tmpdir(), "recipe-library-adaptation-"));
+  const adaptationRoot = path.join(
+    projectRoot, "work", "cache", "graphic-motion", "adapted", "gm-001",
+  );
+  await mkdir(adaptationRoot, { recursive: true });
+  await writeFile(
+    path.join(adaptationRoot, "index.html"),
+    '<div data-composition-id="gm-001">Twenty times faster</div>',
+    "utf8",
+  );
+  await writeFile(
+    path.join(adaptationRoot, "motion.js"),
+    "/* Based on Count Up; original credits remain in the materialized recipe. */",
+    "utf8",
+  );
+
+  const result = await bindAdaptation({ projectRoot, cueId: "gm-001" });
+
+  assert.equal(result.composition_id, "gm-001");
+  assert.ok(result.entry.path.endsWith("/adapted/gm-001/index.html"));
+  assert.deepEqual(result.files.map((item) => path.basename(item.path)), ["index.html", "motion.js"]);
+  assert.ok(result.files.every((item) => !path.isAbsolute(item.path) && /^[0-9a-f]{64}$/.test(item.sha256)));
 });

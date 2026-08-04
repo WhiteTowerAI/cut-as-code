@@ -20,6 +20,12 @@ SHA256 = re.compile(r"[0-9a-f]{64}")
 REVIEW_IMAGE_KEYS = (
     "source_fidelity", "composite_first", "composite_middle", "composite_last",
 )
+ADAPTATION_CHANGE_FIELDS = {
+    "content", "layout", "scale", "palette", "timing", "choreography",
+}
+AESTHETIC_REVIEW_FIELDS = {
+    "semantic_clarity", "composition", "readability", "motion_quality", "footage_integration",
+}
 SNAPSHOT_POSES = ("first-visible", "key-interaction", "final-minus-hold", "final")
 RANGE_EPSILON = 1e-6
 SELECTION_FIELDS = {
@@ -286,6 +292,8 @@ def _cue_bindings(cue):
         for key in ("recipe", "render", "review")
     )
     recipe_files = recipe.get("files") if isinstance(recipe.get("files"), list) else []
+    adaptation = cue.get("adaptation") if isinstance(cue.get("adaptation"), dict) else {}
+    adaptation_files = adaptation.get("files") if isinstance(adaptation.get("files"), list) else []
     frames = render.get("frames") if isinstance(render.get("frames"), list) else []
     review_evidence = review.get("evidence") if isinstance(review.get("evidence"), dict) else {}
     snapshots = review_evidence.get("hyperframes_snapshots")
@@ -296,7 +304,19 @@ def _cue_bindings(cue):
     ]
     fidelity_inputs = review_evidence.get("source_fidelity_inputs")
     source_preview = fidelity_inputs.get("source_preview") if isinstance(fidelity_inputs, dict) else None
+    port_snapshot = fidelity_inputs.get("port_snapshot") if isinstance(fidelity_inputs, dict) else None
     return [
+        *recipe_files,
+        *adaptation_files,
+        *frames,
+        *[review_evidence.get(key) for key in REVIEW_IMAGE_KEYS],
+        review_evidence.get("adaptation_fidelity"),
+        review_evidence.get("hyperframes_check"),
+        *snapshot_files,
+        source_preview,
+        port_snapshot,
+        review.get("receipt"),
+    ] if adaptation else [
         *recipe_files,
         *frames,
         *[review_evidence.get(key) for key in REVIEW_IMAGE_KEYS],
@@ -504,6 +524,47 @@ def _recipe_errors(cue_id, cue, project_root=None, verify_files=False, library=N
     return list(dict.fromkeys(errors))
 
 
+def _adaptation_errors(cue_id, cue, project_root=None, verify_files=False, required=False):
+    adaptation = cue.get("adaptation")
+    if not isinstance(adaptation, dict):
+        return [f"{cue_id} project adaptation is required"] if required else []
+    errors = []
+    if adaptation.get("composition_id") != cue_id:
+        errors.append(f"{cue_id} adaptation composition is invalid")
+    changes = adaptation.get("changes")
+    if (
+        not isinstance(changes, dict)
+        or set(changes) != ADAPTATION_CHANGE_FIELDS
+        or any(not _nonblank(changes.get(field)) for field in ADAPTATION_CHANGE_FIELDS)
+    ):
+        errors.append(f"{cue_id} adaptation must document all six project-level changes")
+    features = adaptation.get("preserved_recipe_features")
+    if not isinstance(features, list) or not features or any(not _nonblank(item) for item in features):
+        errors.append(f"{cue_id} adaptation must name preserved recipe features")
+    if not _nonblank(adaptation.get("rationale")):
+        errors.append(f"{cue_id} adaptation rationale is required")
+    files = adaptation.get("files")
+    entry = adaptation.get("entry")
+    if not isinstance(files, list) or not files:
+        return errors + [f"{cue_id} adaptation files are required"]
+    if entry not in files or Path(str(entry.get("path", ""))).name != "index.html":
+        errors.append(f"{cue_id} adaptation entry binding is invalid")
+    expected_prefix = f"work/cache/graphic-motion/adapted/{cue_id}/"
+    for binding in files:
+        errors.extend(_binding_errors(binding, f"{cue_id} adaptation file", project_root, verify_files))
+        if not isinstance(binding, dict) or not str(binding.get("path", "")).startswith(expected_prefix):
+            errors.append(f"{cue_id} adaptation file is outside its cue directory")
+    if verify_files and project_root is not None:
+        root = Path(project_root).resolve()
+        target_root = (root / expected_prefix).resolve()
+        declared = {_bound_path(binding, root) for binding in files}
+        declared.discard(None)
+        actual = {path.resolve() for path in target_root.rglob("*") if path.is_file()} if target_root.is_dir() else set()
+        if actual != declared:
+            errors.append(f"{cue_id} adaptation file set is incomplete")
+    return list(dict.fromkeys(errors))
+
+
 def _frame_errors(cue_id, cue, render, program, timeline, project_root, verify_files, media_size):
     if not isinstance(render, dict) or not program:
         return []
@@ -567,12 +628,16 @@ def _frame_errors(cue_id, cue, render, program, timeline, project_root, verify_f
 
 def _review_evidence_errors(
     cue_id, evidence, project_root, verify_files, media_size, duration_s=None,
-    composition_id=None,
+    composition_id=None, adapted=False,
 ):
     required_evidence = {*REVIEW_IMAGE_KEYS, "hyperframes_check", "hyperframes_snapshots"}
+    optional_evidence = {"source_fidelity_inputs"}
+    if adapted:
+        required_evidence.add("adaptation_fidelity")
+        optional_evidence.add("adaptation_fidelity_inputs")
     if (
         not isinstance(evidence, dict)
-        or set(evidence) - {"source_fidelity_inputs"} != required_evidence
+        or set(evidence) - optional_evidence != required_evidence
     ):
         return [f"{cue_id} review evidence contract is invalid"]
     snapshots = evidence.get("hyperframes_snapshots")
@@ -599,7 +664,7 @@ def _review_evidence_errors(
     fidelity_inputs_invalid = (
         not isinstance(fidelity_inputs, dict)
         or set(fidelity_inputs) != {"source_preview", "port_snapshot", "normalized_time"}
-        or fidelity_inputs.get("port_snapshot") != key_snapshot.get("file")
+        or (not adapted and fidelity_inputs.get("port_snapshot") != key_snapshot.get("file"))
         or duration_s is None
         or key_time is None
         or normalized_time is None
@@ -614,7 +679,11 @@ def _review_evidence_errors(
         if not valid_preview:
             errors.append(f"{cue_id} source preview is invalid")
     snapshot_bindings = [snapshot.get("file") for snapshot in snapshots]
-    image_bindings = [*[evidence.get(key) for key in REVIEW_IMAGE_KEYS], *snapshot_bindings]
+    image_bindings = [
+        *[evidence.get(key) for key in REVIEW_IMAGE_KEYS],
+        *([evidence.get("adaptation_fidelity")] if adapted else []),
+        *snapshot_bindings,
+    ]
     paths = [binding.get("path") for binding in image_bindings if isinstance(binding, dict)]
     hashes = [binding.get("sha256") for binding in image_bindings if isinstance(binding, dict)]
     if (
@@ -642,6 +711,25 @@ def _review_evidence_errors(
             and _source_fidelity_matches(comparison_path, source_path, port_path)
         ):
             errors.append(f"{cue_id} source fidelity comparison does not match bound pixels")
+    if adapted:
+        adaptation_inputs = evidence.get("adaptation_fidelity_inputs")
+        adaptation_inputs_invalid = (
+            not isinstance(adaptation_inputs, dict)
+            or set(adaptation_inputs) != {"base_snapshot", "adapted_snapshot"}
+            or adaptation_inputs.get("base_snapshot") != fidelity_inputs.get("port_snapshot")
+            or adaptation_inputs.get("adapted_snapshot") != key_snapshot.get("file")
+        )
+        if adaptation_inputs_invalid:
+            errors.append(f"{cue_id} adaptation fidelity inputs are invalid")
+        elif verify_files and project_root is not None:
+            comparison_path = _bound_path(evidence.get("adaptation_fidelity"), project_root)
+            base_path = _bound_path(adaptation_inputs.get("base_snapshot"), project_root)
+            adapted_path = _bound_path(adaptation_inputs.get("adapted_snapshot"), project_root)
+            if not (
+                comparison_path and base_path and adapted_path
+                and _source_fidelity_matches(comparison_path, base_path, adapted_path)
+            ):
+                errors.append(f"{cue_id} adaptation fidelity comparison does not match bound pixels")
     check = evidence.get("hyperframes_check")
     errors.extend(_binding_errors(check, f"{cue_id} HyperFrames check", project_root, verify_files))
     if verify_files and project_root is not None:
@@ -668,6 +756,10 @@ def validate_plan(plan, timeline, project=None, project_root=None, verify_files=
         return ["timeline must be an object"]
     if plan.get("schema_version") != 3:
         errors.append("plan schema_version must be 3; regenerate schema v2 plans")
+    authoring_mode = plan.get("authoring_mode")
+    if authoring_mode not in (None, "recipe-adaptation"):
+        errors.append("plan authoring_mode is invalid")
+    adaptation_required = authoring_mode == "recipe-adaptation"
     if plan.get("timebase") != "program":
         errors.append("plan timebase must be program")
     if plan.get("timeline_id") != timeline.get("timeline_id"):
@@ -795,6 +887,10 @@ def validate_plan(plan, timeline, project=None, project_root=None, verify_files=
             cue_id, cue, project_root, verify_files, recipe_library,
         ))
         recipe = cue.get("recipe") if isinstance(cue.get("recipe"), dict) else {}
+        errors.extend(_adaptation_errors(
+            cue_id, cue, project_root, verify_files, adaptation_required,
+        ))
+        adaptation = cue.get("adaptation") if isinstance(cue.get("adaptation"), dict) else {}
 
         render = cue.get("render")
         expected_duration = program[1] - program[0] if program else None
@@ -820,6 +916,7 @@ def validate_plan(plan, timeline, project=None, project_root=None, verify_files=
         ))
 
         review = cue.get("review")
+        aesthetic_review = review.get("aesthetic_review") if isinstance(review, dict) else None
         if (
             not isinstance(review, dict)
             or review.get("status") != "approved"
@@ -830,10 +927,17 @@ def validate_plan(plan, timeline, project=None, project_root=None, verify_files=
         ):
             errors.append(f"{cue_id} review receipt is invalid")
             review = {}
+        if adaptation_required and (
+            not isinstance(aesthetic_review, dict)
+            or set(aesthetic_review) != AESTHETIC_REVIEW_FIELDS
+            or any(not _nonblank(aesthetic_review.get(field)) for field in AESTHETIC_REVIEW_FIELDS)
+        ):
+            errors.append(f"{cue_id} aesthetic review must assess all five visual criteria")
         evidence = review.get("evidence")
         errors.extend(_review_evidence_errors(
             cue_id, evidence, project_root, verify_files, media_size, expected_duration,
-            recipe.get("composition_id"),
+            adaptation.get("composition_id") or recipe.get("composition_id"),
+            bool(adaptation),
         ))
         receipt_binding = review.get("receipt")
         errors.extend(_binding_errors(receipt_binding, f"{cue_id} review receipt", project_root, verify_files))
@@ -843,7 +947,10 @@ def validate_plan(plan, timeline, project=None, project_root=None, verify_files=
                 receipt = projectlib.load_json(receipt_path) if receipt_path else None
             except (KeyError, OSError, ValueError, TypeError, json.JSONDecodeError):
                 receipt = None
-            authority = ("status", "mode", "actor", "rationale", "explicit_user_action", "evidence")
+            authority = (
+                "status", "mode", "actor", "rationale", "explicit_user_action",
+                "aesthetic_review", "evidence",
+            )
             if not isinstance(receipt, dict) or any(receipt.get(key) != review.get(key) for key in authority):
                 errors.append(f"{cue_id} review receipt authority does not match plan")
         collected.extend(_cue_bindings(cue))

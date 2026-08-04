@@ -1,5 +1,6 @@
 {
   "schema_version": 3,
+  "authoring_mode": "recipe-adaptation",
   "timeline_id": "main",
   "timebase": "program",
   "program_duration_s": 30.0,
@@ -27,9 +28,12 @@
     {"path": "work/cache/graphic-motion/hyperframes/gm-001/conversion.json", "sha256": "6666666666666666666666666666666666666666666666666666666666666666"},
     {"path": "work/cache/graphic-motion/hyperframes/gm-001/index.html", "sha256": "7777777777777777777777777777777777777777777777777777777777777777"},
     {"path": "work/cache/graphic-motion/hyperframes/gm-001/recipe.motion.yaml", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+    {"path": "work/cache/graphic-motion/adapted/gm-001/index.html", "sha256": "abababababababababababababababababababababababababababababababab"},
+    {"path": "work/cache/graphic-motion/adapted/gm-001/motion.js", "sha256": "bcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc"},
     {"path": "work/cache/graphic-motion/rendered/gm-001/frame_000001.png", "sha256": "9999999999999999999999999999999999999999999999999999999999999999"},
     {"path": "work/cache/graphic-motion/rendered/gm-001/frame_000002.png", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
     {"path": "review/04-graphic-motion/source-fidelity.png", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+    {"path": "review/04-graphic-motion/adaptation-fidelity.png", "sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"},
     {"path": "review/04-graphic-motion/composite-first.png", "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
     {"path": "review/04-graphic-motion/composite-middle.png", "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"},
     {"path": "review/04-graphic-motion/composite-last.png", "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},
@@ -39,6 +43,7 @@
     {"path": "review/04-graphic-motion/snapshot-3.png", "sha256": "23456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01"},
     {"path": "review/04-graphic-motion/snapshot-4.png", "sha256": "3456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef012"},
     {"path": "review/04-graphic-motion/recipe-preview.png", "sha256": "456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123"},
+    {"path": "review/04-graphic-motion/base-recipe-snapshot.png", "sha256": "dededededededededededededededededededededededededededededededede"},
     {"path": "review/04-graphic-motion/gm-001-review.json", "sha256": "56789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234"}
   ],
   "cues": [
@@ -106,6 +111,24 @@
           {"path": "work/cache/graphic-motion/hyperframes/gm-001/recipe.motion.yaml", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"}
         ]
       },
+      "adaptation": {
+        "composition_id": "gm-001",
+        "entry": {"path": "work/cache/graphic-motion/adapted/gm-001/index.html", "sha256": "abababababababababababababababababababababababababababababababab"},
+        "files": [
+          {"path": "work/cache/graphic-motion/adapted/gm-001/index.html", "sha256": "abababababababababababababababababababababababababababababababab"},
+          {"path": "work/cache/graphic-motion/adapted/gm-001/motion.js", "sha256": "bcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc"}
+        ],
+        "changes": {
+          "content": "Replace demo copy with the spoken concept.",
+          "layout": "Anchor the phrase in shot-specific negative space.",
+          "scale": "Use video-scale typography.",
+          "palette": "Match the footage while keeping one focal accent.",
+          "timing": "Land the decode on the spoken keyword.",
+          "choreography": "Use build, readable hold, and decisive resolve phases."
+        },
+        "preserved_recipe_features": ["scramble-to-clear text progression"],
+        "rationale": "The recipe supplies the decode mechanic while the shot determines the design."
+      },
       "render": {
         "kind": "overlay",
         "asset": "cache/graphic-motion/rendered/gm-001",
@@ -125,8 +148,16 @@
         "mode": "agent",
         "actor": "Example Agent",
         "rationale": "The conversion stays recognizable and reads over the footage.",
+        "aesthetic_review": {
+          "semantic_clarity": "The silent frame reads as a signal becoming ordered.",
+          "composition": "The headline is anchored in negative space with a supporting data rule.",
+          "readability": "The final phrase remains legible at normal playback size.",
+          "motion_quality": "The build accelerates into a stable hold and exits without a pop.",
+          "footage_integration": "Scale, palette, and placement belong to the source shot."
+        },
         "evidence": {
           "source_fidelity": {"path": "review/04-graphic-motion/source-fidelity.png", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+          "adaptation_fidelity": {"path": "review/04-graphic-motion/adaptation-fidelity.png", "sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"},
           "composite_first": {"path": "review/04-graphic-motion/composite-first.png", "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
           "composite_middle": {"path": "review/04-graphic-motion/composite-middle.png", "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"},
           "composite_last": {"path": "review/04-graphic-motion/composite-last.png", "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},
@@ -139,8 +170,12 @@
           ],
           "source_fidelity_inputs": {
             "source_preview": {"path": "review/04-graphic-motion/recipe-preview.png", "sha256": "456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123"},
-            "port_snapshot": {"path": "review/04-graphic-motion/snapshot-2.png", "sha256": "123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0"},
+            "port_snapshot": {"path": "review/04-graphic-motion/base-recipe-snapshot.png", "sha256": "dededededededededededededededededededededededededededededededede"},
             "normalized_time": 0.4
+          },
+          "adaptation_fidelity_inputs": {
+            "base_snapshot": {"path": "review/04-graphic-motion/base-recipe-snapshot.png", "sha256": "dededededededededededededededededededededededededededededededede"},
+            "adapted_snapshot": {"path": "review/04-graphic-motion/snapshot-2.png", "sha256": "123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0"}
           }
         },
         "receipt": {"path": "review/04-graphic-motion/gm-001-review.json", "sha256": "56789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234"}

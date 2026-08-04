@@ -15,12 +15,14 @@ manifest discovery and provides the smallest required interface:
 search --query ... --category ... --limit 8 --json
 show <recipe-id> --json
 materialize <recipe-id> --project <root> --cue <cue-id> --json
+bind-adaptation --project <root> --cue <cue-id> --json
 ```
 
 `search` tokenizes the local manifest fields, scores positive matches deterministically, reports
 `avoid_when` matches separately, and breaks ties by recipe ID. It does not make the editorial
 decision. `show` returns exact metadata and source hashes. `materialize` copies the already
 converted HyperFrames directory and returns project-relative SHA-256 bindings.
+`bind-adaptation` hashes the separate shot-designed composition after the Agent finishes editing.
 
 ## Agent Decision
 
@@ -37,7 +39,9 @@ repetition with other cues. Before choosing, inspect these seven fields:
 | `best_for` | Does the cue resemble the recommended use? |
 | `avoid_when` | Does the current footage or tone trigger a warning? |
 
-The schema-v3 `selection.field_evidence` object must contain a non-empty assessment for every
+The chosen recipe supplies the motion mechanic, not final copy or layout. Reject unchanged demo
+text, tiny web controls, default centering, and repeated generic pill treatments. The schema-v3
+`selection.field_evidence` object must contain a non-empty assessment for every
 field. `selection.avoid_when_review` must explain why the warning does or does not apply.
 `avoid_when` never removes a recipe from the supported library; it only prevents a poor choice
 for a particular cue.

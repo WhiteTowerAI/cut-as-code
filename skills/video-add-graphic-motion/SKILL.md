@@ -5,7 +5,8 @@ description: Use when an understood Project Protocol V1 video needs selective tr
 
 # Video Add Graphic Motion
 
-Add selective motion-anything recipe overlays without changing timeline, geometry, or audio.
+Add selective, shot-designed motion-anything recipe adaptations without changing timeline,
+geometry, or audio.
 The bundled `recipes/` tree is the only effect library. Do not search the web, query a remote
 catalog, or author a substitute effect. Every bundled manifest recipe is supported through its
 preconverted `hyperframes/` directory.
@@ -48,24 +49,55 @@ Read [recipe-selection.md](reference/recipe-selection.md),
      --project D:\path\to\video-project --cue gm-001 --json
    ```
 
-   Use the returned schema-v3 `recipe` object. Do not run the corpus converter during a video
-   project and do not replace or edit the materialized files. The validator rechecks the local
-   manifest, conversion receipt, complete file set, and every SHA-256. Library attribution stays
-   in `recipes/ATTRIBUTION.md`; copied inline source credits remain in the materialized files.
-7. Run HyperFrames `check`, `keyframes`, one focused `--shot`, and representative snapshots on
-   the materialized directory. Render an RGBA PNG sequence at timeline dimensions and exact
+   Keep this materialized directory immutable: it is the provenance base that preserves library
+   attribution and inline source credits. It is not the finished overlay.
+7. Set `authoring_mode: recipe-adaptation`. Author the real composition under
+   `work/cache/graphic-motion/adapted/<cue-id>/`, using the recipe's recognizable motion mechanic
+   as the template. Replace demo copy and adapt layout, scale, palette, timing, and choreography
+   to the actual shot. A centered web demo, recipe-name label, or unchanged 12-16px control is not
+   an acceptable adaptation.
+
+   **Information budget:** Every visible element must earn its place by carrying the cue's
+   narrative meaning, expressing the recipe's core motion mechanic, or keeping the overlay legible
+   over the footage. Use one primary message per cue. Remove demo titles, recipe names, instructions,
+   status labels, redundant counters, repeated copy, decorative HUD panels, badges, chips, and
+   metadata that do not meet that test. Do not express the same fact as a headline, badge, and
+   caption. Fancy comes from motion, composition, typography, rhythm, and material treatment, not
+   UI density. If the result resembles a dashboard, control panel, or generic AI-generated UI,
+   simplify it before rendering while preserving the recipe's recognizable visual mechanic.
+
+   Then bind the complete adapted file set:
+
+   ```powershell
+   node skills/video-add-graphic-motion/scripts/recipe_library.mjs bind-adaptation `
+     --project D:\path\to\video-project --cue gm-001 --json
+   ```
+
+8. Run HyperFrames `check`, `keyframes`, and one focused `--shot` on the adapted directory. Read
+   the animation source before choosing snapshot times and build an event-time list from the
+   actual timeline: every risky tween's start and end, explicit keyframes and labels, target
+   crossings, overshoot peak, rebound extreme, and settled pose. For spring, elastic, bounce,
+   path, scale, rotation, clip, or mask motion, capture the event/extreme plus one exact timeline frame before
+   and after it, clamped inside the cue. Evenly spaced snapshots are supplemental only
+   and never sufficient for approval. Render an RGBA PNG sequence at timeline dimensions and exact
    rational FPS. Bind every contiguous frame.
-8. Verify the converted effect rather than trusting metadata. Capture the original recipe entry
-   under the materialized `source/` directory and the converted `index.html` at the same
-   normalized cue time. Build the source-versus-converted image described in the porting guide.
-   Also inspect first/middle/last composites over the actual upstream video and four distinct
-   HyperFrames poses. Confirm deterministic seeking and recognizable visual structure,
-   choreography, easing, and timing.
-9. Bind timeline, transcript, understanding, media, contact sheet, recipe files, frames, review
-   images, HyperFrames check, and truthful human or delegated-Agent review receipt. Run
+9. Verify both the converted base and project adaptation. Compare original source with converted
+   base at one normalized time, then compare converted base with the adapted key pose. Inspect
+   first/middle/last composites, every event-time full-frame composite, a focused crop of the moving
+   subject, and the moving clip over the actual video. Reject transient defects even when the
+   settled pose is correct: overshooting the intended track or container, crossing the wrong target,
+   clipping, collision, occlusion, separation from a label, or a one-frame flash. The review must
+   record non-empty `semantic_clarity`, `composition`, `readability`, `motion_quality`, and
+   `footage_integration` judgments. At each sampled pose, account for every visible text or UI-like
+   element: reject the cue if an element has no narrative, motion-mechanic, or legibility purpose,
+   if information is repeated, or if the primary message is not clear at a glance. Collision
+   avoidance alone is not approval.
+10. Bind timeline, transcript, understanding, media, contact sheet, recipe files, adaptation
+   files, frames, review images, HyperFrames check, and a truthful human or delegated-Agent review
+   receipt. Run
    `validate_plan(..., verify_files=True)`, write `graphic-motion-plan.json`, then call
    `register_operation`. All-skipped removes or omits the operation.
-10. Compile with `build_render_plan.py`, render once with `render_project.py`, and self-check
+11. Compile with `build_render_plan.py`, render once with `render_project.py`, and self-check
     duration, dimensions, timeline, audio, exact FPS, alpha, and every cue in context.
 
 Canonical order:
