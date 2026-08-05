@@ -1,28 +1,40 @@
 spec_version: 1
 id: line-md-person-search-twotone
-name: "Line MD Person Search Twotone"
-description: "Animated Person Search Twotone semantic sticker from the original Line MD SVG body."
+name: "Person Search (Twotone)"
+description: "A compact person search icon uses draw-in, fade motion to illustrate a person, profile, account, contact, speaker, or community."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-people-lifestyle
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-people-lifestyle
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "person", "search", "twotone"]
+tags: ["person", "search", "draw-in", "fade", "people", "profile", "social", "compact", "twotone"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
+  - "person search"
+  - "person search icon"
+  - "person search symbol"
   - "person"
-  - "search"
-  - "twotone"
+  - "user profile"
+  - "people"
+  - "community"
+  - "personal account"
+  - "speaker"
+  - "contact"
+  - "人物"
+  - "联系人"
+  - "用户资料"
+  - "社区"
+  - "个人账户"
+  - "讲者"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to person search needs a compact, immediately recognizable cue"
+  - "A person, user, contact, account, or community role is explicitly discussed"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to person search or a close synonym"
+  - "The cue concerns an organization or abstract audience rather than an identifiable person role"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

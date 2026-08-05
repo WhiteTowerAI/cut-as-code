@@ -1,28 +1,35 @@
 spec_version: 1
 id: line-md-plus-circle-filled
-name: "Line MD Plus Circle Filled"
-description: "Animated Plus Circle Filled semantic sticker from the original Line MD SVG body."
+name: "Plus Circle (Filled)"
+description: "A compact plus circle icon uses draw-in motion to illustrate an abstract impact, pulse, energy accent, or non-literal emphasis beat."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-emphasis
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-emphasis
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "plus", "circle", "filled"]
+tags: ["plus", "circle", "draw-in", "emphasis", "impact", "abstract", "compact", "filled"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "plus"
-  - "circle"
-  - "filled"
+  - "plus circle"
+  - "plus circle icon"
+  - "plus circle symbol"
+  - "plus circle animation"
+  - "plus circle visual cue"
+  - "show plus circle"
+  - "animated plus circle"
+  - "强调"
+  - "强调图标"
+  - "强调动画"
+  - "强调提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to plus circle needs a compact, immediately recognizable cue"
+  - "The edit needs a compact abstract hit without introducing a literal icon or new information"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to plus circle or a close synonym"
+  - "A literal status, object, or action would communicate the spoken meaning more precisely"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

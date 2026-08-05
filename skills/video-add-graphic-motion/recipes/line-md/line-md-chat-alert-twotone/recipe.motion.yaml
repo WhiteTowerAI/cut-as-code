@@ -1,28 +1,35 @@
 spec_version: 1
 id: line-md-chat-alert-twotone
-name: "Line MD Chat Alert Twotone"
-description: "Animated Chat Alert Twotone semantic sticker from the original Line MD SVG body."
+name: "Chat Alert (Twotone)"
+description: "A compact chat alert icon uses draw-in motion to illustrate danger, risk, failure, caution, or an urgent problem."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-warning
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-warning
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "chat", "alert", "twotone"]
+tags: ["chat", "alert", "draw-in", "warning", "urgent", "caution", "compact", "twotone"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "chat"
-  - "alert"
-  - "twotone"
+  - "chat alert"
+  - "chat alert icon"
+  - "chat alert symbol"
+  - "chat alert animation"
+  - "chat alert visual cue"
+  - "show chat alert"
+  - "animated chat alert"
+  - "聊天警告"
+  - "聊天警告图标"
+  - "聊天警告动画"
+  - "聊天警告提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to chat alert needs a compact, immediately recognizable cue"
+  - "The spoken point identifies a real risk, failure, hazard, or urgent exception"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to chat alert or a close synonym"
+  - "The message is neutral, routine, positive, or too speculative to justify alarm"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

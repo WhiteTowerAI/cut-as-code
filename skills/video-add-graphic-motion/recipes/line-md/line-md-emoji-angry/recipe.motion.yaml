@@ -1,27 +1,35 @@
 spec_version: 1
 id: line-md-emoji-angry
-name: "Line MD Emoji Angry"
-description: "Animated Emoji Angry semantic sticker from the original Line MD SVG body."
+name: "Emoji Angry"
+description: "A compact emoji angry icon uses draw-in motion to illustrate affection, appreciation, a favorite, or a positive audience reaction."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-reaction
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-reaction
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "emoji", "angry"]
+tags: ["emoji", "angry", "draw-in", "reaction", "affection", "positive", "compact"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "emoji"
-  - "angry"
+  - "emoji angry"
+  - "emoji angry icon"
+  - "emoji angry symbol"
+  - "emoji angry animation"
+  - "emoji angry visual cue"
+  - "show emoji angry"
+  - "animated emoji angry"
+  - "喜欢"
+  - "喜欢图标"
+  - "喜欢动画"
+  - "喜欢提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to emoji angry needs a compact, immediately recognizable cue"
+  - "The narration expresses affection, appreciation, approval, or a favorite"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to emoji angry or a close synonym"
+  - "The cue is a formal completion status rather than an emotional reaction"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

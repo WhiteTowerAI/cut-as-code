@@ -1,30 +1,35 @@
 spec_version: 1
 id: line-md-buy-me-a-coffee-filled
-name: "Line MD Buy Me A Coffee Filled"
-description: "Animated Buy Me A Coffee Filled semantic sticker from the original Line MD SVG body."
+name: "Buy Me A Coffee (Filled)"
+description: "A compact buy me a coffee icon uses draw-in, morph motion to illustrate a literal physical object, place, food, vehicle, or everyday item."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-object
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-object
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "buy", "me", "a", "coffee", "filled"]
+tags: ["buy", "me", "a", "coffee", "draw-in", "morph", "object", "literal", "filled"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "buy"
-  - "me"
-  - "a"
-  - "coffee"
-  - "filled"
+  - "buy me a coffee"
+  - "buy me a coffee icon"
+  - "buy me a coffee symbol"
+  - "buy me a coffee animation"
+  - "buy me a coffee visual cue"
+  - "show buy me a coffee"
+  - "animated buy me a coffee"
+  - "咖啡"
+  - "咖啡图标"
+  - "咖啡动画"
+  - "咖啡提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to buy me a coffee needs a compact, immediately recognizable cue"
+  - "The named object itself is visually useful and immediately recognizable in context"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to buy me a coffee or a close synonym"
+  - "The object name is metaphorical or a more specific semantic category communicates the point better"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

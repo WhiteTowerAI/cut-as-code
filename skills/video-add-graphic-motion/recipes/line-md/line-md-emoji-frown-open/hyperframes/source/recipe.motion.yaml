@@ -1,28 +1,35 @@
 spec_version: 1
 id: line-md-emoji-frown-open
-name: "Line MD Emoji Frown Open"
-description: "Animated Emoji Frown Open semantic sticker from the original Line MD SVG body."
+name: "Emoji Frown Open"
+description: "A compact emoji frown open icon uses draw-in, morph motion to illustrate affection, appreciation, a favorite, or a positive audience reaction."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-reaction
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-reaction
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "emoji", "frown", "open"]
+tags: ["emoji", "frown", "open", "draw-in", "morph", "reaction", "affection", "positive"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "emoji"
-  - "frown"
-  - "open"
+  - "emoji frown open"
+  - "emoji frown open icon"
+  - "emoji frown open symbol"
+  - "emoji frown open animation"
+  - "emoji frown open visual cue"
+  - "show emoji frown open"
+  - "animated emoji frown open"
+  - "喜欢"
+  - "喜欢图标"
+  - "喜欢动画"
+  - "喜欢提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to emoji frown open needs a compact, immediately recognizable cue"
+  - "The narration expresses affection, appreciation, approval, or a favorite"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to emoji frown open or a close synonym"
+  - "The cue is a formal completion status rather than an emotional reaction"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

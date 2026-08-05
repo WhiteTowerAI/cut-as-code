@@ -1,28 +1,35 @@
 spec_version: 1
 id: line-md-reddit-circle-loop
-name: "Line MD Reddit Circle Loop"
-description: "Animated Reddit Circle Loop semantic sticker from the original Line MD SVG body."
+name: "Reddit Circle (Loop)"
+description: "A compact reddit circle icon uses draw-in, morph, fade, looping motion to illustrate an abstract impact, pulse, energy accent, or non-literal emphasis beat."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-emphasis
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-emphasis
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "reddit", "circle", "loop"]
+tags: ["reddit", "circle", "draw-in", "morph", "fade", "looping", "emphasis", "impact", "loop"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "reddit"
-  - "circle"
-  - "loop"
+  - "reddit circle"
+  - "reddit circle icon"
+  - "reddit circle symbol"
+  - "reddit circle animation"
+  - "reddit circle visual cue"
+  - "show reddit circle"
+  - "animated reddit circle"
+  - "强调"
+  - "强调图标"
+  - "强调动画"
+  - "强调提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to reddit circle needs a compact, immediately recognizable cue"
+  - "The edit needs a compact abstract hit without introducing a literal icon or new information"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to reddit circle or a close synonym"
+  - "A literal status, object, or action would communicate the spoken meaning more precisely"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

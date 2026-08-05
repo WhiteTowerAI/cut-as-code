@@ -1,28 +1,40 @@
 spec_version: 1
 id: line-md-moon-rising-filled
-name: "Line MD Moon Rising Filled"
-description: "Animated Moon Rising Filled semantic sticker from the original Line MD SVG body."
+name: "Moon Rising (Filled)"
+description: "A compact moon rising icon uses morph, fade, looping motion to illustrate literal weather, a forecast, climate, or an environmental condition."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-weather
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-weather
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "moon", "rising", "filled"]
+tags: ["moon", "rising", "morph", "fade", "looping", "weather", "forecast", "environment", "filled"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "moon"
-  - "rising"
-  - "filled"
+  - "moon rising"
+  - "moon rising icon"
+  - "moon rising symbol"
+  - "thunderstorm forecast"
+  - "rain"
+  - "sunny weather"
+  - "snow"
+  - "clear night"
+  - "weather"
+  - "sky"
+  - "月亮"
+  - "雷暴天气预报"
+  - "下大雨"
+  - "晴朗天气"
+  - "下雪"
+  - "晴朗夜空"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to moon rising needs a compact, immediately recognizable cue"
+  - "The speaker literally refers to current weather, a forecast, or an environmental condition"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to moon rising or a close synonym"
+  - "Weather language is metaphorical, such as a storm of criticism or a sunny outlook"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

@@ -1,27 +1,40 @@
 spec_version: 1
 id: confetti-star-burst
 name: "Star Confetti Burst"
-description: "Star Confetti Burst rendered with the original canvas-confetti engine."
+description: "Star-shaped confetti bursting from the center."
 surfaces: [video]
-category: sticker-celebration
+category: sticker-reaction
 tech: [js]
 canvas: [video]
 target: [overlay]
-intent: sticker-celebration
+intent: sticker-reaction
 runtime: ["js"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "confetti", "celebration", "center-burst"]
+tags: ["stars", "confetti", "center-burst", "playful", "star", "burst", "reaction", "affection"]
 intent_keywords:
-  - "sticker"
-  - "confetti"
-  - "celebration"
-  - "center-burst"
+  - "star burst"
+  - "five star reaction"
+  - "love"
+  - "appreciation"
+  - "favorite"
+  - "thank you"
+  - "star"
+  - "audience reaction"
+  - "rating"
+  - "star burst icon"
+  - "星星爆发"
+  - "五星回应"
+  - "喜欢"
+  - "感谢"
+  - "爱心回应"
+  - "收藏"
 best_for:
-  - "Wins, launches, reveals, milestones, and celebratory transitions"
+  - "A spoken reference to star burst needs a compact, immediately recognizable cue"
+  - "The narration expresses affection, appreciation, approval, or a favorite"
 avoid_when:
-  - "The cue is neutral, serious, or already visually dense"
-  - "Any particle path would cross a visible face"
+  - "The spoken meaning does not refer to star burst or a close synonym"
+  - "The cue is a formal completion status rather than an emotional reaction"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

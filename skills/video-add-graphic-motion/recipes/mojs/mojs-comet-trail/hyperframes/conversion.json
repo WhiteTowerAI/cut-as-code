@@ -9,5 +9,5 @@
   "entry": "index.html",
   "source_entry": "preview.html",
   "deterministic_adapter": "replay",
-  "source_manifest_sha256": "4b6f8cf0dcf4b83ae034bb1289951ea7b18a542d55603b72b5ef76bd41dbafeb"
+  "source_manifest_sha256": "6b4ff16d3f199ff3cf47c20b55d761885358f0057cffdfbbe2cd7da6738eee98"
 }

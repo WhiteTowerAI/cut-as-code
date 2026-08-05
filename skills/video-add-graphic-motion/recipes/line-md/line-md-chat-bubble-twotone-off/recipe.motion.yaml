@@ -1,29 +1,40 @@
 spec_version: 1
 id: line-md-chat-bubble-twotone-off
-name: "Line MD Chat Bubble Twotone Off"
-description: "Animated Chat Bubble Twotone Off semantic sticker from the original Line MD SVG body."
+name: "Chat Bubble Twotone Off"
+description: "A compact chat bubble twotone off icon uses draw-in motion to illustrate email, chat, calling, messaging, or direct contact."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-communication
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-communication
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "chat", "bubble", "twotone", "off"]
+tags: ["chat", "bubble", "off", "draw-in", "twotone", "communication", "message", "contact"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
+  - "chat bubble twotone off"
+  - "chat bubble twotone off icon"
+  - "chat bubble twotone off symbol"
+  - "email"
+  - "reply"
+  - "message"
+  - "conversation"
+  - "call"
   - "chat"
-  - "bubble"
-  - "twotone"
-  - "off"
+  - "incoming"
+  - "聊天"
+  - "邮件"
+  - "回复"
+  - "消息"
+  - "电话"
+  - "私信"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to chat bubble twotone off needs a compact, immediately recognizable cue"
+  - "The narration explicitly mentions sending, receiving, or replying to a message or call"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to chat bubble twotone off or a close synonym"
+  - "The communication channel is incidental and does not carry the narrative point"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

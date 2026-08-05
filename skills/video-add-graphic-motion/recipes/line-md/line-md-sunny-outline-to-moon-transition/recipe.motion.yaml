@@ -1,30 +1,40 @@
 spec_version: 1
 id: line-md-sunny-outline-to-moon-transition
-name: "Line MD Sunny Outline To Moon Transition"
-description: "Animated Sunny Outline To Moon Transition semantic sticker from the original Line MD SVG body."
+name: "Sunny Outline To Moon Transition"
+description: "A compact sunny outline to moon transition icon uses morph, fade motion to illustrate literal weather, a forecast, climate, or an environmental condition."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-weather
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-weather
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "sunny", "outline", "to", "moon", "transition"]
+tags: ["sunny", "to", "moon", "transition", "morph", "fade", "outline", "weather"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "sunny"
-  - "outline"
-  - "to"
-  - "moon"
-  - "transition"
+  - "sunny outline to moon transition"
+  - "sunny outline to moon transition icon"
+  - "sunny outline to moon transition symbol"
+  - "thunderstorm forecast"
+  - "rain"
+  - "sunny weather"
+  - "snow"
+  - "clear night"
+  - "weather"
+  - "sky"
+  - "晴天月亮"
+  - "雷暴天气预报"
+  - "下大雨"
+  - "晴朗天气"
+  - "下雪"
+  - "晴朗夜空"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to sunny outline to moon transition needs a compact, immediately recognizable cue"
+  - "The speaker literally refers to current weather, a forecast, or an environmental condition"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to sunny outline to moon transition or a close synonym"
+  - "Weather language is metaphorical, such as a storm of criticism or a sunny outlook"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

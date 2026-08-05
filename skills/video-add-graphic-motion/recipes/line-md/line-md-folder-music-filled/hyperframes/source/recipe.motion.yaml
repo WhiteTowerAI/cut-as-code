@@ -1,28 +1,35 @@
 spec_version: 1
 id: line-md-folder-music-filled
-name: "Line MD Folder Music Filled"
-description: "Animated Folder Music Filled semantic sticker from the original Line MD SVG body."
+name: "Folder Music (Filled)"
+description: "A compact folder music icon uses draw-in, morph, fade motion to illustrate audio, video, music, volume, or media playback."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-media
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-media
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "folder", "music", "filled"]
+tags: ["folder", "music", "draw-in", "morph", "fade", "media", "audio", "playback", "filled"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "folder"
-  - "music"
-  - "filled"
+  - "folder music"
+  - "folder music icon"
+  - "folder music symbol"
+  - "folder music animation"
+  - "folder music visual cue"
+  - "show folder music"
+  - "animated folder music"
+  - "文件夹"
+  - "文件夹图标"
+  - "文件夹动画"
+  - "文件夹提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to folder music needs a compact, immediately recognizable cue"
+  - "The narration directly discusses sound, music, video, volume, or playback"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to folder music or a close synonym"
+  - "Media controls are visible in the footage but not relevant to the spoken meaning"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

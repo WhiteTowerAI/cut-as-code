@@ -1,29 +1,35 @@
 spec_version: 1
 id: line-md-paint-drop-half-twotone
-name: "Line MD Paint Drop Half Twotone"
-description: "Animated Paint Drop Half Twotone semantic sticker from the original Line MD SVG body."
+name: "Paint Drop Half (Twotone)"
+description: "A compact paint drop half icon uses draw-in motion to illustrate a literal physical object, place, food, vehicle, or everyday item."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-object
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-object
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "paint", "drop", "half", "twotone"]
+tags: ["paint", "drop", "half", "draw-in", "object", "literal", "everyday", "compact", "twotone"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "paint"
-  - "drop"
-  - "half"
-  - "twotone"
+  - "paint drop half"
+  - "paint drop half icon"
+  - "paint drop half symbol"
+  - "paint drop half animation"
+  - "paint drop half visual cue"
+  - "show paint drop half"
+  - "animated paint drop half"
+  - "日常物品"
+  - "日常物品图标"
+  - "日常物品动画"
+  - "日常物品提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to paint drop half needs a compact, immediately recognizable cue"
+  - "The named object itself is visually useful and immediately recognizable in context"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to paint drop half or a close synonym"
+  - "The object name is metaphorical or a more specific semantic category communicates the point better"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

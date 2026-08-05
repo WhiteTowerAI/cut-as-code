@@ -1,27 +1,40 @@
 spec_version: 1
 id: line-md-cake-filled
-name: "Line MD Cake Filled"
-description: "Animated Cake Filled semantic sticker from the original Line MD SVG body."
+name: "Cake Reveal (Filled)"
+description: "A compact cake icon uses draw-in, morph, fade motion to illustrate a win, launch, milestone, or earned celebratory reveal."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-celebration
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-celebration
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "cake", "filled"]
+tags: ["cake", "draw-in", "morph", "fade", "celebration", "festive", "positive", "compact", "filled"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
   - "cake"
-  - "filled"
+  - "cake icon"
+  - "cake symbol"
+  - "celebration"
+  - "celebrate"
+  - "achievement"
+  - "milestone"
+  - "launch"
+  - "won"
+  - "festive reveal"
+  - "庆祝"
+  - "赢了"
+  - "喜庆揭晓"
+  - "成就"
+  - "里程碑"
+  - "发布"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to cake needs a compact, immediately recognizable cue"
+  - "A genuine positive achievement or announcement deserves a festive visual payoff"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to cake or a close synonym"
+  - "The event is neutral, negative, sensitive, or not genuinely celebratory"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

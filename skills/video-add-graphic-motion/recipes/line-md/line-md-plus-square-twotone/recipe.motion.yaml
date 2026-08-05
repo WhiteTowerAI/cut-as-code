@@ -1,28 +1,35 @@
 spec_version: 1
 id: line-md-plus-square-twotone
-name: "Line MD Plus Square Twotone"
-description: "Animated Plus Square Twotone semantic sticker from the original Line MD SVG body."
+name: "Plus Square (Twotone)"
+description: "A compact plus square icon uses draw-in motion to illustrate an abstract impact, pulse, energy accent, or non-literal emphasis beat."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-emphasis
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-emphasis
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "plus", "square", "twotone"]
+tags: ["plus", "square", "draw-in", "emphasis", "impact", "abstract", "compact", "twotone"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "plus"
-  - "square"
-  - "twotone"
+  - "plus square"
+  - "plus square icon"
+  - "plus square symbol"
+  - "plus square animation"
+  - "plus square visual cue"
+  - "show plus square"
+  - "animated plus square"
+  - "强调"
+  - "强调图标"
+  - "强调动画"
+  - "强调提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to plus square needs a compact, immediately recognizable cue"
+  - "The edit needs a compact abstract hit without introducing a literal icon or new information"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to plus square or a close synonym"
+  - "A literal status, object, or action would communicate the spoken meaning more precisely"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

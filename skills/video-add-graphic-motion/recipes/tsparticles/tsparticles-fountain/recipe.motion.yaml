@@ -1,27 +1,40 @@
 spec_version: 1
 id: tsparticles-fountain
-name: "Particle Fountain"
-description: "Particle Fountain as a deterministic canvas port of the official tsParticles fountain preset."
+name: "Particle Energy Fountain"
+description: "A continuous particle fountain rising from the lower frame."
 surfaces: [video]
-category: sticker-complex-particles
+category: sticker-emphasis
 tech: [js]
 canvas: [video]
 target: [overlay]
-intent: sticker-complex-particles
+intent: sticker-emphasis
 runtime: ["js"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "tsparticles", "particles", "fountain"]
+tags: ["particles", "fountain", "bottom-entry", "continuous", "particle", "emphasis", "impact", "abstract"]
 intent_keywords:
-  - "sticker"
-  - "tsparticles"
-  - "particles"
-  - "fountain"
+  - "particle fountain"
+  - "rising energy"
+  - "impact beat"
+  - "attention pulse"
+  - "energy burst"
+  - "ripple emphasis"
+  - "shockwave"
+  - "abstract energy"
+  - "dramatic impact"
+  - "particle fountain icon"
+  - "粒子喷泉"
+  - "上升能量"
+  - "强调"
+  - "强烈冲击"
+  - "脉冲强调"
+  - "能量爆发"
 best_for:
-  - "Complex particle fields whose behavior is not covered by the smaller confetti or burst recipes"
+  - "A spoken reference to particle fountain needs a compact, immediately recognizable cue"
+  - "The edit needs a compact abstract hit without introducing a literal icon or new information"
 avoid_when:
-  - "A simpler canvas-confetti or mo.js recipe communicates the same cue"
-  - "The particle field would obscure faces or required footage detail"
+  - "The spoken meaning does not refer to particle fountain or a close synonym"
+  - "A literal status, object, or action would communicate the spoken meaning more precisely"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

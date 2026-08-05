@@ -1,29 +1,40 @@
 spec_version: 1
 id: line-md-map-marker-alt-off
-name: "Line MD Map Marker Alt Off"
-description: "Animated Map Marker Alt Off semantic sticker from the original Line MD SVG body."
+name: "Map Marker Alt Off"
+description: "A compact map marker alt off icon uses draw-in, morph, rotation, looping motion to illustrate direction, location, movement, or progression through steps."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-navigation
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-navigation
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "map", "marker", "alt", "off"]
+tags: ["map", "marker", "off", "draw-in", "morph", "rotation", "looping", "alt"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "map"
-  - "marker"
-  - "alt"
-  - "off"
+  - "map marker alt off"
+  - "map marker alt off icon"
+  - "map marker alt off symbol"
+  - "next"
+  - "previous"
+  - "back"
+  - "location"
+  - "left"
+  - "scroll"
+  - "direction"
+  - "地图位置标记"
+  - "下一步"
+  - "返回"
+  - "向左"
+  - "向下滚动"
+  - "位置"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to map marker alt off needs a compact, immediately recognizable cue"
+  - "The narration points to a direction, destination, location, or next step"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to map marker alt off or a close synonym"
+  - "No spatial or sequential relationship needs to be communicated"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

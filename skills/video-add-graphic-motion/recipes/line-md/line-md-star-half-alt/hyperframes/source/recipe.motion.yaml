@@ -1,28 +1,40 @@
 spec_version: 1
 id: line-md-star-half-alt
-name: "Line MD Star Half Alt"
-description: "Animated Star Half Alt semantic sticker from the original Line MD SVG body."
+name: "Star Half Alt"
+description: "A compact star half alt icon uses draw-in motion to illustrate affection, appreciation, a favorite, or a positive audience reaction."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-reaction
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-reaction
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "star", "half", "alt"]
+tags: ["star", "half", "draw-in", "alt", "reaction", "affection", "positive", "compact"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
+  - "star half alt"
+  - "star half alt icon"
+  - "star half alt symbol"
+  - "love"
+  - "appreciation"
+  - "favorite"
+  - "thank you"
   - "star"
-  - "half"
-  - "alt"
+  - "audience reaction"
+  - "rating"
+  - "星星"
+  - "喜欢"
+  - "感谢"
+  - "爱心回应"
+  - "收藏"
+  - "五星好评"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to star half alt needs a compact, immediately recognizable cue"
+  - "The narration expresses affection, appreciation, approval, or a favorite"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to star half alt or a close synonym"
+  - "The cue is a formal completion status rather than an emotional reaction"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

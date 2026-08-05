@@ -1,29 +1,40 @@
 spec_version: 1
 id: line-md-chevron-down-circle-twotone
-name: "Line MD Chevron Down Circle Twotone"
-description: "Animated Chevron Down Circle Twotone semantic sticker from the original Line MD SVG body."
+name: "Chevron Down Circle (Twotone)"
+description: "A compact chevron down circle icon uses draw-in motion to illustrate direction, location, movement, or progression through steps."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-navigation
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-navigation
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "chevron", "down", "circle", "twotone"]
+tags: ["chevron", "down", "circle", "draw-in", "navigation", "direction", "movement", "compact", "twotone"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "chevron"
-  - "down"
-  - "circle"
-  - "twotone"
+  - "chevron down circle"
+  - "chevron down circle icon"
+  - "chevron down circle symbol"
+  - "next"
+  - "previous"
+  - "back"
+  - "location"
+  - "left"
+  - "scroll"
+  - "direction"
+  - "方向箭头"
+  - "下一步"
+  - "返回"
+  - "向左"
+  - "向下滚动"
+  - "位置"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to chevron down circle needs a compact, immediately recognizable cue"
+  - "The narration points to a direction, destination, location, or next step"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to chevron down circle or a close synonym"
+  - "No spatial or sequential relationship needs to be communicated"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

@@ -1,28 +1,35 @@
 spec_version: 1
 id: line-md-my-location-off
-name: "Line MD My Location Off"
-description: "Animated My Location Off semantic sticker from the original Line MD SVG body."
+name: "My Location Off"
+description: "A compact my location off icon uses draw-in, morph, rotation, fade, looping motion to illustrate direction, location, movement, or progression through steps."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-navigation
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-navigation
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "my", "location", "off"]
+tags: ["my", "location", "off", "draw-in", "morph", "rotation", "fade", "looping"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "my"
-  - "location"
-  - "off"
+  - "my location off"
+  - "my location off icon"
+  - "my location off symbol"
+  - "my location off animation"
+  - "my location off visual cue"
+  - "show my location off"
+  - "animated my location off"
+  - "位置"
+  - "位置图标"
+  - "位置动画"
+  - "位置提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to my location off needs a compact, immediately recognizable cue"
+  - "The narration points to a direction, destination, location, or next step"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to my location off or a close synonym"
+  - "No spatial or sequential relationship needs to be communicated"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

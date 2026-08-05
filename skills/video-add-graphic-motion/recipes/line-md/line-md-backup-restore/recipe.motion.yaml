@@ -1,27 +1,35 @@
 spec_version: 1
 id: line-md-backup-restore
-name: "Line MD Backup Restore"
-description: "Animated Backup Restore semantic sticker from the original Line MD SVG body."
+name: "Backup Restore"
+description: "A compact backup restore icon uses draw-in, morph, fade motion to illustrate a literal physical object, place, food, vehicle, or everyday item."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-object
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-object
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "backup", "restore"]
+tags: ["backup", "restore", "draw-in", "morph", "fade", "object", "literal", "everyday"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "backup"
-  - "restore"
+  - "backup restore"
+  - "backup restore icon"
+  - "backup restore symbol"
+  - "backup restore animation"
+  - "backup restore visual cue"
+  - "show backup restore"
+  - "animated backup restore"
+  - "日常物品"
+  - "日常物品图标"
+  - "日常物品动画"
+  - "日常物品提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to backup restore needs a compact, immediately recognizable cue"
+  - "The named object itself is visually useful and immediately recognizable in context"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to backup restore or a close synonym"
+  - "The object name is metaphorical or a more specific semantic category communicates the point better"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

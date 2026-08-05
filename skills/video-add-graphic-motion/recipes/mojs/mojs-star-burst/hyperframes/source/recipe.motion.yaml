@@ -1,27 +1,40 @@
 spec_version: 1
 id: mojs-star-burst
 name: "Star Polygon Burst"
-description: "Star Polygon Burst built from mo.js Burst and Shape primitives."
+description: "Small star polygons radiating from a reaction point."
 surfaces: [video]
-category: sticker-impact
+category: sticker-reaction
 tech: [js]
 canvas: [video]
 target: [overlay]
-intent: sticker-impact
+intent: sticker-reaction
 runtime: ["js"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "mojs", "burst", "polygon"]
+tags: ["stars", "polygon", "radial", "reaction", "star", "affection", "positive", "reveal"]
 intent_keywords:
-  - "sticker"
-  - "mojs"
-  - "burst"
-  - "polygon"
+  - "star reaction"
+  - "rating burst"
+  - "love"
+  - "appreciation"
+  - "favorite"
+  - "thank you"
+  - "star"
+  - "audience reaction"
+  - "rating"
+  - "star reaction icon"
+  - "星星回应"
+  - "评分爆发"
+  - "喜欢"
+  - "感谢"
+  - "爱心回应"
+  - "收藏"
 best_for:
-  - "Impact beats, confirmations, emphasis hits, and compact celebration cues"
+  - "A spoken reference to star reaction needs a compact, immediately recognizable cue"
+  - "The narration expresses affection, appreciation, approval, or a favorite"
 avoid_when:
-  - "The cue needs literal information rather than an abstract impact"
-  - "Any ring or particle path would cross a visible face"
+  - "The spoken meaning does not refer to star reaction or a close synonym"
+  - "The cue is a formal completion status rather than an emotional reaction"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

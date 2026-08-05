@@ -1,26 +1,35 @@
 spec_version: 1
 id: line-md-pleroma
-name: "Line MD Pleroma"
-description: "Animated Pleroma semantic sticker from the original Line MD SVG body."
+name: "Pleroma Reveal"
+description: "A compact pleroma icon uses morph motion to illustrate a literal physical object, place, food, vehicle, or everyday item."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-object
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-object
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "pleroma"]
+tags: ["pleroma", "morph", "object", "literal", "everyday", "compact"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
   - "pleroma"
+  - "pleroma icon"
+  - "pleroma symbol"
+  - "pleroma animation"
+  - "pleroma visual cue"
+  - "show pleroma"
+  - "animated pleroma"
+  - "日常物品"
+  - "日常物品图标"
+  - "日常物品动画"
+  - "日常物品提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to pleroma needs a compact, immediately recognizable cue"
+  - "The named object itself is visually useful and immediately recognizable in context"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to pleroma or a close synonym"
+  - "The object name is metaphorical or a more specific semantic category communicates the point better"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

@@ -1,27 +1,35 @@
 spec_version: 1
 id: line-md-cellphone-off
-name: "Line MD Cellphone Off"
-description: "Animated Cellphone Off semantic sticker from the original Line MD SVG body."
+name: "Cellphone Off"
+description: "A compact cellphone off icon uses draw-in, morph motion to illustrate software, devices, cloud systems, files, data, or digital infrastructure."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-technology
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-technology
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "cellphone", "off"]
+tags: ["cellphone", "off", "draw-in", "morph", "technology", "digital", "system", "compact"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "cellphone"
-  - "off"
+  - "cellphone off"
+  - "cellphone off icon"
+  - "cellphone off symbol"
+  - "cellphone off animation"
+  - "cellphone off visual cue"
+  - "show cellphone off"
+  - "animated cellphone off"
+  - "云计算"
+  - "云计算图标"
+  - "云计算动画"
+  - "云计算提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to cellphone off needs a compact, immediately recognizable cue"
+  - "The narration names a digital system, device, file, cloud service, or technical process"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to cellphone off or a close synonym"
+  - "A similarly named object is being discussed in a physical or weather context"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

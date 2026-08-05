@@ -1,28 +1,35 @@
 spec_version: 1
 id: line-md-loading-twotone-loop
-name: "Line MD Loading Twotone Loop"
-description: "Animated Loading Twotone Loop semantic sticker from the original Line MD SVG body."
+name: "Loading Reveal (Twotone Loop)"
+description: "A compact loading icon uses draw-in, rotation, looping motion to illustrate an abstract impact, pulse, energy accent, or non-literal emphasis beat."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-emphasis
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-emphasis
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "loading", "twotone", "loop"]
+tags: ["loading", "draw-in", "rotation", "looping", "emphasis", "impact", "abstract", "compact", "twotone", "loop"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
   - "loading"
-  - "twotone"
-  - "loop"
+  - "loading icon"
+  - "loading symbol"
+  - "loading animation"
+  - "loading visual cue"
+  - "show loading"
+  - "animated loading"
+  - "强调"
+  - "强调图标"
+  - "强调动画"
+  - "强调提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to loading needs a compact, immediately recognizable cue"
+  - "The edit needs a compact abstract hit without introducing a literal icon or new information"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to loading or a close synonym"
+  - "A literal status, object, or action would communicate the spoken meaning more precisely"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

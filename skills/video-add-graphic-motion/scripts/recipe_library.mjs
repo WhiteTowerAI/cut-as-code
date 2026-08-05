@@ -5,6 +5,8 @@ import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { semanticBaseForLineMd } from "./sticker_semantics.mjs";
+
 export const SELECTION_FIELDS = [
   "name",
   "description",
@@ -20,9 +22,15 @@ const POSITIVE_WEIGHTS = {
   description: 4,
   category: 3,
   tags: 6,
-  intent_keywords: 7,
+  intent_keywords: 14,
   best_for: 5,
 };
+
+const STOPWORDS = new Set([
+  "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "has", "have", "in",
+  "is", "it", "me", "my", "of", "on", "or", "our", "that", "the", "this", "to", "turn",
+  "up", "us", "was", "were", "with", "your",
+]);
 
 function unquote(value) {
   const text = String(value).trim();
@@ -119,17 +127,36 @@ export async function discoverRecipes(recipesRoot) {
 }
 
 function words(value) {
-  return [...String(value).toLocaleLowerCase().matchAll(/[\p{L}\p{N}]+/gu)].map((match) => match[0]);
+  const tokens = [];
+  for (const match of String(value).toLocaleLowerCase().matchAll(/[\p{Script=Han}]+|[\p{L}\p{N}]+/gu)) {
+    const token = match[0];
+    if (STOPWORDS.has(token)) continue;
+    if (!/^\p{Script=Han}+$/u.test(token)) {
+      tokens.push(token);
+      continue;
+    }
+    if (token.length === 1) tokens.push(token);
+    for (let size = 2; size <= Math.min(6, token.length); size += 1) {
+      for (let index = 0; index <= token.length - size; index += 1) {
+        tokens.push(token.slice(index, index + size));
+      }
+    }
+  }
+  return tokens;
 }
 
 function fieldText(value) {
   return Array.isArray(value) ? value.join(" ") : String(value || "");
 }
 
-export async function searchRecipes({ recipesRoot, query = "", category = null, limit = 8 }) {
+export function rankRecipes(recipes, { query = "", category = null, limit = 8 } = {}) {
+  const parsedLimit = Number(limit);
+  if (!Number.isInteger(parsedLimit) || parsedLimit < 1 || parsedLimit > 50) {
+    throw new Error("limit must be an integer from 1 to 50");
+  }
   const queryWords = [...new Set(words(query))];
+  if (String(query).trim() && queryWords.length === 0) return [];
   const normalizedCategory = category ? String(category).toLocaleLowerCase() : null;
-  const recipes = await discoverRecipes(recipesRoot);
   const results = [];
   for (const recipe of recipes) {
     if (normalizedCategory && recipe.metadata.category.toLocaleLowerCase() !== normalizedCategory) continue;
@@ -143,7 +170,7 @@ export async function searchRecipes({ recipesRoot, query = "", category = null, 
     }
     const avoidTokens = new Set(words(fieldText(recipe.metadata.avoid_when)));
     const avoidWhenMatches = queryWords.filter((token) => avoidTokens.has(token));
-    if (queryWords.length && score === 0 && avoidWhenMatches.length === 0) continue;
+    if (queryWords.length && score === 0) continue;
     results.push({
       id: recipe.id,
       surface: recipe.surface,
@@ -154,11 +181,19 @@ export async function searchRecipes({ recipesRoot, query = "", category = null, 
     });
   }
   results.sort((left, right) => right.score - left.score || left.id.localeCompare(right.id));
-  const parsedLimit = Number(limit);
-  if (!Number.isInteger(parsedLimit) || parsedLimit < 1 || parsedLimit > 50) {
-    throw new Error("limit must be an integer from 1 to 50");
-  }
-  return results.slice(0, parsedLimit);
+  const seenGroups = new Set();
+  return results.filter((result) => {
+    const group = result.id.startsWith("line-md-")
+      ? `line-md:${semanticBaseForLineMd(result.id.slice("line-md-".length)).base}`
+      : result.id;
+    if (seenGroups.has(group)) return false;
+    seenGroups.add(group);
+    return true;
+  }).slice(0, parsedLimit);
+}
+
+export async function searchRecipes({ recipesRoot, query = "", category = null, limit = 8 }) {
+  return rankRecipes(await discoverRecipes(recipesRoot), { query, category, limit });
 }
 
 export async function showRecipe({ recipesRoot, recipeId }) {

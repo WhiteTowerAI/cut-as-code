@@ -1,28 +1,35 @@
 spec_version: 1
 id: line-md-emoji-frown-twotone
-name: "Line MD Emoji Frown Twotone"
-description: "Animated Emoji Frown Twotone semantic sticker from the original Line MD SVG body."
+name: "Emoji Frown (Twotone)"
+description: "A compact emoji frown icon uses draw-in motion to illustrate affection, appreciation, a favorite, or a positive audience reaction."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-reaction
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-reaction
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "emoji", "frown", "twotone"]
+tags: ["emoji", "frown", "draw-in", "reaction", "affection", "positive", "compact", "twotone"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "emoji"
-  - "frown"
-  - "twotone"
+  - "emoji frown"
+  - "emoji frown icon"
+  - "emoji frown symbol"
+  - "emoji frown animation"
+  - "emoji frown visual cue"
+  - "show emoji frown"
+  - "animated emoji frown"
+  - "喜欢"
+  - "喜欢图标"
+  - "喜欢动画"
+  - "喜欢提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to emoji frown needs a compact, immediately recognizable cue"
+  - "The narration expresses affection, appreciation, approval, or a favorite"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to emoji frown or a close synonym"
+  - "The cue is a formal completion status rather than an emotional reaction"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

@@ -1,27 +1,40 @@
 spec_version: 1
 id: line-md-briefcase-cancel
-name: "Line MD Briefcase Cancel"
-description: "Animated Briefcase Cancel semantic sticker from the original Line MD SVG body."
+name: "Briefcase Cancel"
+description: "A compact briefcase cancel icon uses draw-in, fade motion to illustrate business, professional work, a company, career, or office activity."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-business
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-business
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "briefcase", "cancel"]
+tags: ["briefcase", "cancel", "draw-in", "fade", "business", "professional", "work", "compact"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "briefcase"
-  - "cancel"
+  - "briefcase cancel"
+  - "briefcase cancel icon"
+  - "briefcase cancel symbol"
+  - "business opportunity"
+  - "professional work"
+  - "job offer"
+  - "career"
+  - "company"
+  - "project"
+  - "office"
+  - "公文包"
+  - "商业机会"
+  - "职场工作"
+  - "职位"
+  - "公司项目"
+  - "办公业务"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to briefcase cancel needs a compact, immediately recognizable cue"
+  - "The spoken point concerns work, a company, a job, or a professional opportunity"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to briefcase cancel or a close synonym"
+  - "The object appears literally but the topic has no business or professional meaning"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

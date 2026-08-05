@@ -1,28 +1,40 @@
 spec_version: 1
 id: line-md-volume-high-twotone
-name: "Line MD Volume High Twotone"
-description: "Animated Volume High Twotone semantic sticker from the original Line MD SVG body."
+name: "Volume High (Twotone)"
+description: "A compact volume high icon uses draw-in, morph motion to illustrate audio, video, music, volume, or media playback."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-media
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-media
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "volume", "high", "twotone"]
+tags: ["volume", "high", "draw-in", "morph", "media", "audio", "playback", "compact", "twotone"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
+  - "volume high"
+  - "volume high icon"
+  - "volume high symbol"
+  - "sound"
+  - "mute"
+  - "audio"
+  - "video playback"
+  - "music"
   - "volume"
-  - "high"
-  - "twotone"
+  - "media control"
+  - "音量"
+  - "声音"
+  - "音频"
+  - "视频播放"
+  - "音乐"
+  - "播放控制"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to volume high needs a compact, immediately recognizable cue"
+  - "The narration directly discusses sound, music, video, volume, or playback"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to volume high or a close synonym"
+  - "Media controls are visible in the footage but not relevant to the spoken meaning"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

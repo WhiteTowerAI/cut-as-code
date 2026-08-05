@@ -1,31 +1,40 @@
 spec_version: 1
 id: line-md-confirm-square-twotone-to-square-transition
-name: "Line MD Confirm Square Twotone To Square Transition"
-description: "Animated Confirm Square Twotone To Square Transition semantic sticker from the original Line MD SVG body."
+name: "Confirm Square Twotone To Square Transition"
+description: "A compact confirm square twotone to square transition icon uses draw-in motion to illustrate completion, approval, confirmation, or a verified successful result."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-success
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-success
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "confirm", "square", "twotone", "to", "square", "transition"]
+tags: ["confirm", "square", "to", "transition", "draw-in", "twotone", "success", "confirmation"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "confirm"
-  - "square"
-  - "twotone"
-  - "to"
-  - "square"
-  - "transition"
+  - "confirm square twotone to square transition"
+  - "confirm square twotone to square transition icon"
+  - "confirm square twotone to square transition symbol"
+  - "completed"
+  - "successful"
+  - "approved"
+  - "confirmed"
+  - "done"
+  - "passed"
+  - "check mark"
+  - "确认"
+  - "完成"
+  - "成功"
+  - "通过"
+  - "搞定"
+  - "无误"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to confirm square twotone to square transition needs a compact, immediately recognizable cue"
+  - "A task, verification, transaction, or decision has clearly succeeded"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to confirm square twotone to square transition or a close synonym"
+  - "The outcome is still pending, uncertain, failed, or merely being discussed"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

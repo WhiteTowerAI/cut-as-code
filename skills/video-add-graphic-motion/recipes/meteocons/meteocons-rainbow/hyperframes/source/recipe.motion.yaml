@@ -1,7 +1,7 @@
 spec_version: 1
 id: meteocons-rainbow
-name: "Meteocons Rainbow"
-description: "Animated Rainbow weather sticker from the original Meteocons fill SVG."
+name: "Rainbow Weather"
+description: "A colorful rainbow appearing after changing weather."
 surfaces: [video]
 category: sticker-weather
 tech: [svg]
@@ -11,17 +11,30 @@ intent: sticker-weather
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "weather", "meteocons", "rainbow"]
+tags: ["rainbow", "colorful", "clearing", "weather", "forecast", "environment", "reveal", "compact"]
 intent_keywords:
-  - "sticker"
-  - "weather"
-  - "meteocons"
   - "rainbow"
+  - "weather clearing"
+  - "thunderstorm forecast"
+  - "rain"
+  - "sunny weather"
+  - "snow"
+  - "clear night"
+  - "weather"
+  - "sky"
+  - "rainbow icon"
+  - "彩虹"
+  - "雨后放晴"
+  - "雷暴天气预报"
+  - "下大雨"
+  - "晴朗天气"
+  - "下雪"
 best_for:
-  - "Literal weather, climate, forecast, or environmental references"
+  - "A spoken reference to rainbow needs a compact, immediately recognizable cue"
+  - "The speaker literally refers to current weather, a forecast, or an environmental condition"
 avoid_when:
-  - "Weather is only metaphorical or unrelated to the spoken meaning"
-  - "The icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to rainbow or a close synonym"
+  - "Weather language is metaphorical, such as a storm of criticism or a sunny outlook"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

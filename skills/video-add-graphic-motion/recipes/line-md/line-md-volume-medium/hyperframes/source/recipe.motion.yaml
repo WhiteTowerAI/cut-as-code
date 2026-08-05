@@ -1,27 +1,40 @@
 spec_version: 1
 id: line-md-volume-medium
-name: "Line MD Volume Medium"
-description: "Animated Volume Medium semantic sticker from the original Line MD SVG body."
+name: "Volume Medium"
+description: "A compact volume medium icon uses draw-in, morph motion to illustrate audio, video, music, volume, or media playback."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-media
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-media
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "volume", "medium"]
+tags: ["volume", "medium", "draw-in", "morph", "media", "audio", "playback", "compact"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
+  - "volume medium"
+  - "volume medium icon"
+  - "volume medium symbol"
+  - "sound"
+  - "mute"
+  - "audio"
+  - "video playback"
+  - "music"
   - "volume"
-  - "medium"
+  - "media control"
+  - "音量"
+  - "声音"
+  - "音频"
+  - "视频播放"
+  - "音乐"
+  - "播放控制"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to volume medium needs a compact, immediately recognizable cue"
+  - "The narration directly discusses sound, music, video, volume, or playback"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to volume medium or a close synonym"
+  - "Media controls are visible in the footage but not relevant to the spoken meaning"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

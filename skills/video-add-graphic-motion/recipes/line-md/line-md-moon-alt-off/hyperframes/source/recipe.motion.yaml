@@ -1,28 +1,40 @@
 spec_version: 1
 id: line-md-moon-alt-off
-name: "Line MD Moon Alt Off"
-description: "Animated Moon Alt Off semantic sticker from the original Line MD SVG body."
+name: "Moon Alt Off"
+description: "A compact moon alt off icon uses draw-in, looping motion to illustrate literal weather, a forecast, climate, or an environmental condition."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-weather
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-weather
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "moon", "alt", "off"]
+tags: ["moon", "off", "draw-in", "looping", "alt", "weather", "forecast", "environment"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "moon"
-  - "alt"
-  - "off"
+  - "moon alt off"
+  - "moon alt off icon"
+  - "moon alt off symbol"
+  - "thunderstorm forecast"
+  - "rain"
+  - "sunny weather"
+  - "snow"
+  - "clear night"
+  - "weather"
+  - "sky"
+  - "月亮"
+  - "雷暴天气预报"
+  - "下大雨"
+  - "晴朗天气"
+  - "下雪"
+  - "晴朗夜空"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to moon alt off needs a compact, immediately recognizable cue"
+  - "The speaker literally refers to current weather, a forecast, or an environmental condition"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to moon alt off or a close synonym"
+  - "Weather language is metaphorical, such as a storm of criticism or a sunny outlook"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

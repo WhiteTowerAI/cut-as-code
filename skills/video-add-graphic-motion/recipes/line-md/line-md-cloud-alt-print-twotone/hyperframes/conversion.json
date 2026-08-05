@@ -9,5 +9,5 @@
   "entry": "index.html",
   "source_entry": "preview.html",
   "deterministic_adapter": "svg-smil",
-  "source_manifest_sha256": "e3657e2fa6992d91e4e191338d8096213c414d1226dc5ada4b252e014e17c883"
+  "source_manifest_sha256": "90fadd01c7ea89420e51fa225ef8083a70ab7fae6e473c2df19ce4510215f185"
 }

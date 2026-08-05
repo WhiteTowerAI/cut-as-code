@@ -1,27 +1,40 @@
 spec_version: 1
 id: confetti-heart-burst
 name: "Heart Confetti Burst"
-description: "Heart Confetti Burst rendered with the original canvas-confetti engine."
+description: "Heart-shaped confetti bursting outward with affection."
 surfaces: [video]
-category: sticker-celebration
+category: sticker-reaction
 tech: [js]
 canvas: [video]
 target: [overlay]
-intent: sticker-celebration
+intent: sticker-reaction
 runtime: ["js"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "confetti", "celebration", "center-burst"]
+tags: ["hearts", "confetti", "center-burst", "affection", "heart", "burst", "reaction", "positive"]
 intent_keywords:
-  - "sticker"
-  - "confetti"
-  - "celebration"
-  - "center-burst"
+  - "heart burst"
+  - "love reaction"
+  - "love"
+  - "appreciation"
+  - "favorite"
+  - "thank you"
+  - "star"
+  - "audience reaction"
+  - "rating"
+  - "heart burst icon"
+  - "爱心爆发"
+  - "喜欢回应"
+  - "喜欢"
+  - "感谢"
+  - "爱心回应"
+  - "收藏"
 best_for:
-  - "Wins, launches, reveals, milestones, and celebratory transitions"
+  - "A spoken reference to heart burst needs a compact, immediately recognizable cue"
+  - "The narration expresses affection, appreciation, approval, or a favorite"
 avoid_when:
-  - "The cue is neutral, serious, or already visually dense"
-  - "Any particle path would cross a visible face"
+  - "The spoken meaning does not refer to heart burst or a close synonym"
+  - "The cue is a formal completion status rather than an emotional reaction"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

@@ -1,28 +1,35 @@
 spec_version: 1
 id: line-md-file-download-twotone
-name: "Line MD File Download Twotone"
-description: "Animated File Download Twotone semantic sticker from the original Line MD SVG body."
+name: "File Download (Twotone)"
+description: "A compact file download icon uses draw-in, morph, fade motion to illustrate a concrete viewer action, command, or media control."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-action
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-action
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "file", "download", "twotone"]
+tags: ["file", "download", "draw-in", "morph", "fade", "action", "control", "instruction", "twotone"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "file"
-  - "download"
-  - "twotone"
+  - "file download"
+  - "file download icon"
+  - "file download symbol"
+  - "file download animation"
+  - "file download visual cue"
+  - "show file download"
+  - "animated file download"
+  - "文件下载"
+  - "文件下载图标"
+  - "文件下载动画"
+  - "文件下载提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to file download needs a compact, immediately recognizable cue"
+  - "The speaker gives a clear instruction or names a specific control action"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to file download or a close synonym"
+  - "The verb is metaphorical or the audience is not expected to perform the action"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

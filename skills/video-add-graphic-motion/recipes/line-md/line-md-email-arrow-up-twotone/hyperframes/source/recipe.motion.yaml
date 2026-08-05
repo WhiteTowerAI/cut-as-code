@@ -1,29 +1,40 @@
 spec_version: 1
 id: line-md-email-arrow-up-twotone
-name: "Line MD Email Arrow Up Twotone"
-description: "Animated Email Arrow Up Twotone semantic sticker from the original Line MD SVG body."
+name: "Email Arrow Up (Twotone)"
+description: "A compact email arrow up icon uses draw-in, fade motion to illustrate email, chat, calling, messaging, or direct contact."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-communication
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-communication
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "email", "arrow", "up", "twotone"]
+tags: ["email", "arrow", "up", "draw-in", "fade", "communication", "message", "contact", "twotone"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
+  - "email arrow up"
+  - "email arrow up icon"
+  - "email arrow up symbol"
   - "email"
-  - "arrow"
-  - "up"
-  - "twotone"
+  - "reply"
+  - "message"
+  - "conversation"
+  - "call"
+  - "chat"
+  - "incoming"
+  - "邮件箭头"
+  - "邮件"
+  - "回复"
+  - "消息"
+  - "聊天"
+  - "电话"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to email arrow up needs a compact, immediately recognizable cue"
+  - "The narration explicitly mentions sending, receiving, or replying to a message or call"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to email arrow up or a close synonym"
+  - "The communication channel is incidental and does not carry the narrative point"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

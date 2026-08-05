@@ -1,26 +1,35 @@
 spec_version: 1
 id: line-md-image
-name: "Line MD Image"
-description: "Animated Image semantic sticker from the original Line MD SVG body."
+name: "Image Reveal"
+description: "A compact image icon uses draw-in, fade motion to illustrate audio, video, music, volume, or media playback."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-media
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-media
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "image"]
+tags: ["image", "draw-in", "fade", "media", "audio", "playback", "compact"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
   - "image"
+  - "image icon"
+  - "image symbol"
+  - "image animation"
+  - "image visual cue"
+  - "show image"
+  - "animated image"
+  - "音量"
+  - "音量图标"
+  - "音量动画"
+  - "音量提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to image needs a compact, immediately recognizable cue"
+  - "The narration directly discusses sound, music, video, volume, or playback"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to image or a close synonym"
+  - "Media controls are visible in the footage but not relevant to the spoken meaning"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

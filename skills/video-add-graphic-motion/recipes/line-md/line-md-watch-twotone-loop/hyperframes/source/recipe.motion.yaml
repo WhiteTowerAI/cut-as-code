@@ -1,28 +1,40 @@
 spec_version: 1
 id: line-md-watch-twotone-loop
-name: "Line MD Watch Twotone Loop"
-description: "Animated Watch Twotone Loop semantic sticker from the original Line MD SVG body."
+name: "Watch Reveal (Twotone Loop)"
+description: "A compact watch icon uses morph, looping motion to illustrate time, dates, schedules, appointments, or deadlines."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-time
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-time
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "watch", "twotone", "loop"]
+tags: ["watch", "morph", "looping", "time", "schedule", "deadline", "compact", "twotone", "loop"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
   - "watch"
-  - "twotone"
-  - "loop"
+  - "watch icon"
+  - "watch symbol"
+  - "schedule"
+  - "date"
+  - "calendar"
+  - "time"
+  - "deadline"
+  - "appointment"
+  - "running time"
+  - "手表"
+  - "安排日期"
+  - "日历"
+  - "时间"
+  - "截止时间"
+  - "预约"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to watch needs a compact, immediately recognizable cue"
+  - "A date, deadline, appointment, duration, or schedule is central to the cue"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to watch or a close synonym"
+  - "Timing is incidental and no date, duration, or deadline needs emphasis"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

@@ -1,27 +1,35 @@
 spec_version: 1
 id: line-md-account-add
-name: "Line MD Account Add"
-description: "Animated Account Add semantic sticker from the original Line MD SVG body."
+name: "Account Add"
+description: "A compact account add icon uses draw-in motion to illustrate a person, profile, account, contact, speaker, or community."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-people-lifestyle
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-people-lifestyle
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "account", "add"]
+tags: ["account", "add", "draw-in", "people", "profile", "social", "compact"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "account"
-  - "add"
+  - "account add"
+  - "account add icon"
+  - "account add symbol"
+  - "account add animation"
+  - "account add visual cue"
+  - "show account add"
+  - "animated account add"
+  - "账户"
+  - "账户图标"
+  - "账户动画"
+  - "账户提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to account add needs a compact, immediately recognizable cue"
+  - "A person, user, contact, account, or community role is explicitly discussed"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to account add or a close synonym"
+  - "The cue concerns an organization or abstract audience rather than an identifiable person role"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

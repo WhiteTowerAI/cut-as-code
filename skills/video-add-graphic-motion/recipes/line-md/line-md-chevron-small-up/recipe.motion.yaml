@@ -1,28 +1,40 @@
 spec_version: 1
 id: line-md-chevron-small-up
-name: "Line MD Chevron Small Up"
-description: "Animated Chevron Small Up semantic sticker from the original Line MD SVG body."
+name: "Chevron Small Up"
+description: "A compact chevron small up icon uses draw-in motion to illustrate direction, location, movement, or progression through steps."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-navigation
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-navigation
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "chevron", "small", "up"]
+tags: ["chevron", "small", "up", "draw-in", "navigation", "direction", "movement", "compact"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "chevron"
-  - "small"
-  - "up"
+  - "chevron small up"
+  - "chevron small up icon"
+  - "chevron small up symbol"
+  - "next"
+  - "previous"
+  - "back"
+  - "location"
+  - "left"
+  - "scroll"
+  - "direction"
+  - "方向箭头"
+  - "下一步"
+  - "返回"
+  - "向左"
+  - "向下滚动"
+  - "位置"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to chevron small up needs a compact, immediately recognizable cue"
+  - "The narration points to a direction, destination, location, or next step"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to chevron small up or a close synonym"
+  - "No spatial or sequential relationship needs to be communicated"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

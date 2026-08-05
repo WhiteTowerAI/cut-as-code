@@ -1,30 +1,35 @@
 spec_version: 1
 id: line-md-square-to-confirm-square-transition
-name: "Line MD Square To Confirm Square Transition"
-description: "Animated Square To Confirm Square Transition semantic sticker from the original Line MD SVG body."
+name: "Square To Confirm Square Transition"
+description: "A compact square to confirm square transition icon uses draw-in motion to illustrate completion, approval, confirmation, or a verified successful result."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-success
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-success
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "square", "to", "confirm", "square", "transition"]
+tags: ["square", "to", "confirm", "transition", "draw-in", "success", "confirmation", "positive"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "square"
-  - "to"
-  - "confirm"
-  - "square"
-  - "transition"
+  - "square to confirm square transition"
+  - "square to confirm square transition icon"
+  - "square to confirm square transition symbol"
+  - "square to confirm square transition animation"
+  - "square to confirm square transition visual cue"
+  - "show square to confirm square transition"
+  - "animated square to confirm square transition"
+  - "确认"
+  - "确认图标"
+  - "确认动画"
+  - "确认提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to square to confirm square transition needs a compact, immediately recognizable cue"
+  - "A task, verification, transaction, or decision has clearly succeeded"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to square to confirm square transition or a close synonym"
+  - "The outcome is still pending, uncertain, failed, or merely being discussed"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

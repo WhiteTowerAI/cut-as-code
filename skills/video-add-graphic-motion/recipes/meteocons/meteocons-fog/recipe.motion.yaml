@@ -1,7 +1,7 @@
 spec_version: 1
 id: meteocons-fog
-name: "Meteocons Fog"
-description: "Animated Fog weather sticker from the original Meteocons fill SVG."
+name: "Dense Fog Weather"
+description: "Layered mist representing fog and reduced visibility."
 surfaces: [video]
 category: sticker-weather
 tech: [svg]
@@ -11,17 +11,30 @@ intent: sticker-weather
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "weather", "meteocons", "fog"]
+tags: ["fog", "mist", "visibility", "weather", "forecast", "environment", "reveal", "compact"]
 intent_keywords:
-  - "sticker"
-  - "weather"
-  - "meteocons"
   - "fog"
+  - "low visibility"
+  - "thunderstorm forecast"
+  - "rain"
+  - "sunny weather"
+  - "snow"
+  - "clear night"
+  - "weather"
+  - "sky"
+  - "fog icon"
+  - "大雾"
+  - "低能见度"
+  - "雷暴天气预报"
+  - "下大雨"
+  - "晴朗天气"
+  - "下雪"
 best_for:
-  - "Literal weather, climate, forecast, or environmental references"
+  - "A spoken reference to fog needs a compact, immediately recognizable cue"
+  - "The speaker literally refers to current weather, a forecast, or an environmental condition"
 avoid_when:
-  - "Weather is only metaphorical or unrelated to the spoken meaning"
-  - "The icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to fog or a close synonym"
+  - "Weather language is metaphorical, such as a storm of criticism or a sunny outlook"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

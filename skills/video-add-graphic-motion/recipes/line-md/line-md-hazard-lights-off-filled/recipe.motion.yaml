@@ -1,29 +1,40 @@
 spec_version: 1
 id: line-md-hazard-lights-off-filled
-name: "Line MD Hazard Lights Off Filled"
-description: "Animated Hazard Lights Off Filled semantic sticker from the original Line MD SVG body."
+name: "Hazard Lights Off (Filled)"
+description: "A compact hazard lights off icon uses draw-in, morph, fade, looping motion to illustrate danger, risk, failure, caution, or an urgent problem."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-warning
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-warning
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "hazard", "lights", "off", "filled"]
+tags: ["hazard", "lights", "off", "draw-in", "morph", "fade", "looping", "warning", "filled"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
+  - "hazard lights off"
+  - "hazard lights off icon"
+  - "hazard lights off symbol"
+  - "warning"
+  - "danger"
+  - "risk"
   - "hazard"
-  - "lights"
-  - "off"
-  - "filled"
+  - "urgent"
+  - "critical"
+  - "problem"
+  - "危险灯"
+  - "警告"
+  - "危险"
+  - "风险"
+  - "隐患"
+  - "紧急"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to hazard lights off needs a compact, immediately recognizable cue"
+  - "The spoken point identifies a real risk, failure, hazard, or urgent exception"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to hazard lights off or a close synonym"
+  - "The message is neutral, routine, positive, or too speculative to justify alarm"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

@@ -1,28 +1,35 @@
 spec_version: 1
 id: line-md-double-arrow-horizontal
-name: "Line MD Double Arrow Horizontal"
-description: "Animated Double Arrow Horizontal semantic sticker from the original Line MD SVG body."
+name: "Double Arrow Horizontal"
+description: "A compact double arrow horizontal icon uses draw-in motion to illustrate direction, location, movement, or progression through steps."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-navigation
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-navigation
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "double", "arrow", "horizontal"]
+tags: ["double", "arrow", "horizontal", "draw-in", "navigation", "direction", "movement", "compact"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "double"
-  - "arrow"
-  - "horizontal"
+  - "double arrow horizontal"
+  - "double arrow horizontal icon"
+  - "double arrow horizontal symbol"
+  - "double arrow horizontal animation"
+  - "double arrow horizontal visual cue"
+  - "show double arrow horizontal"
+  - "animated double arrow horizontal"
+  - "箭头"
+  - "箭头图标"
+  - "箭头动画"
+  - "箭头提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to double arrow horizontal needs a compact, immediately recognizable cue"
+  - "The narration points to a direction, destination, location, or next step"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to double arrow horizontal or a close synonym"
+  - "No spatial or sequential relationship needs to be communicated"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

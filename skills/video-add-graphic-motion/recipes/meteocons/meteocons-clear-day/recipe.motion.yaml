@@ -1,7 +1,7 @@
 spec_version: 1
 id: meteocons-clear-day
-name: "Meteocons Clear Day"
-description: "Animated Clear Day weather sticker from the original Meteocons fill SVG."
+name: "Clear Day Weather"
+description: "A bright sun representing clear daytime weather."
 surfaces: [video]
 category: sticker-weather
 tech: [svg]
@@ -11,18 +11,30 @@ intent: sticker-weather
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "weather", "meteocons", "clear", "day"]
+tags: ["sun", "clear", "daytime", "day", "weather", "forecast", "environment", "reveal"]
 intent_keywords:
-  - "sticker"
+  - "clear day"
+  - "sunny forecast"
+  - "thunderstorm forecast"
+  - "rain"
+  - "sunny weather"
+  - "snow"
+  - "clear night"
   - "weather"
-  - "meteocons"
-  - "clear"
-  - "day"
+  - "sky"
+  - "clear day icon"
+  - "晴天"
+  - "白天晴朗"
+  - "雷暴天气预报"
+  - "下大雨"
+  - "晴朗天气"
+  - "下雪"
 best_for:
-  - "Literal weather, climate, forecast, or environmental references"
+  - "A spoken reference to clear day needs a compact, immediately recognizable cue"
+  - "The speaker literally refers to current weather, a forecast, or an environmental condition"
 avoid_when:
-  - "Weather is only metaphorical or unrelated to the spoken meaning"
-  - "The icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to clear day or a close synonym"
+  - "Weather language is metaphorical, such as a storm of criticism or a sunny outlook"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

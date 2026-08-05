@@ -1,28 +1,35 @@
 spec_version: 1
 id: line-md-cookie-off-twotone
-name: "Line MD Cookie Off Twotone"
-description: "Animated Cookie Off Twotone semantic sticker from the original Line MD SVG body."
+name: "Cookie Off (Twotone)"
+description: "A compact cookie off icon uses draw-in, fade motion to illustrate software, devices, cloud systems, files, data, or digital infrastructure."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-technology
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-technology
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "cookie", "off", "twotone"]
+tags: ["cookie", "off", "draw-in", "fade", "technology", "digital", "system", "compact", "twotone"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "cookie"
-  - "off"
-  - "twotone"
+  - "cookie off"
+  - "cookie off icon"
+  - "cookie off symbol"
+  - "cookie off animation"
+  - "cookie off visual cue"
+  - "show cookie off"
+  - "animated cookie off"
+  - "饼干"
+  - "饼干图标"
+  - "饼干动画"
+  - "饼干提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to cookie off needs a compact, immediately recognizable cue"
+  - "The narration names a digital system, device, file, cloud service, or technical process"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to cookie off or a close synonym"
+  - "A similarly named object is being discussed in a physical or weather context"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

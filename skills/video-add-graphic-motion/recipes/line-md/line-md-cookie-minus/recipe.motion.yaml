@@ -1,27 +1,35 @@
 spec_version: 1
 id: line-md-cookie-minus
-name: "Line MD Cookie Minus"
-description: "Animated Cookie Minus semantic sticker from the original Line MD SVG body."
+name: "Cookie Minus"
+description: "A compact cookie minus icon uses draw-in, fade motion to illustrate software, devices, cloud systems, files, data, or digital infrastructure."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-technology
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-technology
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "cookie", "minus"]
+tags: ["cookie", "minus", "draw-in", "fade", "technology", "digital", "system", "compact"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "cookie"
-  - "minus"
+  - "cookie minus"
+  - "cookie minus icon"
+  - "cookie minus symbol"
+  - "cookie minus animation"
+  - "cookie minus visual cue"
+  - "show cookie minus"
+  - "animated cookie minus"
+  - "饼干"
+  - "饼干图标"
+  - "饼干动画"
+  - "饼干提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to cookie minus needs a compact, immediately recognizable cue"
+  - "The narration names a digital system, device, file, cloud service, or technical process"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to cookie minus or a close synonym"
+  - "A similarly named object is being discussed in a physical or weather context"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

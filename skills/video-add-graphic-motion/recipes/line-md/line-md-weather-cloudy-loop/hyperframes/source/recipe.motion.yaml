@@ -1,28 +1,35 @@
 spec_version: 1
 id: line-md-weather-cloudy-loop
-name: "Line MD Weather Cloudy Loop"
-description: "Animated Weather Cloudy Loop semantic sticker from the original Line MD SVG body."
+name: "Weather Cloudy (Loop)"
+description: "A compact weather cloudy icon uses morph, looping motion to illustrate literal weather, a forecast, climate, or an environmental condition."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-weather
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-weather
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "weather", "cloudy", "loop"]
+tags: ["weather", "cloudy", "morph", "looping", "forecast", "environment", "compact", "loop"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "weather"
-  - "cloudy"
-  - "loop"
+  - "weather cloudy"
+  - "weather cloudy icon"
+  - "weather cloudy symbol"
+  - "weather cloudy animation"
+  - "weather cloudy visual cue"
+  - "show weather cloudy"
+  - "animated weather cloudy"
+  - "雷暴天气预报"
+  - "雷暴天气预报图标"
+  - "雷暴天气预报动画"
+  - "雷暴天气预报提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to weather cloudy needs a compact, immediately recognizable cue"
+  - "The speaker literally refers to current weather, a forecast, or an environmental condition"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to weather cloudy or a close synonym"
+  - "Weather language is metaphorical, such as a storm of criticism or a sunny outlook"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

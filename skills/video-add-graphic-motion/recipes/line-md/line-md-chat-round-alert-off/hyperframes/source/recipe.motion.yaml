@@ -1,29 +1,35 @@
 spec_version: 1
 id: line-md-chat-round-alert-off
-name: "Line MD Chat Round Alert Off"
-description: "Animated Chat Round Alert Off semantic sticker from the original Line MD SVG body."
+name: "Chat Round Alert Off"
+description: "A compact chat round alert off icon uses draw-in, morph, fade motion to illustrate danger, risk, failure, caution, or an urgent problem."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-warning
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-warning
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "chat", "round", "alert", "off"]
+tags: ["chat", "round", "alert", "off", "draw-in", "morph", "fade", "warning"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "chat"
-  - "round"
-  - "alert"
-  - "off"
+  - "chat round alert off"
+  - "chat round alert off icon"
+  - "chat round alert off symbol"
+  - "chat round alert off animation"
+  - "chat round alert off visual cue"
+  - "show chat round alert off"
+  - "animated chat round alert off"
+  - "聊天警告"
+  - "聊天警告图标"
+  - "聊天警告动画"
+  - "聊天警告提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to chat round alert off needs a compact, immediately recognizable cue"
+  - "The spoken point identifies a real risk, failure, hazard, or urgent exception"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to chat round alert off or a close synonym"
+  - "The message is neutral, routine, positive, or too speculative to justify alarm"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

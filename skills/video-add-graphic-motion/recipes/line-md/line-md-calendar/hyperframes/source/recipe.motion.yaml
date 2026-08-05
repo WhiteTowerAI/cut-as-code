@@ -1,26 +1,40 @@
 spec_version: 1
 id: line-md-calendar
-name: "Line MD Calendar"
-description: "Animated Calendar semantic sticker from the original Line MD SVG body."
+name: "Calendar Reveal"
+description: "A compact calendar icon uses draw-in, morph motion to illustrate time, dates, schedules, appointments, or deadlines."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-time
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-time
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "calendar"]
+tags: ["calendar", "draw-in", "morph", "time", "schedule", "deadline", "compact"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
   - "calendar"
+  - "calendar icon"
+  - "calendar symbol"
+  - "schedule"
+  - "date"
+  - "time"
+  - "deadline"
+  - "appointment"
+  - "running time"
+  - "calendar animation"
+  - "日历"
+  - "安排日期"
+  - "时间"
+  - "截止时间"
+  - "预约"
+  - "日历图标"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to calendar needs a compact, immediately recognizable cue"
+  - "A date, deadline, appointment, duration, or schedule is central to the cue"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to calendar or a close synonym"
+  - "Timing is incidental and no date, duration, or deadline needs emphasis"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

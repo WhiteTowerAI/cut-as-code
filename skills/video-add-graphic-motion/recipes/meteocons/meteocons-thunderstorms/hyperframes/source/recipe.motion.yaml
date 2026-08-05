@@ -1,7 +1,7 @@
 spec_version: 1
 id: meteocons-thunderstorms
-name: "Meteocons Thunderstorms"
-description: "Animated Thunderstorms weather sticker from the original Meteocons fill SVG."
+name: "Thunderstorm Cloud"
+description: "A storm cloud flashing with lightning for severe weather."
 surfaces: [video]
 category: sticker-weather
 tech: [svg]
@@ -11,17 +11,30 @@ intent: sticker-weather
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "weather", "meteocons", "thunderstorms"]
+tags: ["storm", "lightning", "cloud", "thunderstorm", "weather", "forecast", "environment", "reveal"]
 intent_keywords:
-  - "sticker"
+  - "thunderstorm"
+  - "storm forecast"
+  - "thunderstorm forecast"
+  - "rain"
+  - "sunny weather"
+  - "snow"
+  - "clear night"
   - "weather"
-  - "meteocons"
-  - "thunderstorms"
+  - "sky"
+  - "thunderstorm icon"
+  - "雷暴"
+  - "暴风雨预报"
+  - "雷暴天气预报"
+  - "下大雨"
+  - "晴朗天气"
+  - "下雪"
 best_for:
-  - "Literal weather, climate, forecast, or environmental references"
+  - "A spoken reference to thunderstorm needs a compact, immediately recognizable cue"
+  - "The speaker literally refers to current weather, a forecast, or an environmental condition"
 avoid_when:
-  - "Weather is only metaphorical or unrelated to the spoken meaning"
-  - "The icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to thunderstorm or a close synonym"
+  - "Weather language is metaphorical, such as a storm of criticism or a sunny outlook"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

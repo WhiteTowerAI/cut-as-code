@@ -1,27 +1,35 @@
 spec_version: 1
 id: line-md-clipboard-check
-name: "Line MD Clipboard Check"
-description: "Animated Clipboard Check semantic sticker from the original Line MD SVG body."
+name: "Clipboard Check"
+description: "A compact clipboard check icon uses draw-in motion to illustrate a literal physical object, place, food, vehicle, or everyday item."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-object
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-object
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "clipboard", "check"]
+tags: ["clipboard", "check", "draw-in", "object", "literal", "everyday", "compact"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "clipboard"
-  - "check"
+  - "clipboard check"
+  - "clipboard check icon"
+  - "clipboard check symbol"
+  - "clipboard check animation"
+  - "clipboard check visual cue"
+  - "show clipboard check"
+  - "animated clipboard check"
+  - "剪贴板勾选"
+  - "剪贴板勾选图标"
+  - "剪贴板勾选动画"
+  - "剪贴板勾选提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to clipboard check needs a compact, immediately recognizable cue"
+  - "The named object itself is visually useful and immediately recognizable in context"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to clipboard check or a close synonym"
+  - "The object name is metaphorical or a more specific semantic category communicates the point better"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

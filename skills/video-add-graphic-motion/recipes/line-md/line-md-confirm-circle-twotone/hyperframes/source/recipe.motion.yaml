@@ -1,28 +1,40 @@
 spec_version: 1
 id: line-md-confirm-circle-twotone
-name: "Line MD Confirm Circle Twotone"
-description: "Animated Confirm Circle Twotone semantic sticker from the original Line MD SVG body."
+name: "Confirm Circle (Twotone)"
+description: "A compact confirm circle icon uses draw-in motion to illustrate completion, approval, confirmation, or a verified successful result."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-success
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-success
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "confirm", "circle", "twotone"]
+tags: ["confirm", "circle", "draw-in", "success", "confirmation", "positive", "compact", "twotone"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "confirm"
-  - "circle"
-  - "twotone"
+  - "confirm circle"
+  - "confirm circle icon"
+  - "confirm circle symbol"
+  - "completed"
+  - "successful"
+  - "approved"
+  - "confirmed"
+  - "done"
+  - "passed"
+  - "check mark"
+  - "确认"
+  - "完成"
+  - "成功"
+  - "通过"
+  - "搞定"
+  - "无误"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to confirm circle needs a compact, immediately recognizable cue"
+  - "A task, verification, transaction, or decision has clearly succeeded"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to confirm circle or a close synonym"
+  - "The outcome is still pending, uncertain, failed, or merely being discussed"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

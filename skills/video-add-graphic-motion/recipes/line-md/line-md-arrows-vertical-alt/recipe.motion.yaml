@@ -1,28 +1,35 @@
 spec_version: 1
 id: line-md-arrows-vertical-alt
-name: "Line MD Arrows Vertical Alt"
-description: "Animated Arrows Vertical Alt semantic sticker from the original Line MD SVG body."
+name: "Arrows Vertical Alt"
+description: "A compact arrows vertical alt icon uses draw-in motion to illustrate direction, location, movement, or progression through steps."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-navigation
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-navigation
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "arrows", "vertical", "alt"]
+tags: ["arrows", "vertical", "draw-in", "alt", "navigation", "direction", "movement", "compact"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "arrows"
-  - "vertical"
-  - "alt"
+  - "arrows vertical alt"
+  - "arrows vertical alt icon"
+  - "arrows vertical alt symbol"
+  - "arrows vertical alt animation"
+  - "arrows vertical alt visual cue"
+  - "show arrows vertical alt"
+  - "animated arrows vertical alt"
+  - "下一步"
+  - "下一步图标"
+  - "下一步动画"
+  - "下一步提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to arrows vertical alt needs a compact, immediately recognizable cue"
+  - "The narration points to a direction, destination, location, or next step"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to arrows vertical alt or a close synonym"
+  - "No spatial or sequential relationship needs to be communicated"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

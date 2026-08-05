@@ -1,29 +1,35 @@
 spec_version: 1
 id: line-md-text-box-multiple-twotone
-name: "Line MD Text Box Multiple Twotone"
-description: "Animated Text Box Multiple Twotone semantic sticker from the original Line MD SVG body."
+name: "Text Box Multiple (Twotone)"
+description: "A compact text box multiple icon uses draw-in, morph, fade motion to illustrate a literal physical object, place, food, vehicle, or everyday item."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-object
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-object
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "text", "box", "multiple", "twotone"]
+tags: ["text", "box", "multiple", "draw-in", "morph", "fade", "object", "literal", "twotone"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "text"
-  - "box"
-  - "multiple"
-  - "twotone"
+  - "text box multiple"
+  - "text box multiple icon"
+  - "text box multiple symbol"
+  - "text box multiple animation"
+  - "text box multiple visual cue"
+  - "show text box multiple"
+  - "animated text box multiple"
+  - "日常物品"
+  - "日常物品图标"
+  - "日常物品动画"
+  - "日常物品提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to text box multiple needs a compact, immediately recognizable cue"
+  - "The named object itself is visually useful and immediately recognizable in context"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to text box multiple or a close synonym"
+  - "The object name is metaphorical or a more specific semantic category communicates the point better"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

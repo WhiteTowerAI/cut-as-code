@@ -1,29 +1,40 @@
 spec_version: 1
 id: line-md-chat-round-filled-off
-name: "Line MD Chat Round Filled Off"
-description: "Animated Chat Round Filled Off semantic sticker from the original Line MD SVG body."
+name: "Chat Round Filled Off"
+description: "A compact chat round filled off icon uses draw-in, morph, fade motion to illustrate email, chat, calling, messaging, or direct contact."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-communication
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-communication
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "chat", "round", "filled", "off"]
+tags: ["chat", "round", "off", "draw-in", "morph", "fade", "filled", "communication"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
+  - "chat round filled off"
+  - "chat round filled off icon"
+  - "chat round filled off symbol"
+  - "email"
+  - "reply"
+  - "message"
+  - "conversation"
+  - "call"
   - "chat"
-  - "round"
-  - "filled"
-  - "off"
+  - "incoming"
+  - "聊天"
+  - "邮件"
+  - "回复"
+  - "消息"
+  - "电话"
+  - "私信"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to chat round filled off needs a compact, immediately recognizable cue"
+  - "The narration explicitly mentions sending, receiving, or replying to a message or call"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to chat round filled off or a close synonym"
+  - "The communication channel is incidental and does not carry the narrative point"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

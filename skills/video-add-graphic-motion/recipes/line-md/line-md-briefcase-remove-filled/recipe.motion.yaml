@@ -1,28 +1,40 @@
 spec_version: 1
 id: line-md-briefcase-remove-filled
-name: "Line MD Briefcase Remove Filled"
-description: "Animated Briefcase Remove Filled semantic sticker from the original Line MD SVG body."
+name: "Briefcase Remove (Filled)"
+description: "A compact briefcase remove icon uses draw-in, fade motion to illustrate business, professional work, a company, career, or office activity."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-business
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-business
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "briefcase", "remove", "filled"]
+tags: ["briefcase", "remove", "draw-in", "fade", "business", "professional", "work", "compact", "filled"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "briefcase"
-  - "remove"
-  - "filled"
+  - "briefcase remove"
+  - "briefcase remove icon"
+  - "briefcase remove symbol"
+  - "business opportunity"
+  - "professional work"
+  - "job offer"
+  - "career"
+  - "company"
+  - "project"
+  - "office"
+  - "公文包"
+  - "商业机会"
+  - "职场工作"
+  - "职位"
+  - "公司项目"
+  - "办公业务"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to briefcase remove needs a compact, immediately recognizable cue"
+  - "The spoken point concerns work, a company, a job, or a professional opportunity"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to briefcase remove or a close synonym"
+  - "The object appears literally but the topic has no business or professional meaning"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

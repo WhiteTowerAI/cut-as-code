@@ -1,27 +1,40 @@
 spec_version: 1
 id: mojs-success-pop
-name: "Success Pop"
-description: "Success Pop built from mo.js Burst and Shape primitives."
+name: "Success Confirmation Pop"
+description: "A compact green burst reinforcing a completed or approved result."
 surfaces: [video]
-category: sticker-impact
+category: sticker-success
 tech: [js]
 canvas: [video]
 target: [overlay]
-intent: sticker-impact
+intent: sticker-success
 runtime: ["js"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "mojs", "burst", "line"]
+tags: ["success", "burst", "confirmation", "compact", "pop", "positive", "reveal"]
 intent_keywords:
-  - "sticker"
-  - "mojs"
-  - "burst"
-  - "line"
+  - "success pop"
+  - "confirmation burst"
+  - "completed"
+  - "successful"
+  - "approved"
+  - "confirmed"
+  - "done"
+  - "passed"
+  - "check mark"
+  - "success pop icon"
+  - "成功弹出"
+  - "确认爆发"
+  - "完成"
+  - "成功"
+  - "确认"
+  - "通过"
 best_for:
-  - "Impact beats, confirmations, emphasis hits, and compact celebration cues"
+  - "A spoken reference to success pop needs a compact, immediately recognizable cue"
+  - "A task, verification, transaction, or decision has clearly succeeded"
 avoid_when:
-  - "The cue needs literal information rather than an abstract impact"
-  - "Any ring or particle path would cross a visible face"
+  - "The spoken meaning does not refer to success pop or a close synonym"
+  - "The outcome is still pending, uncertain, failed, or merely being discussed"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

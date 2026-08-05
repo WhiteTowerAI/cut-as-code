@@ -1,27 +1,35 @@
 spec_version: 1
 id: line-md-beer-loop
-name: "Line MD Beer Loop"
-description: "Animated Beer Loop semantic sticker from the original Line MD SVG body."
+name: "Beer Reveal (Loop)"
+description: "A compact beer icon uses draw-in, movement, fade, looping motion to illustrate a literal physical object, place, food, vehicle, or everyday item."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-object
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-object
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "beer", "loop"]
+tags: ["beer", "draw-in", "movement", "fade", "looping", "object", "literal", "everyday", "loop"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
   - "beer"
-  - "loop"
+  - "beer icon"
+  - "beer symbol"
+  - "beer animation"
+  - "beer visual cue"
+  - "show beer"
+  - "animated beer"
+  - "啤酒"
+  - "啤酒图标"
+  - "啤酒动画"
+  - "啤酒提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to beer needs a compact, immediately recognizable cue"
+  - "The named object itself is visually useful and immediately recognizable in context"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to beer or a close synonym"
+  - "The object name is metaphorical or a more specific semantic category communicates the point better"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

@@ -1,28 +1,40 @@
 spec_version: 1
 id: line-md-star-half-twotone
-name: "Line MD Star Half Twotone"
-description: "Animated Star Half Twotone semantic sticker from the original Line MD SVG body."
+name: "Star Half (Twotone)"
+description: "A compact star half icon uses draw-in motion to illustrate affection, appreciation, a favorite, or a positive audience reaction."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-reaction
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-reaction
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "star", "half", "twotone"]
+tags: ["star", "half", "draw-in", "reaction", "affection", "positive", "compact", "twotone"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
+  - "star half"
+  - "star half icon"
+  - "star half symbol"
+  - "love"
+  - "appreciation"
+  - "favorite"
+  - "thank you"
   - "star"
-  - "half"
-  - "twotone"
+  - "audience reaction"
+  - "rating"
+  - "星星"
+  - "喜欢"
+  - "感谢"
+  - "爱心回应"
+  - "收藏"
+  - "五星好评"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to star half needs a compact, immediately recognizable cue"
+  - "The narration expresses affection, appreciation, approval, or a favorite"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to star half or a close synonym"
+  - "The cue is a formal completion status rather than an emotional reaction"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

@@ -1,27 +1,35 @@
 spec_version: 1
 id: line-md-account-small
-name: "Line MD Account Small"
-description: "Animated Account Small semantic sticker from the original Line MD SVG body."
+name: "Account Small"
+description: "A compact account small icon uses draw-in motion to illustrate a person, profile, account, contact, speaker, or community."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-people-lifestyle
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-people-lifestyle
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "account", "small"]
+tags: ["account", "small", "draw-in", "people", "profile", "social", "compact"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "account"
-  - "small"
+  - "account small"
+  - "account small icon"
+  - "account small symbol"
+  - "account small animation"
+  - "account small visual cue"
+  - "show account small"
+  - "animated account small"
+  - "账户"
+  - "账户图标"
+  - "账户动画"
+  - "账户提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to account small needs a compact, immediately recognizable cue"
+  - "A person, user, contact, account, or community role is explicitly discussed"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to account small or a close synonym"
+  - "The cue concerns an organization or abstract audience rather than an identifiable person role"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

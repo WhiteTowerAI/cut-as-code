@@ -1,27 +1,35 @@
 spec_version: 1
 id: line-md-youtube-twotone
-name: "Line MD Youtube Twotone"
-description: "Animated Youtube Twotone semantic sticker from the original Line MD SVG body."
+name: "Youtube Reveal (Twotone)"
+description: "A compact youtube icon uses draw-in, morph, fade motion to illustrate a literal physical object, place, food, vehicle, or everyday item."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-object
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-object
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "youtube", "twotone"]
+tags: ["youtube", "draw-in", "morph", "fade", "object", "literal", "everyday", "compact", "twotone"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
   - "youtube"
-  - "twotone"
+  - "youtube icon"
+  - "youtube symbol"
+  - "youtube animation"
+  - "youtube visual cue"
+  - "show youtube"
+  - "animated youtube"
+  - "日常物品"
+  - "日常物品图标"
+  - "日常物品动画"
+  - "日常物品提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to youtube needs a compact, immediately recognizable cue"
+  - "The named object itself is visually useful and immediately recognizable in context"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to youtube or a close synonym"
+  - "The object name is metaphorical or a more specific semantic category communicates the point better"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

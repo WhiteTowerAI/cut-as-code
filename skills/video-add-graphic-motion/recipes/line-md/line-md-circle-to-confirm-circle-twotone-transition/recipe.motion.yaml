@@ -1,31 +1,35 @@
 spec_version: 1
 id: line-md-circle-to-confirm-circle-twotone-transition
-name: "Line MD Circle To Confirm Circle Twotone Transition"
-description: "Animated Circle To Confirm Circle Twotone Transition semantic sticker from the original Line MD SVG body."
+name: "Circle To Confirm Circle Twotone Transition"
+description: "A compact circle to confirm circle twotone transition icon uses draw-in motion to illustrate completion, approval, confirmation, or a verified successful result."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-success
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-success
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "circle", "to", "confirm", "circle", "twotone", "transition"]
+tags: ["circle", "to", "confirm", "transition", "draw-in", "twotone", "success", "confirmation"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "circle"
-  - "to"
-  - "confirm"
-  - "circle"
-  - "twotone"
-  - "transition"
+  - "circle to confirm circle twotone transition"
+  - "circle to confirm circle twotone transition icon"
+  - "circle to confirm circle twotone transition symbol"
+  - "circle to confirm circle twotone transition animation"
+  - "circle to confirm circle twotone transition visual cue"
+  - "show circle to confirm circle twotone transition"
+  - "animated circle to confirm circle twotone transition"
+  - "确认"
+  - "确认图标"
+  - "确认动画"
+  - "确认提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to circle to confirm circle twotone transition needs a compact, immediately recognizable cue"
+  - "A task, verification, transaction, or decision has clearly succeeded"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to circle to confirm circle twotone transition or a close synonym"
+  - "The outcome is still pending, uncertain, failed, or merely being discussed"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

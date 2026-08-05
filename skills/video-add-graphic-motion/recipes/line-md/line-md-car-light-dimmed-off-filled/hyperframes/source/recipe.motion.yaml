@@ -1,30 +1,40 @@
 spec_version: 1
 id: line-md-car-light-dimmed-off-filled
-name: "Line MD Car Light Dimmed Off Filled"
-description: "Animated Car Light Dimmed Off Filled semantic sticker from the original Line MD SVG body."
+name: "Car Light Dimmed Off (Filled)"
+description: "A compact car light dimmed off icon uses draw-in motion to illustrate a literal physical object, place, food, vehicle, or everyday item."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-object
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-object
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "car", "light", "dimmed", "off", "filled"]
+tags: ["car", "light", "dimmed", "off", "draw-in", "object", "literal", "everyday", "filled"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "car"
-  - "light"
-  - "dimmed"
-  - "off"
-  - "filled"
+  - "car light dimmed off"
+  - "car light dimmed off icon"
+  - "car light dimmed off symbol"
+  - "home"
+  - "coffee"
+  - "car light"
+  - "bright idea"
+  - "everyday object"
+  - "literal object"
+  - "physical item"
+  - "汽车"
+  - "日常物品"
+  - "家里"
+  - "咖啡"
+  - "车灯"
+  - "主意"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to car light dimmed off needs a compact, immediately recognizable cue"
+  - "The named object itself is visually useful and immediately recognizable in context"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to car light dimmed off or a close synonym"
+  - "The object name is metaphorical or a more specific semantic category communicates the point better"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

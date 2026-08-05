@@ -1,28 +1,35 @@
 spec_version: 1
 id: line-md-clipboard-arrow-twotone
-name: "Line MD Clipboard Arrow Twotone"
-description: "Animated Clipboard Arrow Twotone semantic sticker from the original Line MD SVG body."
+name: "Clipboard Arrow (Twotone)"
+description: "A compact clipboard arrow icon uses draw-in motion to illustrate direction, location, movement, or progression through steps."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-navigation
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-navigation
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "clipboard", "arrow", "twotone"]
+tags: ["clipboard", "arrow", "draw-in", "navigation", "direction", "movement", "compact", "twotone"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "clipboard"
-  - "arrow"
-  - "twotone"
+  - "clipboard arrow"
+  - "clipboard arrow icon"
+  - "clipboard arrow symbol"
+  - "clipboard arrow animation"
+  - "clipboard arrow visual cue"
+  - "show clipboard arrow"
+  - "animated clipboard arrow"
+  - "剪贴板箭头"
+  - "剪贴板箭头图标"
+  - "剪贴板箭头动画"
+  - "剪贴板箭头提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to clipboard arrow needs a compact, immediately recognizable cue"
+  - "The narration points to a direction, destination, location, or next step"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to clipboard arrow or a close synonym"
+  - "No spatial or sequential relationship needs to be communicated"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

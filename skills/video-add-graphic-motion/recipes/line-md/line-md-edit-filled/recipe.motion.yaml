@@ -1,27 +1,35 @@
 spec_version: 1
 id: line-md-edit-filled
-name: "Line MD Edit Filled"
-description: "Animated Edit Filled semantic sticker from the original Line MD SVG body."
+name: "Edit Reveal (Filled)"
+description: "A compact edit icon uses draw-in motion to illustrate a concrete viewer action, command, or media control."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-action
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-action
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "edit", "filled"]
+tags: ["edit", "draw-in", "action", "control", "instruction", "compact", "filled"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
   - "edit"
-  - "filled"
+  - "edit icon"
+  - "edit symbol"
+  - "edit animation"
+  - "edit visual cue"
+  - "show edit"
+  - "animated edit"
+  - "下载文件"
+  - "下载文件图标"
+  - "下载文件动画"
+  - "下载文件提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to edit needs a compact, immediately recognizable cue"
+  - "The speaker gives a clear instruction or names a specific control action"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to edit or a close synonym"
+  - "The verb is metaphorical or the audience is not expected to perform the action"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

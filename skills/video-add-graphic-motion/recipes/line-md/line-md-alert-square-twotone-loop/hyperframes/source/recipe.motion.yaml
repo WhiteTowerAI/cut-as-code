@@ -1,29 +1,40 @@
 spec_version: 1
 id: line-md-alert-square-twotone-loop
-name: "Line MD Alert Square Twotone Loop"
-description: "Animated Alert Square Twotone Loop semantic sticker from the original Line MD SVG body."
+name: "Alert Square (Twotone Loop)"
+description: "A compact alert square icon uses draw-in, looping motion to illustrate danger, risk, failure, caution, or an urgent problem."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-warning
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-warning
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "alert", "square", "twotone", "loop"]
+tags: ["alert", "square", "draw-in", "looping", "warning", "urgent", "caution", "compact", "twotone", "loop"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "alert"
-  - "square"
-  - "twotone"
-  - "loop"
+  - "alert square"
+  - "alert square icon"
+  - "alert square symbol"
+  - "warning"
+  - "danger"
+  - "risk"
+  - "hazard"
+  - "urgent"
+  - "critical"
+  - "problem"
+  - "警告"
+  - "危险"
+  - "风险"
+  - "隐患"
+  - "紧急"
+  - "严重问题"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to alert square needs a compact, immediately recognizable cue"
+  - "The spoken point identifies a real risk, failure, hazard, or urgent exception"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to alert square or a close synonym"
+  - "The message is neutral, routine, positive, or too speculative to justify alarm"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

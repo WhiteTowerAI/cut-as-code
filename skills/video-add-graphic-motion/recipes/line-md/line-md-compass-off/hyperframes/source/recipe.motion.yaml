@@ -1,27 +1,35 @@
 spec_version: 1
 id: line-md-compass-off
-name: "Line MD Compass Off"
-description: "Animated Compass Off semantic sticker from the original Line MD SVG body."
+name: "Compass Off"
+description: "A compact compass off icon uses draw-in, morph, rotation, looping motion to illustrate direction, location, movement, or progression through steps."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-navigation
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-navigation
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "compass", "off"]
+tags: ["compass", "off", "draw-in", "morph", "rotation", "looping", "navigation", "direction"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "compass"
-  - "off"
+  - "compass off"
+  - "compass off icon"
+  - "compass off symbol"
+  - "compass off animation"
+  - "compass off visual cue"
+  - "show compass off"
+  - "animated compass off"
+  - "指南针"
+  - "指南针图标"
+  - "指南针动画"
+  - "指南针提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to compass off needs a compact, immediately recognizable cue"
+  - "The narration points to a direction, destination, location, or next step"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to compass off or a close synonym"
+  - "No spatial or sequential relationship needs to be communicated"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

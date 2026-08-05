@@ -1,27 +1,40 @@
 spec_version: 1
 id: line-md-check-all
-name: "Line MD Check All"
-description: "Animated Check All semantic sticker from the original Line MD SVG body."
+name: "Check All"
+description: "A compact check all icon uses draw-in motion to illustrate completion, approval, confirmation, or a verified successful result."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-success
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-success
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "check", "all"]
+tags: ["check", "all", "draw-in", "success", "confirmation", "positive", "compact"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "check"
-  - "all"
+  - "check all"
+  - "check all icon"
+  - "check all symbol"
+  - "completed"
+  - "successful"
+  - "approved"
+  - "confirmed"
+  - "done"
+  - "passed"
+  - "check mark"
+  - "勾选"
+  - "完成"
+  - "成功"
+  - "确认"
+  - "通过"
+  - "搞定"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to check all needs a compact, immediately recognizable cue"
+  - "A task, verification, transaction, or decision has clearly succeeded"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to check all or a close synonym"
+  - "The outcome is still pending, uncertain, failed, or merely being discussed"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

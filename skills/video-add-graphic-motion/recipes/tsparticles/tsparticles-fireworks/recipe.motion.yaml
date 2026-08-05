@@ -1,27 +1,40 @@
 spec_version: 1
 id: tsparticles-fireworks
-name: "Complex Fireworks"
-description: "Complex Fireworks as a deterministic canvas port of the official tsParticles fireworks preset."
+name: "Multi-Burst Fireworks"
+description: "Multiple colorful fireworks launching and bursting across a wide field."
 surfaces: [video]
-category: sticker-complex-particles
+category: sticker-celebration
 tech: [js]
 canvas: [video]
 target: [overlay]
-intent: sticker-complex-particles
+intent: sticker-celebration
 runtime: ["js"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "tsparticles", "particles", "fireworks"]
+tags: ["fireworks", "multi-burst", "full-frame", "high-impact", "celebration", "festive", "positive", "reveal"]
 intent_keywords:
-  - "sticker"
-  - "tsparticles"
-  - "particles"
   - "fireworks"
+  - "festival celebration"
+  - "celebration"
+  - "celebrate"
+  - "achievement"
+  - "milestone"
+  - "launch"
+  - "won"
+  - "festive reveal"
+  - "fireworks icon"
+  - "烟花"
+  - "节日庆祝"
+  - "庆祝"
+  - "赢了"
+  - "喜庆揭晓"
+  - "成就"
 best_for:
-  - "Complex particle fields whose behavior is not covered by the smaller confetti or burst recipes"
+  - "A spoken reference to fireworks needs a compact, immediately recognizable cue"
+  - "A genuine positive achievement or announcement deserves a festive visual payoff"
 avoid_when:
-  - "A simpler canvas-confetti or mo.js recipe communicates the same cue"
-  - "The particle field would obscure faces or required footage detail"
+  - "The spoken meaning does not refer to fireworks or a close synonym"
+  - "The event is neutral, negative, sensitive, or not genuinely celebratory"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

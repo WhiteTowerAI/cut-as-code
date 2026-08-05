@@ -1,28 +1,35 @@
 spec_version: 1
 id: line-md-file-cancel-filled
-name: "Line MD File Cancel Filled"
-description: "Animated File Cancel Filled semantic sticker from the original Line MD SVG body."
+name: "File Cancel (Filled)"
+description: "A compact file cancel icon uses draw-in, morph, fade motion to illustrate software, devices, cloud systems, files, data, or digital infrastructure."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-technology
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-technology
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "file", "cancel", "filled"]
+tags: ["file", "cancel", "draw-in", "morph", "fade", "technology", "digital", "system", "filled"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "file"
-  - "cancel"
-  - "filled"
+  - "file cancel"
+  - "file cancel icon"
+  - "file cancel symbol"
+  - "file cancel animation"
+  - "file cancel visual cue"
+  - "show file cancel"
+  - "animated file cancel"
+  - "文件"
+  - "文件图标"
+  - "文件动画"
+  - "文件提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to file cancel needs a compact, immediately recognizable cue"
+  - "The narration names a digital system, device, file, cloud service, or technical process"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to file cancel or a close synonym"
+  - "A similarly named object is being discussed in a physical or weather context"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

@@ -1,27 +1,35 @@
 spec_version: 1
 id: line-md-question-circle
-name: "Line MD Question Circle"
-description: "Animated Question Circle semantic sticker from the original Line MD SVG body."
+name: "Question Circle"
+description: "A compact question circle icon uses draw-in motion to illustrate an abstract impact, pulse, energy accent, or non-literal emphasis beat."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-emphasis
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-emphasis
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "question", "circle"]
+tags: ["question", "circle", "draw-in", "emphasis", "impact", "abstract", "compact"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "question"
-  - "circle"
+  - "question circle"
+  - "question circle icon"
+  - "question circle symbol"
+  - "question circle animation"
+  - "question circle visual cue"
+  - "show question circle"
+  - "animated question circle"
+  - "强调"
+  - "强调图标"
+  - "强调动画"
+  - "强调提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to question circle needs a compact, immediately recognizable cue"
+  - "The edit needs a compact abstract hit without introducing a literal icon or new information"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to question circle or a close synonym"
+  - "A literal status, object, or action would communicate the spoken meaning more precisely"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

@@ -1,29 +1,35 @@
 spec_version: 1
 id: line-md-check-list-3-twotone
-name: "Line MD Check List 3 Twotone"
-description: "Animated Check List 3 Twotone semantic sticker from the original Line MD SVG body."
+name: "Check List 3 (Twotone)"
+description: "A compact check list 3 icon uses draw-in motion to illustrate completion, approval, confirmation, or a verified successful result."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-success
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-success
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "check", "list", "3", "twotone"]
+tags: ["check", "list", "3", "draw-in", "success", "confirmation", "positive", "compact", "twotone"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "check"
-  - "list"
-  - "3"
-  - "twotone"
+  - "check list 3"
+  - "check list 3 icon"
+  - "check list 3 symbol"
+  - "check list 3 animation"
+  - "check list 3 visual cue"
+  - "show check list 3"
+  - "animated check list 3"
+  - "勾选"
+  - "勾选图标"
+  - "勾选动画"
+  - "勾选提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to check list 3 needs a compact, immediately recognizable cue"
+  - "A task, verification, transaction, or decision has clearly succeeded"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to check list 3 or a close synonym"
+  - "The outcome is still pending, uncertain, failed, or merely being discussed"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

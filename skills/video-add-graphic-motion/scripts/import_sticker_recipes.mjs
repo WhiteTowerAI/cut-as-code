@@ -12,6 +12,12 @@ import {
   STICKER_TOTAL,
   TSPARTICLES_RECIPES,
 } from "./sticker_recipe_catalog.mjs";
+import {
+  buildStickerProfiles,
+  metadataForSticker,
+  semanticBaseForLineMd,
+  validateStickerProfiles,
+} from "./sticker_semantics.mjs";
 
 const SOURCE_SPECS = Object.freeze({
   "canvas-confetti": {
@@ -99,18 +105,14 @@ function manifestSourceUrl(sourceId, assetPath = "") {
 function recipeManifest({
   sourceId,
   id,
-  name,
-  description,
-  category,
+  metadata,
   runtime,
-  tags,
-  bestFor,
-  avoidWhen,
   implementationFiles,
   upstreamAsset,
   durationMs = 6000,
 }) {
   const source = SOURCE_SPECS[sourceId];
+  const { name, description, category, tags, intent_keywords, best_for, avoid_when } = metadata;
   return `spec_version: 1
 id: ${id}
 name: ${JSON.stringify(name)}
@@ -126,11 +128,11 @@ export: [skill, html]
 dependencies: []
 tags: ${inlineList(tags)}
 intent_keywords:
-${tags.map((tag) => `  - ${JSON.stringify(tag)}`).join("\n")}
+${intent_keywords.map((item) => `  - ${JSON.stringify(item)}`).join("\n")}
 best_for:
-${bestFor.map((item) => `  - ${JSON.stringify(item)}`).join("\n")}
+${best_for.map((item) => `  - ${JSON.stringify(item)}`).join("\n")}
 avoid_when:
-${avoidWhen.map((item) => `  - ${JSON.stringify(item)}`).join("\n")}
+${avoid_when.map((item) => `  - ${JSON.stringify(item)}`).join("\n")}
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."
@@ -540,7 +542,7 @@ async function writeRecipe({ groupDir, sourceId, id, name, manifest, files, upst
   return recipeDir;
 }
 
-async function generateCanvasConfetti({ recipesRoot, sourceCache, packageCache }) {
+async function generateCanvasConfetti({ recipesRoot, sourceCache, packageCache, profiles }) {
   const sourceId = "canvas-confetti";
   const groupDir = path.join(recipesRoot, sourceId);
   const packageRoot = path.join(packageCache, sourceId, "package");
@@ -551,16 +553,12 @@ async function generateCanvasConfetti({ recipesRoot, sourceCache, packageCache }
   });
   for (const entry of CANVAS_CONFETTI_RECIPES) {
     const effect = canvasEffect(entry);
+    const metadata = metadataForSticker(profiles.get(entry.id));
     await writeRecipe({
       groupDir, sourceId, id: entry.id, name: entry.name,
       upstreamAsset: "dist/confetti.browser.js",
       manifest: recipeManifest({
-        sourceId, id: entry.id, name: entry.name,
-        description: `${entry.name} rendered with the original canvas-confetti engine.`,
-        category: "sticker-celebration", runtime: ["js"],
-        tags: ["sticker", "confetti", "celebration", entry.pattern],
-        bestFor: ["Wins, launches, reveals, milestones, and celebratory transitions"],
-        avoidWhen: ["The cue is neutral, serious, or already visually dense", "Any particle path would cross a visible face"],
+        sourceId, id: entry.id, metadata, runtime: ["js"],
         implementationFiles: ["vendor.js", "effect.js"], upstreamAsset: "dist/confetti.browser.js",
       }),
       files: { "preview.html": canvasPreview(), "vendor.js": vendor, "effect.js": effect },
@@ -568,7 +566,7 @@ async function generateCanvasConfetti({ recipesRoot, sourceCache, packageCache }
   }
 }
 
-async function generateMojs({ recipesRoot, sourceCache, packageCache }) {
+async function generateMojs({ recipesRoot, sourceCache, packageCache, profiles }) {
   const sourceId = "mojs";
   const groupDir = path.join(recipesRoot, sourceId);
   const packageRoot = path.join(packageCache, sourceId, "package");
@@ -578,16 +576,12 @@ async function generateMojs({ recipesRoot, sourceCache, packageCache }) {
     licenseSource: path.join(packageRoot, "LICENSE.md"),
   });
   for (const entry of MOJS_RECIPES) {
+    const metadata = metadataForSticker(profiles.get(entry.id));
     await writeRecipe({
       groupDir, sourceId, id: entry.id, name: entry.name,
       upstreamAsset: "dist/mo.umd.js",
       manifest: recipeManifest({
-        sourceId, id: entry.id, name: entry.name,
-        description: `${entry.name} built from mo.js Burst and Shape primitives.`,
-        category: "sticker-impact", runtime: ["js"],
-        tags: ["sticker", "mojs", "burst", entry.childShape || "ring"],
-        bestFor: ["Impact beats, confirmations, emphasis hits, and compact celebration cues"],
-        avoidWhen: ["The cue needs literal information rather than an abstract impact", "Any ring or particle path would cross a visible face"],
+        sourceId, id: entry.id, metadata, runtime: ["js"],
         implementationFiles: ["vendor.js", "effect.js"], upstreamAsset: "dist/mo.umd.js",
       }),
       files: { "preview.html": mojsPreview(), "vendor.js": vendor, "effect.js": mojsEffect(entry) },
@@ -619,7 +613,7 @@ async function readLineMdEntries(sourceCache) {
   return { data, entries };
 }
 
-async function generateLineMd({ recipesRoot, sourceCache, packageCache, lineMd }) {
+async function generateLineMd({ recipesRoot, sourceCache, packageCache, lineMd, profiles }) {
   const sourceId = "line-md";
   const groupDir = path.join(recipesRoot, sourceId);
   const repositoryRoot = path.join(sourceCache, sourceId);
@@ -638,18 +632,13 @@ async function generateLineMd({ recipesRoot, sourceCache, packageCache, lineMd }
       ...(alias ? { alias, parent: { name: alias.parent, ...icon } } : icon),
     }, null, 2)}\n`;
     const svg = `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">${icon.body}</svg>`;
+    const { base, variants } = semanticBaseForLineMd(iconName);
+    const metadata = metadataForSticker(profiles.get(`line-md:${base}`), variants);
     await writeRecipe({
       groupDir, sourceId, id, name,
       upstreamAsset: "line-md.json",
       manifest: recipeManifest({
-        sourceId, id, name,
-        description: alias
-          ? `Animated ${titleCase(iconName)} alias of ${titleCase(alias.parent)} from Line MD.`
-          : `Animated ${titleCase(iconName)} semantic sticker from the original Line MD SVG body.`,
-        category: "sticker-semantic-icon", runtime: ["svg-smil"],
-        tags: ["sticker", "line-md", ...iconName.split("-")],
-        bestFor: ["Literal status, action, notification, or object cues where the icon meaning is immediately clear"],
-        avoidWhen: ["The icon meaning is ambiguous in the transcript context", "The animated icon cannot remain fully outside visible faces"],
+        sourceId, id, metadata, runtime: ["svg-smil"],
         implementationFiles: ["icon.svg", "upstream-icon.json"], upstreamAsset: "line-md.json",
       }),
       files: {
@@ -661,7 +650,7 @@ async function generateLineMd({ recipesRoot, sourceCache, packageCache, lineMd }
   }
 }
 
-async function generateMeteocons({ recipesRoot, sourceCache, packageCache }) {
+async function generateMeteocons({ recipesRoot, sourceCache, packageCache, profiles }) {
   const sourceId = "meteocons";
   const groupDir = path.join(recipesRoot, sourceId);
   const packageRoot = path.join(packageCache, sourceId, "package");
@@ -674,15 +663,11 @@ async function generateMeteocons({ recipesRoot, sourceCache, packageCache }) {
     const svg = await readFile(path.join(packageRoot, assetPath), "utf8");
     const id = `meteocons-${iconName}`;
     const name = `Meteocons ${titleCase(iconName)}`;
+    const metadata = metadataForSticker(profiles.get(id));
     await writeRecipe({
       groupDir, sourceId, id, name, upstreamAsset: assetPath.replaceAll("\\", "/"),
       manifest: recipeManifest({
-        sourceId, id, name,
-        description: `Animated ${titleCase(iconName)} weather sticker from the original Meteocons fill SVG.`,
-        category: "sticker-weather", runtime: ["svg-smil"],
-        tags: ["sticker", "weather", "meteocons", ...iconName.split("-")],
-        bestFor: ["Literal weather, climate, forecast, or environmental references"],
-        avoidWhen: ["Weather is only metaphorical or unrelated to the spoken meaning", "The icon cannot remain fully outside visible faces"],
+        sourceId, id, metadata, runtime: ["svg-smil"],
         implementationFiles: ["icon.svg"], upstreamAsset: assetPath,
       }),
       files: {
@@ -693,7 +678,7 @@ async function generateMeteocons({ recipesRoot, sourceCache, packageCache }) {
   }
 }
 
-async function generateTsParticles({ recipesRoot, sourceCache, packageCache }) {
+async function generateTsParticles({ recipesRoot, sourceCache, packageCache, profiles }) {
   const sourceId = "tsparticles";
   const groupDir = path.join(recipesRoot, sourceId);
   const repositoryRoot = path.join(sourceCache, sourceId);
@@ -704,16 +689,12 @@ async function generateTsParticles({ recipesRoot, sourceCache, packageCache }) {
   for (const entry of TSPARTICLES_RECIPES) {
     const assetPath = path.join("presets", entry.preset, "src", "options.ts");
     const upstreamOptions = await readFile(path.join(repositoryRoot, assetPath), "utf8");
+    const metadata = metadataForSticker(profiles.get(entry.id));
     await writeRecipe({
       groupDir, sourceId, id: entry.id, name: entry.name,
       upstreamAsset: assetPath.replaceAll("\\", "/"),
       manifest: recipeManifest({
-        sourceId, id: entry.id, name: entry.name,
-        description: `${entry.name} as a deterministic canvas port of the official tsParticles ${entry.preset} preset.`,
-        category: "sticker-complex-particles", runtime: ["js"],
-        tags: ["sticker", "tsparticles", "particles", entry.profile],
-        bestFor: ["Complex particle fields whose behavior is not covered by the smaller confetti or burst recipes"],
-        avoidWhen: ["A simpler canvas-confetti or mo.js recipe communicates the same cue", "The particle field would obscure faces or required footage detail"],
+        sourceId, id: entry.id, metadata, runtime: ["js"],
         implementationFiles: ["effect.js", "upstream-options.ts"], upstreamAsset: assetPath,
       }),
       files: {
@@ -728,6 +709,9 @@ async function generateTsParticles({ recipesRoot, sourceCache, packageCache }) {
 export async function generateStickerRecipes({ recipesRoot, sourceCache, packageCache }) {
   if (STICKER_TOTAL !== 1258) throw new Error(`Sticker catalog must contain 1258 recipes, got ${STICKER_TOTAL}`);
   const lineMd = await readLineMdEntries(sourceCache);
+  const profiles = buildStickerProfiles(lineMd.data);
+  const profileErrors = validateStickerProfiles(profiles);
+  if (profileErrors.length) throw new Error(`Invalid sticker semantic profiles:\n${profileErrors.join("\n")}`);
   const ids = [
     ...CANVAS_CONFETTI_RECIPES.map((entry) => entry.id),
     ...MOJS_RECIPES.map((entry) => entry.id),
@@ -737,11 +721,11 @@ export async function generateStickerRecipes({ recipesRoot, sourceCache, package
   ];
   if (new Set(ids).size !== ids.length) throw new Error("Sticker catalog contains duplicate recipe IDs");
 
-  await generateCanvasConfetti({ recipesRoot, sourceCache, packageCache });
-  await generateMojs({ recipesRoot, sourceCache, packageCache });
-  await generateLineMd({ recipesRoot, sourceCache, packageCache, lineMd });
-  await generateMeteocons({ recipesRoot, sourceCache, packageCache });
-  await generateTsParticles({ recipesRoot, sourceCache, packageCache });
+  await generateCanvasConfetti({ recipesRoot, sourceCache, packageCache, profiles });
+  await generateMojs({ recipesRoot, sourceCache, packageCache, profiles });
+  await generateLineMd({ recipesRoot, sourceCache, packageCache, lineMd, profiles });
+  await generateMeteocons({ recipesRoot, sourceCache, packageCache, profiles });
+  await generateTsParticles({ recipesRoot, sourceCache, packageCache, profiles });
   return { recipe_count: STICKER_TOTAL, counts: STICKER_COUNTS };
 }
 

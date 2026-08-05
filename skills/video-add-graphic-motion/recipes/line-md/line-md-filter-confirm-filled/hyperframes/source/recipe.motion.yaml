@@ -1,28 +1,35 @@
 spec_version: 1
 id: line-md-filter-confirm-filled
-name: "Line MD Filter Confirm Filled"
-description: "Animated Filter Confirm Filled semantic sticker from the original Line MD SVG body."
+name: "Filter Confirm (Filled)"
+description: "A compact filter confirm icon uses draw-in motion to illustrate completion, approval, confirmation, or a verified successful result."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-success
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-success
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "filter", "confirm", "filled"]
+tags: ["filter", "confirm", "draw-in", "success", "confirmation", "positive", "compact", "filled"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "filter"
-  - "confirm"
-  - "filled"
+  - "filter confirm"
+  - "filter confirm icon"
+  - "filter confirm symbol"
+  - "filter confirm animation"
+  - "filter confirm visual cue"
+  - "show filter confirm"
+  - "animated filter confirm"
+  - "筛选确认"
+  - "筛选确认图标"
+  - "筛选确认动画"
+  - "筛选确认提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to filter confirm needs a compact, immediately recognizable cue"
+  - "A task, verification, transaction, or decision has clearly succeeded"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to filter confirm or a close synonym"
+  - "The outcome is still pending, uncertain, failed, or merely being discussed"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

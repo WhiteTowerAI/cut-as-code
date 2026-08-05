@@ -1,27 +1,40 @@
 spec_version: 1
 id: tsparticles-linked-field
-name: "Linked Particle Field"
-description: "Linked Particle Field as a deterministic canvas port of the official tsParticles links preset."
+name: "Linked Particle Network"
+description: "Moving particles connecting into a responsive network field."
 surfaces: [video]
-category: sticker-complex-particles
+category: sticker-emphasis
 tech: [js]
 canvas: [video]
 target: [overlay]
-intent: sticker-complex-particles
+intent: sticker-emphasis
 runtime: ["js"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "tsparticles", "particles", "links"]
+tags: ["particles", "links", "network", "full-frame", "linked", "emphasis", "impact", "abstract"]
 intent_keywords:
-  - "sticker"
-  - "tsparticles"
-  - "particles"
-  - "links"
+  - "linked particles"
+  - "network field"
+  - "impact beat"
+  - "attention pulse"
+  - "energy burst"
+  - "ripple emphasis"
+  - "shockwave"
+  - "abstract energy"
+  - "dramatic impact"
+  - "linked particles icon"
+  - "连接粒子"
+  - "网络场"
+  - "强调"
+  - "强烈冲击"
+  - "脉冲强调"
+  - "能量爆发"
 best_for:
-  - "Complex particle fields whose behavior is not covered by the smaller confetti or burst recipes"
+  - "A spoken reference to linked particles needs a compact, immediately recognizable cue"
+  - "The edit needs a compact abstract hit without introducing a literal icon or new information"
 avoid_when:
-  - "A simpler canvas-confetti or mo.js recipe communicates the same cue"
-  - "The particle field would obscure faces or required footage detail"
+  - "The spoken meaning does not refer to linked particles or a close synonym"
+  - "A literal status, object, or action would communicate the spoken meaning more precisely"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

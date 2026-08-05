@@ -1,28 +1,35 @@
 spec_version: 1
 id: line-md-navigation-right-up
-name: "Line MD Navigation Right Up"
-description: "Animated Navigation Right Up semantic sticker from the original Line MD SVG body."
+name: "Navigation Right Up"
+description: "A compact navigation right up icon uses draw-in motion to illustrate direction, location, movement, or progression through steps."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-navigation
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-navigation
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "navigation", "right", "up"]
+tags: ["navigation", "right", "up", "draw-in", "direction", "movement", "compact"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "navigation"
-  - "right"
-  - "up"
+  - "navigation right up"
+  - "navigation right up icon"
+  - "navigation right up symbol"
+  - "navigation right up animation"
+  - "navigation right up visual cue"
+  - "show navigation right up"
+  - "animated navigation right up"
+  - "下一步"
+  - "下一步图标"
+  - "下一步动画"
+  - "下一步提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to navigation right up needs a compact, immediately recognizable cue"
+  - "The narration points to a direction, destination, location, or next step"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to navigation right up or a close synonym"
+  - "No spatial or sequential relationship needs to be communicated"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

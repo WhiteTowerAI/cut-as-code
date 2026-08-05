@@ -1,30 +1,40 @@
 spec_version: 1
 id: line-md-star-right-half-alt-twotone
-name: "Line MD Star Right Half Alt Twotone"
-description: "Animated Star Right Half Alt Twotone semantic sticker from the original Line MD SVG body."
+name: "Star Right Half Alt (Twotone)"
+description: "A compact star right half alt icon uses draw-in motion to illustrate affection, appreciation, a favorite, or a positive audience reaction."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-reaction
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-reaction
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "star", "right", "half", "alt", "twotone"]
+tags: ["star", "right", "half", "draw-in", "alt", "reaction", "affection", "positive", "twotone"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
+  - "star right half alt"
+  - "star right half alt icon"
+  - "star right half alt symbol"
+  - "love"
+  - "appreciation"
+  - "favorite"
+  - "thank you"
   - "star"
-  - "right"
-  - "half"
-  - "alt"
-  - "twotone"
+  - "audience reaction"
+  - "rating"
+  - "星星"
+  - "喜欢"
+  - "感谢"
+  - "爱心回应"
+  - "收藏"
+  - "五星好评"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to star right half alt needs a compact, immediately recognizable cue"
+  - "The narration expresses affection, appreciation, approval, or a favorite"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to star right half alt or a close synonym"
+  - "The cue is a formal completion status rather than an emotional reaction"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

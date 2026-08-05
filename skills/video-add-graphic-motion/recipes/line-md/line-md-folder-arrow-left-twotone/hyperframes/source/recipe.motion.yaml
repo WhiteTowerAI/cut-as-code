@@ -1,29 +1,35 @@
 spec_version: 1
 id: line-md-folder-arrow-left-twotone
-name: "Line MD Folder Arrow Left Twotone"
-description: "Animated Folder Arrow Left Twotone semantic sticker from the original Line MD SVG body."
+name: "Folder Arrow Left (Twotone)"
+description: "A compact folder arrow left icon uses draw-in, morph, fade motion to illustrate direction, location, movement, or progression through steps."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-navigation
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-navigation
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "folder", "arrow", "left", "twotone"]
+tags: ["folder", "arrow", "left", "draw-in", "morph", "fade", "navigation", "direction", "twotone"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "folder"
-  - "arrow"
-  - "left"
-  - "twotone"
+  - "folder arrow left"
+  - "folder arrow left icon"
+  - "folder arrow left symbol"
+  - "folder arrow left animation"
+  - "folder arrow left visual cue"
+  - "show folder arrow left"
+  - "animated folder arrow left"
+  - "文件夹箭头"
+  - "文件夹箭头图标"
+  - "文件夹箭头动画"
+  - "文件夹箭头提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to folder arrow left needs a compact, immediately recognizable cue"
+  - "The narration points to a direction, destination, location, or next step"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to folder arrow left or a close synonym"
+  - "No spatial or sequential relationship needs to be communicated"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

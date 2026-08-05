@@ -1,7 +1,7 @@
 spec_version: 1
 id: confetti-side-cannons
 name: "Side Confetti Cannons"
-description: "Side Confetti Cannons rendered with the original canvas-confetti engine."
+description: "Confetti cannons firing inward from both edges."
 surfaces: [video]
 category: sticker-celebration
 tech: [js]
@@ -11,17 +11,30 @@ intent: sticker-celebration
 runtime: ["js"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "confetti", "celebration", "side-cannons"]
+tags: ["confetti", "cannons", "side-entry", "full-frame", "side", "celebration", "festive", "positive"]
 intent_keywords:
-  - "sticker"
-  - "confetti"
+  - "side cannons"
+  - "edge celebration"
   - "celebration"
-  - "side-cannons"
+  - "celebrate"
+  - "achievement"
+  - "milestone"
+  - "launch"
+  - "won"
+  - "festive reveal"
+  - "side cannons icon"
+  - "双侧彩带"
+  - "庆祝礼炮"
+  - "庆祝"
+  - "赢了"
+  - "喜庆揭晓"
+  - "成就"
 best_for:
-  - "Wins, launches, reveals, milestones, and celebratory transitions"
+  - "A spoken reference to side cannons needs a compact, immediately recognizable cue"
+  - "A genuine positive achievement or announcement deserves a festive visual payoff"
 avoid_when:
-  - "The cue is neutral, serious, or already visually dense"
-  - "Any particle path would cross a visible face"
+  - "The spoken meaning does not refer to side cannons or a close synonym"
+  - "The event is neutral, negative, sensitive, or not genuinely celebratory"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

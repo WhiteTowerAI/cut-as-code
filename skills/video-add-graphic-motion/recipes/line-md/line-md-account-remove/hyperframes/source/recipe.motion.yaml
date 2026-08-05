@@ -1,27 +1,35 @@
 spec_version: 1
 id: line-md-account-remove
-name: "Line MD Account Remove"
-description: "Animated Account Remove semantic sticker from the original Line MD SVG body."
+name: "Account Remove"
+description: "A compact account remove icon uses draw-in motion to illustrate a person, profile, account, contact, speaker, or community."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-people-lifestyle
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-people-lifestyle
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "account", "remove"]
+tags: ["account", "remove", "draw-in", "people", "profile", "social", "compact"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
-  - "account"
-  - "remove"
+  - "account remove"
+  - "account remove icon"
+  - "account remove symbol"
+  - "account remove animation"
+  - "account remove visual cue"
+  - "show account remove"
+  - "animated account remove"
+  - "账户"
+  - "账户图标"
+  - "账户动画"
+  - "账户提示"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to account remove needs a compact, immediately recognizable cue"
+  - "A person, user, contact, account, or community role is explicitly discussed"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to account remove or a close synonym"
+  - "The cue concerns an organization or abstract audience rather than an identifiable person role"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

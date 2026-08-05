@@ -1,27 +1,40 @@
 spec_version: 1
 id: mojs-ripple-ring
-name: "Ripple Ring"
-description: "Ripple Ring built from mo.js Burst and Shape primitives."
+name: "Soft Ripple Rings"
+description: "Multiple soft rings expanding like ripples around a focal point."
 surfaces: [video]
-category: sticker-impact
+category: sticker-emphasis
 tech: [js]
 canvas: [video]
 target: [overlay]
-intent: sticker-impact
+intent: sticker-emphasis
 runtime: ["js"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "mojs", "burst", "circle"]
+tags: ["rings", "ripple", "expanding", "soft", "emphasis", "impact", "abstract", "reveal"]
 intent_keywords:
-  - "sticker"
-  - "mojs"
-  - "burst"
-  - "circle"
+  - "ripple emphasis"
+  - "soft pulse"
+  - "impact beat"
+  - "attention pulse"
+  - "energy burst"
+  - "shockwave"
+  - "abstract energy"
+  - "dramatic impact"
+  - "ripple emphasis icon"
+  - "ripple emphasis animation"
+  - "涟漪强调"
+  - "柔和脉冲"
+  - "强调"
+  - "强烈冲击"
+  - "脉冲强调"
+  - "能量爆发"
 best_for:
-  - "Impact beats, confirmations, emphasis hits, and compact celebration cues"
+  - "A spoken reference to ripple emphasis needs a compact, immediately recognizable cue"
+  - "The edit needs a compact abstract hit without introducing a literal icon or new information"
 avoid_when:
-  - "The cue needs literal information rather than an abstract impact"
-  - "Any ring or particle path would cross a visible face"
+  - "The spoken meaning does not refer to ripple emphasis or a close synonym"
+  - "A literal status, object, or action would communicate the spoken meaning more precisely"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

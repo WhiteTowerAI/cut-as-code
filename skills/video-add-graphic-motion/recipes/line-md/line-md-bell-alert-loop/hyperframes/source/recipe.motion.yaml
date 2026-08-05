@@ -1,28 +1,40 @@
 spec_version: 1
 id: line-md-bell-alert-loop
-name: "Line MD Bell Alert Loop"
-description: "Animated Bell Alert Loop semantic sticker from the original Line MD SVG body."
+name: "Bell Alert (Loop)"
+description: "A compact bell alert icon uses draw-in, rotation, looping motion to illustrate a notification, reminder, subscription prompt, or incoming update."
 surfaces: [video]
-category: sticker-semantic-icon
+category: sticker-notification
 tech: [svg]
 canvas: [video]
 target: [overlay]
-intent: sticker-semantic-icon
+intent: sticker-notification
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "line-md", "bell", "alert", "loop"]
+tags: ["bell", "alert", "draw-in", "rotation", "looping", "notification", "reminder", "attention", "loop"]
 intent_keywords:
-  - "sticker"
-  - "line-md"
+  - "bell alert"
+  - "bell alert icon"
+  - "bell alert symbol"
+  - "notifications"
+  - "subscribe"
   - "bell"
-  - "alert"
-  - "loop"
+  - "reminder"
+  - "incoming"
+  - "update"
+  - "received"
+  - "铃铛警告"
+  - "通知"
+  - "订阅"
+  - "铃铛"
+  - "提醒"
+  - "更新"
 best_for:
-  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+  - "A spoken reference to bell alert needs a compact, immediately recognizable cue"
+  - "A speaker asks viewers to subscribe, enable notifications, or notice a reminder"
 avoid_when:
-  - "The icon meaning is ambiguous in the transcript context"
-  - "The animated icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to bell alert or a close synonym"
+  - "The cue communicates immediate physical danger rather than a routine notification"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."

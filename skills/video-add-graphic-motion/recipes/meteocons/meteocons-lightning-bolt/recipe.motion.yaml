@@ -1,7 +1,7 @@
 spec_version: 1
 id: meteocons-lightning-bolt
-name: "Meteocons Lightning Bolt"
-description: "Animated Lightning Bolt weather sticker from the original Meteocons fill SVG."
+name: "Lightning Bolt Weather"
+description: "A bright lightning bolt marking an electrical storm."
 surfaces: [video]
 category: sticker-weather
 tech: [svg]
@@ -11,18 +11,30 @@ intent: sticker-weather
 runtime: ["svg-smil"]
 export: [skill, html]
 dependencies: []
-tags: ["sticker", "weather", "meteocons", "lightning", "bolt"]
+tags: ["lightning", "bolt", "electric", "weather", "forecast", "environment", "reveal", "compact"]
 intent_keywords:
-  - "sticker"
-  - "weather"
-  - "meteocons"
   - "lightning"
-  - "bolt"
+  - "storm warning"
+  - "thunderstorm forecast"
+  - "rain"
+  - "sunny weather"
+  - "snow"
+  - "clear night"
+  - "weather"
+  - "sky"
+  - "lightning icon"
+  - "闪电"
+  - "雷雨警告"
+  - "雷暴天气预报"
+  - "下大雨"
+  - "晴朗天气"
+  - "下雪"
 best_for:
-  - "Literal weather, climate, forecast, or environmental references"
+  - "A spoken reference to lightning needs a compact, immediately recognizable cue"
+  - "The speaker literally refers to current weather, a forecast, or an environmental condition"
 avoid_when:
-  - "Weather is only metaphorical or unrelated to the spoken meaning"
-  - "The icon cannot remain fully outside visible faces"
+  - "The spoken meaning does not refer to lightning or a close synonym"
+  - "Weather language is metaphorical, such as a storm of criticism or a sunny outlook"
 restraint:
   max_per_view: 1
   notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."
