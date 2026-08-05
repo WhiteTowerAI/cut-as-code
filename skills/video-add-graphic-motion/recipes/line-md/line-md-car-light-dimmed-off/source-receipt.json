@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-car-light-dimmed-off",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "d983f8a5284f1885a790e2eff8980787642742812ca5572cf98a65e2bdd9e7d1",
+    "icon.svg": "a66361aea338244c8afa8e78165b74c981019f03629a76e274c5b4c25dee52fd",
+    "upstream-icon.json": "11c089389f630a1bd827c901a637813457ed6ea3951cd926ea9c3eb63324e67a"
+  }
+}

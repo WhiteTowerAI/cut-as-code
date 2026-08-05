@@ -6,7 +6,7 @@ selectable. `recipes/imported/**` is reference-only, and generated copies under
 
 ## Why this router
 
-Do not concatenate 218 manifests into a hand-maintained catalog: it would duplicate the source
+Do not concatenate 1,477 manifests into a hand-maintained catalog: it would duplicate the source
 of truth and drift. Do not invoke the full motion-anything CLI: its broader project generation
 and server features are unnecessary here. `scripts/recipe_library.mjs` reuses the converter's
 manifest discovery and provides the smallest required interface:
@@ -23,6 +23,15 @@ bind-adaptation --project <root> --cue <cue-id> --json
 decision. `show` returns exact metadata and source hashes. `materialize` copies the already
 converted HyperFrames directory and returns project-relative SHA-256 bindings.
 `bind-adaptation` hashes the separate shot-designed composition after the Agent finishes editing.
+
+`codrops/kinetic-images` is one recipe with three scene modes: `cylinders`, `paper`, and `spiral`.
+Its immutable converted base uses `showcase` to review all three; an adaptation selects one mode.
+
+The 1,258 sticker recipes are grouped by upstream implementation: 10 canvas-confetti celebration
+effects, 10 mo.js burst/impact effects, all 1,218 Line MD icons plus its 4 aliases, 12 Meteocons
+weather icons, and 4 tsParticles-derived complex particle fields. Prefer Line MD or Meteocons when a literal
+symbol carries the cue. Prefer canvas-confetti or mo.js for celebration and impact. Use the four
+tsParticles ports only when their complex field behavior is not covered by a smaller recipe.
 
 ## Agent Decision
 

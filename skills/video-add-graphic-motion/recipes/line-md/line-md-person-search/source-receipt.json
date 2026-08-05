@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-person-search",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "ba7d94115bf61b4515840de168dbb715e3535bc77db480ed1cf04ef39a5a57b3",
+    "icon.svg": "b447cd8cec168ce69a19570e4e9b8fa9d222327148f4536e36836fc545f25390",
+    "upstream-icon.json": "85d8404d482d83858f707179cb5ec35cf0e4b2a7b262249ca5b6f37270c8d723"
+  }
+}

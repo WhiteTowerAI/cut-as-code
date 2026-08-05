@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "meteocons-thunderstorms",
+  "surface": "meteocons",
+  "runtime": [
+    "svg-smil"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "svg-smil",
+  "source_manifest_sha256": "0d8e00773e0110f778d1909fa6a0d43cca187405b4cdf56a557bef26141b55f1"
+}

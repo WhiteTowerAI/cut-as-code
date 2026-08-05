@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-tablet-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "4125e2ba16837d552093224d39c8324f14034528d55be23b2c71fa8d7660df91",
+    "icon.svg": "d53e87d5a6ca256b44c0b458f3dc80dbee07d830b2efc582c6c3a9bbd9940fc9",
+    "upstream-icon.json": "029cd8d954b8f94f515c9acd312c7e414ff0e91c7b1b0f854ff83fa4ce0c840d"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-sunny-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "af84e6843a0db8f3cca6da00eb1b2429199afb90fc46d6c4cf8ce5e853d41be8",
+    "icon.svg": "d22a8bad09feb719ab7742eda09cb25a37d47c89da3385974879d7a8865b4d90",
+    "upstream-icon.json": "ae9854666fcfeb25949cf4a54e9855843f23866d4ec304e19a1ff4b2d97a3fad"
+  }
+}

@@ -8,6 +8,9 @@ hashes to match the bundled preconverted recipe exactly.
 The materialized directory contains the HyperFrames entry point `index.html`, its deterministic
 adapter files, `conversion.json`, `recipe.motion.yaml`, and the preserved original files under
 `source/`. Inline credit comments from original JavaScript and related files remain intact.
+For grouped sticker sources, `source/` also contains the source-level `LICENSE.*` and
+`SOURCE.json`, copied from the recipe's parent directory so a materialized recipe remains
+self-contained without duplicating license files throughout the bundled library.
 
 ## Project Adaptation
 

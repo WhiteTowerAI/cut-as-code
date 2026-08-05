@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/DistortedButtonEffects",
+  "repository_url": "https://github.com/codrops/DistortedButtonEffects",
+  "clone_url": "https://github.com/codrops/DistortedButtonEffects.git",
+  "revision": "e45285afb2a3a8b4cb31fe6c0c069880f17c05d2",
+  "default_branch": "master",
+  "downloaded_at": "2026-08-04T10:26:15.508Z",
+  "selection": {
+    "score": 11,
+    "visual_rationale": "Visual/motion signals: effect, svg, distort, button.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "CSS",
+    "topics": [],
+    "github_size_kb": 769
+  },
+  "license": {
+    "github_spdx_id": null,
+    "repository_license_files": [
+      "fonts/codropsicons/license.txt"
+    ],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "codrops-official-licensing-page-and-local-files"
+  },
+  "inventory": {
+    "file_count": 98,
+    "total_bytes": 537482,
+    "license_files": [
+      "fonts/codropsicons/license.txt"
+    ],
+    "top_extensions": [
+      {
+        "extension": ".scss",
+        "count": 81
+      },
+      {
+        "extension": ".png",
+        "count": 3
+      },
+      {
+        "extension": ".css",
+        "count": 2
+      },
+      {
+        "extension": ".js",
+        "count": 2
+      },
+      {
+        "extension": ".eot",
+        "count": 1
+      },
+      {
+        "extension": ".html",
+        "count": 1
+      },
+      {
+        "extension": ".ico",
+        "count": 1
+      },
+      {
+        "extension": ".map",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      },
+      {
+        "extension": ".svg",
+        "count": 1
+      },
+      {
+        "extension": ".ttf",
+        "count": 1
+      },
+      {
+        "extension": ".txt",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-cellphone-screenshot-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "8090a0056c9ec167848bfa6a57b0f9e61a6927d996ab4907cd713d25b22fd607",
+    "icon.svg": "b29668b1002fe50cb7cc38ef29093761383172f19b9bea180e7fc5f3e3c057ef",
+    "upstream-icon.json": "e91c4be27fbf8734d28015025e92b19a3b8e31c1507fb92695dcf9cc1971c5a7"
+  }
+}

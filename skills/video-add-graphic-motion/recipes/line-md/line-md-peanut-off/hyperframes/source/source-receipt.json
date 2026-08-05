@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-peanut-off",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "8d2da2275249e5e91cf054cc3476d8d961a4f4b0eca4d9823bbec158a7234fb9",
+    "icon.svg": "fbfe243c68ecee4ad71652e327ea069b0fb0f438d67f70e8ec5f3d75e34d0e18",
+    "upstream-icon.json": "5ec901ac50e0296440d5616a3b00f54a009dad4fc07ecc0bac2a809b658fdcee"
+  }
+}

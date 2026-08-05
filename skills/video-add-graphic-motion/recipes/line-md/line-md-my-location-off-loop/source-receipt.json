@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-my-location-off-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "e24ad8707e3ca57d7563c8545ed8c63e09172b021805fed99a7d63ee5821c85e",
+    "icon.svg": "72fb8469d6792e87f4ce73e27d32b1b14de78f2f99e0ae2b39ccb32326e4e30c",
+    "upstream-icon.json": "5940e9c7b8da2e94b36a9a9d8674170d8dfd2f57751a0f9e7f54d95d39a245dd"
+  }
+}

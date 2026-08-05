@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/PlayfulTrampolineEffect",
+  "repository_url": "https://github.com/codrops/PlayfulTrampolineEffect",
+  "clone_url": "https://github.com/codrops/PlayfulTrampolineEffect.git",
+  "revision": "3152559784c82598f21b4ac8b582d49725f74784",
+  "default_branch": "master",
+  "downloaded_at": "2026-08-04T10:24:07.292Z",
+  "selection": {
+    "score": 13,
+    "visual_rationale": "Visual/motion signals: anim, effect, navigation, svg, shape, background.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "HTML",
+    "topics": [],
+    "github_size_kb": 427
+  },
+  "license": {
+    "github_spdx_id": null,
+    "repository_license_files": [
+      "fonts/codropsicons/license.txt"
+    ],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "codrops-official-licensing-page-and-local-files"
+  },
+  "inventory": {
+    "file_count": 28,
+    "total_bytes": 474495,
+    "license_files": [
+      "fonts/codropsicons/license.txt"
+    ],
+    "top_extensions": [
+      {
+        "extension": ".css",
+        "count": 4
+      },
+      {
+        "extension": ".jpg",
+        "count": 4
+      },
+      {
+        "extension": ".js",
+        "count": 4
+      },
+      {
+        "extension": ".png",
+        "count": 4
+      },
+      {
+        "extension": ".eot",
+        "count": 2
+      },
+      {
+        "extension": ".html",
+        "count": 2
+      },
+      {
+        "extension": ".svg",
+        "count": 2
+      },
+      {
+        "extension": ".ttf",
+        "count": 2
+      },
+      {
+        "extension": ".woff",
+        "count": 2
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      },
+      {
+        "extension": ".txt",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

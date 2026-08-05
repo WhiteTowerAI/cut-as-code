@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/AnimatedCodeBackground",
+  "repository_url": "https://github.com/codrops/AnimatedCodeBackground",
+  "clone_url": "https://github.com/codrops/AnimatedCodeBackground.git",
+  "revision": "4aa37f6d011b3c36bb9c18f77ecd91de5a08f6d0",
+  "default_branch": "main",
+  "downloaded_at": "2026-08-04T10:25:53.659Z",
+  "selection": {
+    "score": 11,
+    "visual_rationale": "Visual/motion signals: anim, effect, hover, grid, background.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "HTML",
+    "topics": [],
+    "github_size_kb": 48
+  },
+  "license": {
+    "github_spdx_id": "MIT",
+    "repository_license_files": [
+      "LICENSE"
+    ],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "repository-metadata-and-local-files"
+  },
+  "inventory": {
+    "file_count": 11,
+    "total_bytes": 136327,
+    "license_files": [
+      "LICENSE"
+    ],
+    "top_extensions": [
+      {
+        "extension": ".js",
+        "count": 4
+      },
+      {
+        "extension": "(none)",
+        "count": 3
+      },
+      {
+        "extension": ".css",
+        "count": 1
+      },
+      {
+        "extension": ".html",
+        "count": 1
+      },
+      {
+        "extension": ".ico",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

@@ -1,0 +1,10 @@
+---
+name: line-md-clipboard-check-to-clipboard-transition
+description: Adapt the bundled Line MD Clipboard Check To Clipboard Transition sticker from Line MD as a selective HyperFrames overlay.
+---
+
+# Line MD Clipboard Check To Clipboard Transition
+
+Use the preconverted `hyperframes/` composition as the immutable base. Preserve the recognizable
+source motion, keep every animated pixel outside visible faces, and remove any element that does not
+carry the cue's meaning.

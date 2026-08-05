@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/ScrollBlurTypography",
+  "repository_url": "https://github.com/codrops/ScrollBlurTypography",
+  "clone_url": "https://github.com/codrops/ScrollBlurTypography.git",
+  "revision": "3e64d4bdae65b1f291e21a9a9c4b2ac6258c45c1",
+  "default_branch": "main",
+  "downloaded_at": "2026-08-04T10:26:46.841Z",
+  "selection": {
+    "score": 10,
+    "visual_rationale": "Visual/motion signals: anim, scroll, reveal, text.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "JavaScript",
+    "topics": [],
+    "github_size_kb": 93
+  },
+  "license": {
+    "github_spdx_id": "MIT",
+    "repository_license_files": [
+      "LICENSE"
+    ],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "repository-metadata-and-local-files"
+  },
+  "inventory": {
+    "file_count": 33,
+    "total_bytes": 381813,
+    "license_files": [
+      "LICENSE"
+    ],
+    "top_extensions": [
+      {
+        "extension": ".js",
+        "count": 20
+      },
+      {
+        "extension": "(none)",
+        "count": 8
+      },
+      {
+        "extension": ".css",
+        "count": 1
+      },
+      {
+        "extension": ".html",
+        "count": 1
+      },
+      {
+        "extension": ".ico",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      },
+      {
+        "extension": ".png",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

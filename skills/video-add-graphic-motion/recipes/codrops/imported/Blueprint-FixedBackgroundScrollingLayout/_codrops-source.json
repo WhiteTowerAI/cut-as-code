@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/Blueprint-FixedBackgroundScrollingLayout",
+  "repository_url": "https://github.com/codrops/Blueprint-FixedBackgroundScrollingLayout",
+  "clone_url": "https://github.com/codrops/Blueprint-FixedBackgroundScrollingLayout.git",
+  "revision": "b55ab13f7b1e9b24f6000bbed26847f2a2e77b0d",
+  "default_branch": "master",
+  "downloaded_at": "2026-08-04T10:26:56.328Z",
+  "selection": {
+    "score": 10,
+    "visual_rationale": "Visual/motion signals: scroll, image, background, layout.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "JavaScript",
+    "topics": [],
+    "github_size_kb": 178
+  },
+  "license": {
+    "github_spdx_id": null,
+    "repository_license_files": [],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "codrops-official-licensing-page-and-local-files"
+  },
+  "inventory": {
+    "file_count": 20,
+    "total_bytes": 119786,
+    "license_files": [],
+    "top_extensions": [
+      {
+        "extension": ".js",
+        "count": 6
+      },
+      {
+        "extension": ".jpg",
+        "count": 5
+      },
+      {
+        "extension": ".css",
+        "count": 2
+      },
+      {
+        "extension": ".md",
+        "count": 2
+      },
+      {
+        "extension": ".eot",
+        "count": 1
+      },
+      {
+        "extension": ".html",
+        "count": 1
+      },
+      {
+        "extension": ".svg",
+        "count": 1
+      },
+      {
+        "extension": ".ttf",
+        "count": 1
+      },
+      {
+        "extension": ".woff",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/ModalWindowEffects",
+  "repository_url": "https://github.com/codrops/ModalWindowEffects",
+  "clone_url": "https://github.com/codrops/ModalWindowEffects.git",
+  "revision": "859d73f6f88e763ad10e698746cb94acceb870d9",
+  "default_branch": "master",
+  "downloaded_at": "2026-08-04T10:28:36.951Z",
+  "selection": {
+    "score": 9,
+    "visual_rationale": "Visual/motion signals: anim, effect, transition.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "JavaScript",
+    "topics": [],
+    "github_size_kb": 190
+  },
+  "license": {
+    "github_spdx_id": null,
+    "repository_license_files": [
+      "fonts/codropsicons/license.txt"
+    ],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "codrops-official-licensing-page-and-local-files"
+  },
+  "inventory": {
+    "file_count": 14,
+    "total_bytes": 265400,
+    "license_files": [
+      "fonts/codropsicons/license.txt"
+    ],
+    "top_extensions": [
+      {
+        "extension": ".js",
+        "count": 5
+      },
+      {
+        "extension": ".css",
+        "count": 2
+      },
+      {
+        "extension": ".eot",
+        "count": 1
+      },
+      {
+        "extension": ".html",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      },
+      {
+        "extension": ".svg",
+        "count": 1
+      },
+      {
+        "extension": ".ttf",
+        "count": 1
+      },
+      {
+        "extension": ".txt",
+        "count": 1
+      },
+      {
+        "extension": ".woff",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-moon-alt-twotone-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "8b7119c1c2eab381078ea6fce7f75fe7a365b36b4c17b0f2ba63566ca9c9034a",
+    "icon.svg": "9176ad5d91364e2cbf0212940cf288e2fd2a7ca451567a418b9cadd717f059db",
+    "upstream-icon.json": "1c598a94f5894f75e1fbd27dcf89cc8e5586e101079129b38ae37d8bacec0100"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-moon-filled-to-sunny-filled-transition",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "7d3207534185f3583d3cfe1b9082482b95e3d27a8b26da4ce71a2aeea58224d9",
+    "icon.svg": "baf119d7a6154904475dcf782dfb5d166f72df820971d402a009f2161ee1d300",
+    "upstream-icon.json": "8787f531d07ae71ba9aef54d97949ae3839e08f8c9d93bc628d197956a127c40"
+  }
+}

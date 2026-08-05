@@ -1,0 +1,5 @@
+{
+  "prefix": "line-md",
+  "name": "menu-to-close-transition",
+  "body": "<path d=\"M5 5l7 7l7 -7M12 12h0M5 19l7 -7l7 7\" stroke=\"currentColor\" fill=\"none\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><animate attributeName=\"d\" dur=\"0.4s\" fill=\"freeze\" values=\"M5 5l7 0l7 0M5 12h14M5 19l7 0l7 0;M5 5l7 7l7 -7M12 12h0M5 19l7 -7l7 7\"/></path>"
+}

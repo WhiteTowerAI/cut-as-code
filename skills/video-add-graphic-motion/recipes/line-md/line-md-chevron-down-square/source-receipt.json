@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-chevron-down-square",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "aa4071e82c38ea63d9461e45389b3cc9e46bf2aacaf160f92affb35772dabac9",
+    "icon.svg": "cd2f094a707aa0ee9dc8d7416aacdd0e96c39cec9ba5e0bade29f0511d153379",
+    "upstream-icon.json": "2801377d0dda3e99e2bb9239b74db8a374a02c4b8058bbbc15fa3c9d85094d53"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-brake-alert-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "ef3b0f731cffc4c2226aea10c0bb9d8215d208e6d3b76c4f0e9434351aefeca4",
+    "icon.svg": "aad40bc34fbf990b3544515f2d6f115d501c4161c71d0aa984f63406be58aab0",
+    "upstream-icon.json": "ec7370be70b19e4ed88386c426e1ca9c92b9a3fa49d940a665b7d4fa3a23734f"
+  }
+}

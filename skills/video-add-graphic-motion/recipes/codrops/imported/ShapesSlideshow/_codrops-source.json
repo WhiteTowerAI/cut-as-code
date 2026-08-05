@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/ShapesSlideshow",
+  "repository_url": "https://github.com/codrops/ShapesSlideshow",
+  "clone_url": "https://github.com/codrops/ShapesSlideshow.git",
+  "revision": "793c6d005a897e4545a33bbd9de4cb4b013117ef",
+  "default_branch": "main",
+  "downloaded_at": "2026-08-04T10:27:43.769Z",
+  "selection": {
+    "score": 10,
+    "visual_rationale": "Visual/motion signals: transition, slideshow, shape, clip.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "JavaScript",
+    "topics": [],
+    "github_size_kb": 1122
+  },
+  "license": {
+    "github_spdx_id": "MIT",
+    "repository_license_files": [
+      "LICENSE"
+    ],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "repository-metadata-and-local-files"
+  },
+  "inventory": {
+    "file_count": 51,
+    "total_bytes": 3298957,
+    "license_files": [
+      "LICENSE"
+    ],
+    "top_extensions": [
+      {
+        "extension": ".jpg",
+        "count": 18
+      },
+      {
+        "extension": ".js",
+        "count": 15
+      },
+      {
+        "extension": ".html",
+        "count": 9
+      },
+      {
+        "extension": "(none)",
+        "count": 3
+      },
+      {
+        "extension": ".css",
+        "count": 2
+      },
+      {
+        "extension": ".ico",
+        "count": 2
+      },
+      {
+        "extension": ".json",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

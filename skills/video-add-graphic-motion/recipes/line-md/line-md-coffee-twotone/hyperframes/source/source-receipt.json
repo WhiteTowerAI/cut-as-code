@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-coffee-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "a59a26754ec9f86777b588feb64f2a773c57301943b9a88f127d1d5fbb685918",
+    "icon.svg": "e4064148a322e19e34e8a0c0fec006275d542e5f8ce24ed1604bf2b9276d23c8",
+    "upstream-icon.json": "38defbd2b16d142ebd568db8e3368988dad0c254dcf52e299c2389491be0cc87"
+  }
+}

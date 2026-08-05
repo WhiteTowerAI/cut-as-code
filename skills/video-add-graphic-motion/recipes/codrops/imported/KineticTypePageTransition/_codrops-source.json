@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/KineticTypePageTransition",
+  "repository_url": "https://github.com/codrops/KineticTypePageTransition",
+  "clone_url": "https://github.com/codrops/KineticTypePageTransition.git",
+  "revision": "ebe926e2f1de42950c36ff8a678321155280c1af",
+  "default_branch": "main",
+  "downloaded_at": "2026-08-04T10:28:23.234Z",
+  "selection": {
+    "score": 10,
+    "visual_rationale": "Visual/motion signals: transition, type, kinetic, page.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "JavaScript",
+    "topics": [],
+    "github_size_kb": 6344
+  },
+  "license": {
+    "github_spdx_id": "MIT",
+    "repository_license_files": [
+      "LICENSE"
+    ],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "repository-metadata-and-local-files"
+  },
+  "inventory": {
+    "file_count": 33,
+    "total_bytes": 787751,
+    "license_files": [
+      "LICENSE"
+    ],
+    "top_extensions": [
+      {
+        "extension": ".jpg",
+        "count": 16
+      },
+      {
+        "extension": ".js",
+        "count": 6
+      },
+      {
+        "extension": "(none)",
+        "count": 3
+      },
+      {
+        "extension": ".css",
+        "count": 2
+      },
+      {
+        "extension": ".html",
+        "count": 2
+      },
+      {
+        "extension": ".ico",
+        "count": 2
+      },
+      {
+        "extension": ".json",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

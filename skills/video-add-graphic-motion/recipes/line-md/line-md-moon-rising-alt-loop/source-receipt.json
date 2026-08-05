@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-moon-rising-alt-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "6d968cf8276698489226828a49c6c061e27957df68d2f56d40a3bb96df7f277f",
+    "icon.svg": "f7eb2aa933a3fa5ab75b830da847f7562ec0755753c821c0b9e79750f905e616",
+    "upstream-icon.json": "fa5d67769e5de9cde0b72a92fd4629d8c5342d309a448364ebd93caf2bd8f57a"
+  }
+}

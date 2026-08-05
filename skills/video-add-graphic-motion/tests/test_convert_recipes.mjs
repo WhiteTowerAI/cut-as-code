@@ -82,6 +82,34 @@ test("converts JavaScript recipes to a deterministic hf-seek composition and pre
   assert.match(adapter, /seed/i);
 });
 
+test("copies source-level license and provenance into each converted recipe", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "graphic-motion-shared-license-"));
+  const sourceRoot = path.join(root, "canvas-confetti");
+  await mkdir(sourceRoot, { recursive: true });
+  await writeFile(path.join(sourceRoot, "LICENSE.canvas-confetti"), "ISC License fixture\n", "utf8");
+  await writeFile(
+    path.join(sourceRoot, "SOURCE.json"),
+    `${JSON.stringify({ name: "canvas-confetti", version: "1.9.4" }, null, 2)}\n`,
+    "utf8",
+  );
+  const recipeDir = await fixtureRecipe(
+    root,
+    "canvas-confetti",
+    "confetti-center-burst",
+    "id: confetti-center-burst\nruntime: [js]\nentry: preview.html\n",
+    { "preview.html": "<!doctype html><body><canvas></canvas></body>" },
+  );
+
+  await convertRecipe({ recipesRoot: root, recipeDir });
+  const outputDir = path.join(recipeDir, "hyperframes", "source");
+
+  assert.equal(await readFile(path.join(outputDir, "LICENSE.canvas-confetti"), "utf8"), "ISC License fixture\n");
+  assert.deepEqual(
+    JSON.parse(await readFile(path.join(outputDir, "SOURCE.json"), "utf8")),
+    { name: "canvas-confetti", version: "1.9.4" },
+  );
+});
+
 test("removes visible demo chrome from converted output while preserving the source preview", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "graphic-motion-demo-chrome-"));
   const recipeDir = await fixtureRecipe(
@@ -368,6 +396,121 @@ test("keeps Lottie JSON unchanged and registers a local non-autoplay player", as
   assert.doesNotMatch(html, /https?:\/\//);
 });
 
+test("converts inline SVG SMIL recipes to absolute-time HyperFrames seeks", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "graphic-motion-svg-smil-"));
+  const recipeDir = await fixtureRecipe(
+    root,
+    "line-md",
+    "line-md-gift",
+    [
+      "id: line-md-gift",
+      "runtime: [svg-smil]",
+      "entry: preview.html",
+      "motion:",
+      "  duration_ms: 6000",
+      "",
+    ].join("\n"),
+    {
+      "preview.html": [
+        "<!doctype html><html><body>",
+        '<svg data-native-duration="2.4" viewBox="0 0 24 24">',
+        '<path d="M4 9h16v11H4z"><animate attributeName="opacity" values="0;1" dur="2.4s"/></path>',
+        "</svg>",
+        "</body></html>",
+      ].join(""),
+      "LICENSE.line-md": "MIT License fixture\n",
+    },
+  );
+
+  const receipt = await convertRecipe({ recipesRoot: root, recipeDir });
+  const outputDir = path.join(recipeDir, "hyperframes");
+  const html = await readFile(path.join(outputDir, "index.html"), "utf8");
+  const adapter = await readFile(path.join(outputDir, "hf-adapter.js"), "utf8");
+  const events = new Map();
+  const seekTimes = [];
+  let pauseCalls = 0;
+  const svg = {
+    dataset: { nativeDuration: "2.4" },
+    pauseAnimations() { pauseCalls += 1; },
+    setCurrentTime(time) { seekTimes.push(time); },
+  };
+  const browser = {
+    window: null,
+    document: { querySelector: (selector) => selector === "svg" ? svg : null },
+    addEventListener(type, listener) { events.set(type, listener); },
+  };
+  browser.window = browser;
+
+  assert.equal(receipt.deterministic_adapter, "svg-smil");
+  vm.runInNewContext(adapter, browser);
+  browser.__hf.seek(3.25);
+  events.get("hf-seek")({ detail: { time: 1.2 } });
+
+  assert.match(html, /data-composition-id="line-md-gift"/);
+  assert.match(html, /<svg data-native-duration="2\.4"/);
+  assert.deepEqual(seekTimes.map((time) => Number(time.toFixed(3))), [0, 0.85, 1.2]);
+  assert.equal(pauseCalls, 3);
+});
+
+test("converts Three.js recipes to local absolute-time hf-seek compositions", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "graphic-motion-three-"));
+  const recipeDir = await fixtureRecipe(
+    root,
+    "web",
+    "kinetic-images",
+    [
+      "id: kinetic-images",
+      "runtime: [three]",
+      "entry: preview.html",
+      "motion:",
+      "  duration_ms: 6000",
+      "",
+    ].join("\n"),
+    {
+      "preview.html": '<!doctype html><canvas id="three-layer"></canvas><script type="module" src="scene.js"></script>',
+      "scene.js": "export async function createRecipe() { return { renderAt() {} }; }\n",
+      "assets/paper.glb": "glb fixture",
+      "LICENSE.codrops": "MIT License fixture\n",
+      "_runtime/three/three.module.js": "export class WebGLRenderer {}\n",
+      "_runtime/three/addons/loaders/GLTFLoader.js": "export class GLTFLoader {}\n",
+    },
+  );
+
+  const receipt = await convertRecipe({ recipesRoot: root, recipeDir });
+  const outputDir = path.join(recipeDir, "hyperframes");
+  const html = await readFile(path.join(outputDir, "index.html"), "utf8");
+  const adapter = await readFile(path.join(outputDir, "hf-adapter.js"), "utf8");
+  const copiedModel = await readFile(path.join(outputDir, "source", "assets", "paper.glb"), "utf8");
+  const copiedRuntime = await readFile(path.join(outputDir, "_runtime", "three", "three.module.js"), "utf8");
+
+  assert.equal(receipt.deterministic_adapter, "three");
+  assert.match(html, /data-composition-id="kinetic-images"/);
+  assert.match(html, /data-scene-mode="showcase"/);
+  assert.match(html, /type="importmap"/);
+  assert.match(html, /type="module" src="hf-recipe\.js"/);
+  assert.doesNotMatch(html, /https?:\/\//);
+  assert.equal(copiedModel, "glb fixture");
+  assert.match(copiedRuntime, /WebGLRenderer/);
+
+  const events = new Map();
+  const rendered = [];
+  const browser = {
+    window: null,
+    CustomEvent: class {
+      constructor(type, init = {}) { this.type = type; this.detail = init.detail; }
+    },
+    addEventListener(type, listener) { events.set(type, listener); },
+  };
+  browser.window = browser;
+  vm.runInNewContext(adapter, browser);
+  browser.__hfThreeRegister((time) => rendered.push(time));
+  browser.__hf.seek(4.25);
+  browser.__hf.seek(1.5);
+
+  assert.deepEqual(rendered, [0, 4.25, 1.5]);
+  assert.equal(browser.__hfThreeTime, 1.5);
+});
+
 test("writes one library attribution with motion-anything and original author credits", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "graphic-motion-attribution-"));
   const upstream = [
@@ -390,7 +533,7 @@ test("writes one library attribution with motion-anything and original author cr
   assert.match(contents, /Original Artist/);
 });
 
-test("the vendored library exposes exactly 218 selectable recipes", async () => {
+test("the vendored library exposes the curated sticker recipes plus every Line MD name", async () => {
   const recipesRoot = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
     "..",
@@ -398,9 +541,38 @@ test("the vendored library exposes exactly 218 selectable recipes", async () => 
   );
 
   const recipes = await discoverRecipes(recipesRoot);
+  const kineticImages = recipes.find((recipe) => recipe.id === "kinetic-images");
+  const mojsEffect = await readFile(
+    path.join(recipesRoot, "mojs", "mojs-shockwave", "hyperframes", "source", "effect.js"),
+    "utf8",
+  );
+  const stickerCounts = Object.fromEntries(
+    ["canvas-confetti", "mojs", "line-md", "meteocons", "tsparticles"]
+      .map((surface) => [surface, recipes.filter((recipe) => recipe.surface === surface).length]),
+  );
 
-  assert.equal(recipes.length, 218);
-  assert.equal(new Set(recipes.map((recipe) => recipe.id)).size, 218);
+  assert.equal(recipes.length, 1477);
+  assert.equal(new Set(recipes.map((recipe) => recipe.id)).size, 1477);
+  assert.deepEqual(stickerCounts, {
+    "canvas-confetti": 10,
+    mojs: 10,
+    "line-md": 1222,
+    meteocons: 12,
+    tsparticles: 4,
+  });
+  for (const id of [
+    "line-md-sunny-outline",
+    "line-md-sunny-outline-loop",
+    "line-md-sunny-outline-twotone",
+    "line-md-sunny-outline-twotone-loop",
+  ]) {
+    assert.ok(recipes.some((recipe) => recipe.id === id), `missing Line MD alias ${id}`);
+  }
+  assert.ok(!recipes.some((recipe) => recipe.id === "confetti-left-stream"));
+  assert.ok(!recipes.some((recipe) => recipe.id === "mojs-double-shockwave"));
+  assert.equal(kineticImages?.surface, "codrops");
+  assert.match(mojsEffect, /const shiftX = x - 960;/);
+  assert.match(mojsEffect, /const shiftY = y - 540;/);
 });
 
 test("all converted recipes pass the static HyperFrames artifact audit", async () => {
@@ -412,8 +584,8 @@ test("all converted recipes pass the static HyperFrames artifact audit", async (
 
   const audit = await auditConvertedRecipes(recipesRoot);
 
-  assert.equal(audit.recipe_count, 218);
-  assert.equal(audit.converted_count, 218);
+  assert.equal(audit.recipe_count, 1477);
+  assert.equal(audit.converted_count, 1477);
   assert.ok(audit.preserved_credit_comments > 0);
   assert.deepEqual(audit.errors, []);
 });

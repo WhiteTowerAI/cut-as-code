@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-round-360",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "8cbd35d356ca977cef22ad90b456321108cd5a2b5da8bd32bcbb00ec22c64e7d",
+    "icon.svg": "3607d0c9182bfc436eaec0268697586d95072297f4894b63261cf842a6f314c3",
+    "upstream-icon.json": "02da8f40b1d10d3a38e0b7063e94586b8be3ad4f486be2969bc32a06d2235079"
+  }
+}

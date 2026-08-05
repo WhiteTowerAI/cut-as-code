@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-cloud-alt-off-twotone-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "a5a67e86bc0786248677bc2a68b28b89c943525d7e87fa24c303f0c484a207be",
+    "icon.svg": "2dbe9fa65e79d19f13634cfdcdcd763c7caf934690a5b764b695bc795335b22f",
+    "upstream-icon.json": "22be5b2b168e2aec5fb428b45da50b657012e628c26de229fe2bd29008834c42"
+  }
+}

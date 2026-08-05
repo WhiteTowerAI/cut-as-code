@@ -1,0 +1,45 @@
+spec_version: 1
+id: confetti-center-burst
+name: "Center Confetti Burst"
+description: "Center Confetti Burst rendered with the original canvas-confetti engine."
+surfaces: [video]
+category: sticker-celebration
+tech: [js]
+canvas: [video]
+target: [overlay]
+intent: sticker-celebration
+runtime: ["js"]
+export: [skill, html]
+dependencies: []
+tags: ["sticker", "confetti", "celebration", "center-burst"]
+intent_keywords:
+  - "sticker"
+  - "confetti"
+  - "celebration"
+  - "center-burst"
+best_for:
+  - "Wins, launches, reveals, milestones, and celebratory transitions"
+avoid_when:
+  - "The cue is neutral, serious, or already visually dense"
+  - "Any particle path would cross a visible face"
+restraint:
+  max_per_view: 1
+  notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."
+motion:
+  duration_ms: 6000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: preview.html
+implementations:
+  - tech: js
+    files: ["vendor.js", "effect.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt placement, scale, palette, and timing to the shot."
+license:
+  spdx: ISC
+  upstream: "https://github.com/catdad/canvas-confetti/blob/20eebad51dde793070c373d594099a7ed8d96e22/dist/confetti.browser.js"
+  attribution_required: true
+author:
+  name: "Kiril Vatev"
+  url: "https://github.com/catdad/canvas-confetti"
+version: 1.9.4

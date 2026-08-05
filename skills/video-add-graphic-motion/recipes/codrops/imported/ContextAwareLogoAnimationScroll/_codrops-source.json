@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/ContextAwareLogoAnimationScroll",
+  "repository_url": "https://github.com/codrops/ContextAwareLogoAnimationScroll",
+  "clone_url": "https://github.com/codrops/ContextAwareLogoAnimationScroll.git",
+  "revision": "2c717fbf374d5751ae0c2ba2d0b0bb533520e427",
+  "default_branch": "main",
+  "downloaded_at": "2026-08-04T10:28:37.739Z",
+  "selection": {
+    "score": 9,
+    "visual_rationale": "Visual/motion signals: anim, scroll, reveal, text.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "JavaScript",
+    "topics": [],
+    "github_size_kb": 363
+  },
+  "license": {
+    "github_spdx_id": "MIT",
+    "repository_license_files": [
+      "LICENSE"
+    ],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "repository-metadata-and-local-files"
+  },
+  "inventory": {
+    "file_count": 19,
+    "total_bytes": 508974,
+    "license_files": [
+      "LICENSE"
+    ],
+    "top_extensions": [
+      {
+        "extension": ".js",
+        "count": 8
+      },
+      {
+        "extension": "(none)",
+        "count": 6
+      },
+      {
+        "extension": ".css",
+        "count": 1
+      },
+      {
+        "extension": ".html",
+        "count": 1
+      },
+      {
+        "extension": ".ico",
+        "count": 1
+      },
+      {
+        "extension": ".jpg",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/SlicedTextEffect",
+  "repository_url": "https://github.com/codrops/SlicedTextEffect",
+  "clone_url": "https://github.com/codrops/SlicedTextEffect.git",
+  "revision": "45bbcfd96b0c87a5a5299cb4bacc583dd3b71bf8",
+  "default_branch": "main",
+  "downloaded_at": "2026-08-04T10:28:45.404Z",
+  "selection": {
+    "score": 9,
+    "visual_rationale": "Visual/motion signals: anim, effect, scroll, text.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "JavaScript",
+    "topics": [],
+    "github_size_kb": 722
+  },
+  "license": {
+    "github_spdx_id": "MIT",
+    "repository_license_files": [
+      "LICENSE"
+    ],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "repository-metadata-and-local-files"
+  },
+  "inventory": {
+    "file_count": 24,
+    "total_bytes": 860076,
+    "license_files": [
+      "LICENSE"
+    ],
+    "top_extensions": [
+      {
+        "extension": ".jpg",
+        "count": 9
+      },
+      {
+        "extension": ".js",
+        "count": 7
+      },
+      {
+        "extension": "(none)",
+        "count": 4
+      },
+      {
+        "extension": ".css",
+        "count": 1
+      },
+      {
+        "extension": ".html",
+        "count": 1
+      },
+      {
+        "extension": ".ico",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

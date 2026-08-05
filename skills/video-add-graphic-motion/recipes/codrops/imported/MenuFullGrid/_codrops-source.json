@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/MenuFullGrid",
+  "repository_url": "https://github.com/codrops/MenuFullGrid",
+  "clone_url": "https://github.com/codrops/MenuFullGrid.git",
+  "revision": "c2644d0417163fa252371da3222160f662ac262e",
+  "default_branch": "master",
+  "downloaded_at": "2026-08-04T10:23:29.161Z",
+  "selection": {
+    "score": 15,
+    "visual_rationale": "Visual/motion signals: anim, image, grid, menu, background, layout, page.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "JavaScript",
+    "topics": [],
+    "github_size_kb": 2037
+  },
+  "license": {
+    "github_spdx_id": "MIT",
+    "repository_license_files": [
+      "LICENSE"
+    ],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "repository-metadata-and-local-files"
+  },
+  "inventory": {
+    "file_count": 112,
+    "total_bytes": 6674622,
+    "license_files": [
+      "LICENSE"
+    ],
+    "top_extensions": [
+      {
+        "extension": ".jpg",
+        "count": 90
+      },
+      {
+        "extension": ".js",
+        "count": 8
+      },
+      {
+        "extension": ".css",
+        "count": 3
+      },
+      {
+        "extension": ".html",
+        "count": 3
+      },
+      {
+        "extension": ".ico",
+        "count": 3
+      },
+      {
+        "extension": "(none)",
+        "count": 3
+      },
+      {
+        "extension": ".json",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

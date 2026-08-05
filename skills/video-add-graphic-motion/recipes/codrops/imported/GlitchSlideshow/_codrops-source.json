@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/GlitchSlideshow",
+  "repository_url": "https://github.com/codrops/GlitchSlideshow",
+  "clone_url": "https://github.com/codrops/GlitchSlideshow.git",
+  "revision": "b678d6c67ed71ccc2a95cc45a092cf1d09e468a4",
+  "default_branch": "master",
+  "downloaded_at": "2026-08-04T10:27:42.402Z",
+  "selection": {
+    "score": 10,
+    "visual_rationale": "Visual/motion signals: effect, transition, slideshow, glitch.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "CSS",
+    "topics": [
+      "css",
+      "javascript",
+      "slideshow"
+    ],
+    "github_size_kb": 1080
+  },
+  "license": {
+    "github_spdx_id": null,
+    "repository_license_files": [],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "codrops-official-licensing-page-and-local-files"
+  },
+  "inventory": {
+    "file_count": 20,
+    "total_bytes": 1164342,
+    "license_files": [],
+    "top_extensions": [
+      {
+        "extension": ".jpg",
+        "count": 9
+      },
+      {
+        "extension": ".js",
+        "count": 4
+      },
+      {
+        "extension": ".css",
+        "count": 2
+      },
+      {
+        "extension": ".html",
+        "count": 2
+      },
+      {
+        "extension": ".ico",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      },
+      {
+        "extension": "(none)",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

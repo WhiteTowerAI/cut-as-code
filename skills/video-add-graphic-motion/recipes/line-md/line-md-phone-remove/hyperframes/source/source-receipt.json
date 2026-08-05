@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-phone-remove",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "a50cc1440b90d42f7b85ff558ac5d451d8e4cbf3e728c1684ace0b0ae54b8f58",
+    "icon.svg": "2caa98b3ceecf7de5978fd55338f108742b84a360ace430d4ab4b65114ad5c20",
+    "upstream-icon.json": "159077c67407f54ff8773334586ca723093819806c424ecafe23451a741c1ac0"
+  }
+}

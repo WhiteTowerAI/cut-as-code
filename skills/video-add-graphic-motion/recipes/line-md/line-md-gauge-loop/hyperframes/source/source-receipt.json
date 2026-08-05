@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-gauge-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "7c2fd5a94dab6aa3a6fa69237e97107569e1ef3f4eb41516306aac8f930dd7bf",
+    "icon.svg": "159c1440deaf03309eacb169e5a42a1e4a42c58f78669097e8fae28bc75f6b9b",
+    "upstream-icon.json": "cea3e417505070a92b2ccb5a668e1bf852d314c880a9b61224a9b854c5ba4166"
+  }
+}

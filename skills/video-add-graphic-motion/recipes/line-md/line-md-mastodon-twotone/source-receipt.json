@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-mastodon-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "1d1dc12c2fbd1d6464e825506e186e8a5c5201d53a743726e7a1fba2bfceb76f",
+    "icon.svg": "8bbc1d62f812b9c3ba1f362cbe1c0286dca5487d555dc4bcad360f5ed4007b7a",
+    "upstream-icon.json": "f2d00302697f78e1d493a20760d09e963435aab051f482911b41e95e0446b957"
+  }
+}

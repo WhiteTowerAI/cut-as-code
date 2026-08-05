@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/PageFlipLayout",
+  "repository_url": "https://github.com/codrops/PageFlipLayout",
+  "clone_url": "https://github.com/codrops/PageFlipLayout.git",
+  "revision": "79e085264bed1eb76937651873ae7817a41ccc3d",
+  "default_branch": "master",
+  "downloaded_at": "2026-08-04T10:27:19.564Z",
+  "selection": {
+    "score": 10,
+    "visual_rationale": "Visual/motion signals: anim, layout, page.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "JavaScript",
+    "topics": [
+      "cssgrid",
+      "gsap",
+      "layout-animation",
+      "template",
+      "tweenmax"
+    ],
+    "github_size_kb": 488
+  },
+  "license": {
+    "github_spdx_id": null,
+    "repository_license_files": [],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "codrops-official-licensing-page-and-local-files"
+  },
+  "inventory": {
+    "file_count": 25,
+    "total_bytes": 628560,
+    "license_files": [],
+    "top_extensions": [
+      {
+        "extension": ".jpg",
+        "count": 17
+      },
+      {
+        "extension": ".js",
+        "count": 3
+      },
+      {
+        "extension": ".css",
+        "count": 1
+      },
+      {
+        "extension": ".html",
+        "count": 1
+      },
+      {
+        "extension": ".ico",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      },
+      {
+        "extension": "(none)",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

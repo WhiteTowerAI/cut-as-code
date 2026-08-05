@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-monitor",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "f33a2229013877f9a4d6b891d7e575f48b3f3d261f2b3bc01c9a85cc72ba6b57",
+    "icon.svg": "31960f2933e7c2e77da1de8640692396ce7154c4af7feb173e1c7b18086b7316",
+    "upstream-icon.json": "415cae223ed8e8db8cb31bf4b3bbcbf7333d70dcb958fce9cff21e98fe87fb77"
+  }
+}

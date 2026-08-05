@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-peertube-alt",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "d7c4645be8fed73b9a933b346edd00e2fafdb131426900c517d00cdfda6d942b",
+    "icon.svg": "6444ab5648a1d8e7c6b850adcdeaf94207d408b6a8e435bfbc6383b33ec98be9",
+    "upstream-icon.json": "35f73ce0d7125750bc558d71901f7d0c25fe65ca6f0bf6f38c59d0f8f3d1996c"
+  }
+}

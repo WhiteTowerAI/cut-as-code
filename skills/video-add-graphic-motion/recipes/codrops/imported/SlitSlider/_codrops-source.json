@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/SlitSlider",
+  "repository_url": "https://github.com/codrops/SlitSlider",
+  "clone_url": "https://github.com/codrops/SlitSlider.git",
+  "revision": "14ccc222595de9271e13a9b2e3a04c8d321ea35e",
+  "default_branch": "master",
+  "downloaded_at": "2026-08-04T10:27:13.460Z",
+  "selection": {
+    "score": 10,
+    "visual_rationale": "Visual/motion signals: anim, transition, slideshow, slider.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "CSS",
+    "topics": [],
+    "github_size_kb": 421
+  },
+  "license": {
+    "github_spdx_id": null,
+    "repository_license_files": [],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "codrops-official-licensing-page-and-local-files"
+  },
+  "inventory": {
+    "file_count": 21,
+    "total_bytes": 582375,
+    "license_files": [],
+    "top_extensions": [
+      {
+        "extension": ".jpg",
+        "count": 5
+      },
+      {
+        "extension": ".css",
+        "count": 4
+      },
+      {
+        "extension": ".js",
+        "count": 3
+      },
+      {
+        "extension": ".html",
+        "count": 2
+      },
+      {
+        "extension": ".eot",
+        "count": 1
+      },
+      {
+        "extension": ".json",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      },
+      {
+        "extension": ".svg",
+        "count": 1
+      },
+      {
+        "extension": ".ttf",
+        "count": 1
+      },
+      {
+        "extension": ".txt",
+        "count": 1
+      },
+      {
+        "extension": ".woff",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

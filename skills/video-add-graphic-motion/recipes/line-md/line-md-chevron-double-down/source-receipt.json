@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-chevron-double-down",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "130017ff2a0c1f651eeae16b4adf45d641dbbf39b2a020cfa710e19b14f14d5b",
+    "icon.svg": "0cdc4cb6263fadfc48e49473deeae69befac8e187974849c93a122075e3bd09f",
+    "upstream-icon.json": "436b2950748ff70901f43efe3b308146a356514656d255790ff7cb2d3a7b30f5"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-sun-rising-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "393272b1f15e337f85f4ac9d20abd2ac5b192bbcd3b84d3c085f01390a42b854",
+    "icon.svg": "0721b7486be396509c4fb16c468b332279bef3c934abb356a68ee4b2791d6873",
+    "upstream-icon.json": "d14d590c91dd35cc8547f936b59c229bb45396c761b997e9b3705a5dc930ab43"
+  }
+}

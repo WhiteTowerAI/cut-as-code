@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/CrosshairDistortion",
+  "repository_url": "https://github.com/codrops/CrosshairDistortion",
+  "clone_url": "https://github.com/codrops/CrosshairDistortion.git",
+  "revision": "e8d3c5578c935ad881afe6fe3a45782e79ae31b3",
+  "default_branch": "main",
+  "downloaded_at": "2026-08-04T10:25:53.749Z",
+  "selection": {
+    "score": 11,
+    "visual_rationale": "Visual/motion signals: effect, hover, cursor, svg, distort.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "JavaScript",
+    "topics": [],
+    "github_size_kb": 78
+  },
+  "license": {
+    "github_spdx_id": "MIT",
+    "repository_license_files": [
+      "LICENSE"
+    ],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "repository-metadata-and-local-files"
+  },
+  "inventory": {
+    "file_count": 18,
+    "total_bytes": 305794,
+    "license_files": [
+      "LICENSE"
+    ],
+    "top_extensions": [
+      {
+        "extension": ".js",
+        "count": 5
+      },
+      {
+        "extension": ".css",
+        "count": 3
+      },
+      {
+        "extension": ".html",
+        "count": 3
+      },
+      {
+        "extension": "(none)",
+        "count": 3
+      },
+      {
+        "extension": ".ico",
+        "count": 2
+      },
+      {
+        "extension": ".json",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

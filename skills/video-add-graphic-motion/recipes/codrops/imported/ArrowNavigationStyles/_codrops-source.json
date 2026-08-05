@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/ArrowNavigationStyles",
+  "repository_url": "https://github.com/codrops/ArrowNavigationStyles",
+  "clone_url": "https://github.com/codrops/ArrowNavigationStyles.git",
+  "revision": "2e7c8868f44814bb80ce74e1b669984c417345bd",
+  "default_branch": "master",
+  "downloaded_at": "2026-08-04T10:23:36.756Z",
+  "selection": {
+    "score": 14,
+    "visual_rationale": "Visual/motion signals: anim, effect, hover, transition, navigation, svg.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "CSS",
+    "topics": [],
+    "github_size_kb": 346
+  },
+  "license": {
+    "github_spdx_id": null,
+    "repository_license_files": [
+      "fonts/codropsicons/license.txt"
+    ],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "codrops-official-licensing-page-and-local-files"
+  },
+  "inventory": {
+    "file_count": 34,
+    "total_bytes": 269367,
+    "license_files": [
+      "fonts/codropsicons/license.txt"
+    ],
+    "top_extensions": [
+      {
+        "extension": ".png",
+        "count": 22
+      },
+      {
+        "extension": ".css",
+        "count": 3
+      },
+      {
+        "extension": ".jpg",
+        "count": 2
+      },
+      {
+        "extension": ".eot",
+        "count": 1
+      },
+      {
+        "extension": ".html",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      },
+      {
+        "extension": ".svg",
+        "count": 1
+      },
+      {
+        "extension": ".ttf",
+        "count": 1
+      },
+      {
+        "extension": ".txt",
+        "count": 1
+      },
+      {
+        "extension": ".woff",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

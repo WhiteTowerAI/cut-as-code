@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/RotatedRevealers",
+  "repository_url": "https://github.com/codrops/RotatedRevealers",
+  "clone_url": "https://github.com/codrops/RotatedRevealers.git",
+  "revision": "0127791b2aa1fb5cd12bb46128b9d54ae84cafff",
+  "default_branch": "master",
+  "downloaded_at": "2026-08-04T10:23:47.110Z",
+  "selection": {
+    "score": 14,
+    "visual_rationale": "Visual/motion signals: anim, effect, transition, reveal, page.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "JavaScript",
+    "topics": [
+      "animation",
+      "demo",
+      "gsap",
+      "javascript",
+      "prototype",
+      "webdesign"
+    ],
+    "github_size_kb": 408
+  },
+  "license": {
+    "github_spdx_id": null,
+    "repository_license_files": [],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "codrops-official-licensing-page-and-local-files"
+  },
+  "inventory": {
+    "file_count": 29,
+    "total_bytes": 569606,
+    "license_files": [],
+    "top_extensions": [
+      {
+        "extension": ".jpg",
+        "count": 9
+      },
+      {
+        "extension": ".js",
+        "count": 8
+      },
+      {
+        "extension": ".html",
+        "count": 5
+      },
+      {
+        "extension": ".css",
+        "count": 2
+      },
+      {
+        "extension": ".ico",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      },
+      {
+        "extension": ".png",
+        "count": 1
+      },
+      {
+        "extension": ".svg",
+        "count": 1
+      },
+      {
+        "extension": "(none)",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/DistortedMenuLinkEffects",
+  "repository_url": "https://github.com/codrops/DistortedMenuLinkEffects",
+  "clone_url": "https://github.com/codrops/DistortedMenuLinkEffects.git",
+  "revision": "5f2f934d8f56845932f6b042af99a9ef81c199d4",
+  "default_branch": "master",
+  "downloaded_at": "2026-08-04T10:28:22.195Z",
+  "selection": {
+    "score": 9,
+    "visual_rationale": "Visual/motion signals: effect, menu, svg, distort.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "HTML",
+    "topics": [],
+    "github_size_kb": 9
+  },
+  "license": {
+    "github_spdx_id": "MIT",
+    "repository_license_files": [
+      "LICENSE"
+    ],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "repository-metadata-and-local-files"
+  },
+  "inventory": {
+    "file_count": 16,
+    "total_bytes": 59378,
+    "license_files": [
+      "LICENSE"
+    ],
+    "top_extensions": [
+      {
+        "extension": ".html",
+        "count": 6
+      },
+      {
+        "extension": "(none)",
+        "count": 3
+      },
+      {
+        "extension": ".js",
+        "count": 2
+      },
+      {
+        "extension": ".css",
+        "count": 1
+      },
+      {
+        "extension": ".ico",
+        "count": 1
+      },
+      {
+        "extension": ".json",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      },
+      {
+        "extension": ".svg",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/Staggered3DGridAnimations",
+  "repository_url": "https://github.com/codrops/Staggered3DGridAnimations",
+  "clone_url": "https://github.com/codrops/Staggered3DGridAnimations.git",
+  "revision": "7c2703d41f55005c2758e1031b593d2493d392f8",
+  "default_branch": "main",
+  "downloaded_at": "2026-08-04T10:24:28.940Z",
+  "selection": {
+    "score": 13,
+    "visual_rationale": "Visual/motion signals: anim, effect, scroll, transition, grid, 3d.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "HTML",
+    "topics": [],
+    "github_size_kb": 1948
+  },
+  "license": {
+    "github_spdx_id": "MIT",
+    "repository_license_files": [
+      "LICENSE"
+    ],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "repository-metadata-and-local-files"
+  },
+  "inventory": {
+    "file_count": 37,
+    "total_bytes": 2136597,
+    "license_files": [
+      "LICENSE"
+    ],
+    "top_extensions": [
+      {
+        "extension": ".jpg",
+        "count": 21
+      },
+      {
+        "extension": ".js",
+        "count": 7
+      },
+      {
+        "extension": "(none)",
+        "count": 5
+      },
+      {
+        "extension": ".css",
+        "count": 1
+      },
+      {
+        "extension": ".html",
+        "count": 1
+      },
+      {
+        "extension": ".ico",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

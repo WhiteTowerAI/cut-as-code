@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "tsparticles-fountain",
+  "surface": "tsparticles",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "3400bc8d86255c6b13f5df2c1fe0e0f2dae1b8fe58993f46b365784c76bbaa6b"
+}

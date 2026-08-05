@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-logout",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "39462f39223af551a57eb751f55fb64ec1c9b53e64a32ae1608f99a30fd98abc",
+    "icon.svg": "14c290cf1225ccddd6c32e7b1ee3136a93852047b5505f0c03735ed1662985c7",
+    "upstream-icon.json": "7d0d8f2352655f1400ec1b311e1626759451ab2f95715208634de38cabfaeba5"
+  }
+}

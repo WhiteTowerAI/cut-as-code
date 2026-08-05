@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-briefcase-cancel-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "3759b09cdf05eb68e17bd637f78c9f192d1bc597d86e45a8626859c172bc1db2",
+    "icon.svg": "f58e957cb60b28bea620c5fd21373f333805305ace9d2a6c01c2ea05476133ca",
+    "upstream-icon.json": "cb3d06b7d8af6e16db9f9cd386dd464df72493fa78e4a5dfd2f77d16308cad7c"
+  }
+}

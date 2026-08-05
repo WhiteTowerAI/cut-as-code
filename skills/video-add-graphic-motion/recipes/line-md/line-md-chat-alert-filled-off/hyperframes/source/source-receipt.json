@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-chat-alert-filled-off",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "1e55f68672370bf71c65b16c586f0e3f100626396dfb702baf7864387dc9df1a",
+    "icon.svg": "6bcc4a0c4c2174c87b333bc6a8034b8a53edb6f65a5f1914d1354a37630c3755",
+    "upstream-icon.json": "6d5ae6ec4795ee863f805cead41a6ed27e6a4d325013608f24d4d7782fe24b51"
+  }
+}

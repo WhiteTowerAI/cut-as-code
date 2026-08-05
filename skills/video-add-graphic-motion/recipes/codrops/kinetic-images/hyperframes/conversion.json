@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "kinetic-images",
+  "surface": "codrops",
+  "runtime": [
+    "three"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "three",
+  "source_manifest_sha256": "f0a022906983b448cc56a1509e1b3daebfd5b2c26224cf470ccae6ce1e0b9af0"
+}

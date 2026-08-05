@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-email-opened-alt-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "07492d1a405290d69923d281af344100051be69ae8fee071ee04672689a1edc8",
+    "icon.svg": "23d64e2c5b1448b12e3a054aeba70f9d2cb4f3bea8aa10b5124eb62573f11bd3",
+    "upstream-icon.json": "4903480b329f594bebf42faefdd68c62e57fae2aedf54ca5b315b9c1d268a231"
+  }
+}

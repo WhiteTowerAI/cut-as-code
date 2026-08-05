@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "recipe_id": "meteocons-clear-night",
+  "source_id": "meteocons",
+  "upstream_asset": "fill/clear-night.svg",
+  "source_files": {
+    "preview.html": "6cdfac1e6040fd609ec628dc27565ee8a6872498bf01acd08777fe83757496de",
+    "icon.svg": "e17bb7507931a54e222580af66c490ddb8aac95a0f8870aab13648a5b43213d4"
+  }
+}

@@ -154,10 +154,12 @@ export async function auditConvertedRecipes(recipesRoot) {
       const scriptPath = path.join(outputDir, name);
       if (!(await fileExists(scriptPath))) continue;
       const script = await readFile(scriptPath, "utf8");
-      try {
-        new Function(script);
-      } catch (error) {
-        errors.push(`${recipe.id}: ${name} is not valid script syntax (${error.message})`);
+      if (!(name === "hf-recipe.js" && recipe.runtime.includes("three"))) {
+        try {
+          new Function(script);
+        } catch (error) {
+          errors.push(`${recipe.id}: ${name} is not valid script syntax (${error.message})`);
+        }
       }
       if (name === "hf-recipe.js" && forbiddenRuntime.test(script)) {
         errors.push(`${recipe.id}: converted recipe contains an unwrapped time or random API`);
@@ -321,6 +323,102 @@ ${rewriteLocalAssetPaths(body)}
   <script src="hf-adapter.js"></script>
 </body>
 </html>
+`;
+}
+
+function threeCompositionHtml({ id, duration }) {
+  const safeId = escapeAttribute(id);
+  const safeDuration = Number(duration.toFixed(6));
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <title>${safeId} - HyperFrames</title>
+  <style>
+    html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
+    [data-composition-id] { position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+    #three-layer { display: block; width: 1920px; height: 1080px; }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./_runtime/three/three.module.js",
+        "three/addons/": "./_runtime/three/addons/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div data-composition-id="${safeId}" data-start="0" data-width="1920" data-height="1080" data-duration="${safeDuration}" data-no-timeline>
+    <canvas id="three-layer" class="clip" data-scene-mode="showcase" data-start="0" data-duration="${safeDuration}" data-track-index="1" width="1920" height="1080"></canvas>
+  </div>
+  <script src="hf-adapter.js"></script>
+  <script type="module" src="hf-recipe.js"></script>
+</body>
+</html>
+`;
+}
+
+function threeRecipeSource() {
+  return `/* Generated HyperFrames entry; scene implementation remains in source/scene.js. */
+import { createRecipe } from "./source/scene.js";
+
+const canvas = document.getElementById("three-layer");
+createRecipe({ canvas })
+  .then(({ renderAt }) => window.__hfThreeRegister(renderAt))
+  .catch((error) => {
+    window.__hfThreeError = error;
+    console.error(error);
+  });
+`;
+}
+
+function threeAdapterSource({ id, duration }) {
+  return `/* Deterministic HyperFrames Three.js adapter for ${id}. */
+(function () {
+  "use strict";
+  const duration = ${duration};
+  let renderAt = null;
+  let currentTime = Math.max(0, Math.min(duration, Number(window.__hfThreeTime) || 0));
+
+  function seek(time) {
+    currentTime = Math.max(0, Math.min(duration, Number(time) || 0));
+    window.__hfThreeTime = currentTime;
+    if (renderAt) renderAt(currentTime);
+  }
+
+  window.__hfThreeRegister = function (callback) {
+    renderAt = callback;
+    renderAt(currentTime);
+  };
+  window.__hf = { duration, seek };
+  window.addEventListener("hf-seek", (event) => seek(event.detail.time));
+  seek(currentTime);
+})();
+`;
+}
+
+function svgSmilAdapterSource({ id, duration }) {
+  return `/* Deterministic HyperFrames SVG SMIL adapter for ${id}. */
+(function () {
+  "use strict";
+  const duration = ${duration};
+  const svg = document.querySelector("svg");
+
+  function seek(time) {
+    if (!svg) return;
+    const target = Math.max(0, Math.min(duration, Number(time) || 0));
+    const nativeDuration = Number(svg.dataset.nativeDuration) || duration;
+    const localTime = nativeDuration > 0 ? target % nativeDuration : target;
+    if (typeof svg.pauseAnimations === "function") svg.pauseAnimations();
+    if (typeof svg.setCurrentTime === "function") svg.setCurrentTime(localTime);
+  }
+
+  window.__hf = { duration, seek };
+  window.addEventListener("hf-seek", (event) => seek(event.detail.time));
+  seek(0);
+})();
 `;
 }
 
@@ -561,6 +659,10 @@ async function copyRecipeSource(recipeDir, outputDir) {
     if (entry.name === "hyperframes") continue;
     await cp(path.join(recipeDir, entry.name), path.join(sourceDir, entry.name), { recursive: true });
   }
+  for (const entry of await readdir(path.dirname(recipeDir), { withFileTypes: true })) {
+    if (!entry.isFile() || !/^(?:LICENSE(?:\..*)?|NOTICE(?:\..*)?|SOURCE\.json)$/i.test(entry.name)) continue;
+    await cp(path.join(path.dirname(recipeDir), entry.name), path.join(sourceDir, entry.name));
+  }
 }
 
 async function copyLottieRuntime(recipesRoot, outputDir) {
@@ -573,6 +675,12 @@ async function copyLottieRuntime(recipesRoot, outputDir) {
   const destination = path.join(outputDir, "_runtime", "lottie.min.js");
   await mkdir(path.dirname(destination), { recursive: true });
   await cp(runtime, destination);
+}
+
+async function copyThreeRuntime(recipeDir, outputDir) {
+  const source = path.join(recipeDir, "_runtime", "three");
+  const destination = path.join(outputDir, "_runtime", "three");
+  await cp(source, destination, { recursive: true });
 }
 
 async function ensureLottieAssets(recipeDir, outputDir, jsonFile) {
@@ -662,12 +770,25 @@ export async function convertRecipe({ recipesRoot, recipeDir }) {
     if (jsonFile) lottieJson = jsonFile;
     await copyLottieRuntime(recipesRoot, outputDir);
     await ensureLottieAssets(recipeDir, outputDir, lottieJson);
+  } else if (runtime.includes("three")) {
+    await copyThreeRuntime(recipeDir, outputDir);
+    await writeFile(path.join(outputDir, "hf-recipe.js"), threeRecipeSource(), "utf8");
+    await writeFile(path.join(outputDir, "hf-adapter.js"), threeAdapterSource({ id, duration }), "utf8");
+  } else if (runtime.includes("svg-smil")) {
+    await writeFile(
+      path.join(outputDir, "hf-recipe.js"),
+      "/* The original inline SVG SMIL implementation is preserved in index.html and source/. */\n",
+      "utf8",
+    );
+    await writeFile(path.join(outputDir, "hf-adapter.js"), svgSmilAdapterSource({ id, duration }), "utf8");
   } else {
     await writeFile(path.join(outputDir, "hf-recipe.js"), await bundleRecipeScripts(recipeDir, blocks), "utf8");
     await writeFile(path.join(outputDir, "hf-adapter.js"), adapterSource({ id, duration, body, runtime }), "utf8");
   }
 
-  const html = compositionHtml({ id, duration, head, body, runtime, lottieJson });
+  const html = runtime.includes("three")
+    ? threeCompositionHtml({ id, duration })
+    : compositionHtml({ id, duration, head, body, runtime, lottieJson });
   await writeFile(path.join(outputDir, "index.html"), html, "utf8");
   const receipt = {
     schema_version: 1,
@@ -677,7 +798,15 @@ export async function convertRecipe({ recipesRoot, recipeDir }) {
     duration_s: duration,
     entry: "index.html",
     source_entry: entry,
-    deterministic_adapter: runtime.includes("lottie") ? "lottie" : runtime.includes("css") && runtime.length === 1 ? "css" : "replay",
+    deterministic_adapter: runtime.includes("lottie")
+      ? "lottie"
+      : runtime.includes("three")
+        ? "three"
+        : runtime.includes("svg-smil")
+          ? "svg-smil"
+        : runtime.includes("css") && runtime.length === 1
+          ? "css"
+          : "replay",
     source_manifest_sha256: sha256(manifest),
   };
   await writeFile(path.join(outputDir, "conversion.json"), `${JSON.stringify(receipt, null, 2)}\n`, "utf8");

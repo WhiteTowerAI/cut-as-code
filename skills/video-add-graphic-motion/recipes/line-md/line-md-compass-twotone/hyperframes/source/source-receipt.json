@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-compass-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "d3f15ce920a902d64c57bc09dee0909b680ea7c0dfc25f06078892c5d2b9dc4a",
+    "icon.svg": "2c83372346d65794beb99527b8c9c3e47345be96af8f054b9f09de09676be128",
+    "upstream-icon.json": "e8aea03696dcf925ca3ed935f25bdaae1e36c7ffafbf31e2028c0bac47c82c51"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-pizza",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "5fca3b726022a204930facf65fe76fb8c603835e7c6516a0bfa340900dbde1bf",
+    "icon.svg": "4dc99c3532f6936318626ae8b1e602ea004f6e38bceb9bfe937a01aeed19d04d",
+    "upstream-icon.json": "6cfd2ea9353637d038b9f6f41c68460501a191d2621eba1ebcd3990a1851bfd3"
+  }
+}

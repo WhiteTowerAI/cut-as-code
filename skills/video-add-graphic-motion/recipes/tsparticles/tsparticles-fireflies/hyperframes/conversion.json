@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "tsparticles-fireflies",
+  "surface": "tsparticles",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "0d3eee6e38b3d23bd39c6a6f627256f376a44bb38b9673f446f65cbcddb3aecf"
+}

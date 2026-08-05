@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-download-off-twotone-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "6f1a29c53be9373ca4945fc9b2251e23720692b754b3d35104920ca8c0796ca1",
+    "icon.svg": "6d9856573824503d70eba6b01011449aebb4da3fb5827a2774deb3c5335385cb",
+    "upstream-icon.json": "854be8927f8ada99f51a3e895f2defe42d510be43b3c85eefa73f032480a2db3"
+  }
+}

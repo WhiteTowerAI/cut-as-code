@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/ItemRevealer",
+  "repository_url": "https://github.com/codrops/ItemRevealer",
+  "clone_url": "https://github.com/codrops/ItemRevealer.git",
+  "revision": "f5b67c3ddc3eba63a84e4512d018ee00d60dd231",
+  "default_branch": "master",
+  "downloaded_at": "2026-08-04T10:26:28.553Z",
+  "selection": {
+    "score": 11,
+    "visual_rationale": "Visual/motion signals: anim, reveal, grid, svg, morph.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "HTML",
+    "topics": [],
+    "github_size_kb": 3922
+  },
+  "license": {
+    "github_spdx_id": null,
+    "repository_license_files": [],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "codrops-official-licensing-page-and-local-files"
+  },
+  "inventory": {
+    "file_count": 58,
+    "total_bytes": 4161873,
+    "license_files": [],
+    "top_extensions": [
+      {
+        "extension": ".jpg",
+        "count": 42
+      },
+      {
+        "extension": ".css",
+        "count": 4
+      },
+      {
+        "extension": ".js",
+        "count": 4
+      },
+      {
+        "extension": ".html",
+        "count": 3
+      },
+      {
+        "extension": ".ico",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      },
+      {
+        "extension": ".png",
+        "count": 1
+      },
+      {
+        "extension": ".svg",
+        "count": 1
+      },
+      {
+        "extension": "(none)",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

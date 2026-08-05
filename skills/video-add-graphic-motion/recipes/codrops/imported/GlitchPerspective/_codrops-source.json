@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/GlitchPerspective",
+  "repository_url": "https://github.com/codrops/GlitchPerspective",
+  "clone_url": "https://github.com/codrops/GlitchPerspective.git",
+  "revision": "80f9295118011ad55691398d2cec220ecf8c8f74",
+  "default_branch": "main",
+  "downloaded_at": "2026-08-04T10:26:04.606Z",
+  "selection": {
+    "score": 11,
+    "visual_rationale": "Visual/motion signals: anim, effect, hover, image, glitch.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "HTML",
+    "topics": [],
+    "github_size_kb": 454
+  },
+  "license": {
+    "github_spdx_id": "MIT",
+    "repository_license_files": [
+      "LICENSE"
+    ],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "repository-metadata-and-local-files"
+  },
+  "inventory": {
+    "file_count": 39,
+    "total_bytes": 534368,
+    "license_files": [
+      "LICENSE"
+    ],
+    "top_extensions": [
+      {
+        "extension": ".avif",
+        "count": 15
+      },
+      {
+        "extension": ".png",
+        "count": 15
+      },
+      {
+        "extension": "(none)",
+        "count": 3
+      },
+      {
+        "extension": ".html",
+        "count": 2
+      },
+      {
+        "extension": ".css",
+        "count": 1
+      },
+      {
+        "extension": ".ico",
+        "count": 1
+      },
+      {
+        "extension": ".js",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

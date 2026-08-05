@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-light-dark-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "fa922e84d24c440c15a2ef7441eee4c167848ce34b3a718aec0d9be3a7d0a104",
+    "icon.svg": "b592036214aa4240ef41999b03be4da53cd031573e01edea287786a33cb78e12",
+    "upstream-icon.json": "f64a6948f82de31328f8e166f9047bddbb3441375932b744ee13e57caf020792"
+  }
+}

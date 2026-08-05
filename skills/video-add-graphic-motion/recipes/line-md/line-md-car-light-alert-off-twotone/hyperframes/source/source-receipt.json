@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-car-light-alert-off-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "5ac1817dec9212d316e198cc22014a1b6e6e0227a0c42924b054d9e0c40696da",
+    "icon.svg": "d521f0a433961d47771ec2e33d9bc432e441bf43276aa2f33f8cfb004d935ee4",
+    "upstream-icon.json": "7af79d2b7391fac22c5f41a118e2bd312ea32bc7c0aa1e06588afc85d3600d5a"
+  }
+}

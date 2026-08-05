@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/ImageGridEffects",
+  "repository_url": "https://github.com/codrops/ImageGridEffects",
+  "clone_url": "https://github.com/codrops/ImageGridEffects.git",
+  "revision": "30c994b612900be1174d4c1535b1d6d8932cba1b",
+  "default_branch": "master",
+  "downloaded_at": "2026-08-04T10:28:14.255Z",
+  "selection": {
+    "score": 10,
+    "visual_rationale": "Visual/motion signals: anim, effect, image, grid.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "HTML",
+    "topics": [],
+    "github_size_kb": 4438
+  },
+  "license": {
+    "github_spdx_id": null,
+    "repository_license_files": [
+      "fonts/codropsicons/license.txt"
+    ],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "codrops-official-licensing-page-and-local-files"
+  },
+  "inventory": {
+    "file_count": 103,
+    "total_bytes": 5046078,
+    "license_files": [
+      "fonts/codropsicons/license.txt"
+    ],
+    "top_extensions": [
+      {
+        "extension": ".jpg",
+        "count": 60
+      },
+      {
+        "extension": ".css",
+        "count": 10
+      },
+      {
+        "extension": ".html",
+        "count": 6
+      },
+      {
+        "extension": ".js",
+        "count": 5
+      },
+      {
+        "extension": ".svg",
+        "count": 5
+      },
+      {
+        "extension": ".eot",
+        "count": 3
+      },
+      {
+        "extension": ".ttf",
+        "count": 3
+      },
+      {
+        "extension": ".woff",
+        "count": 3
+      },
+      {
+        "extension": ".ico",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      },
+      {
+        "extension": ".otf",
+        "count": 1
+      },
+      {
+        "extension": ".png",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

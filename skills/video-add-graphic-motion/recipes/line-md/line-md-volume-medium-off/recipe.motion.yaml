@@ -1,0 +1,46 @@
+spec_version: 1
+id: line-md-volume-medium-off
+name: "Line MD Volume Medium Off"
+description: "Animated Volume Medium Off semantic sticker from the original Line MD SVG body."
+surfaces: [video]
+category: sticker-semantic-icon
+tech: [svg]
+canvas: [video]
+target: [overlay]
+intent: sticker-semantic-icon
+runtime: ["svg-smil"]
+export: [skill, html]
+dependencies: []
+tags: ["sticker", "line-md", "volume", "medium", "off"]
+intent_keywords:
+  - "sticker"
+  - "line-md"
+  - "volume"
+  - "medium"
+  - "off"
+best_for:
+  - "Literal status, action, notification, or object cues where the icon meaning is immediately clear"
+avoid_when:
+  - "The icon meaning is ambiguous in the transcript context"
+  - "The animated icon cannot remain fully outside visible faces"
+restraint:
+  max_per_view: 1
+  notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."
+motion:
+  duration_ms: 6000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: preview.html
+implementations:
+  - tech: svg-smil
+    files: ["icon.svg", "upstream-icon.json"]
+    usage: "Materialize the converted HyperFrames directory, then adapt placement, scale, palette, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/cyberalien/line-md/blob/2ed22555cee9c1e50d4269865681d01ee8cffd7c/line-md.json"
+  attribution_required: true
+author:
+  name: "Vjacheslav Trushkin"
+  url: "https://github.com/cyberalien/line-md"
+version: 3.0.5

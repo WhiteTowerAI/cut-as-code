@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/MultiLayoutSlideshow",
+  "repository_url": "https://github.com/codrops/MultiLayoutSlideshow",
+  "clone_url": "https://github.com/codrops/MultiLayoutSlideshow.git",
+  "revision": "f5b3e94d8858a3128330213d26c71bbccba242da",
+  "default_branch": "master",
+  "downloaded_at": "2026-08-04T10:27:52.316Z",
+  "selection": {
+    "score": 10,
+    "visual_rationale": "Visual/motion signals: anim, effect, slideshow, layout.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "HTML",
+    "topics": [],
+    "github_size_kb": 1157
+  },
+  "license": {
+    "github_spdx_id": null,
+    "repository_license_files": [],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "codrops-official-licensing-page-and-local-files"
+  },
+  "inventory": {
+    "file_count": 59,
+    "total_bytes": 1416674,
+    "license_files": [],
+    "top_extensions": [
+      {
+        "extension": ".jpg",
+        "count": 38
+      },
+      {
+        "extension": ".css",
+        "count": 7
+      },
+      {
+        "extension": ".js",
+        "count": 4
+      },
+      {
+        "extension": ".html",
+        "count": 2
+      },
+      {
+        "extension": ".eot",
+        "count": 1
+      },
+      {
+        "extension": ".ico",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      },
+      {
+        "extension": ".svg",
+        "count": 1
+      },
+      {
+        "extension": ".ttf",
+        "count": 1
+      },
+      {
+        "extension": ".woff",
+        "count": 1
+      },
+      {
+        "extension": ".woff2",
+        "count": 1
+      },
+      {
+        "extension": "(none)",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

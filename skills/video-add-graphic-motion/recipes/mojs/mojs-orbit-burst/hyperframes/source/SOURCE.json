@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "source_id": "mojs",
+  "display_name": "mo.js",
+  "website": "https://mojs.github.io/tutorials/",
+  "repository": "https://github.com/mojs/mojs",
+  "revision": "0a9cf9a87dd5637e6fa770755e79048489bcf817",
+  "package": {
+    "name": "@mojs/core",
+    "version": "1.7.1",
+    "tarball_file": "mojs-core-1.7.1.tgz",
+    "tarball_sha256": "54e4e5f861af42d0337282f79379ab9f0b07eb44495f16754bd58b1a024e54dd"
+  },
+  "license": {
+    "spdx": "MIT",
+    "file": "LICENSE.mojs"
+  },
+  "selection_count": 10,
+  "conversion": "Original implementation or SVG preserved and wrapped for deterministic HyperFrames seeking."
+}

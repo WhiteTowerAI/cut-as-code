@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/RapidImageHoverMenuEffects",
+  "repository_url": "https://github.com/codrops/RapidImageHoverMenuEffects",
+  "clone_url": "https://github.com/codrops/RapidImageHoverMenuEffects.git",
+  "revision": "16efa4884dffd30d6bc1cdee6702f2528f3354dc",
+  "default_branch": "master",
+  "downloaded_at": "2026-08-04T10:27:32.302Z",
+  "selection": {
+    "score": 10,
+    "visual_rationale": "Visual/motion signals: effect, hover, image, menu.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "JavaScript",
+    "topics": [],
+    "github_size_kb": 657
+  },
+  "license": {
+    "github_spdx_id": "MIT",
+    "repository_license_files": [
+      "LICENSE"
+    ],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "repository-metadata-and-local-files"
+  },
+  "inventory": {
+    "file_count": 350,
+    "total_bytes": 9056294,
+    "license_files": [
+      "LICENSE"
+    ],
+    "top_extensions": [
+      {
+        "extension": ".jpg",
+        "count": 300
+      },
+      {
+        "extension": ".js",
+        "count": 23
+      },
+      {
+        "extension": ".css",
+        "count": 10
+      },
+      {
+        "extension": ".html",
+        "count": 10
+      },
+      {
+        "extension": "(none)",
+        "count": 3
+      },
+      {
+        "extension": ".ico",
+        "count": 2
+      },
+      {
+        "extension": ".json",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

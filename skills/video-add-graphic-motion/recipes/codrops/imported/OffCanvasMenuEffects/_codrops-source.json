@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/OffCanvasMenuEffects",
+  "repository_url": "https://github.com/codrops/OffCanvasMenuEffects",
+  "clone_url": "https://github.com/codrops/OffCanvasMenuEffects.git",
+  "revision": "f6d9ef2ce7f45c86244b6ff56643ed66f71a2d57",
+  "default_branch": "master",
+  "downloaded_at": "2026-08-04T10:23:47.173Z",
+  "selection": {
+    "score": 14,
+    "visual_rationale": "Visual/motion signals: anim, effect, transition, menu, svg, canvas.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "CSS",
+    "topics": [],
+    "github_size_kb": 544
+  },
+  "license": {
+    "github_spdx_id": null,
+    "repository_license_files": [
+      "fonts/codropsicons/license.txt"
+    ],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "codrops-official-licensing-page-and-local-files"
+  },
+  "inventory": {
+    "file_count": 40,
+    "total_bytes": 748441,
+    "license_files": [
+      "fonts/codropsicons/license.txt"
+    ],
+    "top_extensions": [
+      {
+        "extension": ".css",
+        "count": 12
+      },
+      {
+        "extension": ".html",
+        "count": 9
+      },
+      {
+        "extension": ".js",
+        "count": 6
+      },
+      {
+        "extension": ".png",
+        "count": 3
+      },
+      {
+        "extension": ".eot",
+        "count": 2
+      },
+      {
+        "extension": ".svg",
+        "count": 2
+      },
+      {
+        "extension": ".ttf",
+        "count": 2
+      },
+      {
+        "extension": ".woff",
+        "count": 2
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      },
+      {
+        "extension": ".txt",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

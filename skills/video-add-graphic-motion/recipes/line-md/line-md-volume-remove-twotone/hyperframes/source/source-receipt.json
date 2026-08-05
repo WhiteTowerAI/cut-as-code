@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-volume-remove-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "7b00ab4186517ae44a0f5b69b53ddd5ffed4a9eb903c00b6134ea618914e2a88",
+    "icon.svg": "e0fb8086bc030c7eab422f59ae545dbfb44dd437032f1dbe386e2b7cfe11772f",
+    "upstream-icon.json": "5efa5ff8c4c58ccfff6a4db9bf542225f0ca3f17d3d22fb38a8d4211d6590170"
+  }
+}

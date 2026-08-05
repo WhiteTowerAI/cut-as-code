@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/Theodore",
+  "repository_url": "https://github.com/codrops/Theodore",
+  "clone_url": "https://github.com/codrops/Theodore.git",
+  "revision": "e7bfd13c67e63aac864f812d0fa0f56a3eb7ee18",
+  "default_branch": "main",
+  "downloaded_at": "2026-08-04T10:26:28.356Z",
+  "selection": {
+    "score": 11,
+    "visual_rationale": "Visual/motion signals: anim, effect, menu, svg, background.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "CSS",
+    "topics": [
+      "animation",
+      "css",
+      "front-end",
+      "template"
+    ],
+    "github_size_kb": 3974
+  },
+  "license": {
+    "github_spdx_id": "MIT",
+    "repository_license_files": [
+      "LICENSE"
+    ],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "repository-metadata-and-local-files"
+  },
+  "inventory": {
+    "file_count": 37,
+    "total_bytes": 1759878,
+    "license_files": [
+      "LICENSE"
+    ],
+    "top_extensions": [
+      {
+        "extension": ".jpg",
+        "count": 18
+      },
+      {
+        "extension": ".js",
+        "count": 4
+      },
+      {
+        "extension": "(none)",
+        "count": 4
+      },
+      {
+        "extension": ".svg",
+        "count": 3
+      },
+      {
+        "extension": ".css",
+        "count": 2
+      },
+      {
+        "extension": ".html",
+        "count": 2
+      },
+      {
+        "extension": ".ico",
+        "count": 2
+      },
+      {
+        "extension": ".json",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

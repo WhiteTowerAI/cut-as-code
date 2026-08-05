@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-round-ramp-right",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "ebbd86afef16f484a1973a540549261728ce22130fde8e0f37dfbd93432c7208",
+    "icon.svg": "c3511c4b1730e220c39bbce6050a8ddd182641deda79ad0638d569b84e0eccf1",
+    "upstream-icon.json": "cfdf376cf1bd46e75edd4621b726e3b9036d7d5ebffa346a7d5acf7c50931bcc"
+  }
+}

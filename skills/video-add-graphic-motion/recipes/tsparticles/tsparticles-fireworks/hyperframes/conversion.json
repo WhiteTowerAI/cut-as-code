@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "tsparticles-fireworks",
+  "surface": "tsparticles",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "881616c14a87df57b67e755c9dc91f528238fa5517ea6e8edf790f665e41cf25"
+}

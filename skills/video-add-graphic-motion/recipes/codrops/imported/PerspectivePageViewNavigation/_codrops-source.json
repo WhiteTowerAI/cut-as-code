@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/PerspectivePageViewNavigation",
+  "repository_url": "https://github.com/codrops/PerspectivePageViewNavigation",
+  "clone_url": "https://github.com/codrops/PerspectivePageViewNavigation.git",
+  "revision": "b473003a97e91d3d0174ac362b2b670085dc7918",
+  "default_branch": "master",
+  "downloaded_at": "2026-08-04T10:23:37.291Z",
+  "selection": {
+    "score": 14,
+    "visual_rationale": "Visual/motion signals: effect, reveal, menu, navigation, 3d, page.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "CSS",
+    "topics": [],
+    "github_size_kb": 167
+  },
+  "license": {
+    "github_spdx_id": null,
+    "repository_license_files": [
+      "fonts/codropsicons/license.txt",
+      "fonts/typicons/license.txt"
+    ],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "codrops-official-licensing-page-and-local-files"
+  },
+  "inventory": {
+    "file_count": 23,
+    "total_bytes": 87873,
+    "license_files": [
+      "fonts/codropsicons/license.txt",
+      "fonts/typicons/license.txt"
+    ],
+    "top_extensions": [
+      {
+        "extension": ".html",
+        "count": 6
+      },
+      {
+        "extension": ".css",
+        "count": 3
+      },
+      {
+        "extension": ".js",
+        "count": 3
+      },
+      {
+        "extension": ".eot",
+        "count": 2
+      },
+      {
+        "extension": ".svg",
+        "count": 2
+      },
+      {
+        "extension": ".ttf",
+        "count": 2
+      },
+      {
+        "extension": ".txt",
+        "count": 2
+      },
+      {
+        "extension": ".woff",
+        "count": 2
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-phone-add",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "5c33c0725005714fad28223d6bc86d184efbc0034d2d9dbf7e87f426a84467ec",
+    "icon.svg": "90c4ef6d63584d9a4ea258be45477682f8a743ad5ab68528e2c95449559ba651",
+    "upstream-icon.json": "fa8986c70387ff7bc9ec788e1d710290c2b4fbcd02ea671ac829dc628feef27c"
+  }
+}

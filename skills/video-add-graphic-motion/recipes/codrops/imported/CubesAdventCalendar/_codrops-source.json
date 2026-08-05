@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/CubesAdventCalendar",
+  "repository_url": "https://github.com/codrops/CubesAdventCalendar",
+  "clone_url": "https://github.com/codrops/CubesAdventCalendar.git",
+  "revision": "45b4d6770398c5b6e5d029c6419f63407dae3554",
+  "default_branch": "master",
+  "downloaded_at": "2026-08-04T10:24:43.807Z",
+  "selection": {
+    "score": 12,
+    "visual_rationale": "Visual/motion signals: anim, effect, hover, 3d, background.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "JavaScript",
+    "topics": [],
+    "github_size_kb": 238
+  },
+  "license": {
+    "github_spdx_id": null,
+    "repository_license_files": [],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "codrops-official-licensing-page-and-local-files"
+  },
+  "inventory": {
+    "file_count": 55,
+    "total_bytes": 388937,
+    "license_files": [],
+    "top_extensions": [
+      {
+        "extension": ".png",
+        "count": 37
+      },
+      {
+        "extension": ".css",
+        "count": 6
+      },
+      {
+        "extension": ".js",
+        "count": 6
+      },
+      {
+        "extension": ".html",
+        "count": 3
+      },
+      {
+        "extension": ".ico",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      },
+      {
+        "extension": "(none)",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

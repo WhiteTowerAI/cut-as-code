@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/CSSGlitchEffect",
+  "repository_url": "https://github.com/codrops/CSSGlitchEffect",
+  "clone_url": "https://github.com/codrops/CSSGlitchEffect.git",
+  "revision": "1c5caf538111e8a1c82a11f72065fa6eea01e464",
+  "default_branch": "master",
+  "downloaded_at": "2026-08-04T10:25:01.276Z",
+  "selection": {
+    "score": 12,
+    "visual_rationale": "Visual/motion signals: anim, effect, glitch, clip, page.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "CSS",
+    "topics": [],
+    "github_size_kb": 685
+  },
+  "license": {
+    "github_spdx_id": null,
+    "repository_license_files": [],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "codrops-official-licensing-page-and-local-files"
+  },
+  "inventory": {
+    "file_count": 20,
+    "total_bytes": 769375,
+    "license_files": [],
+    "top_extensions": [
+      {
+        "extension": ".jpg",
+        "count": 8
+      },
+      {
+        "extension": ".css",
+        "count": 4
+      },
+      {
+        "extension": ".html",
+        "count": 3
+      },
+      {
+        "extension": ".js",
+        "count": 2
+      },
+      {
+        "extension": ".ico",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      },
+      {
+        "extension": "(none)",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

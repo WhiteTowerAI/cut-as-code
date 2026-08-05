@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/MagneticButtons",
+  "repository_url": "https://github.com/codrops/MagneticButtons",
+  "clone_url": "https://github.com/codrops/MagneticButtons.git",
+  "revision": "b2ee8ac9cd561e13198335cca5684fe1c31d543c",
+  "default_branch": "master",
+  "downloaded_at": "2026-08-04T10:27:19.916Z",
+  "selection": {
+    "score": 10,
+    "visual_rationale": "Visual/motion signals: effect, hover, button.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "JavaScript",
+    "topics": [
+      "button-animation"
+    ],
+    "github_size_kb": 499
+  },
+  "license": {
+    "github_spdx_id": "MIT",
+    "repository_license_files": [
+      "LICENSE"
+    ],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "repository-metadata-and-local-files"
+  },
+  "inventory": {
+    "file_count": 55,
+    "total_bytes": 1548581,
+    "license_files": [
+      "LICENSE"
+    ],
+    "top_extensions": [
+      {
+        "extension": ".js",
+        "count": 22
+      },
+      {
+        "extension": ".css",
+        "count": 14
+      },
+      {
+        "extension": ".html",
+        "count": 12
+      },
+      {
+        "extension": "(none)",
+        "count": 3
+      },
+      {
+        "extension": ".ico",
+        "count": 2
+      },
+      {
+        "extension": ".json",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

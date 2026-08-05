@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/AnimatedGridLayout",
+  "repository_url": "https://github.com/codrops/AnimatedGridLayout",
+  "clone_url": "https://github.com/codrops/AnimatedGridLayout.git",
+  "revision": "faed393932f2c0cfc42242b1bd40b624f5423c23",
+  "default_branch": "master",
+  "downloaded_at": "2026-08-04T10:27:22.063Z",
+  "selection": {
+    "score": 10,
+    "visual_rationale": "Visual/motion signals: anim, effect, grid, layout.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "HTML",
+    "topics": [],
+    "github_size_kb": 636
+  },
+  "license": {
+    "github_spdx_id": null,
+    "repository_license_files": [
+      "fonts/codropsicons/license.txt"
+    ],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "codrops-official-licensing-page-and-local-files"
+  },
+  "inventory": {
+    "file_count": 37,
+    "total_bytes": 1412457,
+    "license_files": [
+      "fonts/codropsicons/license.txt"
+    ],
+    "top_extensions": [
+      {
+        "extension": ".png",
+        "count": 8
+      },
+      {
+        "extension": ".css",
+        "count": 5
+      },
+      {
+        "extension": ".scss",
+        "count": 4
+      },
+      {
+        "extension": ".js",
+        "count": 3
+      },
+      {
+        "extension": ".svg",
+        "count": 3
+      },
+      {
+        "extension": ".eot",
+        "count": 2
+      },
+      {
+        "extension": ".html",
+        "count": 2
+      },
+      {
+        "extension": ".map",
+        "count": 2
+      },
+      {
+        "extension": ".ttf",
+        "count": 2
+      },
+      {
+        "extension": ".woff",
+        "count": 2
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      },
+      {
+        "extension": ".otf",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

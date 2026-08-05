@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-circle-filled-to-confirm-circle-filled-transition",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "8ec0e0cf442f316751457e8c44f572cb28c82a9ec6182fd6b4addcd526e4b1aa",
+    "icon.svg": "770f52aa9e1f02e86eb0786651fb42d27cead986ebb7d78b910f1a17860785c8",
+    "upstream-icon.json": "9c667cd8acc85760bb1a074639137312715c81a3e0186f5d4427c44b1dbaba84"
+  }
+}

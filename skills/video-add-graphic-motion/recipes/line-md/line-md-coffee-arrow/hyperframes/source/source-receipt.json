@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-coffee-arrow",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "2ed9e8bc179e4d7cdc23ae09a07532159f26d5f2fbd6de1c87e3f76500f6a227",
+    "icon.svg": "306313723d69e11ddf0c51d90e8129667614e8989c2b8e62dde46d998a9082e7",
+    "upstream-icon.json": "cd5f900a75650de2988bf52e830d9fb8c49354069520c86c89f033b2389b9e8e"
+  }
+}

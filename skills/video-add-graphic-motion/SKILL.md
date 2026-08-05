@@ -1,11 +1,11 @@
 ---
 name: video-add-graphic-motion
-description: Use when an understood Project Protocol V1 video needs selective transcript-timed motion graphics chosen only from the bundled motion-anything recipe library and rendered with HyperFrames.
+description: Use when an understood Project Protocol V1 video needs selective transcript-timed motion graphics chosen from the bundled recipe library and rendered with HyperFrames.
 ---
 
 # Video Add Graphic Motion
 
-Add selective, shot-designed motion-anything recipe adaptations without changing timeline,
+Add selective, shot-designed recipe adaptations without changing timeline,
 geometry, or audio.
 Face safety is absolute: no graphic, text, mask, particle, or transient animation may overlap
 any visible face in any frame. Reposition, scale down, redesign, or skip the cue when no
@@ -13,6 +13,11 @@ face-safe placement exists.
 The bundled `recipes/` tree is the only effect library. Do not search the web, query a remote
 catalog, or author a substitute effect. Every bundled manifest recipe is supported through its
 preconverted `hyperframes/` directory.
+The library contains 1,477 recipes: 218 motion-anything recipes, the MIT-licensed Codrops
+`codrops/kinetic-images` Three.js recipe, and 1,258 source-backed stickers across
+`canvas-confetti/`, `mojs/`, `line-md/`, `meteocons/`, and `tsparticles/`. Library-level
+provenance lives in `recipes/ATTRIBUTION.md`; each source directory also carries its exact
+license and `SOURCE.json` receipt.
 
 **REQUIRED SUB-SKILLS:** Use `video-understand` first. Use `hyperframes`,
 `hyperframes-core`, `hyperframes-animation`, `hyperframes-keyframes`, and

@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/MotionTransitionEffect",
+  "repository_url": "https://github.com/codrops/MotionTransitionEffect",
+  "clone_url": "https://github.com/codrops/MotionTransitionEffect.git",
+  "revision": "b1d49d5acc0987a6fd3f94d2f5e0413a7cb96ebe",
+  "default_branch": "master",
+  "downloaded_at": "2026-08-04T10:26:15.371Z",
+  "selection": {
+    "score": 11,
+    "visual_rationale": "Visual/motion signals: effect, motion, transition, image, slideshow.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "JavaScript",
+    "topics": [],
+    "github_size_kb": 711
+  },
+  "license": {
+    "github_spdx_id": null,
+    "repository_license_files": [],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "codrops-official-licensing-page-and-local-files"
+  },
+  "inventory": {
+    "file_count": 23,
+    "total_bytes": 859254,
+    "license_files": [],
+    "top_extensions": [
+      {
+        "extension": ".jpg",
+        "count": 10
+      },
+      {
+        "extension": ".js",
+        "count": 5
+      },
+      {
+        "extension": ".html",
+        "count": 2
+      },
+      {
+        "extension": ".png",
+        "count": 2
+      },
+      {
+        "extension": ".css",
+        "count": 1
+      },
+      {
+        "extension": ".ico",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      },
+      {
+        "extension": "(none)",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

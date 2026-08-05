@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "source_kind": "unconverted-codrops-project",
+  "repository": "codrops/GridRevealEffects",
+  "repository_url": "https://github.com/codrops/GridRevealEffects",
+  "clone_url": "https://github.com/codrops/GridRevealEffects.git",
+  "revision": "b8a05526995dd7e4ab92edbb08c1244d7cc90057",
+  "default_branch": "master",
+  "downloaded_at": "2026-08-04T10:28:14.128Z",
+  "selection": {
+    "score": 10,
+    "visual_rationale": "Visual/motion signals: anim, effect, reveal, grid.",
+    "hyperframes_compatibility": "candidate",
+    "compatibility_rationale": "Front-end HTML/CSS/JS/TS/Astro source can be ported to deterministic absolute-time browser rendering; no conversion has been attempted."
+  },
+  "technology": {
+    "primary_language": "HTML",
+    "topics": [
+      "animation",
+      "animejs",
+      "cssgrid",
+      "javascript"
+    ],
+    "github_size_kb": 3465
+  },
+  "license": {
+    "github_spdx_id": null,
+    "repository_license_files": [],
+    "codrops_official_license_url": "https://tympanus.net/codrops/licensing/",
+    "evidence": "codrops-official-licensing-page-and-local-files"
+  },
+  "inventory": {
+    "file_count": 56,
+    "total_bytes": 4191909,
+    "license_files": [],
+    "top_extensions": [
+      {
+        "extension": ".jpg",
+        "count": 42
+      },
+      {
+        "extension": ".js",
+        "count": 6
+      },
+      {
+        "extension": ".html",
+        "count": 4
+      },
+      {
+        "extension": ".css",
+        "count": 1
+      },
+      {
+        "extension": ".ico",
+        "count": 1
+      },
+      {
+        "extension": ".md",
+        "count": 1
+      },
+      {
+        "extension": "(none)",
+        "count": 1
+      }
+    ]
+  },
+  "conversion": {
+    "attempted": false,
+    "recipe_manifest_created": false,
+    "hyperframes_output_created": false
+  }
+}

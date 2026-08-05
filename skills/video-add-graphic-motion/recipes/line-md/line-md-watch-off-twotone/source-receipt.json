@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-watch-off-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "cdb1c17604db934fd3bb27c9d26f67b477c115934f13808336b85a220a1efc57",
+    "icon.svg": "5efa79c249fe766d58e2b0149af23cac9e05223595a817070c6123a1d71aec77",
+    "upstream-icon.json": "26a0ca61704795995a938a4f94d34a5168a26c44168ef34eda8b00af36587661"
+  }
+}
