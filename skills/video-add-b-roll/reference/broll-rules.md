@@ -140,6 +140,62 @@
   normalize, compile, or render until the user explicitly copies, downloads, or approves exact
   selections.
 
+## Speaker Inset Review
+
+- Omit `speaker_inset_style` for the legacy one-page workflow. When enabled, require one strict
+  project-level circle or rounded-rectangle style with fixed size, aspect ratio, border, margins,
+  subtitle-safe bottom area, and unique allowed anchors.
+- Require two or three unique, ascending project `size_candidates`; `width_ratio` must equal one of
+  them. Render the candidates from the first enabled shot, let the Agent recommend the smallest
+  legible safe size, and show that one project-level comparison in the composite review. Do not
+  repeat size approval per shot or silently use one shot's custom size.
+- The first-page `prepare_composite` action freezes exact B-roll segments in
+  `broll-selection.json` and moves selected shots to `composite_pending`. It is not approval,
+  creates no `review_status`, and never authorizes normalization or registration.
+- Split every selected program range at canonical clip discontinuities and conservative FFmpeg
+  scene candidates. Align boundaries and keyframes to rational timeline frames. Never interpolate
+  a ROI across a cut or infer identity across cuts.
+- Build temporal A-roll evidence from the hash-bound upstream review video. Include entry, middle,
+  exit, adjacent frames, transcript context, frame path, dimensions, program time, and SHA-256.
+  A single still is insufficient evidence for a current speaker in a multi-person shot.
+- When the baseline bursts cannot isolate one current speaker, request one or more frame-aligned
+  supplemental points inside that subshot. Extract a denser adjacent-frame burst, rebuild the
+  analysis ID/hash, and inspect it before using `ambiguous`. Never carry an old Agent input across
+  the rebuilt analysis.
+- Use the delegated Agent only for visual speaker judgment, sparse normalized ROI annotation, and
+  composition review. Do not install or invoke a face detector, person segmentation/tracking model,
+  or external identity service.
+- Require `confirmed`, `ambiguous`, `absent`, or `occluded` for every subshot and a specific
+  rationale. Only confirmed tracks may enable the window. Every other status must use
+  `pure_broll`, no anchor, and no keyframes.
+- Keep confirmed ROI values finite, positive, inside the A-roll frame, strictly ordered, frame
+  aligned, and covering the complete subshot. Interpolate only within that subshot.
+- Render the user's exact B-roll bytes, trims, segment order, speeds, timeline geometry, rational
+  FPS, and selected LUT. Read speaker pixels from the already graded upstream review video; never
+  apply the LUT to those pixels again.
+- Freeze the current composite, pure B-roll, and a full-shot exact preview for every allowed anchor.
+  Agent clearance must inspect these composited pixels, not isolated A-roll and B-roll sources.
+- Freeze one additional project-level size comparison from the first enabled shot. Bind every
+  candidate ratio and the selected ratio; the selected candidate must be the exact current
+  contextual preview.
+- Record `subject_legibility: pass` for every enabled subshot after inspecting its final-size pixels.
+  Tighten the ROI and rebuild when the subject occupies too little of the window. Use
+  `not_applicable` for pure B-roll; never enlarge only one shot or approve a blurred enlargement.
+- Record one continuity assessment per shot. Derive `short_flash` when an enabled run is shorter
+  than 1.5 seconds and is followed by a longer pure-B-roll run. Resolve it by independently
+  confirming and extending the later subshot, disabling the whole shot inset, or explicitly
+  justifying an intentional transition. Do not use a fade or a guessed identity to mask it.
+- `pass` binds the enabled anchor actually checked. `no_safe_position` must list every allowed
+  anchor and resolve the subshot to `pure_broll`; never shrink the project style, cover focal B-roll
+  content, replace the selected B-roll, or invent a fallback speaker image.
+- The second immutable page must show the locked selection, temporal evidence, ROI keyframes,
+  current composite, pure B-roll, anchor previews, and clearance reasoning. Approval requires
+  `review_stage: composite` and current selection, analysis, Agent input, preview, clearance, and
+  style hashes. Any modification requests a new immutable page.
+- The implemented speaker-inset path currently stops at the second-page review gate. Do not send an
+  enabled inset plan to normalization or delivery until the normalizer precomposes the approved
+  speaker pixels into the one existing per-shot overlay and that stage has been reviewed.
+
 ## Segment Timing And Playback
 
 - Store every new selected video as one to three ordered canonical `segments`. Each segment names a

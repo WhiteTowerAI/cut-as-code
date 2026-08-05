@@ -18,6 +18,7 @@ from PIL import Image
 
 import broll_plan
 import projectlib
+import speaker_inset
 
 TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "assets" / "broll-review.html"
 PAYLOAD_MARKER = "__BROLL_REVIEW_DATA__"
@@ -173,6 +174,150 @@ def _payload(plan, timeline, transcript, root, assets_dir):
     return payload_shots, candidate_specs, pre_skipped_ids
 
 
+def _load_speaker_document(plan, root, name):
+    binding = plan.get("speaker_inset", {}).get(name)
+    if not isinstance(binding, dict):
+        raise ValueError(f"speaker inset {name} binding is missing")
+    path = root / "work" / str(binding.get("path", ""))
+    if not _inside(root / "work", path) or not path.is_file():
+        raise ValueError(f"speaker inset {name} path is invalid")
+    if _hash(path) != binding.get("sha256"):
+        raise ValueError(f"speaker inset {name} SHA-256 is stale")
+    return projectlib.load_json(path)
+
+
+def _composite_payload(plan, root, assets_dir):
+    analysis = _load_speaker_document(plan, root, "analysis")
+    agent_input = _load_speaker_document(plan, root, "agent_input")
+    preview = _load_speaker_document(plan, root, "preview")
+    clearance = _load_speaker_document(plan, root, "clearance")
+    analysis_shots = {item["shot_id"]: item for item in analysis["shots"]}
+    agent_shots = {item["shot_id"]: item for item in agent_input["shots"]}
+    preview_shots = {item["shot_id"]: item for item in preview["shots"]}
+    clearance_shots = {item["shot_id"]: item for item in clearance["shots"]}
+    asset_specs = []
+    asset_names = {}
+
+    def freeze(binding, label):
+        source = root / "work" / str(binding.get("path", ""))
+        if not _inside(root / "work", source) or not source.is_file():
+            raise ValueError(f"{label} path is invalid")
+        digest = binding.get("sha256")
+        if _hash(source) != digest:
+            raise ValueError(f"{label} SHA-256 is stale")
+        key = (str(source), digest)
+        if key not in asset_names:
+            suffix = source.suffix.lower() if re.fullmatch(r"\.[a-zA-Z0-9]{1,8}", source.suffix) else ""
+            basename = f"speaker-{len(asset_names) + 1:03d}{suffix}"
+            asset_names[key] = basename
+            asset_specs.append((source, basename, digest))
+        return {
+            "path": f"{assets_dir.name}/{asset_names[key]}",
+            "sha256": digest,
+        }
+
+    size_review = preview.get("size_review")
+    speaker_size_review = None
+    if isinstance(size_review, dict):
+        speaker_size_review = {
+            "shot_id": size_review["shot_id"],
+            "selected_width_ratio": size_review["selected_width_ratio"],
+            "assessment": copy.deepcopy(clearance["size_assessment"]),
+            "candidates": [{
+                "width_ratio": candidate["width_ratio"],
+                **freeze(
+                    candidate,
+                    f"project speaker size {candidate['width_ratio']}",
+                ),
+            } for candidate in size_review["candidates"]],
+        }
+
+    payload_shots = []
+    pre_skipped_ids = []
+    for shot_index, shot in enumerate(plan["shots"], 1):
+        if shot["status"] == "skipped":
+            pre_skipped_ids.append(shot["id"])
+            continue
+        if shot["status"] != "composite_pending":
+            raise ValueError("composite review requires composite_pending or skipped shots")
+        shot_id = shot["id"]
+        if any(shot_id not in values for values in (
+                analysis_shots, agent_shots, preview_shots, clearance_shots)):
+            raise ValueError(f"{shot_id} speaker artifacts are incomplete")
+        candidates = {item["id"]: item for item in shot["candidates"]}
+        selected_candidates = []
+        for candidate_index, candidate_id in enumerate(
+                broll_plan.selected_candidate_ids(shot["selected"]), 1):
+            candidate = candidates[candidate_id]
+            source = broll_plan._candidate_path(root, candidate["cache_path"])
+            if source is None or not source.is_file() or _hash(source) != candidate["sha256"]:
+                raise ValueError(f"{shot_id} selected candidate is stale")
+            suffix = source.suffix.lower() if re.fullmatch(r"\.[a-zA-Z0-9]{1,8}", source.suffix) else ""
+            basename = f"locked-candidate-{shot_index:03d}-{candidate_index:03d}{suffix}"
+            asset_specs.append((source, basename, candidate["sha256"]))
+            selected_candidates.append({
+                "id": candidate_id,
+                "media_type": candidate["media_type"],
+                "path": f"{assets_dir.name}/{basename}",
+                "sha256": candidate["sha256"],
+                "provenance": copy.deepcopy(candidate["provenance"]),
+            })
+        analysis_subshots = {
+            item["id"]: item for item in analysis_shots[shot_id]["subshots"]
+        }
+        agent_subshots = {
+            item["id"]: item for item in agent_shots[shot_id]["subshots"]
+        }
+        clearance_subshots = {
+            item["id"]: item for item in clearance_shots[shot_id]["subshots"]
+        }
+        subshots = []
+        for subshot_id, analysis_subshot in analysis_subshots.items():
+            agent_subshot = agent_subshots[subshot_id]
+            clearance_subshot = clearance_subshots[subshot_id]
+            evidence_frames = []
+            seen_frames = set()
+            for point in analysis_subshot.get("evidence_points", []):
+                for frame in point.get("frames", []):
+                    key = (frame.get("path"), frame.get("sha256"))
+                    if key in seen_frames:
+                        continue
+                    seen_frames.add(key)
+                    frozen = freeze(frame, f"{subshot_id} evidence frame")
+                    frozen["program_time_s"] = frame.get("program_time_s")
+                    evidence_frames.append(frozen)
+            subshots.append({
+                "id": subshot_id,
+                "program_range": copy.deepcopy(analysis_subshot["program_range"]),
+                "speaker_status": agent_subshot["speaker_status"],
+                "speaker_rationale": agent_subshot["rationale"],
+                "keyframes": copy.deepcopy(agent_subshot["keyframes"]),
+                "display_mode": clearance_subshot["display_mode"],
+                "anchor": clearance_subshot.get("anchor"),
+                "clearance_status": clearance_subshot["clearance_status"],
+                "checked_anchors": copy.deepcopy(clearance_subshot["checked_anchors"]),
+                "subject_legibility": clearance_subshot["subject_legibility"],
+                "clearance_rationale": clearance_subshot["rationale"],
+                "evidence_frames": evidence_frames,
+            })
+        preview_shot = preview_shots[shot_id]
+        payload_shots.append({
+            "id": shot_id,
+            "program_range": copy.deepcopy(shot["program_range"]),
+            "locked_selection": copy.deepcopy(shot["selected"]),
+            "selected_candidates": selected_candidates,
+            "base_broll": freeze(preview_shot["base_broll"], f"{shot_id} base B-roll"),
+            "preview": freeze(preview_shot["preview"], f"{shot_id} contextual preview"),
+            "anchor_previews": {
+                anchor: freeze(binding, f"{shot_id} {anchor} preview")
+                for anchor, binding in preview_shot["anchor_previews"].items()
+            },
+            "continuity": copy.deepcopy(clearance_shots[shot_id]["continuity"]),
+            "subshots": subshots,
+        })
+    return payload_shots, asset_specs, pre_skipped_ids, speaker_size_review
+
+
 def _write_alias(page, alias):
     with tempfile.NamedTemporaryFile(dir=alias.parent, delete=False) as handle:
         staged = Path(handle.name)
@@ -234,9 +379,22 @@ def build_review_page(plan, timeline, transcript, video, output_dir, *, project_
     page, assets_dir = output_dir / f"b-roll-review-{identifier}.html", output_dir / f"b-roll-review-{identifier}-assets"
     if page.exists() or assets_dir.exists():
         raise FileExistsError(f"review publication already exists: {identifier}")
-    shots, candidate_specs, pre_skipped_ids = _payload(
-        plan, canonical_timeline, canonical_transcript, root, assets_dir,
+    speaker_enabled = speaker_inset.style_enabled(
+        plan.get("speaker_inset_style")
     )
+    review_mode = (
+        "composite" if speaker_enabled and isinstance(
+            plan.get("speaker_inset", {}).get("clearance"), dict,
+        ) else "selection" if speaker_enabled else "standard"
+    )
+    if review_mode == "composite":
+        shots, candidate_specs, pre_skipped_ids, speaker_size_review = _composite_payload(
+            plan, root, assets_dir,
+        )
+    else:
+        shots, candidate_specs, pre_skipped_ids = _payload(
+            plan, canonical_timeline, canonical_transcript, root, assets_dir,
+        )
     output_dir.parent.mkdir(parents=True, exist_ok=True)
     published_assets = False
     published_page = False
@@ -250,14 +408,31 @@ def build_review_page(plan, timeline, transcript, video, output_dir, *, project_
                 shutil.copyfile(source, frozen)
                 if _hash(frozen) != digest:
                     raise ValueError(f"candidate SHA-256 changed during review publication: {source}")
-            for index, shot in enumerate(shots, 1):
-                frame = staged_assets / f"frame-{index:03d}.jpg"
-                program = shot["program_range"]
-                _extract_frame(video, (float(program["start_s"]) + float(program["end_s"])) / 2, frame)
-                _validate_jpeg(frame)
-                shot["source_frame"]["sha256"] = _hash(frame)
+            if review_mode != "composite":
+                for index, shot in enumerate(shots, 1):
+                    frame = staged_assets / f"frame-{index:03d}.jpg"
+                    program = shot["program_range"]
+                    _extract_frame(video, (float(program["start_s"]) + float(program["end_s"])) / 2, frame)
+                    _validate_jpeg(frame)
+                    shot["source_frame"]["sha256"] = _hash(frame)
             subject_hash = broll_plan.canonical_sha256(broll_plan.review_subject(plan))
-            payload = {"review_id": identifier, "plan_sha256": subject_hash, "plan_subject_sha256": subject_hash, "candidate_manifest_sha256": broll_plan.canonical_sha256(broll_plan.candidate_manifest(plan)), "review_video_sha256": expected_video_hash, "timeline": {"fps": copy.deepcopy(canonical_timeline["fps"]), "program_duration_s": canonical_timeline["program_duration_s"], "clips": copy.deepcopy(canonical_timeline["clips"])}, "decision_modes": ["human", "agent"], "pre_skipped_ids": pre_skipped_ids, "shots": shots}
+            payload = {"review_id": identifier, "review_mode": review_mode, "plan_sha256": subject_hash, "plan_subject_sha256": subject_hash, "candidate_manifest_sha256": broll_plan.canonical_sha256(broll_plan.candidate_manifest(plan)), "review_video_sha256": expected_video_hash, "timeline": {"fps": copy.deepcopy(canonical_timeline["fps"]), "program_duration_s": canonical_timeline["program_duration_s"], "clips": copy.deepcopy(canonical_timeline["clips"])}, "decision_modes": ["human", "agent"], "pre_skipped_ids": pre_skipped_ids, "shots": shots}
+            if review_mode == "composite":
+                speaker = plan["speaker_inset"]
+                payload.update({
+                    "speaker_style": copy.deepcopy(plan["speaker_inset_style"]),
+                    "speaker_size_review": speaker_size_review,
+                    "speaker_bindings": {
+                        "selection_sha256": plan["selection"]["sha256"],
+                        "analysis_sha256": speaker["analysis"]["sha256"],
+                        "agent_input_sha256": speaker["agent_input"]["sha256"],
+                        "preview_sha256": speaker["preview"]["sha256"],
+                        "clearance_sha256": speaker["clearance"]["sha256"],
+                        "style_sha256": broll_plan.canonical_sha256(
+                            plan["speaker_inset_style"]
+                        ),
+                    },
+                })
             document = template.replace(PAYLOAD_MARKER, base64.b64encode(json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")).decode("ascii"))
             staged_page = stage / page.name
             staged_page.write_text(document, encoding="utf-8")
@@ -268,7 +443,10 @@ def build_review_page(plan, timeline, transcript, video, output_dir, *, project_
                 os.replace(asset, assets_dir / asset.name)
             os.link(staged_page, page)
             published_page = True
-        hashes = {"page": _hash(page), **{asset.relative_to(output_dir).as_posix(): _hash(asset) for asset in assets_dir.glob("*.jpg")}}
+        hashes = {"page": _hash(page), **{
+            asset.relative_to(output_dir).as_posix(): _hash(asset)
+            for asset in assets_dir.iterdir() if asset.is_file()
+        }}
         _write_alias(page, output_dir / "b-roll-review.html")
     except Exception:
         if published_page:

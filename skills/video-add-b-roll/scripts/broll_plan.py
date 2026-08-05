@@ -14,11 +14,13 @@ from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "video-understand" / "scripts"))
 import projectlib
+import speaker_inset
 
 
 RANGE_EPSILON = 1e-6
 KEN_BURNS_DIRECTIONS = {"zoom-in", "pan-left", "pan-right"}
 HUMAN_APPROVAL_RATIONALE = "Explicit user action approved the exact configuration shown in this review."
+HUMAN_PREPARE_COMPOSITE_RATIONALE = "Explicit user action locked the exact B-roll selection for composite preview."
 REVIEW_INTENTS = {"approve", "request_revision"}
 PLAYBACK_RATES = (0.5, 1.0, 1.5, 2.0)
 VISUAL_REVIEW_CHECKS = (
@@ -362,7 +364,7 @@ def review_subject(plan):
     clean(value)
     for shot in value.get("shots", []):
         status = shot.get("status") if isinstance(shot, dict) else None
-        if isinstance(status, str) and status in ("planned", "candidates_ready", "selected", "normalized", "verified"):
+        if isinstance(status, str) and status in ("planned", "candidates_ready", "composite_pending", "selected", "normalized", "verified"):
             shot["status"] = "reviewable"
         elif status == "skipped" and isinstance(shot.get("id"), str) and shot["id"] in decision_skipped_ids:
             shot["status"] = "reviewable"
@@ -382,7 +384,7 @@ def _decision_manifest(shots):
         if status == "skipped":
             decisions.append({"id": shot_id, "decision": "skip"})
             continue
-        if status not in ("selected", "normalized", "verified"):
+        if status not in ("composite_pending", "selected", "normalized", "verified"):
             return None
         selected, candidates = shot.get("selected"), shot.get("candidates")
         if not isinstance(selected, dict) or not isinstance(candidates, list):
@@ -515,6 +517,67 @@ def _review_errors(plan, shots):
         input_hashes = {}
     if review.get("review_video_sha256") != input_hashes.get("review_video_sha256"):
         errors.append("review video SHA-256 does not match")
+    if speaker_inset.style_enabled(plan.get("speaker_inset_style")):
+        if review.get("review_stage") != "composite":
+            errors.append("speaker inset approval review_stage must be composite")
+        speaker = plan.get("speaker_inset")
+        expected_speaker = {
+            "selection_sha256": plan.get("selection", {}).get("sha256"),
+            "analysis_sha256": speaker.get("analysis", {}).get("sha256") if isinstance(speaker, dict) else None,
+            "agent_input_sha256": speaker.get("agent_input", {}).get("sha256") if isinstance(speaker, dict) else None,
+            "preview_sha256": speaker.get("preview", {}).get("sha256") if isinstance(speaker, dict) else None,
+            "clearance_sha256": speaker.get("clearance", {}).get("sha256") if isinstance(speaker, dict) else None,
+            "style_sha256": canonical_sha256(plan.get("speaker_inset_style")),
+        }
+        for field, expected in expected_speaker.items():
+            if review.get(field) != expected:
+                errors.append(f"review {field} does not match current speaker artifacts")
+    return errors
+
+
+def _speaker_artifact_binding_errors(plan, shots):
+    style = plan.get("speaker_inset_style")
+    enabled = speaker_inset.style_enabled(style)
+    speaker = plan.get("speaker_inset")
+    if not enabled:
+        return ["speaker_inset artifacts require enabled speaker_inset_style"] if speaker is not None else []
+    selected = any(
+        isinstance(shot, dict) and shot.get("status") in ("selected", "normalized", "verified")
+        for shot in shots
+    )
+    if speaker is None:
+        return ["selected speaker inset shots require speaker_inset artifacts"] if selected else []
+    if not isinstance(speaker, dict):
+        return ["speaker_inset must be an object"]
+    errors = []
+    expected_paths = {
+        "analysis": "b-roll/speaker-inset-analysis.json",
+        "agent_input": "b-roll/speaker-inset-agent-input.json",
+        "preview": "b-roll/speaker-inset-preview.json",
+        "clearance": "b-roll/speaker-inset-clearance.json",
+    }
+    if any(key not in expected_paths for key in speaker):
+        errors.append("speaker_inset contains unsupported artifacts")
+    seen_missing = False
+    for name, expected_path in expected_paths.items():
+        binding = speaker.get(name)
+        if binding is None:
+            seen_missing = True
+            if selected:
+                errors.append(f"selected speaker inset shots require {name} artifact")
+            continue
+        if seen_missing:
+            errors.append(f"speaker_inset {name} requires all preceding artifacts")
+        if not isinstance(binding, dict):
+            errors.append(f"speaker_inset {name} binding must be an object")
+            continue
+        if binding.get("path") != expected_path:
+            errors.append(f"speaker_inset {name} path is invalid")
+        if not _is_sha256(binding.get("sha256")):
+            errors.append(f"speaker_inset {name} SHA-256 is invalid")
+    selection = plan.get("selection")
+    if isinstance(selection, dict) and selection.get("style_sha256") != canonical_sha256(style):
+        errors.append("prepared selection speaker inset style SHA-256 is stale")
     return errors
 
 
@@ -1147,6 +1210,9 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
     brief = plan.get("brief")
     if not isinstance(brief, dict): errors.append("brief must be an object")
     elif brief.get("density") != "selective": errors.append("brief density must be selective")
+    style = plan.get("speaker_inset_style")
+    if style is not None:
+        errors.extend(speaker_inset.style_errors(style))
     duration = timeline_duration if timeline_duration is not None else 0
     source_duration = _strict_finite_number(timeline.get("source_duration_s"))
     if source_duration is _INVALID_NUMBER or source_duration < 0:
@@ -1228,10 +1294,10 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
                 elif not path.is_file(): errors.append(f"{prefix} file is missing")
                 elif candidate.get("sha256") != sha256_file(path): errors.append(f"{prefix} SHA-256 is stale")
         selected, status = shot.get("selected"), shot.get("status")
-        if not isinstance(status, str) or status not in ("planned", "candidates_ready", "selected", "normalized", "verified", "skipped"): errors.append(f"{shot_id} status is invalid")
+        if not isinstance(status, str) or status not in ("planned", "candidates_ready", "composite_pending", "selected", "normalized", "verified", "skipped"): errors.append(f"{shot_id} status is invalid")
         elif status in {"planned", "candidates_ready", "skipped"} and selected is not None: errors.append(f"{shot_id} {status} shot must not select a candidate")
-        elif status in {"selected", "normalized", "verified"} and not isinstance(selected, dict): errors.append(f"{shot_id} {status} shot requires a selection")
-        elif status in {"selected", "normalized", "verified"}:
+        elif status in {"composite_pending", "selected", "normalized", "verified"} and not isinstance(selected, dict): errors.append(f"{shot_id} {status} shot requires a selection")
+        elif status in {"composite_pending", "selected", "normalized", "verified"}:
             selected_ids = selected_candidate_ids(selected)
             selected_candidates = [
                 next((item for item in candidates
@@ -1295,6 +1361,27 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
                 errors.append(f"{shot_id} verified verification must pass")
         elif "verification" in shot:
             errors.append(f"{shot_id} {status} shot must not carry verification")
+    if any(isinstance(shot, dict) and shot.get("status") == "composite_pending" for shot in shots):
+        if not speaker_inset.style_enabled(style):
+            errors.append("composite_pending shots require enabled speaker_inset_style")
+        selection = plan.get("selection")
+        if not isinstance(selection, dict) or selection.get("status") != "prepared":
+            errors.append("composite_pending shots require a prepared selection")
+        elif not _is_sha256(selection.get("sha256")):
+            errors.append("prepared selection SHA-256 is invalid")
+        elif selection.get("path") != "b-roll/broll-selection.json":
+            errors.append("prepared selection path is invalid")
+        elif verify_files and project_root:
+            selection_path = Path(project_root).resolve() / "work" / selection["path"]
+            if not selection_path.is_file():
+                errors.append("prepared selection file is missing")
+            elif sha256_file(selection_path) != selection["sha256"]:
+                errors.append("prepared selection SHA-256 is stale")
+    errors.extend(_speaker_artifact_binding_errors(plan, shots))
+    errors.extend(speaker_inset.artifact_errors(
+        plan, timeline, transcript,
+        project_root=project_root, verify_files=verify_files,
+    ))
     for start, end, shot_id in sorted(ranges):
         for previous_start, previous_end, previous_id in ranges:
             if previous_id != shot_id and previous_start < end and start < previous_end:
@@ -1625,6 +1712,232 @@ def rebuild_plan_from_revision(plan, request, timeline, transcript):
     return result
 
 
+def _apply_exact_entries(result, entries, *, timeline, explicit_intent, target_status, action):
+    shots = {shot.get("id"): shot for shot in result["shots"]}
+    seen = set()
+    for entry in entries:
+        shot_id = entry.get("id")
+        if not isinstance(shot_id, str) or not shot_id.strip():
+            raise ValueError("review shot id is required")
+        if shot_id in seen:
+            raise ValueError(f"duplicate review shot id: {shot_id}")
+        seen.add(shot_id)
+        if shot_id not in shots:
+            raise ValueError(f"review has unknown shots: {shot_id}")
+    missing = sorted(set(shots) - seen)
+    if missing:
+        raise ValueError("review is missing shots: " + ", ".join(missing))
+
+    entries_by_id = {entry["id"]: entry for entry in entries}
+    selected_hashes = []
+    decision_skipped_ids = []
+    for shot in result["shots"]:
+        entry = entries_by_id[shot["id"]]
+        decision = entry.get("decision")
+        if decision not in ("select", "skip"):
+            raise ValueError(f"{shot['id']} decision must be select or skip")
+        if shot.get("status") == "skipped" and decision != "skip":
+            raise ValueError(f"{shot['id']} was already skipped and requires decision skip")
+        shot.pop("normalized", None)
+        shot.pop("verification", None)
+        if decision == "skip":
+            if (isinstance(shot.get("review_default"), dict)
+                    and shot["review_default"].get("decision") != "skip"):
+                raise ValueError(
+                    f"{shot['id']} {action} does not match the exact review default"
+                )
+            if shot.get("status") != "skipped":
+                decision_skipped_ids.append(shot["id"])
+            shot["selected"], shot["status"] = None, "skipped"
+            continue
+
+        segments = entry.get("segments")
+        if segments is not None and (
+                not isinstance(segments, list) or not 1 <= len(segments) <= 3):
+            raise ValueError(f"{shot['id']} select requires 1-3 segments")
+        candidate_ids = (
+            [segment.get("candidate_id") for segment in segments if isinstance(segment, dict)]
+            if isinstance(segments, list) else [entry.get("candidate_id")]
+        )
+        candidates = shot.get("candidates", [])
+        selected_candidates = [
+            next((item for item in candidates
+                  if isinstance(item, dict) and item.get("id") == candidate_id), None)
+            for candidate_id in candidate_ids
+        ]
+        if (not candidate_ids or len(candidate_ids) != len(segments or candidate_ids)
+                or any(candidate is None for candidate in selected_candidates)):
+            raise ValueError(f"{shot['id']} selected candidate does not belong to shot")
+        candidate = selected_candidates[0]
+        if explicit_intent:
+            if not _ranges_equal(entry.get("program_range"), shot.get("program_range")):
+                raise ValueError(
+                    f"{shot['id']} {action} program_range does not match current review"
+                )
+            default = shot.get("review_default")
+            if isinstance(default, dict):
+                actual = {"decision": "select", "segments": copy.deepcopy(segments)}
+                if actual != default:
+                    raise ValueError(
+                        f"{shot['id']} {action} does not match the exact review default"
+                    )
+        if segments is not None:
+            if any(candidate.get("media_type") != "video" for candidate in selected_candidates):
+                raise ValueError(f"{shot['id']} canonical segments require a video candidate")
+            if not isinstance(timeline, dict):
+                raise ValueError("canonical segment approval requires the canonical timeline")
+            frame_duration = timeline_frame_duration(timeline)
+            segment_errors = _canonical_segments_errors(
+                segments, candidates, shot.get("program_range"), frame_duration,
+            )
+            if segment_errors:
+                raise ValueError(f"{shot['id']} " + "; ".join(segment_errors))
+            shot["selected"] = {"segments": copy.deepcopy(segments)}
+            shot["status"] = target_status
+            selected_hashes.extend(item["sha256"] for item in selected_candidates)
+            continue
+        option = "source_trim" if candidate.get("media_type") == "video" else "ken_burns"
+        if option == "source_trim" and not _valid_source_trim(entry.get(option), candidate):
+            raise ValueError(f"{shot['id']} select requires a valid source_trim")
+        if option == "ken_burns" and not _valid_ken_burns(entry.get(option)):
+            raise ValueError(f"{shot['id']} select requires a valid ken_burns direction")
+        shot["selected"] = {
+            "candidate_id": candidate["id"], option: copy.deepcopy(entry[option]),
+        }
+        shot["status"] = target_status
+        selected_hashes.append(candidate["sha256"])
+    return selected_hashes, decision_skipped_ids
+
+
+def prepare_composite(plan, selection, *, mode, actor, rationale, project_root, timeline):
+    """Freeze exact B-roll choices without creating approval or normalization authority."""
+    if not isinstance(plan, dict):
+        raise ValueError("plan must be an object")
+    if not isinstance(selection, dict):
+        raise ValueError("selection must be an object")
+    if selection.get("submission_intent") != "prepare_composite":
+        raise ValueError("submission_intent must be prepare_composite")
+    notes = selection.get("revision_notes", "")
+    if not isinstance(notes, str) or notes.strip():
+        raise ValueError("prepare_composite requires empty revision_notes")
+    if not speaker_inset.style_enabled(plan.get("speaker_inset_style")):
+        raise ValueError("prepare_composite requires enabled speaker_inset_style")
+    style_validation = speaker_inset.style_errors(plan["speaker_inset_style"])
+    if style_validation:
+        raise ValueError("invalid speaker_inset_style: " + "; ".join(style_validation))
+
+    plan_shots, entries = plan.get("shots"), selection.get("shots")
+    if not isinstance(plan_shots, list):
+        raise ValueError("plan shots must be a list")
+    if not isinstance(entries, list):
+        raise ValueError("selection shots must be a list")
+    for shot in plan_shots:
+        if not isinstance(shot, dict):
+            raise ValueError("plan shot must be an object")
+        candidates = shot.get("candidates", [])
+        if not isinstance(candidates, list):
+            raise ValueError(f"{shot.get('id', '<missing>')} candidates must be a list")
+        for candidate in candidates:
+            candidate_validation = _candidate_errors(shot.get("id", "<missing>"), candidate)
+            if candidate_validation:
+                raise ValueError("; ".join(candidate_validation))
+    if any(not isinstance(entry, dict) for entry in entries):
+        raise ValueError("selection shot must be an object")
+    if mode not in ("human", "agent"):
+        raise ValueError("mode must be human or agent")
+    if not isinstance(actor, str) or not actor.strip():
+        raise ValueError("actor is required")
+    if not isinstance(rationale, str) or not rationale.strip():
+        raise ValueError("rationale is required")
+    rationale = rationale.strip()
+    if (not isinstance(selection.get("rationale"), str)
+            or selection["rationale"].strip() != rationale):
+        raise ValueError("exported rationale does not match selection rationale")
+    if not _valid_timestamp(selection.get("timestamp")):
+        raise ValueError("selection timestamp is invalid")
+    if mode == "human" and selection.get("explicit_user_action") is not True:
+        raise ValueError("human selection requires explicit_user_action true")
+    rationale_source = selection.get("rationale_source")
+    if mode == "human" and (
+            rationale != HUMAN_PREPARE_COMPOSITE_RATIONALE
+            or rationale_source != "review_ui_explicit_action"):
+        raise ValueError("human prepare_composite requires the explicit review UI action rationale")
+    if not _is_uuid(selection.get("review_id")):
+        raise ValueError("review_id must be a UUID")
+    input_hashes = plan.get("input_hashes")
+    if not isinstance(input_hashes, dict):
+        raise ValueError("plan input_hashes must be an object")
+    expected_bindings = {
+        "plan_sha256": canonical_sha256(review_subject(plan)),
+        "candidate_manifest_sha256": canonical_sha256(candidate_manifest(plan)),
+        "review_video_sha256": input_hashes.get("review_video_sha256"),
+    }
+    if not _is_sha256(expected_bindings["review_video_sha256"]):
+        raise ValueError("plan review_video_sha256 is invalid")
+    for field, expected in expected_bindings.items():
+        if selection.get(field) != expected:
+            raise ValueError(f"{field} does not match current review artifacts")
+    if selection.get("timeline_fps") != timeline.get("fps"):
+        raise ValueError("timeline_fps does not match canonical timeline")
+
+    result = copy.deepcopy(plan)
+    result["decision"] = None
+    result["review"] = None
+    result.pop("review_status", None)
+    result.pop("visual_review", None)
+    result.pop("selection", None)
+    selected_hashes, decision_skipped_ids = _apply_exact_entries(
+        result, entries, timeline=timeline, explicit_intent=True,
+        target_status="composite_pending", action="prepare_composite",
+    )
+    decisions = _decision_manifest(result["shots"])
+    if decisions is None:
+        raise ValueError("selection decision manifest cannot be reconstructed")
+    receipt = {
+        "schema_version": 1,
+        "status": "prepared",
+        "submission_intent": "prepare_composite",
+        "review_id": selection["review_id"],
+        "mode": mode,
+        "actor": actor.strip(),
+        "rationale": rationale,
+        "rationale_source": rationale_source,
+        "timestamp": selection["timestamp"],
+        "explicit_user_action": selection.get("explicit_user_action") is True,
+        **expected_bindings,
+        "style_sha256": canonical_sha256(plan["speaker_inset_style"]),
+        "timeline_fps": copy.deepcopy(timeline["fps"]),
+        "decisions": decisions,
+        "decision_skipped_shot_ids": sorted(set(decision_skipped_ids)),
+        "selected_asset_sha256": sorted(set(selected_hashes)),
+    }
+    root = Path(project_root).resolve()
+    target = root / "work/b-roll/broll-selection.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temp = None
+    try:
+        with tempfile.NamedTemporaryFile(
+                "w", delete=False, dir=target.parent, suffix=".json", encoding="utf-8") as handle:
+            temp = Path(handle.name)
+        projectlib.write_json(temp, receipt)
+        os.replace(temp, target)
+    finally:
+        if temp is not None:
+            temp.unlink(missing_ok=True)
+    result["selection"] = {
+        "status": "prepared",
+        "submission_intent": "prepare_composite",
+        "path": "b-roll/broll-selection.json",
+        "sha256": sha256_file(target),
+        "review_id": receipt["review_id"],
+        "mode": receipt["mode"],
+        "actor": receipt["actor"],
+        "timestamp": receipt["timestamp"],
+        "style_sha256": receipt["style_sha256"],
+    }
+    return result
+
+
 def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None, timeline=None):
     if not isinstance(plan, dict): raise ValueError("plan must be an object")
     if not isinstance(review, dict): raise ValueError("review must be an object")
@@ -1680,85 +1993,61 @@ def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None,
         "candidate_manifest_sha256": canonical_sha256(candidate_manifest(plan)),
         "review_video_sha256": input_hashes.get("review_video_sha256"),
     }
+    composite_review = speaker_inset.style_enabled(plan.get("speaker_inset_style"))
+    if composite_review:
+        if review.get("review_stage") != "composite":
+            raise ValueError("speaker inset approval review_stage must be composite")
+        speaker = plan.get("speaker_inset")
+        if not isinstance(speaker, dict):
+            raise ValueError("speaker inset approval requires speaker artifacts")
+        expected_bindings.update({
+            "selection_sha256": plan.get("selection", {}).get("sha256"),
+            "analysis_sha256": speaker.get("analysis", {}).get("sha256"),
+            "agent_input_sha256": speaker.get("agent_input", {}).get("sha256"),
+            "preview_sha256": speaker.get("preview", {}).get("sha256"),
+            "clearance_sha256": speaker.get("clearance", {}).get("sha256"),
+            "style_sha256": canonical_sha256(plan.get("speaker_inset_style")),
+        })
+        if any(not _is_sha256(value) for field, value in expected_bindings.items()
+               if field not in ("plan_sha256", "candidate_manifest_sha256", "review_video_sha256")):
+            raise ValueError("speaker inset approval requires complete current artifact bindings")
     if not isinstance(expected_bindings["review_video_sha256"], str) or len(expected_bindings["review_video_sha256"]) != 64 or any(char not in "0123456789abcdefABCDEF" for char in expected_bindings["review_video_sha256"]):
         raise ValueError("plan review_video_sha256 is invalid")
     for field, expected in expected_bindings.items():
         if review.get(field) != expected:
             raise ValueError(f"{field} does not match current review artifacts")
-    result, shots = copy.deepcopy(plan), {shot.get("id"): shot for shot in plan_shots}
+    result = copy.deepcopy(plan)
     result.pop("visual_review", None)
-    seen = set()
-    for entry in entries:
-        shot_id = entry.get("id")
-        if not isinstance(shot_id, str) or not shot_id.strip(): raise ValueError("review shot id is required")
-        if shot_id in seen: raise ValueError(f"duplicate review shot id: {shot_id}")
-        seen.add(shot_id)
-        if shot_id not in shots: raise ValueError(f"review has unknown shots: {shot_id}")
-    missing = sorted(set(shots) - seen)
-    if missing: raise ValueError("review is missing shots: " + ", ".join(missing))
-    entries_by_id = {entry["id"]: entry for entry in entries}
-    selected_hashes = []
-    decision_skipped_ids = []
-    for shot in result["shots"]:
-        entry, decision = entries_by_id[shot["id"]], entries_by_id[shot["id"]].get("decision")
-        if decision not in ("select", "skip"): raise ValueError(f"{shot['id']} decision must be select or skip")
-        if shot.get("status") == "skipped" and decision != "skip":
-            raise ValueError(f"{shot['id']} was already skipped and requires decision skip")
-        shot.pop("normalized", None)
-        shot.pop("verification", None)
-        if decision == "skip":
-            if isinstance(shot.get("review_default"), dict) and shot["review_default"].get("decision") != "skip":
-                raise ValueError(f"{shot['id']} approve does not match the exact review default")
-            if shot.get("status") != "skipped": decision_skipped_ids.append(shot["id"])
-            shot["selected"], shot["status"] = None, "skipped"
-            continue
-        segments = entry.get("segments")
-        if segments is not None and (not isinstance(segments, list) or not 1 <= len(segments) <= 3):
-            raise ValueError(f"{shot['id']} select requires 1-3 segments")
-        candidate_ids = (
-            [segment.get("candidate_id") for segment in segments if isinstance(segment, dict)]
-            if isinstance(segments, list) else [entry.get("candidate_id")]
+    if explicit_intent and review.get("timeline_fps") != timeline.get("fps"):
+        raise ValueError("timeline_fps does not match canonical timeline")
+    if composite_review:
+        locked_decisions = _decision_manifest(plan_shots)
+        if entries != locked_decisions:
+            raise ValueError("composite review shots must match the locked selection")
+        selected_hashes = []
+        decision_skipped_ids = []
+        for shot in result["shots"]:
+            if shot.get("status") == "composite_pending":
+                shot["status"] = "selected"
+                candidates = shot.get("candidates", [])
+                for candidate_id in selected_candidate_ids(shot["selected"]):
+                    candidate = next(
+                        (item for item in candidates
+                         if isinstance(item, dict) and item.get("id") == candidate_id),
+                        None,
+                    )
+                    if candidate is None:
+                        raise ValueError(f"{shot['id']} locked selection candidate is missing")
+                    selected_hashes.append(candidate["sha256"])
+            elif shot.get("status") == "skipped":
+                decision_skipped_ids.append(shot["id"])
+            else:
+                raise ValueError("composite approval requires composite_pending or skipped shots")
+    else:
+        selected_hashes, decision_skipped_ids = _apply_exact_entries(
+            result, entries, timeline=timeline, explicit_intent=explicit_intent,
+            target_status="selected", action="approve",
         )
-        candidates = shot.get("candidates", [])
-        selected_candidates = [
-            next((item for item in candidates
-                  if isinstance(item, dict) and item.get("id") == candidate_id), None)
-            for candidate_id in candidate_ids
-        ]
-        if (not candidate_ids or len(candidate_ids) != len(segments or candidate_ids)
-                or any(candidate is None for candidate in selected_candidates)):
-            raise ValueError(f"{shot['id']} selected candidate does not belong to shot")
-        candidate = selected_candidates[0]
-        if explicit_intent:
-            if not _ranges_equal(entry.get("program_range"), shot.get("program_range")):
-                raise ValueError(f"{shot['id']} approve program_range does not match current review")
-            default = shot.get("review_default")
-            if isinstance(default, dict):
-                actual = {"decision": "select", "segments": copy.deepcopy(segments)}
-                if actual != default:
-                    raise ValueError(f"{shot['id']} approve does not match the exact review default")
-        if segments is not None:
-            if any(candidate.get("media_type") != "video" for candidate in selected_candidates):
-                raise ValueError(f"{shot['id']} canonical segments require a video candidate")
-            if not isinstance(timeline, dict):
-                raise ValueError("canonical segment approval requires the canonical timeline")
-            frame_duration = timeline_frame_duration(timeline)
-            if review.get("timeline_fps") != timeline.get("fps"):
-                raise ValueError("timeline_fps does not match canonical timeline")
-            segment_errors = _canonical_segments_errors(
-                segments, candidates, shot.get("program_range"), frame_duration,
-            )
-            if segment_errors:
-                raise ValueError(f"{shot['id']} " + "; ".join(segment_errors))
-            shot["selected"], shot["status"] = {"segments": copy.deepcopy(segments)}, "selected"
-            selected_hashes.extend(candidate["sha256"] for candidate in selected_candidates)
-            continue
-        option = "source_trim" if candidate.get("media_type") == "video" else "ken_burns"
-        if option == "source_trim" and not _valid_source_trim(entry.get(option), candidate):
-            raise ValueError(f"{shot['id']} select requires a valid source_trim")
-        if option == "ken_burns" and not _valid_ken_burns(entry.get(option)):
-            raise ValueError(f"{shot['id']} select requires a valid ken_burns direction")
-        shot["selected"], shot["status"] = {"candidate_id": candidate["id"], option: copy.deepcopy(entry[option])}, "selected"; selected_hashes.append(candidate["sha256"])
     decisions = _decision_manifest(result["shots"])
     if decisions is None:
         raise ValueError("review decision manifest cannot be reconstructed")
@@ -1768,6 +2057,8 @@ def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None,
         result["decision"]["rationale_source"] = rationale_source
     if mode == "human": result["decision"]["explicit_user_action"] = True
     result["review"] = {"status": "approved", "review_id": review["review_id"], "mode": mode, "actor": actor, "rationale": rationale, "timestamp": review["timestamp"], **expected_bindings, "decisions": decisions, "decision_skipped_shot_ids": sorted(set(decision_skipped_ids)), "selected_asset_sha256": sorted(set(selected_hashes))}
+    if composite_review:
+        result["review"]["review_stage"] = "composite"
     if explicit_intent:
         result["review"].update({"submission_intent": "approve", "revision_notes": ""})
     if rationale_source is not None:

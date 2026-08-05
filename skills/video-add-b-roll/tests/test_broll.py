@@ -4,6 +4,7 @@ import copy
 import base64
 import contextlib
 import io
+import inspect
 import json
 import math
 import os
@@ -27,6 +28,7 @@ import pexels
 import build_review_page
 import normalize_broll
 import check_broll
+import speaker_inset
 
 
 class _BrollFixture:
@@ -91,6 +93,177 @@ class _BrollFixture:
 
 
 class BrollPlanTests(_BrollFixture, unittest.TestCase):
+
+    @staticmethod
+    def _speaker_style():
+        return {
+            "enabled": True,
+            "shape": "circle",
+            "width_ratio": 0.22,
+            "size_candidates": [0.22, 0.30],
+            "aspect_ratio": 1.0,
+            "border": {"width_px": 3, "color": "#FFFFFF"},
+            "margin_ratio": 0.04,
+            "reserved_bottom_ratio": 0.20,
+            "allowed_anchors": [
+                "top-left", "top-right", "middle-left", "middle-right",
+            ],
+        }
+
+    def test_speaker_inset_style_is_optional_and_enabled_style_is_strict(self):
+        self.assertEqual([], broll_plan.validate_plan(
+            self.plan, self.timeline, self.transcript,
+        ))
+        valid = copy.deepcopy(self.plan)
+        valid["speaker_inset_style"] = self._speaker_style()
+        self.assertEqual([], broll_plan.validate_plan(
+            valid, self.timeline, self.transcript,
+        ))
+
+        invalid_values = (
+            ({**self._speaker_style(), "shape": "oval"}, "shape"),
+            ({**self._speaker_style(), "width_ratio": 0}, "width_ratio"),
+            ({key: value for key, value in self._speaker_style().items() if key != "size_candidates"}, "size_candidates"),
+            ({**self._speaker_style(), "size_candidates": [0.22]}, "size_candidates"),
+            ({**self._speaker_style(), "size_candidates": [0.24, 0.30]}, "include width_ratio"),
+            ({**self._speaker_style(), "aspect_ratio": True}, "aspect_ratio"),
+            ({**self._speaker_style(), "border": {"width_px": -1, "color": "white"}}, "border"),
+            ({**self._speaker_style(), "allowed_anchors": ["bottom-left"]}, "allowed_anchors"),
+        )
+        for style, message in invalid_values:
+            plan = copy.deepcopy(self.plan)
+            plan["speaker_inset_style"] = style
+            with self.subTest(message=message):
+                self.assertTrue(any(
+                    message in error for error in broll_plan.validate_plan(
+                        plan, self.timeline, self.transcript,
+                    )
+                ))
+
+    def test_prepare_composite_writes_non_approval_selection_snapshot(self):
+        candidates = self._canonical_candidates(1)
+        segment = {
+            "candidate_id": candidates[0]["id"],
+            "source_range": {"start_s": 0.0, "end_s": 1.0},
+            "program_range": copy.deepcopy(self.plan["shots"][0]["program_range"]),
+            "playback_rate": 1.0,
+        }
+        self.plan["speaker_inset_style"] = self._speaker_style()
+        selection = self._canonical_review([segment], intent="prepare_composite")
+        selection.update({
+            "rationale": broll_plan.HUMAN_PREPARE_COMPOSITE_RATIONALE,
+            "rationale_source": "review_ui_explicit_action",
+        })
+
+        prepared = broll_plan.prepare_composite(
+            self.plan, selection,
+            mode="human", actor="Actual user",
+            rationale=broll_plan.HUMAN_PREPARE_COMPOSITE_RATIONALE,
+            project_root=self.root, timeline=self.timeline,
+        )
+
+        self.assertEqual("composite_pending", prepared["shots"][0]["status"])
+        self.assertEqual({"segments": [segment]}, prepared["shots"][0]["selected"])
+        self.assertNotIn("review_status", prepared)
+        self.assertIsNone(prepared["decision"])
+        self.assertIsNone(prepared["review"])
+        receipt = prepared["selection"]
+        self.assertEqual("prepared", receipt["status"])
+        self.assertEqual("prepare_composite", receipt["submission_intent"])
+        self.assertEqual("b-roll/broll-selection.json", receipt["path"])
+        selection_path = self.root / "work" / receipt["path"]
+        self.assertTrue(selection_path.is_file())
+        self.assertEqual(receipt["sha256"], broll_plan.sha256_file(selection_path))
+        self.assertEqual([], broll_plan.validate_plan(
+            prepared, self.timeline, self.transcript,
+            project_root=self.root, verify_files=True,
+        ))
+
+    def test_composite_review_binds_all_speaker_artifacts_and_cannot_change_selection(self):
+        candidates = self._canonical_candidates(1)
+        segment = {
+            "candidate_id": candidates[0]["id"],
+            "source_range": {"start_s": 0.0, "end_s": 1.0},
+            "program_range": copy.deepcopy(self.plan["shots"][0]["program_range"]),
+            "playback_rate": 1.0,
+        }
+        self.plan["speaker_inset_style"] = self._speaker_style()
+        selection = self._canonical_review([segment], intent="prepare_composite")
+        selection.update({
+            "rationale": broll_plan.HUMAN_PREPARE_COMPOSITE_RATIONALE,
+            "rationale_source": "review_ui_explicit_action",
+        })
+        prepared = broll_plan.prepare_composite(
+            self.plan, selection,
+            mode="human", actor="Actual user",
+            rationale=broll_plan.HUMAN_PREPARE_COMPOSITE_RATIONALE,
+            project_root=self.root, timeline=self.timeline,
+        )
+        prepared["speaker_inset"] = {
+            "analysis": {
+                "path": "b-roll/speaker-inset-analysis.json", "sha256": "a" * 64,
+            },
+            "agent_input": {
+                "path": "b-roll/speaker-inset-agent-input.json", "sha256": "b" * 64,
+            },
+            "preview": {
+                "path": "b-roll/speaker-inset-preview.json", "sha256": "c" * 64,
+            },
+            "clearance": {
+                "path": "b-roll/speaker-inset-clearance.json", "sha256": "d" * 64,
+            },
+        }
+        decisions = broll_plan._decision_manifest(prepared["shots"])
+        review = self.review_for(
+            prepared, decisions,
+            rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
+            submission_intent="approve",
+            review_stage="composite",
+            explicit_user_action=True,
+            revision_notes="",
+            rationale_source="review_ui_explicit_action",
+            timeline_fps=copy.deepcopy(self.timeline["fps"]),
+            selection_sha256=prepared["selection"]["sha256"],
+            analysis_sha256=prepared["speaker_inset"]["analysis"]["sha256"],
+            agent_input_sha256=prepared["speaker_inset"]["agent_input"]["sha256"],
+            preview_sha256=prepared["speaker_inset"]["preview"]["sha256"],
+            clearance_sha256=prepared["speaker_inset"]["clearance"]["sha256"],
+            style_sha256=broll_plan.canonical_sha256(prepared["speaker_inset_style"]),
+        )
+        approved = broll_plan.apply_review(
+            prepared, review,
+            mode="human", actor="Actual user",
+            rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
+            timeline=self.timeline,
+        )
+        self.assertEqual("selected", approved["shots"][0]["status"])
+        self.assertEqual("composite", approved["review"]["review_stage"])
+        self.assertEqual(
+            prepared["speaker_inset"]["clearance"]["sha256"],
+            approved["review"]["clearance_sha256"],
+        )
+        self.assertEqual([], broll_plan.validate_plan(
+            approved, self.timeline, self.transcript,
+        ))
+
+        stale = copy.deepcopy(review)
+        stale["preview_sha256"] = "f" * 64
+        with self.assertRaisesRegex(ValueError, "preview_sha256"):
+            broll_plan.apply_review(
+                prepared, stale,
+                mode="human", actor="Actual user",
+                rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
+                timeline=self.timeline,
+            )
+        changed = copy.deepcopy(review)
+        changed["shots"][0]["segments"][0]["source_range"]["start_s"] = 0.25
+        with self.assertRaisesRegex(ValueError, "locked selection"):
+            broll_plan.apply_review(
+                prepared, changed,
+                mode="human", actor="Actual user",
+                rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
+                timeline=self.timeline,
+            )
 
     def _canonical_candidates(self, count=3):
         shot = self.plan["shots"][0]
@@ -1943,6 +2116,191 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
         with self.assertRaises(FileExistsError):
             build_review_page.build_review_page(self.plan, self.timeline, self.transcript, self.video, self.review_dir, project_root=self.root, review_id=review_id)
 
+    def test_review_page_switches_selection_intent_and_publishes_composite_assets(self):
+        selection_plan = copy.deepcopy(self.plan)
+        selection_plan["speaker_inset_style"] = BrollPlanTests._speaker_style()
+        with mock.patch.object(build_review_page, "_extract_frame", side_effect=self._frame):
+            selection_result = build_review_page.build_review_page(
+                selection_plan, self.timeline, self.transcript, self.video, self.review_dir,
+                project_root=self.root,
+                review_id="123e4567-e89b-12d3-a456-426614174020",
+            )
+        selection_payload = json.loads(base64.b64decode(
+            build_review_page.PAYLOAD_RE.search(
+                selection_result["page"].read_text(encoding="utf-8")
+            ).group(1)
+        ))
+        self.assertEqual("selection", selection_payload["review_mode"])
+
+        plan = copy.deepcopy(selection_plan)
+        segment = {
+            "candidate_id": "asset",
+            "source_range": {"start_s": 0.0, "end_s": 1.0},
+            "program_range": copy.deepcopy(plan["shots"][0]["program_range"]),
+            "playback_rate": 1.0,
+        }
+        plan["shots"][0].update({
+            "selected": {"segments": [segment]},
+            "status": "composite_pending",
+        })
+        plan["selection"] = {
+            "status": "prepared", "submission_intent": "prepare_composite",
+            "path": "b-roll/broll-selection.json", "sha256": "9" * 64,
+            "style_sha256": broll_plan.canonical_sha256(plan["speaker_inset_style"]),
+        }
+        cache = self.root / "work/cache/b-roll/speaker-inset"
+        cache.mkdir(parents=True)
+        evidence = cache / "evidence.jpg"
+        Image.new("RGB", (160, 90), "navy").save(evidence, "JPEG")
+        base = cache / "base.mp4"
+        context = cache / "context.mp4"
+        base.write_bytes(b"base-preview")
+        context.write_bytes(b"context-preview")
+        alternates = {}
+        for anchor in plan["speaker_inset_style"]["allowed_anchors"]:
+            path = cache / f"context-{anchor}.mp4"
+            path.write_bytes(f"context-{anchor}".encode("ascii"))
+            alternates[anchor] = {
+                "path": path.relative_to(self.root / "work").as_posix(),
+                "sha256": broll_plan.sha256_file(path),
+            }
+        analysis = {
+            "schema_version": 1,
+            "shots": [{
+                "shot_id": "shot",
+                "subshots": [{
+                    "id": "shot-subshot-001",
+                    "program_range": copy.deepcopy(plan["shots"][0]["program_range"]),
+                    "evidence_points": [{
+                        "frames": [{
+                            "program_time_s": 1.0,
+                            "path": evidence.relative_to(self.root / "work").as_posix(),
+                            "sha256": broll_plan.sha256_file(evidence),
+                        }],
+                    }],
+                }],
+            }],
+        }
+        analysis_path = self.root / "work/b-roll/speaker-inset-analysis.json"
+        projectlib.write_json(analysis_path, analysis)
+        agent_input = {
+            "schema_version": 1, "actor": "Codex",
+            "shots": [{
+                "shot_id": "shot",
+                "subshots": [{
+                    "id": "shot-subshot-001", "speaker_status": "confirmed",
+                    "display_mode": "enabled", "anchor": "top-left",
+                    "rationale": "One current speaker is visible.",
+                    "keyframes": [{
+                        "program_time_s": 1.0,
+                        "roi": {"x": 0.1, "y": 0.1, "width": 0.3, "height": 0.6},
+                    }],
+                }],
+            }],
+        }
+        agent_path = self.root / "work/b-roll/speaker-inset-agent-input.json"
+        projectlib.write_json(agent_path, agent_input)
+        preview = {
+            "schema_version": 1,
+            "size_review": {
+                "shot_id": "shot",
+                "selected_width_ratio": plan["speaker_inset_style"]["width_ratio"],
+                "candidates": [{
+                    "width_ratio": plan["speaker_inset_style"]["width_ratio"],
+                    "path": context.relative_to(self.root / "work").as_posix(),
+                    "sha256": broll_plan.sha256_file(context),
+                }, {
+                    "width_ratio": plan["speaker_inset_style"]["size_candidates"][1],
+                    **alternates["top-left"],
+                }],
+            },
+            "shots": [{
+                "shot_id": "shot",
+                "base_broll": {
+                    "path": base.relative_to(self.root / "work").as_posix(),
+                    "sha256": broll_plan.sha256_file(base),
+                },
+                "preview": {
+                    "path": context.relative_to(self.root / "work").as_posix(),
+                    "sha256": broll_plan.sha256_file(context),
+                },
+                "anchor_previews": alternates,
+            }],
+        }
+        preview_path = self.root / "work/b-roll/speaker-inset-preview.json"
+        projectlib.write_json(preview_path, preview)
+        clearance = {
+            "schema_version": 1, "actor": "Codex",
+            "size_assessment": {
+                "status": "pass",
+                "calibration_shot_id": "shot",
+                "selected_width_ratio": plan["speaker_inset_style"]["width_ratio"],
+                "checked_width_ratios": copy.deepcopy(
+                    plan["speaker_inset_style"]["size_candidates"]
+                ),
+                "rationale": "The selected project-level size is legible and leaves B-roll readable.",
+            },
+            "shots": [{
+                "shot_id": "shot",
+                "continuity": {
+                    "risk": "none",
+                    "decision": "continuous",
+                    "rationale": "The inset remains enabled for the complete shot.",
+                },
+                "subshots": [{
+                    "id": "shot-subshot-001", "display_mode": "enabled",
+                    "anchor": "top-left", "clearance_status": "pass",
+                    "checked_anchors": ["top-left"],
+                    "subject_legibility": "pass",
+                    "rationale": "The inset does not cover the B-roll focal action.",
+                }],
+            }],
+        }
+        clearance_path = self.root / "work/b-roll/speaker-inset-clearance.json"
+        projectlib.write_json(clearance_path, clearance)
+        plan["speaker_inset"] = {
+            "analysis": {"path": "b-roll/speaker-inset-analysis.json", "sha256": broll_plan.sha256_file(analysis_path)},
+            "agent_input": {"path": "b-roll/speaker-inset-agent-input.json", "sha256": broll_plan.sha256_file(agent_path)},
+            "preview": {"path": "b-roll/speaker-inset-preview.json", "sha256": broll_plan.sha256_file(preview_path)},
+            "clearance": {"path": "b-roll/speaker-inset-clearance.json", "sha256": broll_plan.sha256_file(clearance_path)},
+        }
+        with mock.patch.object(broll_plan, "validate_plan", return_value=[]), mock.patch.object(
+                build_review_page, "_extract_frame") as extract:
+            result = build_review_page.build_review_page(
+                plan, self.timeline, self.transcript, self.video, self.review_dir,
+                project_root=self.root,
+                review_id="123e4567-e89b-12d3-a456-426614174021",
+            )
+        extract.assert_not_called()
+        html = result["page"].read_text(encoding="utf-8")
+        payload = json.loads(base64.b64decode(
+            build_review_page.PAYLOAD_RE.search(html).group(1)
+        ))
+        self.assertEqual("composite", payload["review_mode"])
+        self.assertEqual({"segments": [segment]}, payload["shots"][0]["locked_selection"])
+        self.assertEqual("pass", payload["shots"][0]["subshots"][0]["clearance_status"])
+        self.assertEqual("pass", payload["shots"][0]["subshots"][0]["subject_legibility"])
+        self.assertEqual("continuous", payload["shots"][0]["continuity"]["decision"])
+        self.assertEqual(
+            plan["speaker_inset_style"]["width_ratio"],
+            payload["speaker_size_review"]["selected_width_ratio"],
+        )
+        self.assertEqual(2, len(payload["speaker_size_review"]["candidates"]))
+        self.assertEqual(
+            plan["speaker_inset"]["clearance"]["sha256"],
+            payload["speaker_bindings"]["clearance_sha256"],
+        )
+        for key in ("base_broll", "preview"):
+            self.assertTrue((result["page"].parent / payload["shots"][0][key]["path"]).is_file())
+        self.assertTrue((
+            result["page"].parent
+            / payload["shots"][0]["subshots"][0]["evidence_frames"][0]["path"]
+        ).is_file())
+        for text in (
+                "prepare_composite", "value.review_stage='composite'", "speaker_bindings",
+                "Project speaker size", "subject_legibility", "continuity"):
+            self.assertIn(text, html)
+
     def test_build_review_page_keeps_prior_publication_when_a_second_uuid_is_published(self):
         first = "123e4567-e89b-12d3-a456-426614174001"
         second = "123e4567-e89b-12d3-a456-426614174002"
@@ -2499,6 +2857,670 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
             with self.assertRaises(ValueError):
                 build_review_page.build_review_page(self.plan, self.timeline, self.transcript, self.video, self.review_dir, project_root=self.root)
         self.assertFalse(self.review_dir.exists())
+
+
+class SpeakerInsetTests(_BrollFixture, unittest.TestCase):
+    def setUp(self):
+        super().setUp()
+        self.review_video = self.root / "final/current.mp4"
+        self.review_video.parent.mkdir(parents=True, exist_ok=True)
+        self.review_video.write_bytes(b"review-video")
+        self.plan["input_hashes"]["review_video_sha256"] = broll_plan.sha256_file(
+            self.review_video
+        )
+        self.plan["speaker_inset_style"] = BrollPlanTests._speaker_style()
+        segment = {
+            "candidate_id": "asset",
+            "source_range": {"start_s": 0.0, "end_s": 1.0},
+            "program_range": copy.deepcopy(self.plan["shots"][0]["program_range"]),
+            "playback_rate": 1.0,
+        }
+        selection = self.review_for(
+            self.plan,
+            [{
+                "id": "shot", "decision": "select",
+                "program_range": copy.deepcopy(self.plan["shots"][0]["program_range"]),
+                "segments": [segment],
+            }],
+            rationale=broll_plan.HUMAN_PREPARE_COMPOSITE_RATIONALE,
+            submission_intent="prepare_composite",
+            explicit_user_action=True,
+            revision_notes="",
+            rationale_source="review_ui_explicit_action",
+            timeline_fps=copy.deepcopy(self.timeline["fps"]),
+        )
+        self.prepared = broll_plan.prepare_composite(
+            self.plan, selection,
+            mode="human", actor="Actual user",
+            rationale=broll_plan.HUMAN_PREPARE_COMPOSITE_RATIONALE,
+            project_root=self.root, timeline=self.timeline,
+        )
+
+    @staticmethod
+    def _frame(video, time_s, output):
+        Image.new("RGB", (480, 270), (40, 60, 80)).save(output, "JPEG")
+
+    def _prepare_evidence(self, supplemental_points=None):
+        probe = {
+            "width": 1920, "height": 1080, "duration_s": 10.0,
+            "fps": {"num": 30, "den": 1},
+        }
+        with (
+            mock.patch.object(speaker_inset, "_probe_video", return_value=probe),
+            mock.patch.object(speaker_inset, "_detect_scene_times", return_value=[1.5]),
+            mock.patch.object(speaker_inset, "_extract_frame", side_effect=self._frame),
+            mock.patch.object(speaker_inset, "_ffmpeg_version", return_value="ffmpeg test"),
+        ):
+            args = {}
+            if supplemental_points is not None:
+                args["supplemental_points"] = supplemental_points
+            return speaker_inset.prepare_evidence(
+                self.prepared, self.timeline, self.transcript,
+                self.review_video, self.root, **args,
+            )
+
+    def test_prepare_evidence_splits_scenes_and_hash_binds_temporal_frames(self):
+        updated = self._prepare_evidence()
+        binding = updated["speaker_inset"]["analysis"]
+        analysis_path = self.root / "work" / binding["path"]
+        self.assertTrue(analysis_path.is_file())
+        self.assertEqual(binding["sha256"], broll_plan.sha256_file(analysis_path))
+        analysis = projectlib.load_json(analysis_path)
+        self.assertEqual(self.prepared["selection"]["sha256"], analysis["selection_sha256"])
+        self.assertEqual([1.5], analysis["scene_detection"]["candidate_times_s"])
+        subshots = analysis["shots"][0]["subshots"]
+        self.assertEqual(2, len(subshots))
+        self.assertEqual(1.5, subshots[0]["program_range"]["end_s"])
+        self.assertEqual(1.5, subshots[1]["program_range"]["start_s"])
+        self.assertEqual("scene", subshots[1]["boundary_source"])
+        for subshot in subshots:
+            self.assertGreaterEqual(len(subshot["evidence_points"]), 2)
+            for point in subshot["evidence_points"]:
+                self.assertGreaterEqual(len(point["frames"]), 2)
+                for frame in point["frames"]:
+                    path = self.root / "work" / frame["path"]
+                    self.assertTrue(path.is_file())
+                    self.assertEqual(frame["sha256"], broll_plan.sha256_file(path))
+        self.assertEqual([], speaker_inset.analysis_errors(
+            analysis, updated, self.timeline, self.transcript,
+            project_root=self.root, verify_files=True,
+        ))
+
+    def test_prepare_evidence_adds_requested_dense_supplemental_points(self):
+        self.assertIn(
+            "supplemental_points",
+            inspect.signature(speaker_inset.prepare_evidence).parameters,
+        )
+        baseline = self._prepare_evidence()
+        analysis_path = self.root / "work" / baseline["speaker_inset"]["analysis"]["path"]
+        analysis = projectlib.load_json(analysis_path)
+        second = analysis["shots"][0]["subshots"][1]
+        start = second["program_range"]["start_s"]
+        supplemented = self._prepare_evidence({second["id"]: [start + 0.1]})
+        supplemented_path = self.root / "work" / supplemented["speaker_inset"]["analysis"]["path"]
+        supplemented_analysis = projectlib.load_json(supplemented_path)
+        supplemented_second = supplemented_analysis["shots"][0]["subshots"][1]
+        extra = [
+            point for point in supplemented_second["evidence_points"]
+            if point.get("evidence_kind") == "supplemental"
+        ]
+        self.assertEqual(1, len(extra))
+        self.assertGreaterEqual(len(extra[0]["frames"]), 5)
+
+    def test_agent_input_requires_per_subshot_frame_aligned_tracks_and_honest_fallbacks(self):
+        updated = self._prepare_evidence()
+        analysis_path = self.root / "work" / updated["speaker_inset"]["analysis"]["path"]
+        analysis = projectlib.load_json(analysis_path)
+        frame = self.timeline["fps"]["den"] / self.timeline["fps"]["num"]
+        subshot_inputs = []
+        for index, subshot in enumerate(analysis["shots"][0]["subshots"]):
+            start = subshot["program_range"]["start_s"]
+            end = subshot["program_range"]["end_s"]
+            if index == 0:
+                subshot_inputs.append({
+                    "id": subshot["id"],
+                    "speaker_status": "confirmed",
+                    "display_mode": "enabled",
+                    "anchor": "top-left",
+                    "rationale": "The visible speaker moves continuously in the frame burst.",
+                    "keyframes": [
+                        {"program_time_s": start, "roi": {"x": 0.10, "y": 0.10, "width": 0.30, "height": 0.60}},
+                        {"program_time_s": round(end - frame, 9), "roi": {"x": 0.20, "y": 0.10, "width": 0.30, "height": 0.60}},
+                    ],
+                })
+            else:
+                subshot_inputs.append({
+                    "id": subshot["id"],
+                    "speaker_status": "ambiguous",
+                    "display_mode": "pure_broll",
+                    "anchor": None,
+                    "rationale": "The frame burst does not identify one current speaker.",
+                    "keyframes": [],
+                })
+        agent_input = {
+            "schema_version": 1,
+            "mode": "agent",
+            "actor": "Codex",
+            "timestamp": "2026-08-04T16:00:00+08:00",
+            "rationale": "Reviewed every frozen temporal evidence packet.",
+            "analysis_sha256": updated["speaker_inset"]["analysis"]["sha256"],
+            "selection_sha256": updated["selection"]["sha256"],
+            "style_sha256": broll_plan.canonical_sha256(updated["speaker_inset_style"]),
+            "review_video_sha256": updated["input_hashes"]["review_video_sha256"],
+            "shots": [{"shot_id": "shot", "subshots": subshot_inputs}],
+        }
+        self.assertTrue(any(
+            "supplemental" in error for error in speaker_inset.agent_input_errors(
+                agent_input, analysis, updated, self.timeline,
+            )
+        ))
+        analysis["shots"][0]["subshots"][1]["evidence_points"][1][
+            "evidence_kind"
+        ] = "supplemental"
+        self.assertEqual([], speaker_inset.agent_input_errors(
+            agent_input, analysis, updated, self.timeline,
+        ))
+        attached = speaker_inset.attach_agent_input(
+            updated, analysis, agent_input, self.timeline, self.root,
+        )
+        binding = attached["speaker_inset"]["agent_input"]
+        path = self.root / "work" / binding["path"]
+        self.assertTrue(path.is_file())
+        self.assertEqual(binding["sha256"], broll_plan.sha256_file(path))
+
+        crossing = copy.deepcopy(agent_input)
+        crossing["shots"][0]["subshots"][0]["keyframes"][-1]["program_time_s"] = 1.5
+        self.assertTrue(any(
+            "cover its subshot" in error or "inside its subshot" in error
+            for error in speaker_inset.agent_input_errors(
+                crossing, analysis, updated, self.timeline,
+            )
+        ))
+        dishonest = copy.deepcopy(agent_input)
+        dishonest["shots"][0]["subshots"][1]["keyframes"] = [
+            {"program_time_s": 1.5, "roi": {"x": 0.1, "y": 0.1, "width": 0.3, "height": 0.6}},
+        ]
+        self.assertTrue(any(
+            "pure_broll" in error for error in speaker_inset.agent_input_errors(
+                dishonest, analysis, updated, self.timeline,
+            )
+        ))
+
+    def test_roi_interpolation_is_linear_and_never_crosses_subshot_boundaries(self):
+        keyframes = [
+            {"program_time_s": 1.0, "roi": {"x": 0.1, "y": 0.2, "width": 0.3, "height": 0.4}},
+            {"program_time_s": 1.4, "roi": {"x": 0.3, "y": 0.4, "width": 0.5, "height": 0.6}},
+        ]
+        self.assertEqual(
+            {"x": 0.2, "y": 0.3, "width": 0.4, "height": 0.5},
+            speaker_inset.interpolate_roi(keyframes, 1.2, {"start_s": 1.0, "end_s": 1.5}),
+        )
+        with self.assertRaisesRegex(ValueError, "outside subshot"):
+            speaker_inset.interpolate_roi(
+                keyframes, 1.5, {"start_s": 1.0, "end_s": 1.5},
+            )
+
+    def test_probe_video_accepts_ffprobe_string_duration_and_rational_fps(self):
+        payload = {
+            "streams": [{
+                "codec_type": "video", "width": 96, "height": 54,
+                "avg_frame_rate": "30000/1001",
+            }],
+            "format": {"duration": "10.000000"},
+        }
+        with mock.patch.object(
+                speaker_inset.subprocess, "run",
+                return_value=mock.Mock(stdout=json.dumps(payload))):
+            self.assertEqual({
+                "width": 96, "height": 54, "duration_s": 10.0,
+                "fps": {"num": 30000, "den": 1001},
+            }, speaker_inset._probe_video(self.review_video))
+
+    def test_composite_frame_masks_outside_circle_and_respects_anchor(self):
+        base = Image.new("RGB", (100, 80), (0, 180, 0))
+        speaker = Image.new("RGB", (100, 80), (220, 20, 20))
+        style = {
+            **BrollPlanTests._speaker_style(),
+            "width_ratio": 0.30,
+            "margin_ratio": 0.05,
+            "reserved_bottom_ratio": 0.20,
+            "border": {"width_px": 2, "color": "#FFFFFF"},
+        }
+        rendered = speaker_inset.composite_frame(
+            base, speaker,
+            {"x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0},
+            style, "top-left",
+        )
+        self.assertEqual((0, 180, 0), rendered.getpixel((5, 5)))
+        self.assertEqual((220, 20, 20), rendered.getpixel((20, 20)))
+        self.assertEqual((0, 180, 0), rendered.getpixel((80, 70)))
+        self.assertEqual((100, 80), rendered.size)
+
+    def test_render_context_preview_uses_exact_selection_and_real_speaker_frames(self):
+        self.timeline.update({"width": 96, "height": 54, "fps": {"num": 10, "den": 1}})
+        projectlib.write_json(self.timeline_path, self.timeline)
+        self.selected_lut_path.write_text(
+            'TITLE "Identity"\nLUT_3D_SIZE 2\nDOMAIN_MIN 0 0 0\nDOMAIN_MAX 1 1 1\n'
+            "0 0 0\n0 0 1\n0 1 0\n0 1 1\n1 0 0\n1 0 1\n1 1 0\n1 1 1\n",
+            encoding="ascii",
+        )
+        candidate_path = self.root / "work/cache/b-roll/factory.mp4"
+        subprocess.run([
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-f", "lavfi", "-i", "color=green:size=128x96:rate=10",
+            "-t", "2", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            str(candidate_path),
+        ], check=True, capture_output=True)
+        subprocess.run([
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-f", "lavfi", "-i", "color=blue:size=96x54:rate=10",
+            "-t", "10", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            str(self.review_video),
+        ], check=True, capture_output=True)
+        candidate = self.plan["shots"][0]["candidates"][0]
+        candidate.update({
+            "cache_path": candidate_path.relative_to(self.root / "work").as_posix(),
+            "sha256": broll_plan.sha256_file(candidate_path),
+            "bytes": candidate_path.stat().st_size,
+            "duration_s": 2.0,
+            "probe": {"duration_s": 2.0, "width": 128, "height": 96},
+        })
+        self.plan["input_hashes"].update({
+            "timeline_sha256": broll_plan.sha256_file(self.timeline_path),
+            "review_video_sha256": broll_plan.sha256_file(self.review_video),
+            "selected_lut_sha256": broll_plan.sha256_file(self.selected_lut_path),
+        })
+        segment = {
+            "candidate_id": "asset",
+            "source_range": {"start_s": 0.0, "end_s": 1.0},
+            "program_range": copy.deepcopy(self.plan["shots"][0]["program_range"]),
+            "playback_rate": 1.0,
+        }
+        selection = self.review_for(
+            self.plan,
+            [{
+                "id": "shot", "decision": "select",
+                "program_range": copy.deepcopy(self.plan["shots"][0]["program_range"]),
+                "segments": [segment],
+            }],
+            rationale=broll_plan.HUMAN_PREPARE_COMPOSITE_RATIONALE,
+            submission_intent="prepare_composite", explicit_user_action=True,
+            revision_notes="", rationale_source="review_ui_explicit_action",
+            timeline_fps=copy.deepcopy(self.timeline["fps"]),
+        )
+        prepared = broll_plan.prepare_composite(
+            self.plan, selection, mode="human", actor="Actual user",
+            rationale=broll_plan.HUMAN_PREPARE_COMPOSITE_RATIONALE,
+            project_root=self.root, timeline=self.timeline,
+        )
+        with (
+            mock.patch.object(speaker_inset, "_detect_scene_times", return_value=[]),
+            mock.patch.object(speaker_inset, "_extract_frame", side_effect=self._frame),
+        ):
+            analyzed = speaker_inset.prepare_evidence(
+                prepared, self.timeline, self.transcript,
+                self.review_video, self.root,
+            )
+        analysis_path = self.root / "work" / analyzed["speaker_inset"]["analysis"]["path"]
+        analysis = projectlib.load_json(analysis_path)
+        subshot = analysis["shots"][0]["subshots"][0]
+        agent_input = {
+            "schema_version": 1, "mode": "agent", "actor": "Codex",
+            "timestamp": "2026-08-04T16:00:00+08:00",
+            "rationale": "The exact A-roll evidence shows one continuous speaker.",
+            "analysis_sha256": analyzed["speaker_inset"]["analysis"]["sha256"],
+            "selection_sha256": analyzed["selection"]["sha256"],
+            "style_sha256": broll_plan.canonical_sha256(analyzed["speaker_inset_style"]),
+            "review_video_sha256": analyzed["input_hashes"]["review_video_sha256"],
+            "shots": [{
+                "shot_id": "shot",
+                "subshots": [{
+                    "id": subshot["id"], "speaker_status": "confirmed",
+                    "display_mode": "enabled", "anchor": "top-left",
+                    "rationale": "One visible speaker remains continuous.",
+                    "keyframes": [
+                        {"program_time_s": 1.0, "roi": {"x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0}},
+                        {"program_time_s": 1.9, "roi": {"x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0}},
+                    ],
+                }],
+            }],
+        }
+        attached = speaker_inset.attach_agent_input(
+            analyzed, analysis, agent_input, self.timeline, self.root,
+        )
+        previewed = speaker_inset.render_context_previews(
+            attached, analysis, agent_input, self.timeline,
+            self.review_video, self.root, lut=self.selected_lut_path,
+        )
+        preview_binding = previewed["speaker_inset"]["preview"]
+        record_path = self.root / "work" / preview_binding["path"]
+        self.assertTrue(record_path.is_file())
+        self.assertEqual(preview_binding["sha256"], broll_plan.sha256_file(record_path))
+        record = projectlib.load_json(record_path)
+        video = self.root / "work" / record["shots"][0]["preview"]["path"]
+        self.assertTrue(video.is_file())
+        self.assertEqual(record["shots"][0]["preview"]["sha256"], broll_plan.sha256_file(video))
+        anchor_previews = record["shots"][0]["anchor_previews"]
+        self.assertEqual(
+            set(previewed["speaker_inset_style"]["allowed_anchors"]),
+            set(anchor_previews),
+        )
+        for binding in anchor_previews.values():
+            alternate = self.root / "work" / binding["path"]
+            self.assertTrue(alternate.is_file())
+            self.assertEqual(binding["sha256"], broll_plan.sha256_file(alternate))
+        probe = speaker_inset._probe_video(video)
+        self.assertEqual({"num": 10, "den": 1}, probe["fps"])
+        self.assertAlmostEqual(1.0, probe["duration_s"], places=2)
+        still = self.root / "preview-still.png"
+        subprocess.run([
+            "ffmpeg", "-y", "-loglevel", "error", "-ss", "0.5",
+            "-i", str(video), "-frames:v", "1", str(still),
+        ], check=True, capture_output=True)
+        with Image.open(still).convert("RGB") as image:
+            inset_pixel = image.getpixel((14, 14))
+            broll_pixel = image.getpixel((80, 40))
+        self.assertGreater(inset_pixel[2], inset_pixel[1])
+        self.assertGreater(broll_pixel[1], broll_pixel[2])
+
+    def test_broll_preview_base_covers_every_timeline_frame_when_upsampling(self):
+        self.timeline.update({"width": 96, "height": 54, "fps": {"num": 60, "den": 1}})
+        frame_count = 209
+        duration = frame_count / 60
+        candidate_path = self.root / "work/cache/b-roll/factory.mp4"
+        subprocess.run([
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-f", "lavfi", "-i", "color=green:size=128x96:rate=30",
+            "-t", "4", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            "-video_track_timescale", "30",
+            str(candidate_path),
+        ], check=True, capture_output=True)
+        plan = copy.deepcopy(self.prepared)
+        shot = plan["shots"][0]
+        candidate = shot["candidates"][0]
+        candidate.update({
+            "cache_path": candidate_path.relative_to(self.root / "work").as_posix(),
+            "sha256": broll_plan.sha256_file(candidate_path),
+            "bytes": candidate_path.stat().st_size,
+            "duration_s": 4.0,
+            "probe": {"duration_s": 4.0, "width": 128, "height": 96},
+        })
+        shot["program_range"] = {"start_s": 1.0, "end_s": 1.0 + duration}
+        shot["selected"] = {"segments": [{
+            "candidate_id": "asset",
+            "source_range": {"start_s": 0.0, "end_s": duration},
+            "program_range": copy.deepcopy(shot["program_range"]),
+            "playback_rate": 1.0,
+        }]}
+        output = self.root / "work/cache/b-roll/speaker-inset/base.mp4"
+
+        speaker_inset._render_broll_base(
+            plan, shot, self.timeline, self.root, output, None,
+        )
+
+        probe = subprocess.run([
+            "ffprobe", "-v", "error", "-count_frames", "-select_streams", "v:0",
+            "-show_entries", "stream=nb_read_frames", "-of", "json", str(output),
+        ], check=True, capture_output=True, text=True)
+        self.assertEqual(
+            frame_count,
+            int(json.loads(probe.stdout)["streams"][0]["nb_read_frames"]),
+        )
+
+    def test_clearance_binds_exact_preview_and_requires_honest_safe_position_fallback(self):
+        analyzed = self._prepare_evidence()
+        analysis_path = self.root / "work" / analyzed["speaker_inset"]["analysis"]["path"]
+        analysis = projectlib.load_json(analysis_path)
+        analysis["shots"][0]["subshots"][1]["evidence_points"][1][
+            "evidence_kind"
+        ] = "supplemental"
+        projectlib.write_json(analysis_path, analysis)
+        analyzed["speaker_inset"]["analysis"]["sha256"] = broll_plan.sha256_file(
+            analysis_path
+        )
+        frame = self.timeline["fps"]["den"] / self.timeline["fps"]["num"]
+        subshots = analysis["shots"][0]["subshots"]
+        first_range = subshots[0]["program_range"]
+        agent_input = {
+            "schema_version": 1,
+            "mode": "agent",
+            "actor": "Codex",
+            "timestamp": "2026-08-04T16:00:00+08:00",
+            "rationale": "Reviewed the frozen A-roll evidence for every subshot.",
+            "analysis_sha256": analyzed["speaker_inset"]["analysis"]["sha256"],
+            "selection_sha256": analyzed["selection"]["sha256"],
+            "style_sha256": broll_plan.canonical_sha256(analyzed["speaker_inset_style"]),
+            "review_video_sha256": analyzed["input_hashes"]["review_video_sha256"],
+            "shots": [{
+                "shot_id": "shot",
+                "subshots": [{
+                    "id": subshots[0]["id"],
+                    "speaker_status": "confirmed",
+                    "display_mode": "enabled",
+                    "anchor": "top-left",
+                    "rationale": "One current speaker remains continuous.",
+                    "keyframes": [
+                        {
+                            "program_time_s": first_range["start_s"],
+                            "roi": {"x": 0.1, "y": 0.1, "width": 0.3, "height": 0.6},
+                        },
+                        {
+                            "program_time_s": round(first_range["end_s"] - frame, 9),
+                            "roi": {"x": 0.2, "y": 0.1, "width": 0.3, "height": 0.6},
+                        },
+                    ],
+                }, {
+                    "id": subshots[1]["id"],
+                    "speaker_status": "ambiguous",
+                    "display_mode": "pure_broll",
+                    "anchor": None,
+                    "rationale": "The temporal evidence cannot isolate one current speaker.",
+                    "keyframes": [],
+                }],
+            }],
+        }
+        attached = speaker_inset.attach_agent_input(
+            analyzed, analysis, agent_input, self.timeline, self.root,
+        )
+        preview_media = self.root / "work/cache/b-roll"
+        base_path = preview_media / "base.mp4"
+        context_path = preview_media / "context.mp4"
+        base_path.write_bytes(b"base-broll-preview")
+        context_path.write_bytes(b"contextual-preview")
+        alternate_bindings = {}
+        for index, anchor in enumerate(attached["speaker_inset_style"]["allowed_anchors"]):
+            path = preview_media / f"context-{anchor}.mp4"
+            path.write_bytes(f"context-{anchor}-{index}".encode("ascii"))
+            alternate_bindings[anchor] = {
+                "path": path.relative_to(self.root / "work").as_posix(),
+                "sha256": broll_plan.sha256_file(path),
+            }
+        preview_record = {
+            "schema_version": 1,
+            "analysis_sha256": attached["speaker_inset"]["analysis"]["sha256"],
+            "agent_input_sha256": attached["speaker_inset"]["agent_input"]["sha256"],
+            "selection_sha256": attached["selection"]["sha256"],
+            "style_sha256": broll_plan.canonical_sha256(attached["speaker_inset_style"]),
+            "review_video_sha256": attached["input_hashes"]["review_video_sha256"],
+            "size_review": {
+                "shot_id": "shot",
+                "selected_width_ratio": 0.22,
+                "candidates": [{
+                    "width_ratio": 0.22,
+                    "path": context_path.relative_to(self.root / "work").as_posix(),
+                    "sha256": broll_plan.sha256_file(context_path),
+                }, {
+                    "width_ratio": 0.30,
+                    **alternate_bindings["top-left"],
+                }],
+            },
+            "shots": [{
+                "shot_id": "shot",
+                "program_range": copy.deepcopy(attached["shots"][0]["program_range"]),
+                "base_broll": {
+                    "path": base_path.relative_to(self.root / "work").as_posix(),
+                    "sha256": broll_plan.sha256_file(base_path),
+                },
+                "preview": {
+                    "path": context_path.relative_to(self.root / "work").as_posix(),
+                    "sha256": broll_plan.sha256_file(context_path),
+                },
+                "anchor_previews": alternate_bindings,
+            }],
+        }
+        missing_size_review = copy.deepcopy(preview_record)
+        missing_size_review.pop("size_review")
+        self.assertTrue(any(
+            "size review" in error for error in speaker_inset.preview_errors(
+                missing_size_review, attached, analysis, agent_input, self.timeline,
+            )
+        ))
+        preview_path = self.root / "work/b-roll/speaker-inset-preview.json"
+        projectlib.write_json(preview_path, preview_record)
+        previewed = copy.deepcopy(attached)
+        previewed["speaker_inset"]["preview"] = {
+            "path": "b-roll/speaker-inset-preview.json",
+            "sha256": broll_plan.sha256_file(preview_path),
+        }
+        clearance = {
+            "schema_version": 1,
+            "mode": "agent",
+            "actor": "Codex",
+            "timestamp": "2026-08-04T16:10:00+08:00",
+            "rationale": "Checked the exact composited previews against B-roll focal content.",
+            "analysis_sha256": previewed["speaker_inset"]["analysis"]["sha256"],
+            "agent_input_sha256": previewed["speaker_inset"]["agent_input"]["sha256"],
+            "preview_sha256": previewed["speaker_inset"]["preview"]["sha256"],
+            "selection_sha256": previewed["selection"]["sha256"],
+            "style_sha256": broll_plan.canonical_sha256(previewed["speaker_inset_style"]),
+            "size_assessment": {
+                "status": "pass",
+                "calibration_shot_id": "shot",
+                "selected_width_ratio": 0.22,
+                "checked_width_ratios": [0.22, 0.30],
+                "rationale": "The selected project size keeps the speaker legible without dominating B-roll.",
+            },
+            "shots": [{
+                "shot_id": "shot",
+                "continuity": {
+                    "risk": "mode_change",
+                    "decision": "intentional_transition",
+                    "rationale": "The speaker window stops only after the independently reviewed cut.",
+                },
+                "subshots": [{
+                    "id": subshots[0]["id"],
+                    "display_mode": "enabled",
+                    "anchor": "top-left",
+                    "clearance_status": "pass",
+                    "checked_anchors": ["top-left"],
+                    "subject_legibility": "pass",
+                    "rationale": "The inset leaves the primary B-roll action visible.",
+                }, {
+                    "id": subshots[1]["id"],
+                    "display_mode": "pure_broll",
+                    "anchor": None,
+                    "clearance_status": "pass",
+                    "checked_anchors": [],
+                    "subject_legibility": "not_applicable",
+                    "rationale": "Speaker identity is ambiguous, so the inset stays disabled.",
+                }],
+            }],
+        }
+        missing_size_assessment = copy.deepcopy(clearance)
+        missing_size_assessment.pop("size_assessment")
+        self.assertTrue(any(
+            "size assessment" in error for error in speaker_inset.clearance_errors(
+                missing_size_assessment, preview_record, agent_input, analysis, previewed,
+            )
+        ))
+        missing_continuity = copy.deepcopy(clearance)
+        missing_continuity["shots"][0].pop("continuity")
+        self.assertTrue(any(
+            "continuity" in error for error in speaker_inset.clearance_errors(
+                missing_continuity, preview_record, agent_input, analysis, previewed,
+            )
+        ))
+        missing_legibility = copy.deepcopy(clearance)
+        missing_legibility["shots"][0]["subshots"][0].pop("subject_legibility")
+        self.assertTrue(any(
+            "subject_legibility" in error for error in speaker_inset.clearance_errors(
+                missing_legibility, preview_record, agent_input, analysis, previewed,
+            )
+        ))
+        flash_analysis = copy.deepcopy(analysis)
+        flash_subshots = flash_analysis["shots"][0]["subshots"]
+        flash_subshots[0]["program_range"] = {"start_s": 0.0, "end_s": 0.933333333}
+        flash_subshots[1]["program_range"] = {"start_s": 0.933333333, "end_s": 3.483333333}
+        wrong_flash = copy.deepcopy(clearance)
+        self.assertTrue(any(
+            "short_flash" in error for error in speaker_inset.clearance_errors(
+                wrong_flash, preview_record, agent_input, flash_analysis, previewed,
+            )
+        ))
+        wrong_flash["shots"][0]["continuity"]["risk"] = "short_flash"
+        self.assertFalse(any(
+            "continuity risk" in error for error in speaker_inset.clearance_errors(
+                wrong_flash, preview_record, agent_input, flash_analysis, previewed,
+            )
+        ))
+        self.assertEqual([], speaker_inset.clearance_errors(
+            clearance, preview_record, agent_input, analysis, previewed,
+        ))
+        cleared = speaker_inset.attach_clearance(
+            previewed, analysis, agent_input, preview_record, clearance,
+            self.root, self.timeline,
+        )
+        binding = cleared["speaker_inset"]["clearance"]
+        path = self.root / "work" / binding["path"]
+        self.assertTrue(path.is_file())
+        self.assertEqual(binding["sha256"], broll_plan.sha256_file(path))
+        self.assertEqual([], broll_plan.validate_plan(
+            cleared, self.timeline, self.transcript,
+            project_root=self.root, verify_files=True,
+        ))
+
+        no_safe = copy.deepcopy(clearance)
+        fallback = no_safe["shots"][0]["subshots"][0]
+        fallback.update({
+            "display_mode": "pure_broll",
+            "anchor": None,
+            "clearance_status": "no_safe_position",
+            "checked_anchors": copy.deepcopy(previewed["speaker_inset_style"]["allowed_anchors"]),
+            "subject_legibility": "not_applicable",
+            "rationale": "Every allowed anchor covers the primary B-roll action.",
+        })
+        no_safe["shots"][0]["continuity"].update({
+            "risk": "none",
+            "decision": "all_pure_broll",
+            "rationale": "Every subshot is pure B-roll after the safe-position fallback.",
+        })
+        self.assertEqual([], speaker_inset.clearance_errors(
+            no_safe, preview_record, agent_input, analysis, previewed,
+        ))
+        dishonest = copy.deepcopy(no_safe)
+        dishonest["shots"][0]["subshots"][0]["checked_anchors"] = ["top-left"]
+        self.assertTrue(any(
+            "all allowed anchors" in error
+            for error in speaker_inset.clearance_errors(
+                dishonest, preview_record, agent_input, analysis, previewed,
+            )
+        ))
+        stale = copy.deepcopy(clearance)
+        stale["preview_sha256"] = "f" * 64
+        self.assertTrue(any(
+            "preview_sha256" in error
+            for error in speaker_inset.clearance_errors(
+                stale, preview_record, agent_input, analysis, previewed,
+            )
+        ))
+        path.write_text("{}\n", encoding="utf-8")
+        self.assertTrue(any(
+            "clearance SHA-256 is stale" in error
+            for error in broll_plan.validate_plan(
+                cleared, self.timeline, self.transcript,
+                project_root=self.root, verify_files=True,
+            )
+        ))
 
 
 class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):

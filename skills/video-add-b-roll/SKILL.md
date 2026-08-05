@@ -86,6 +86,11 @@ contract; do not hand-build the operation.
 ```text
 work/b-roll/broll-plan.json                         # durable domain plan
 work/b-roll/broll-interaction.json                  # durable applied receipt
+work/b-roll/broll-selection.json                    # durable non-approval exact selection
+work/b-roll/speaker-inset-analysis.json             # durable scene/evidence packet
+work/b-roll/speaker-inset-agent-input.json          # durable Agent ROI decisions
+work/b-roll/speaker-inset-preview.json              # durable exact preview bindings
+work/b-roll/speaker-inset-clearance.json            # durable Agent obstruction check
 work/b-roll/broll-revision-request-<UUID>.json      # durable unapproved request bytes
 work/b-roll/candidate-search.json                   # durable query and provider order
 work/b-roll/candidate-analysis.json                 # durable deterministic evidence
@@ -93,6 +98,7 @@ work/b-roll/candidate-ranking.json                  # durable Agent ranking and 
 work/cache/b-roll/candidate-analysis/media/         # disposable analysis variants
 work/cache/b-roll/candidate-analysis/frames/        # reproducible samples and crops
 work/cache/b-roll/candidates/                       # frozen acquired media
+work/cache/b-roll/speaker-inset/                    # reproducible evidence and previews
 work/cache/b-roll/normalized/                       # reproducible silent overlays
 review/03-b-roll/candidate-analysis-<UUID>/          # immutable analysis packet
 review/03-b-roll/candidate-analysis-<UUID>.md        # analysis and baseline summary
@@ -137,6 +143,11 @@ For each proposed shot:
 
 Keep `brief.density` equal to `selective`. Do not pad the plan to meet a count. If no moment
 earns B-roll, an approved all-skipped plan is a valid no-op.
+
+For a simultaneous speaker window, add one strict project-level `speaker_inset_style`; otherwise
+omit it. Include two or three ascending `size_candidates`, select one `width_ratio` from that list,
+and review that size once for the project rather than once per shot. Never introduce a face
+detector, segmentation model, cross-cut identity tracker, or guessed ROI.
 
 Validate the draft after every material edit:
 
@@ -376,7 +387,8 @@ analysis/ranking hashes. Existing SHA-256-identical analysis and delivery media 
 a new UUID review page with `build_review_page.py`, present it, and stop again. Never route a
 revision request to `apply_review()` or convert `revision_notes` into a human rationale.
 
-Apply the received review JSON and durably bind the interaction receipt:
+For a plan without enabled `speaker_inset_style`, apply the received approval JSON and durably
+bind the interaction receipt:
 
 ```powershell
 python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]); sys.path.insert(0,sys.argv[2]); import broll_plan,projectlib; path=root/'work/b-roll/broll-plan.json'; plan=projectlib.load_json(path); review=projectlib.load_json(sys.argv[3]); timeline=projectlib.load_json(root/'work/timeline.json'); updated=broll_plan.apply_review(plan,review,mode=sys.argv[4],actor=sys.argv[5],rationale=review['rationale'],interaction_path=root/'work/b-roll/broll-interaction.json',timeline=timeline); projectlib.write_json(path,updated)" $ProjectRoot $BrollScripts $ReviewExport human "Actual user name"
@@ -385,6 +397,18 @@ python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]); sys.pat
 Use `human` and the actual human actor only after explicit user export. A new human approve uses
 the page's factual `review_ui_explicit_action` rationale; it does not claim to quote a user-authored
 reason. Agent mode still requires the real Agent actor and a specific exported Agent rationale.
+
+For an enabled inset, apply first-page `prepare_composite`, then use `speaker_inset.py` for evidence,
+Agent ROI, exact anchor previews, and clearance; follow `reference/broll-rules.md`. Only the republished
+page's hash-bound `review_stage: composite` approval may select shots. Stop there: do not normalize
+or deliver until the normalizer precomposes the speaker window and that stage is reviewed.
+
+Before accepting `ambiguous`, request dense supplemental evidence inside that subshot and rebuild
+the analysis hash. Render the project size candidates once from the first enabled shot. Require
+`subject_legibility: pass` for every displayed subshot and a shot-level continuity decision. Treat
+an enabled run shorter than 1.5 seconds followed by a longer pure-B-roll run as `short_flash`; extend
+the independently confirmed ROI, disable the whole shot inset, or record a specific intentional
+transition. Never relax the confirmed-speaker rule to hide a continuity problem.
 
 ### 5. Normalize Approved Selections
 

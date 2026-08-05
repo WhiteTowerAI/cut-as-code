@@ -29,89 +29,58 @@
       "generic office footage"
     ]
   },
-  "candidate_ranking": {
-    "path": "b-roll/candidate-ranking.json",
-    "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-    "analysis_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-    "shortlists": [
-      {
-        "shot_id": "example-manufacturing-process",
-        "candidate_ids": [
-          "example-owned-factory-video",
-          "example-owned-factory-detail-video"
-        ]
-      },
-      {
-        "shot_id": "example-software-claim",
-        "candidate_ids": []
-      }
+  "speaker_inset_style": {
+    "enabled": true,
+    "shape": "circle",
+    "width_ratio": 0.22,
+    "size_candidates": [
+      0.22,
+      0.3
+    ],
+    "aspect_ratio": 1.0,
+    "border": {
+      "width_px": 3,
+      "color": "#FFFFFF"
+    },
+    "margin_ratio": 0.04,
+    "reserved_bottom_ratio": 0.2,
+    "allowed_anchors": [
+      "top-left",
+      "top-right",
+      "middle-left",
+      "middle-right"
     ]
   },
-  "review_status": "approved",
-  "decision": {
-    "mode": "agent",
-    "actor": "Example Agent",
-    "rationale": "Selected the literal manufacturing process shot and skipped the weak software visual."
-  },
-  "review": {
-    "status": "approved",
-    "submission_intent": "approve",
-    "revision_notes": "",
+  "decision": null,
+  "review": null,
+  "selection": {
+    "status": "prepared",
+    "submission_intent": "prepare_composite",
+    "path": "b-roll/broll-selection.json",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "review_id": "123e4567-e89b-12d3-a456-426614174000",
-    "mode": "agent",
-    "actor": "Example Agent",
-    "rationale": "Selected the literal manufacturing process shot and skipped the weak software visual.",
-    "timestamp": "2026-07-23T12:00:00Z",
-    "plan_sha256": "278fe37aa4ac3bf528ebd0161bdb19a917158bd707debd19090f69b0f81fa2df",
-    "candidate_manifest_sha256": "4d46ef77624f6c2dfc1e0b2c62d54aba8bdac44609be6bc3ef5c1e8a625ab616",
-    "review_video_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
-    "decisions": [
-      {
-        "id": "example-manufacturing-process",
-        "decision": "select",
-        "program_range": {
-          "start_s": 6.0,
-          "end_s": 9.0
-        },
-        "segments": [
-          {
-            "candidate_id": "example-owned-factory-video",
-            "source_range": {
-              "start_s": 0.5,
-              "end_s": 1.5
-            },
-            "program_range": {
-              "start_s": 6.0,
-              "end_s": 7.0
-            },
-            "playback_rate": 1.0
-          },
-          {
-            "candidate_id": "example-owned-factory-detail-video",
-            "source_range": {
-              "start_s": 0.5,
-              "end_s": 3.5
-            },
-            "program_range": {
-              "start_s": 7.0,
-              "end_s": 9.0
-            },
-            "playback_rate": 1.5
-          }
-        ]
-      },
-      {
-        "id": "example-software-claim",
-        "decision": "skip"
-      }
-    ],
-    "decision_skipped_shot_ids": [
-      "example-software-claim"
-    ],
-    "selected_asset_sha256": [
-      "6666666666666666666666666666666666666666666666666666666666666666",
-      "6767676767676767676767676767676767676767676767676767676767676767"
-    ]
+    "mode": "human",
+    "actor": "Actual user",
+    "timestamp": "2026-08-04T12:00:00Z",
+    "style_sha256": "59705002a624caae0777b45ce53798f3c970981b3687a015d38068465ebf58eb"
+  },
+  "speaker_inset": {
+    "analysis": {
+      "path": "b-roll/speaker-inset-analysis.json",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "agent_input": {
+      "path": "b-roll/speaker-inset-agent-input.json",
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    "preview": {
+      "path": "b-roll/speaker-inset-preview.json",
+      "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    "clearance": {
+      "path": "b-roll/speaker-inset-clearance.json",
+      "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
   },
   "shots": [
     {
@@ -144,7 +113,7 @@
         ]
       },
       "editorial_reason": "Shows the physical process named in the claim.",
-      "visual_intent": "A wide, readable view of precision parts moving through a factory line.",
+      "visual_intent": "A readable view of precision parts moving through a factory line.",
       "queries": [
         "precision parts factory line",
         "manufacturing assembly process wide shot"
@@ -167,21 +136,8 @@
             "source_type": "local",
             "creator": "Example Studio",
             "license": "Example owned footage - replace with real rights statement",
-            "retrieval_time": "2026-07-23T10:00:00Z",
+            "retrieval_time": "2026-08-04T10:00:00Z",
             "original_path": "input/example-owned-factory-video.mp4"
-          },
-          "ranking": {
-            "rank": 1,
-            "scores": {
-              "semantic_fit": 4,
-              "context_fit": 4,
-              "composition_fit": 3,
-              "style_fit": 3,
-              "text_logo_risk": 0
-            },
-            "warnings": [],
-            "rationale": "The visible manufacturing line directly supports the spoken process claim and remains readable in the target framing.",
-            "duplicate_notes": []
           }
         },
         {
@@ -201,21 +157,8 @@
             "source_type": "local",
             "creator": "Example Studio",
             "license": "Example owned footage - replace with real rights statement",
-            "retrieval_time": "2026-07-23T10:00:00Z",
+            "retrieval_time": "2026-08-04T10:00:00Z",
             "original_path": "input/example-owned-factory-detail-video.mp4"
-          },
-          "ranking": {
-            "rank": 2,
-            "scores": {
-              "semantic_fit": 3,
-              "context_fit": 4,
-              "composition_fit": 4,
-              "style_fit": 3,
-              "text_logo_risk": 0
-            },
-            "warnings": [],
-            "rationale": "The closer detail view supplies a distinct second beat while remaining specific to the manufacturing claim.",
-            "duplicate_notes": []
           }
         }
       ],
@@ -247,147 +190,7 @@
           }
         ]
       },
-      "status": "verified",
-      "normalized": {
-        "path": "cache/b-roll/normalized/broll-001.mp4",
-        "selection_format": "canonical",
-        "sha256": "7777777777777777777777777777777777777777777777777777777777777777",
-        "concat_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
-        "source_paths": [
-          "cache/b-roll/candidates/example-owned-factory-video.mp4",
-          "cache/b-roll/candidates/example-owned-factory-detail-video.mp4"
-        ],
-        "source_sha256s": [
-          "6666666666666666666666666666666666666666666666666666666666666666",
-          "6767676767676767676767676767676767676767676767676767676767676767"
-        ],
-        "segments": [
-          {
-            "candidate_id": "example-owned-factory-video",
-            "segment": {
-              "candidate_id": "example-owned-factory-video",
-              "source_range": {
-                "start_s": 0.5,
-                "end_s": 1.5
-              },
-              "program_range": {
-                "start_s": 6.0,
-                "end_s": 7.0
-              },
-              "playback_rate": 1.0
-            },
-            "source_path": "cache/b-roll/candidates/example-owned-factory-video.mp4",
-            "source_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
-            "normalized_path": "cache/b-roll/normalized/broll-001-segment-01.mp4",
-            "normalized_sha256": "7878787878787878787878787878787878787878787878787878787878787878",
-            "source_duration_s": 1.0,
-            "effective_duration_s": 1.0,
-            "program_duration_s": 1.0,
-            "playback_rate": 1.0,
-            "probe": {
-              "duration_s": 1.0,
-              "width": 1920,
-              "height": 1080,
-              "fps": {
-                "num": 30000,
-                "den": 1001
-              },
-              "sar": "1:1",
-              "codec": "h264",
-              "pix_fmt": "yuv420p",
-              "has_audio": false,
-              "has_subtitles": false,
-              "has_data": false
-            }
-          },
-          {
-            "candidate_id": "example-owned-factory-detail-video",
-            "segment": {
-              "candidate_id": "example-owned-factory-detail-video",
-              "source_range": {
-                "start_s": 0.5,
-                "end_s": 3.5
-              },
-              "program_range": {
-                "start_s": 7.0,
-                "end_s": 9.0
-              },
-              "playback_rate": 1.5
-            },
-            "source_path": "cache/b-roll/candidates/example-owned-factory-detail-video.mp4",
-            "source_sha256": "6767676767676767676767676767676767676767676767676767676767676767",
-            "normalized_path": "cache/b-roll/normalized/broll-001-segment-02.mp4",
-            "normalized_sha256": "7979797979797979797979797979797979797979797979797979797979797979",
-            "source_duration_s": 3.0,
-            "effective_duration_s": 2.0,
-            "program_duration_s": 2.0,
-            "playback_rate": 1.5,
-            "probe": {
-              "duration_s": 2.0,
-              "width": 1920,
-              "height": 1080,
-              "fps": {
-                "num": 30000,
-                "den": 1001
-              },
-              "sar": "1:1",
-              "codec": "h264",
-              "pix_fmt": "yuv420p",
-              "has_audio": false,
-              "has_subtitles": false,
-              "has_data": false
-            }
-          }
-        ],
-        "program_duration_s": 3.0,
-        "probe": {
-          "duration_s": 3.0,
-          "width": 1920,
-          "height": 1080,
-          "fps": {
-            "num": 30000,
-            "den": 1001
-          },
-          "sar": "1:1",
-          "codec": "h264",
-          "pix_fmt": "yuv420p",
-          "has_audio": false,
-          "has_subtitles": false,
-          "has_data": false
-        },
-        "grade_plan_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
-        "selected_lut_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
-      },
-      "verification": {
-        "status": "pass",
-        "normalized_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
-        "stills": {
-          "first": {
-            "path": "review/03-b-roll/stills/001-example-manufacturing-process-first.png",
-            "sha256": "8888888888888888888888888888888888888888888888888888888888888888"
-          },
-          "middle": {
-            "path": "review/03-b-roll/stills/001-example-manufacturing-process-middle.png",
-            "sha256": "9999999999999999999999999999999999999999999999999999999999999999"
-          },
-          "last": {
-            "path": "review/03-b-roll/stills/001-example-manufacturing-process-last.png",
-            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-          }
-        },
-        "contact_sheet": {
-          "path": "review/03-b-roll/contact-sheet.jpg",
-          "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-        },
-        "boundary_reel": {
-          "path": "review/03-b-roll/boundary-reel.mp4",
-          "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
-        },
-        "report": {
-          "path": "review/03-b-roll/b-roll-summary.md",
-          "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
-        }
-      }
+      "status": "composite_pending"
     },
     {
       "id": "example-software-claim",
