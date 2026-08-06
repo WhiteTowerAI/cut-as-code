@@ -32,6 +32,16 @@ STYLE_FIELDS = {
     "enabled", "shape", "width_ratio", "aspect_ratio", "border",
     "corner_radius_ratio", "margin_ratio", "reserved_bottom_ratio",
 }
+DEFAULT_STYLE = {
+    "enabled": True,
+    "shape": "rounded-rectangle",
+    "width_ratio": 0.39,
+    "aspect_ratio": 0.80,
+    "border": {"width_px": 3, "color": "#9E9E9E"},
+    "corner_radius_ratio": 0.10,
+    "margin_ratio": 0.04,
+    "reserved_bottom_ratio": 0.20,
+}
 SPEAKER_STATUSES = {"confirmed", "ambiguous", "absent", "occluded"}
 PRESET_ASSESSMENTS = {"pass", "warn", "fail"}
 RECOMMENDATION_CONFIDENCE = {"high", "medium", "low"}
@@ -48,6 +58,10 @@ def _number(value):
 
 def style_enabled(style):
     return isinstance(style, dict) and style.get("enabled") is True
+
+
+def default_style():
+    return copy.deepcopy(DEFAULT_STYLE)
 
 
 def style_errors(style):

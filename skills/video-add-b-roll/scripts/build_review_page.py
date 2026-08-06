@@ -359,6 +359,13 @@ def build_review_page(plan, timeline, transcript, video, output_dir, *, project_
     errors = broll_plan.validate_plan(plan, canonical_timeline, canonical_transcript, project=canonical_values["project"], project_root=root, verify_files=True)
     if errors:
         raise ValueError("invalid plan: " + "; ".join(errors))
+    presentation_errors = broll_plan.presentation_errors(
+        plan, project_root=root, required=True,
+    )
+    if presentation_errors:
+        raise ValueError(
+            "invalid presentation decision: " + "; ".join(presentation_errors)
+        )
     expected_video_hash = plan.get("input_hashes", {}).get("review_video_sha256")
     if not isinstance(expected_video_hash, str) or len(expected_video_hash) != 64 or any(char not in "0123456789abcdefABCDEF" for char in expected_video_hash):
         raise ValueError("plan review video SHA-256 is invalid")

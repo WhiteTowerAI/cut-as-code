@@ -42,6 +42,15 @@
     "margin_ratio": 0.04,
     "reserved_bottom_ratio": 0.2
   },
+  "presentation": {
+    "status": "chosen",
+    "mode": "speaker-inset",
+    "path": "b-roll/presentation-decision.json",
+    "sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+    "decision_id": "123e4567-e89b-12d3-a456-426614174009",
+    "actor": "Actual user",
+    "timestamp": "2026-08-04T11:30:00Z"
+  },
   "decision": null,
   "review": null,
   "selection": {

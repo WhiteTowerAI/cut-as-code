@@ -142,7 +142,15 @@
 
 ## Speaker Inset Review
 
-- Omit `speaker_inset_style` for the ordinary one-page workflow. When enabled, require
+- After candidates are frozen and before publishing any review page, the current Agent must present
+  a recommendation for `ordinary` or `speaker-inset` in chat and obtain an explicit user choice.
+  Persist the actual user response, recommendation, rationale, plan, candidate-manifest, and
+  review-video bindings in `work/b-roll/presentation-decision.json` with
+  `rationale_source: "agent_chat_explicit_action"`. The plan binds that receipt by SHA-256. This
+  chat decision selects a route only; it cannot impersonate a `review_ui_explicit_action` or replace
+  either webpage approval.
+- An `ordinary` choice removes `speaker_inset_style` and uses the existing one-page workflow. A
+  `speaker-inset` choice installs the default style. When enabled, require
   `shape: "rounded-rectangle"`, `width_ratio: 0.39`, `aspect_ratio: 0.80`, a 3px `#9E9E9E` border,
   `corner_radius_ratio: 0.10`, `margin_ratio: 0.04`, and `reserved_bottom_ratio: 0.20`. Keep only
   common appearance in this project-level style; preset and anchor belong to the Agent input.

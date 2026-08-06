@@ -22,6 +22,8 @@ KEN_BURNS_DIRECTIONS = {"zoom-in", "pan-left", "pan-right"}
 HUMAN_APPROVAL_RATIONALE = "Explicit user action approved the exact configuration shown in this review."
 HUMAN_PREPARE_COMPOSITE_RATIONALE = "Explicit user action locked the exact B-roll selection for composite preview."
 REVIEW_INTENTS = {"approve", "request_revision"}
+PRESENTATION_MODES = {"ordinary", "speaker-inset"}
+CHAT_PRESENTATION_RATIONALE_SOURCE = "agent_chat_explicit_action"
 PLAYBACK_RATES = (0.5, 1.0, 1.5, 2.0)
 VISUAL_REVIEW_CHECKS = (
     "semantic_fit", "unwanted_logos_or_text", "jump_cuts",
@@ -379,6 +381,183 @@ def review_subject(plan):
         elif status == "skipped" and isinstance(shot.get("id"), str) and shot["id"] in decision_skipped_ids:
             shot["status"] = "reviewable"
     return value
+
+
+def presentation_subject(plan):
+    value = copy.deepcopy(plan)
+    for key in (
+            "presentation", "speaker_inset_style", "speaker_inset", "selection",
+            "decision", "review", "review_status", "visual_review"):
+        value.pop(key, None)
+
+    def clean(item):
+        if isinstance(item, dict):
+            for key in ("selected", "normalized", "verification"):
+                item.pop(key, None)
+            for child in item.values():
+                clean(child)
+        elif isinstance(item, list):
+            for child in item:
+                clean(child)
+
+    clean(value)
+    for shot in value.get("shots", []):
+        if isinstance(shot, dict) and shot.get("status") in {
+                "planned", "candidates_ready", "composite_pending", "selected",
+                "normalized", "verified"}:
+            shot["status"] = "reviewable"
+    return value
+
+
+def presentation_errors(plan, *, project_root=None, required=False):
+    if not isinstance(plan, dict):
+        return ["plan must be an object"]
+    presentation = plan.get("presentation")
+    if presentation is None:
+        return ["agent-chat presentation decision is required"] if required else []
+    if not isinstance(presentation, dict):
+        return ["presentation decision binding must be an object"]
+    errors = []
+    if presentation.get("status") != "chosen":
+        errors.append("presentation decision status must be chosen")
+    mode = presentation.get("mode")
+    if mode not in PRESENTATION_MODES:
+        errors.append("presentation decision mode is invalid")
+    if not _is_uuid(presentation.get("decision_id")):
+        errors.append("presentation decision id is invalid")
+    if not isinstance(presentation.get("actor"), str) or not presentation["actor"].strip():
+        errors.append("presentation decision actor is required")
+    if not _valid_timestamp(presentation.get("timestamp")):
+        errors.append("presentation decision timestamp is invalid")
+    if presentation.get("path") != "b-roll/presentation-decision.json":
+        errors.append("presentation decision path is invalid")
+    if not _is_sha256(presentation.get("sha256")):
+        errors.append("presentation decision SHA-256 is invalid")
+    if mode == "speaker-inset":
+        style = plan.get("speaker_inset_style")
+        if not speaker_inset.style_enabled(style) or speaker_inset.style_errors(style):
+            errors.append("speaker-inset presentation requires enabled speaker_inset_style")
+    elif speaker_inset.style_enabled(plan.get("speaker_inset_style")):
+        errors.append("ordinary presentation must not enable speaker_inset_style")
+    if project_root is None or errors:
+        return errors
+    root = Path(project_root).resolve()
+    path = root / "work" / presentation["path"]
+    try:
+        path.resolve().relative_to((root / "work").resolve())
+    except ValueError:
+        return errors + ["presentation decision path escapes work"]
+    if not path.is_file() or sha256_file(path) != presentation["sha256"]:
+        return errors + ["presentation decision artifact is missing or stale"]
+    try:
+        receipt = projectlib.load_json(path)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return errors + ["presentation decision artifact is invalid"]
+    if not isinstance(receipt, dict):
+        return errors + ["presentation decision artifact must be an object"]
+    expected = {
+        "schema_version": 1,
+        "status": "chosen",
+        "mode": "human",
+        "rationale_source": CHAT_PRESENTATION_RATIONALE_SOURCE,
+        "explicit_user_action": True,
+        "decision_id": presentation.get("decision_id"),
+        "actor": presentation.get("actor"),
+        "timestamp": presentation.get("timestamp"),
+        "presentation_mode": mode,
+        "plan_sha256": canonical_sha256(presentation_subject(plan)),
+        "candidate_manifest_sha256": canonical_sha256(candidate_manifest(plan)),
+        "review_video_sha256": plan.get("input_hashes", {}).get("review_video_sha256"),
+    }
+    for field, value in expected.items():
+        if receipt.get(field) != value:
+            errors.append(f"presentation decision {field} does not match")
+    if not isinstance(receipt.get("user_response"), str) or not receipt["user_response"].strip():
+        errors.append("presentation decision user_response is required")
+    recommendation = receipt.get("agent_recommendation")
+    if (not isinstance(recommendation, dict)
+            or recommendation.get("presentation_mode") not in PRESENTATION_MODES
+            or not isinstance(recommendation.get("rationale"), str)
+            or not recommendation["rationale"].strip()):
+        errors.append("presentation decision agent_recommendation is invalid")
+    return errors
+
+
+def record_chat_presentation_decision(plan, decision, *, project_root):
+    """Persist an explicit Agent-chat route choice before any B-roll review page."""
+    if not isinstance(plan, dict):
+        raise ValueError("plan must be an object")
+    if not isinstance(decision, dict):
+        raise ValueError("presentation decision must be an object")
+    if plan.get("presentation") is not None:
+        raise ValueError("presentation decision is already recorded; rebuild the plan to change it")
+    if any(key in plan for key in ("selection", "speaker_inset", "review_status", "visual_review")):
+        raise ValueError("presentation decision must precede selection and review")
+    if any(isinstance(shot, dict) and shot.get("status") not in {"candidates_ready", "skipped"}
+           for shot in plan.get("shots", [])):
+        raise ValueError("presentation decision requires candidates_ready or skipped shots")
+    expected = {
+        "mode": "human",
+        "rationale_source": CHAT_PRESENTATION_RATIONALE_SOURCE,
+        "explicit_user_action": True,
+        "plan_sha256": canonical_sha256(presentation_subject(plan)),
+        "candidate_manifest_sha256": canonical_sha256(candidate_manifest(plan)),
+        "review_video_sha256": plan.get("input_hashes", {}).get("review_video_sha256"),
+    }
+    for field, value in expected.items():
+        if decision.get(field) != value:
+            raise ValueError(f"presentation decision {field} does not match")
+    if not _is_uuid(decision.get("decision_id")):
+        raise ValueError("presentation decision id is invalid")
+    if not isinstance(decision.get("actor"), str) or not decision["actor"].strip():
+        raise ValueError("presentation decision actor is required")
+    if not _valid_timestamp(decision.get("timestamp")):
+        raise ValueError("presentation decision timestamp is invalid")
+    if not isinstance(decision.get("user_response"), str) or not decision["user_response"].strip():
+        raise ValueError("presentation decision user_response is required")
+    mode = decision.get("presentation_mode")
+    recommendation = decision.get("agent_recommendation")
+    if mode not in PRESENTATION_MODES:
+        raise ValueError("presentation decision mode is invalid")
+    if (not isinstance(recommendation, dict)
+            or recommendation.get("presentation_mode") not in PRESENTATION_MODES
+            or not isinstance(recommendation.get("rationale"), str)
+            or not recommendation["rationale"].strip()):
+        raise ValueError("presentation decision agent_recommendation is invalid")
+    result = copy.deepcopy(plan)
+    if mode == "speaker-inset":
+        style = result.get("speaker_inset_style")
+        if style is None:
+            result["speaker_inset_style"] = speaker_inset.default_style()
+        elif not speaker_inset.style_enabled(style) or speaker_inset.style_errors(style):
+            raise ValueError("speaker-inset presentation requires enabled speaker_inset_style")
+    else:
+        result.pop("speaker_inset_style", None)
+    root = Path(project_root).resolve()
+    target = root / "work/b-roll/presentation-decision.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    receipt = copy.deepcopy(decision)
+    receipt.update({"schema_version": 1, "status": "chosen"})
+    part = target.with_suffix(".part.json")
+    try:
+        projectlib.write_json(part, receipt)
+        os.replace(part, target)
+    finally:
+        part.unlink(missing_ok=True)
+    result["presentation"] = {
+        "status": "chosen",
+        "mode": mode,
+        "path": "b-roll/presentation-decision.json",
+        "sha256": sha256_file(target),
+        "decision_id": decision["decision_id"],
+        "actor": decision["actor"].strip(),
+        "timestamp": decision["timestamp"],
+    }
+    errors = presentation_errors(result, project_root=root, required=True)
+    if errors:
+        target.unlink(missing_ok=True)
+        raise ValueError("invalid presentation decision: " + "; ".join(errors))
+    return result
 
 
 def _decision_manifest(shots):
@@ -1861,6 +2040,13 @@ def prepare_composite(plan, selection, *, mode, actor, rationale, project_root, 
     style_validation = speaker_inset.style_errors(plan["speaker_inset_style"])
     if style_validation:
         raise ValueError("invalid speaker_inset_style: " + "; ".join(style_validation))
+    presentation_validation = presentation_errors(
+        plan, project_root=project_root, required=True,
+    )
+    if presentation_validation:
+        raise ValueError(
+            "invalid presentation decision: " + "; ".join(presentation_validation)
+        )
 
     plan_shots, entries = plan.get("shots"), selection.get("shots")
     if not isinstance(plan_shots, list):

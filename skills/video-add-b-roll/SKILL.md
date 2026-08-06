@@ -85,6 +85,7 @@ contract; do not hand-build the operation.
 
 ```text
 work/b-roll/broll-plan.json                         # durable domain plan
+work/b-roll/presentation-decision.json               # durable Agent-chat route decision
 work/b-roll/broll-interaction.json                  # durable applied receipt
 work/b-roll/broll-selection.json                    # durable non-approval exact selection
 work/b-roll/speaker-inset-analysis.json             # durable scene/evidence packet
@@ -144,10 +145,11 @@ For each proposed shot:
 Keep `brief.density` equal to `selective`. Do not pad the plan to meet a count. If no moment
 earns B-roll, an approved all-skipped plan is a valid no-op.
 
-For a simultaneous speaker window, add the strict project-level rounded-rectangle
-`speaker_inset_style` from the example; otherwise omit it. Keep `width_ratio: 0.39`, gray border,
-aspect ratio, corner radius, margins, and subtitle-safe bottom area at project level. Do not place a
-preset or anchor in the style. The Agent records `project_layout_strategy` plus one per-shot
+Do not add `speaker_inset_style` while authoring the draft. After candidate acquisition, the
+explicit Agent-chat presentation decision selects the ordinary or speaker-inset route. The latter
+automatically installs the strict project-level rounded-rectangle style: `width_ratio: 0.39`, gray
+border, aspect ratio, corner radius, margins, and subtitle-safe bottom area. Preset and anchor do
+not belong to the style. The Agent records `project_layout_strategy` plus one per-shot
 `layout_recommendation` after inspecting the exact selected media. Never introduce a face detector,
 segmentation model, cross-cut identity tracker, or guessed ROI. Fit speaker ROI pixels into the
 window with aspect-preserving cover scaling; never stretch them to the configured aspect ratio.
@@ -307,10 +309,32 @@ python $CandidateAnalysis publish `
 External generation still follows `import-local` with `source_type: "external-generated"` and
 complete truthful provenance. This is import only, not authorization to call a generation service.
 
+### 3a. Choose The Presentation Route In Agent Chat
+
+After acquisition produces `candidates_ready` or `skipped` shots, inspect the exact A-roll and
+frozen candidate evidence. In the current Agent chat, present an Agent recommendation for either `ordinary`
+full-screen B-roll or `speaker-inset`, with a concrete rationale. Then ask the user for an explicit
+route choice in natural language. Do not infer this choice from the original draft, a candidate
+selection, or silence.
+
+Record the reply with `broll_plan.record_chat_presentation_decision()`. Its input must preserve the
+actual `user_response`, the Agent `presentation_mode` recommendation and rationale, the real user
+actor, a UUID and timestamp, `explicit_user_action: true`, and
+`rationale_source: "agent_chat_explicit_action"`. It writes the hash-bound
+`work/b-roll/presentation-decision.json` receipt and the plan's `presentation` binding. The receipt
+binds the review-video, candidate manifest, and pre-review plan hashes. A changed candidate, plan,
+or review video requires a new chat choice before a review page can be published.
+
+Choosing `ordinary` removes any speaker style and continues to the existing one-page exact
+candidate review. Choosing `speaker-inset` installs the default rounded-rectangle style and still
+uses that first page only to freeze exact B-roll selections. It must then run `prepare_composite`,
+produce the existing second composite page, and stop for its separate approval. The chat response
+selects a route; it never substitutes for either webpage's explicit review action.
+
 ### 4. Publish And Complete Exact-Candidate Review
 
 Set `input_hashes.review_video_sha256` to the actual current review video's SHA-256, revalidate,
-then publish the immutable local review:
+then confirm the current Agent-chat presentation receipt and publish the immutable local review:
 
 ```powershell
 $ReviewPublication = & python "$BrollScripts/build_review_page.py" `
@@ -392,8 +416,8 @@ analysis/ranking hashes. Existing SHA-256-identical analysis and delivery media 
 a new UUID review page with `build_review_page.py`, present it, and stop again. Never route a
 revision request to `apply_review()` or convert `revision_notes` into a human rationale.
 
-For a plan without enabled `speaker_inset_style`, apply the received approval JSON and durably
-bind the interaction receipt:
+For an `ordinary` chat decision, apply the received one-page approval JSON and durably bind the
+interaction receipt:
 
 ```powershell
 python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]); sys.path.insert(0,sys.argv[2]); import broll_plan,projectlib; path=root/'work/b-roll/broll-plan.json'; plan=projectlib.load_json(path); review=projectlib.load_json(sys.argv[3]); timeline=projectlib.load_json(root/'work/timeline.json'); updated=broll_plan.apply_review(plan,review,mode=sys.argv[4],actor=sys.argv[5],rationale=review['rationale'],interaction_path=root/'work/b-roll/broll-interaction.json',timeline=timeline); projectlib.write_json(path,updated)" $ProjectRoot $BrollScripts $ReviewExport human "Actual user name"
@@ -403,8 +427,8 @@ Use `human` and the actual human actor only after explicit user export. A new hu
 the page's factual `review_ui_explicit_action` rationale; it does not claim to quote a user-authored
 reason. Agent mode still requires the real Agent actor and a specific exported Agent rationale.
 
-For an enabled inset, apply first-page `prepare_composite`, then use `speaker_inset.py` for evidence,
-Agent ROI, layout recommendation, exact anchor previews, and clearance; follow
+For a `speaker-inset` chat decision, apply first-page `prepare_composite`, then use
+`speaker_inset.py` for evidence, Agent ROI, layout recommendation, exact anchor previews, and clearance; follow
 `reference/broll-rules.md`. The Agent must assess `focused-panel`, `full-bleed-wash`, and
 `corner-pip`, choose a project primary preset, and keep one preset and anchor for each complete
 shot. `corner-pip` supports only the shot-level `top-left` and `top-right` anchors. Only the
