@@ -31,25 +31,16 @@
   },
   "speaker_inset_style": {
     "enabled": true,
-    "shape": "circle",
-    "width_ratio": 0.22,
-    "size_candidates": [
-      0.22,
-      0.3
-    ],
-    "aspect_ratio": 1.0,
+    "shape": "rounded-rectangle",
+    "width_ratio": 0.39,
+    "aspect_ratio": 0.8,
     "border": {
       "width_px": 3,
-      "color": "#FFFFFF"
+      "color": "#9E9E9E"
     },
+    "corner_radius_ratio": 0.1,
     "margin_ratio": 0.04,
-    "reserved_bottom_ratio": 0.2,
-    "allowed_anchors": [
-      "top-left",
-      "top-right",
-      "middle-left",
-      "middle-right"
-    ]
+    "reserved_bottom_ratio": 0.2
   },
   "decision": null,
   "review": null,
@@ -62,7 +53,7 @@
     "mode": "human",
     "actor": "Actual user",
     "timestamp": "2026-08-04T12:00:00Z",
-    "style_sha256": "59705002a624caae0777b45ce53798f3c970981b3687a015d38068465ebf58eb"
+    "style_sha256": "ab2a11307eabc99255f230422a4c0fe99ebc46fe7287808bd25d47423f730c72"
   },
   "speaker_inset": {
     "analysis": {

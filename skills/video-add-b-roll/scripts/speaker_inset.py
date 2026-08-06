@@ -13,16 +13,28 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from PIL import Image, ImageColor, ImageDraw
+from PIL import Image, ImageColor, ImageDraw, ImageFilter, ImageOps
 
 import projectlib
 
 
-ALLOWED_ANCHORS = {
-    "top-left", "top-right", "middle-left", "middle-right",
+LAYOUT_PRESETS = ("focused-panel", "full-bleed-wash", "corner-pip")
+PRESET_ANCHORS = {
+    "focused-panel": ("lower-center",),
+    "full-bleed-wash": ("upper-center",),
+    "corner-pip": ("top-left", "top-right"),
 }
-ALLOWED_SHAPES = {"circle", "rounded-rectangle"}
+ALLOWED_ANCHORS = {
+    anchor for anchors in PRESET_ANCHORS.values() for anchor in anchors
+}
+ARTIFACT_SHOT_STATUSES = {"composite_pending", "selected", "normalized", "verified"}
+STYLE_FIELDS = {
+    "enabled", "shape", "width_ratio", "aspect_ratio", "border",
+    "corner_radius_ratio", "margin_ratio", "reserved_bottom_ratio",
+}
 SPEAKER_STATUSES = {"confirmed", "ambiguous", "absent", "occluded"}
+PRESET_ASSESSMENTS = {"pass", "warn", "fail"}
+RECOMMENDATION_CONFIDENCE = {"high", "medium", "low"}
 RANGE_EPSILON = 1e-6
 SHORT_FLASH_SECONDS = 1.5
 
@@ -48,29 +60,15 @@ def style_errors(style):
         return []
 
     errors = []
+    unsupported = sorted(set(style) - STYLE_FIELDS)
+    for field in unsupported:
+        errors.append(f"speaker_inset_style {field} is unsupported; re-author the enabled style")
     shape = style.get("shape")
-    if shape not in ALLOWED_SHAPES:
-        errors.append("speaker_inset_style shape must be circle or rounded-rectangle")
+    if shape != "rounded-rectangle":
+        errors.append("speaker_inset_style shape must be rounded-rectangle")
     width = _number(style.get("width_ratio"))
     if width is None or not 0 < width < 1:
         errors.append("speaker_inset_style width_ratio must be between 0 and 1")
-    size_candidates = style.get("size_candidates")
-    parsed_sizes = []
-    if (not isinstance(size_candidates, list) or not 2 <= len(size_candidates) <= 3
-            or any(_number(value) is None or not 0 < float(value) < 1
-                   for value in size_candidates)):
-        errors.append(
-            "speaker_inset_style size_candidates must contain two or three valid width ratios"
-        )
-    else:
-        parsed_sizes = [float(value) for value in size_candidates]
-        if parsed_sizes != sorted(set(parsed_sizes)):
-            errors.append(
-                "speaker_inset_style size_candidates must be unique and strictly increasing"
-            )
-        if width is not None and not any(
-                abs(width - value) <= RANGE_EPSILON for value in parsed_sizes):
-            errors.append("speaker_inset_style size_candidates must include width_ratio")
     aspect = _number(style.get("aspect_ratio"))
     if aspect is None or aspect <= 0:
         errors.append("speaker_inset_style aspect_ratio must be positive")
@@ -93,34 +91,14 @@ def style_errors(style):
                 r"#[0-9a-fA-F]{6}", border["color"]):
             errors.append("speaker_inset_style border color must be #RRGGBB")
 
-    anchors = style.get("allowed_anchors")
-    if (not isinstance(anchors, list) or not anchors
-            or any(anchor not in ALLOWED_ANCHORS for anchor in anchors)
-            or len(anchors) != len(set(anchors))):
-        errors.append("speaker_inset_style allowed_anchors must be unique supported anchors")
-
     corner = style.get("corner_radius_ratio")
-    if shape == "rounded-rectangle" and (
-            _number(corner) is None or not 0 <= float(corner) <= 0.5):
+    if _number(corner) is None or not 0 <= float(corner) <= 0.5:
         errors.append(
             "speaker_inset_style corner_radius_ratio must be between 0 and 0.5 "
             "for rounded-rectangle"
         )
     if width is not None and margin is not None and width + 2 * margin > 1:
         errors.append("speaker_inset_style width and margins do not fit the frame")
-    if (width is not None and aspect is not None and margin is not None
-            and reserved is not None and width / aspect + 2 * margin + reserved > 1):
-        errors.append("speaker_inset_style height, margins, and reserved bottom do not fit the frame")
-    if margin is not None and aspect is not None and reserved is not None:
-        for candidate in parsed_sizes:
-            if candidate + 2 * margin > 1:
-                errors.append("speaker_inset_style size_candidates and margins do not fit the frame")
-                break
-            if candidate / aspect + 2 * margin + reserved > 1:
-                errors.append(
-                    "speaker_inset_style size_candidates height and reserved bottom do not fit the frame"
-                )
-                break
     return errors
 
 
@@ -137,6 +115,12 @@ def _canonical_sha256(value):
         value, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
         allow_nan=False,
     ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _json_document_sha256(value):
+    text = json.dumps(value, ensure_ascii=False, indent=2) + "\n"
+    encoded = text.replace("\n", os.linesep).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
 
 
@@ -573,7 +557,7 @@ def analysis_errors(analysis, plan, timeline, transcript, *, project_root=None, 
         return errors + [str(exc)]
     expected_shots = {
         shot.get("id"): shot for shot in plan.get("shots", [])
-        if isinstance(shot, dict) and shot.get("status") == "composite_pending"
+        if isinstance(shot, dict) and shot.get("status") in ARTIFACT_SHOT_STATUSES
     }
     shots = analysis.get("shots")
     if not isinstance(shots, list):
@@ -649,6 +633,75 @@ def _roi_errors(roi):
     return []
 
 
+def _preset_anchor_errors(preset, anchor, label):
+    if preset not in LAYOUT_PRESETS:
+        return [f"{label} preset is invalid"]
+    if anchor not in PRESET_ANCHORS[preset]:
+        return [f"{label} preset/anchor combination is invalid"]
+    return []
+
+
+def _recommendation_errors(recommendation, label):
+    if not isinstance(recommendation, dict):
+        return [f"{label} layout_recommendation must be an object"]
+    errors = _preset_anchor_errors(
+        recommendation.get("preset"), recommendation.get("anchor"), label,
+    )
+    confidence = recommendation.get("confidence")
+    if confidence not in RECOMMENDATION_CONFIDENCE:
+        errors.append(f"{label} recommendation confidence is invalid")
+    if (not isinstance(recommendation.get("rationale"), str)
+            or not recommendation["rationale"].strip()):
+        errors.append(f"{label} recommendation rationale is required")
+    assessments = recommendation.get("preset_assessments")
+    if (not isinstance(assessments, dict)
+            or set(assessments) != set(LAYOUT_PRESETS)
+            or any(value not in PRESET_ASSESSMENTS for value in assessments.values())):
+        errors.append(f"{label} must assess all three presets with pass, warn, or fail")
+        assessments = {}
+    alternate = recommendation.get("alternate")
+    if alternate is None:
+        if confidence == "low" and any(
+                preset != recommendation.get("preset")
+                and assessments.get(preset) in {"pass", "warn"}
+                for preset in LAYOUT_PRESETS):
+            errors.append(f"{label} low-confidence recommendation requires alternate")
+    elif confidence != "low":
+        errors.append(f"{label} alternate is only valid for low confidence")
+    elif not isinstance(alternate, dict) or set(alternate) != {"preset", "anchor"}:
+        errors.append(f"{label} alternate must contain only preset and anchor")
+    else:
+        errors.extend(_preset_anchor_errors(
+            alternate.get("preset"), alternate.get("anchor"), f"{label} alternate",
+        ))
+        alternate_preset = alternate.get("preset")
+        if alternate_preset == recommendation.get("preset"):
+            errors.append(f"{label} alternate preset must differ from recommendation")
+        if assessments.get(alternate_preset) not in {"pass", "warn"}:
+            errors.append(f"{label} alternate preset assessment must not fail")
+    return errors
+
+
+def _strategy_errors(strategy):
+    if not isinstance(strategy, dict):
+        return ["speaker Agent input project_layout_strategy must be an object"]
+    errors = []
+    primary = strategy.get("primary_preset")
+    if primary not in LAYOUT_PRESETS:
+        errors.append("speaker Agent input primary_preset is invalid")
+    used = strategy.get("used_presets")
+    if (not isinstance(used, list) or not 1 <= len(used) <= 3
+            or any(preset not in LAYOUT_PRESETS for preset in used)
+            or len(used) != len(set(used))):
+        errors.append("speaker Agent input used_presets must be unique supported presets")
+    elif used[0] != primary:
+        errors.append("speaker Agent input used_presets must start with primary_preset")
+    if (not isinstance(strategy.get("rationale"), str)
+            or not strategy["rationale"].strip()):
+        errors.append("speaker Agent input project layout rationale is required")
+    return errors
+
+
 def agent_input_errors(agent_input, analysis, plan, timeline):
     errors = []
     if not isinstance(agent_input, dict):
@@ -662,6 +715,8 @@ def agent_input_errors(agent_input, analysis, plan, timeline):
             errors.append(f"speaker Agent input {field} is required")
     if not _valid_timestamp(agent_input.get("timestamp")):
         errors.append("speaker Agent input timestamp is invalid")
+    strategy = agent_input.get("project_layout_strategy")
+    errors.extend(_strategy_errors(strategy))
     bindings = plan.get("speaker_inset", {}).get("analysis", {})
     expected = {
         "analysis_sha256": bindings.get("sha256"),
@@ -686,10 +741,16 @@ def agent_input_errors(agent_input, analysis, plan, timeline):
         return errors + ["speaker Agent input shots must be a list"]
     if [shot.get("shot_id") for shot in shots if isinstance(shot, dict)] != list(analysis_shots):
         errors.append("speaker Agent input shots do not match analysis")
-    allowed_anchors = set(plan.get("speaker_inset_style", {}).get("allowed_anchors", []))
+    recommendations = []
     for shot in shots:
         if not isinstance(shot, dict) or shot.get("shot_id") not in analysis_shots:
             continue
+        recommendation = shot.get("layout_recommendation")
+        errors.extend(_recommendation_errors(
+            recommendation, f"{shot['shot_id']}",
+        ))
+        if isinstance(recommendation, dict):
+            recommendations.append(recommendation)
         expected_subshots = {
             subshot.get("id"): subshot for subshot in analysis_shots[shot["shot_id"]].get("subshots", [])
             if isinstance(subshot, dict)
@@ -726,8 +787,11 @@ def agent_input_errors(agent_input, analysis, plan, timeline):
                 continue
             if mode != "enabled":
                 errors.append(f"{label} confirmed speaker must be enabled")
-            if item.get("anchor") not in allowed_anchors:
-                errors.append(f"{label} anchor is not allowed by speaker_inset_style")
+            recommended_anchor = (
+                recommendation.get("anchor") if isinstance(recommendation, dict) else None
+            )
+            if item.get("anchor") != recommended_anchor:
+                errors.append(f"{label} must use the shot-level recommended anchor")
             if not isinstance(keyframes, list) or not keyframes:
                 errors.append(f"{label} confirmed speaker requires keyframes")
                 continue
@@ -750,6 +814,25 @@ def agent_input_errors(agent_input, analysis, plan, timeline):
                 errors.extend(f"{label} {error}" for error in _roi_errors(keyframe.get("roi")))
             if seen_frames and (seen_frames[0] != start_frame or seen_frames[-1] != expected_last):
                 errors.append(f"{label} keyframes must cover its subshot")
+    if isinstance(strategy, dict) and isinstance(strategy.get("used_presets"), list):
+        assigned = []
+        for recommendation in recommendations:
+            preset = recommendation.get("preset")
+            if preset in LAYOUT_PRESETS and preset not in assigned:
+                assigned.append(preset)
+        used = strategy["used_presets"]
+        if set(used) != set(assigned):
+            errors.append("speaker Agent input used_presets must match shot recommendations")
+        primary = strategy.get("primary_preset")
+        for recommendation in recommendations:
+            if recommendation.get("preset") == primary:
+                continue
+            assessments = recommendation.get("preset_assessments", {})
+            if (assessments.get(primary) not in {"warn", "fail"}
+                    or assessments.get(recommendation.get("preset")) != "pass"):
+                errors.append(
+                    "secondary preset requires a warn/fail primary and passing recommendation"
+                )
     return errors
 
 
@@ -803,24 +886,72 @@ def _anchor_position(frame_size, inset_size, style, anchor):
     inset_width, inset_height = inset_size
     margin = round(width * float(style["margin_ratio"]))
     safe_bottom = round(height * (1 - float(style["reserved_bottom_ratio"])))
-    x = margin if anchor.endswith("left") else width - margin - inset_width
-    if anchor.startswith("top"):
-        y = margin
+    if anchor in {"upper-center", "lower-center"}:
+        x = (width - inset_width) // 2
+    elif anchor == "top-left":
+        x = margin
+    elif anchor == "top-right":
+        x = width - margin - inset_width
     else:
-        centered = (safe_bottom - inset_height) // 2
-        y = max(margin, centered)
+        raise ValueError("speaker inset preset/anchor combination is invalid")
+    if anchor in {"top-left", "top-right"}:
+        y = margin
+    elif anchor == "upper-center":
+        y = max(margin, (safe_bottom - inset_height) // 4)
+    else:
+        # lower-center is exclusive to focused-panel, so place the larger window
+        # directly above the reserved subtitle area rather than overlapping its panel.
+        y = safe_bottom - inset_height
     if x < 0 or y < 0 or x + inset_width > width or y + inset_height > safe_bottom:
         raise ValueError("speaker inset anchor does not fit the frame or reserved bottom")
     return x, y
 
 
-def composite_frame(base, speaker, roi, style, anchor):
-    """Composite one masked speaker ROI over one exact B-roll frame."""
+def _inset_size(frame_size, style, anchor):
+    """Return a proportional window size, clamped only when the safe area is too small."""
+    width = max(2, round(frame_size[0] * float(style["width_ratio"])))
+    height = max(2, round(width / float(style["aspect_ratio"])))
+    safe_height = round(frame_size[1] * (1 - float(style["reserved_bottom_ratio"])))
+    if anchor != "lower-center":
+        safe_height -= round(frame_size[0] * float(style["margin_ratio"]))
+    if height > safe_height:
+        height = max(2, safe_height)
+        width = max(2, round(height * float(style["aspect_ratio"])))
+    return width, height
+
+
+def _apply_broll_treatment(base, preset):
+    base = base.convert("RGB")
+    if preset == "corner-pip":
+        return base.copy()
+    if preset == "full-bleed-wash":
+        return Image.blend(base, Image.new("RGB", base.size, "white"), 0.30)
+    if preset != "focused-panel":
+        raise ValueError("speaker inset layout preset is invalid")
+    result = base.filter(ImageFilter.GaussianBlur(
+        radius=0.025 * min(base.width, base.height),
+    ))
+    x = round(base.width * 0.04)
+    y = round(base.height * 0.08)
+    width = round(base.width * 0.92)
+    height = round(base.height * 0.40)
+    resampling = getattr(Image, "Resampling", Image).LANCZOS
+    panel = ImageOps.fit(base, (width, height), method=resampling)
+    result.paste(panel, (x, y))
+    ImageDraw.Draw(result).rectangle(
+        (x, y, x + width - 1, y + height - 1),
+        outline=ImageColor.getrgb("#9E9E9E"), width=3,
+    )
+    return result
+
+
+def _paste_speaker(base, speaker, roi, style, anchor):
+    """Crop, mask, border, and paste one speaker ROI onto a treated frame."""
+    if anchor not in ALLOWED_ANCHORS:
+        raise ValueError("speaker inset preset/anchor combination is invalid")
     errors = style_errors(style)
     if errors or not style_enabled(style):
         raise ValueError("invalid enabled speaker_inset_style: " + "; ".join(errors))
-    if anchor not in style["allowed_anchors"]:
-        raise ValueError("speaker inset anchor is not allowed")
     roi_validation = _roi_errors(roi)
     if roi_validation:
         raise ValueError("invalid speaker ROI: " + "; ".join(roi_validation))
@@ -835,22 +966,19 @@ def composite_frame(base, speaker, roi, style, anchor):
     bottom = max(top + 1, min(
         source_height, math.ceil((float(roi["y"]) + float(roi["height"])) * source_height),
     ))
-    inset_width = max(2, round(base.width * float(style["width_ratio"])))
-    inset_height = max(2, round(inset_width / float(style["aspect_ratio"])))
+    inset_width, inset_height = _inset_size(base.size, style, anchor)
     resampling = getattr(Image, "Resampling", Image).LANCZOS
-    crop = speaker.crop((left, top, right, bottom)).resize(
-        (inset_width, inset_height), resampling,
+    crop = ImageOps.fit(
+        speaker.crop((left, top, right, bottom)),
+        (inset_width, inset_height), method=resampling, centering=(0.5, 0.0),
     )
     mask = Image.new("L", (inset_width, inset_height), 0)
     mask_draw = ImageDraw.Draw(mask)
     bounds = (0, 0, inset_width - 1, inset_height - 1)
-    if style["shape"] == "circle":
-        mask_draw.ellipse(bounds, fill=255)
-    else:
-        radius = round(
-            min(inset_width, inset_height) * float(style.get("corner_radius_ratio", 0.08))
-        )
-        mask_draw.rounded_rectangle(bounds, radius=radius, fill=255)
+    radius = round(
+        min(inset_width, inset_height) * float(style["corner_radius_ratio"])
+    )
+    mask_draw.rounded_rectangle(bounds, radius=radius, fill=255)
     layer = crop.convert("RGBA")
     layer.putalpha(mask)
     border_width = int(style["border"]["width_px"])
@@ -859,19 +987,29 @@ def composite_frame(base, speaker, roi, style, anchor):
         draw = ImageDraw.Draw(layer)
         inset = max(0, border_width // 2)
         outline = (inset, inset, inset_width - 1 - inset, inset_height - 1 - inset)
-        if style["shape"] == "circle":
-            draw.ellipse(outline, outline=color, width=border_width)
-        else:
-            radius = round(
-                min(inset_width, inset_height) * float(style.get("corner_radius_ratio", 0.08))
-            )
-            draw.rounded_rectangle(
-                outline, radius=max(0, radius - inset), outline=color, width=border_width,
-            )
+        draw.rounded_rectangle(
+            outline, radius=max(0, radius - inset), outline=color, width=border_width,
+        )
     position = _anchor_position(base.size, layer.size, style, anchor)
     result = base.copy()
     result.paste(layer, position, layer)
     return result
+
+
+def composite_frame(base, speaker, roi, style, preset, anchor):
+    """Apply one preset, then optionally composite one cleared speaker ROI."""
+    errors = style_errors(style)
+    if errors or not style_enabled(style):
+        raise ValueError("invalid enabled speaker_inset_style: " + "; ".join(errors))
+    result = _apply_broll_treatment(base, preset)
+    if speaker is None:
+        if roi is not None or anchor is not None:
+            raise ValueError("pure B-roll must not provide speaker ROI or anchor")
+        return result
+    anchor_errors = _preset_anchor_errors(preset, anchor, "speaker inset")
+    if anchor_errors:
+        raise ValueError("; ".join(anchor_errors))
+    return _paste_speaker(result, speaker, roi, style, anchor)
 
 
 def _candidate_source(candidate, root):
@@ -1026,7 +1164,8 @@ def _close_process(process):
 
 
 def _render_composite_video(base_video, review_video, shot, analysis_shot, agent_input,
-                            timeline, style, destination, *, anchor_override=None):
+                            timeline, style, destination, *, preset,
+                            anchor_override=None, display_choices=None):
     width, height = timeline["width"], timeline["height"]
     num, den = _fps(timeline)
     frame_duration = den / num
@@ -1055,11 +1194,13 @@ def _render_composite_video(base_video, review_video, shot, analysis_shot, agent
         encoder = subprocess.Popen([
             "ffmpeg", "-y", "-v", "error", "-f", "rawvideo", "-pix_fmt", "rgb24",
             "-s", f"{width}x{height}", "-r", f"{num}/{den}", "-i", "-",
+            "-vf", "setsar=1",
             "-an", "-sn", "-dn", "-map_metadata", "-1", "-write_tmcd", "0",
             "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
             str(part),
         ], stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-        choices = _agent_subshots(agent_input)
+        agent_choices = _agent_subshots(agent_input)
+        effective_choices = display_choices or agent_choices
         for index in range(frame_count):
             base_bytes = _read_exact(base_process.stdout, frame_bytes)
             speaker_bytes = _read_exact(speaker_process.stdout, frame_bytes)
@@ -1073,14 +1214,19 @@ def _render_composite_video(base_video, review_video, shot, analysis_shot, agent
             subshot = _analysis_subshot_at(analysis_shot, program_time)
             if subshot is None:
                 raise ValueError("context preview frame is outside speaker subshots")
-            choice = choices[(shot["id"], subshot["id"])]
-            if choice.get("display_mode") == "enabled":
+            choice = agent_choices[(shot["id"], subshot["id"])]
+            effective = effective_choices[(shot["id"], subshot["id"])]
+            if effective.get("display_mode") == "enabled":
                 roi = interpolate_roi(
                     choice["keyframes"], program_time, subshot["program_range"],
                 )
                 base_frame = composite_frame(
-                    base_frame, speaker_frame, roi, style,
-                    anchor_override or choice["anchor"],
+                    base_frame, speaker_frame, roi, style, preset,
+                    anchor_override or effective["anchor"],
+                )
+            else:
+                base_frame = composite_frame(
+                    base_frame, None, None, style, preset, None,
                 )
             encoder.stdin.write(base_frame.tobytes())
         encoder.stdin.close()
@@ -1106,6 +1252,106 @@ def _render_composite_video(base_video, review_video, shot, analysis_shot, agent
         _close_process(speaker_process)
         _close_process(encoder)
         part.unlink(missing_ok=True)
+
+
+def validate_review_video(plan, timeline, review_video, project_root):
+    """Return the exact hash-bound review video and timeline media geometry."""
+    import normalize_broll
+
+    root = Path(project_root).resolve()
+    video = _inside(root, review_video, "review video")
+    if not video.is_file():
+        raise ValueError("review video is missing")
+    if _sha256_file(video) != plan.get("input_hashes", {}).get("review_video_sha256"):
+        raise ValueError("review video SHA-256 is stale")
+    media_timeline = normalize_broll._timeline_with_media_geometry(timeline, root)
+    width, height, num, den = normalize_broll._timeline_spec(media_timeline)
+    media_timeline = copy.deepcopy(media_timeline)
+    media_timeline.update({"width": width, "height": height})
+    probe = _probe_video(video)
+    duration = _number(media_timeline.get("program_duration_s"))
+    if (probe.get("width") != width or probe.get("height") != height
+            or probe.get("fps") != {"num": num, "den": den}
+            or duration is None
+            or abs(probe.get("duration_s", -1) - duration) > den / num + RANGE_EPSILON):
+        raise ValueError("review video geometry, fps, or duration does not match timeline")
+    subprocess.run([
+        "ffmpeg", "-v", "error", "-i", str(video),
+        "-map", "0:v:0", "-f", "null", "-",
+    ], check=True, capture_output=True)
+    return video, media_timeline
+
+
+def render_delivery_composite(*, plan, shot, analysis, agent_input, preview, clearance,
+                              timeline, style, base_video, review_video, destination,
+                              project_root):
+    """Render one clearance-effective speaker composite for normalized delivery."""
+    import broll_plan
+    import normalize_broll
+
+    root = Path(project_root).resolve()
+    if not isinstance(plan, dict) or not isinstance(shot, dict):
+        raise ValueError("speaker inset delivery plan and shot must be objects")
+    if shot not in plan.get("shots", []):
+        raise ValueError("speaker inset delivery shot is not in the plan")
+    if style != plan.get("speaker_inset_style"):
+        raise ValueError("speaker inset delivery style does not match plan")
+    errors = style_errors(style)
+    errors.extend(analysis_errors(
+        analysis, plan, timeline, {}, project_root=root, verify_files=True,
+    ))
+    errors = [error for error in errors if "transcript_sha256" not in error]
+    errors.extend(agent_input_errors(agent_input, analysis, plan, timeline))
+    errors.extend(preview_errors(
+        preview, plan, analysis, agent_input, timeline,
+        project_root=root, verify_files=True,
+    ))
+    errors.extend(clearance_errors(clearance, preview, agent_input, analysis, plan))
+    errors.extend(broll_plan._review_errors(plan, plan.get("shots", [])))
+    if errors:
+        raise ValueError("invalid speaker inset delivery artifacts: " + "; ".join(errors))
+
+    video, media_timeline = validate_review_video(
+        plan, timeline, review_video, root,
+    )
+    width, height, num, den = normalize_broll._timeline_spec(media_timeline)
+
+    base = _inside(root, base_video, "normalized B-roll base")
+    if not base.is_file():
+        raise ValueError("normalized B-roll base is missing")
+    shot_id = shot.get("id")
+    analysis_shot = next((
+        item for item in analysis.get("shots", [])
+        if isinstance(item, dict) and item.get("shot_id") == shot_id
+    ), None)
+    agent_shot = next((
+        item for item in agent_input.get("shots", [])
+        if isinstance(item, dict) and item.get("shot_id") == shot_id
+    ), None)
+    clearance_shot = next((
+        item for item in clearance.get("shots", [])
+        if isinstance(item, dict) and item.get("shot_id") == shot_id
+    ), None)
+    if not all(isinstance(item, dict) for item in (
+            analysis_shot, agent_shot, clearance_shot)):
+        raise ValueError("speaker inset delivery shot artifacts are missing")
+    recommendation = agent_shot.get("layout_recommendation", {})
+    choices = {
+        (shot_id, item["id"]): item
+        for item in clearance_shot.get("subshots", []) if isinstance(item, dict)
+    }
+    rendered = _render_composite_video(
+        base, video, shot, analysis_shot, agent_input,
+        media_timeline, style, destination,
+        preset=recommendation.get("preset"), display_choices=choices,
+    )
+    output = Path(rendered["path"])
+    probe = normalize_broll._probe(output)
+    normalize_broll._check_probe(
+        probe, width, height, num, den, _range(shot["program_range"])[1]
+        - _range(shot["program_range"])[0],
+    )
+    return {"path": output, "sha256": _sha256_file(output), "probe": probe}
 
 
 def render_context_previews(plan, analysis, agent_input, timeline, review_video,
@@ -1136,9 +1382,10 @@ def render_context_previews(plan, analysis, agent_input, timeline, review_video,
     )
     preview_dir.mkdir(parents=True, exist_ok=True)
     analysis_shots = {shot["shot_id"]: shot for shot in analysis["shots"]}
-    agent_subshots = _agent_subshots(agent_input)
+    agent_shots = {
+        shot["shot_id"]: shot for shot in agent_input["shots"]
+    }
     shot_records = []
-    size_review = None
     for shot in plan.get("shots", []):
         if not isinstance(shot, dict) or shot.get("status") != "composite_pending":
             continue
@@ -1146,55 +1393,28 @@ def render_context_previews(plan, analysis, agent_input, timeline, review_video,
             plan, shot, media_timeline, root,
             preview_dir / f"base-{shot['id']}.mp4", lut_path,
         )
+        recommendation = agent_shots[shot["id"]]["layout_recommendation"]
+        preset, anchor = recommendation["preset"], recommendation["anchor"]
         context = _render_composite_video(
             base, video, shot, analysis_shots[shot["id"]], agent_input,
             media_timeline, plan["speaker_inset_style"],
             preview_dir / f"context-{shot['id']}.mp4",
+            preset=preset, anchor_override=anchor,
         )
         anchor_previews = {}
-        for anchor in plan["speaker_inset_style"]["allowed_anchors"]:
+        for preview_anchor in PRESET_ANCHORS[preset]:
             alternate = _render_composite_video(
                 base, video, shot, analysis_shots[shot["id"]], agent_input,
                 media_timeline, plan["speaker_inset_style"],
-                preview_dir / f"context-{shot['id']}-{anchor}.mp4",
-                anchor_override=anchor,
+                preview_dir / f"context-{shot['id']}-{preview_anchor}.mp4",
+                preset=preset, anchor_override=preview_anchor,
             )
-            anchor_previews[anchor] = {
+            anchor_previews[preview_anchor] = {
                 "path": alternate["path"].relative_to(root / "work").as_posix(),
                 "sha256": alternate["sha256"],
                 "probe": alternate["probe"],
             }
-        if size_review is None and any(
-                choice.get("display_mode") == "enabled"
-                for (shot_id, _), choice in agent_subshots.items()
-                if shot_id == shot["id"]):
-            size_candidates = []
-            selected_width = float(plan["speaker_inset_style"]["width_ratio"])
-            for width_ratio in plan["speaker_inset_style"]["size_candidates"]:
-                width_ratio = float(width_ratio)
-                if abs(width_ratio - selected_width) <= RANGE_EPSILON:
-                    candidate = context
-                else:
-                    candidate_style = copy.deepcopy(plan["speaker_inset_style"])
-                    candidate_style["width_ratio"] = width_ratio
-                    token = str(width_ratio).replace(".", "p")
-                    candidate = _render_composite_video(
-                        base, video, shot, analysis_shots[shot["id"]], agent_input,
-                        media_timeline, candidate_style,
-                        preview_dir / f"size-{shot['id']}-{token}.mp4",
-                    )
-                size_candidates.append({
-                    "width_ratio": width_ratio,
-                    "path": candidate["path"].relative_to(root / "work").as_posix(),
-                    "sha256": candidate["sha256"],
-                    "probe": candidate["probe"],
-                })
-            size_review = {
-                "shot_id": shot["id"],
-                "selected_width_ratio": selected_width,
-                "candidates": size_candidates,
-            }
-        shot_records.append({
+        record = {
             "shot_id": shot["id"],
             "program_range": copy.deepcopy(shot["program_range"]),
             "base_broll": {
@@ -1207,7 +1427,23 @@ def render_context_previews(plan, analysis, agent_input, timeline, review_video,
                 "probe": context["probe"],
             },
             "anchor_previews": anchor_previews,
-        })
+        }
+        alternate = recommendation.get("alternate")
+        if isinstance(alternate, dict):
+            alternate_render = _render_composite_video(
+                base, video, shot, analysis_shots[shot["id"]], agent_input,
+                media_timeline, plan["speaker_inset_style"],
+                preview_dir / f"context-{shot['id']}-alternate.mp4",
+                preset=alternate["preset"], anchor_override=alternate["anchor"],
+            )
+            record["alternate_preview"] = {
+                "preset": alternate["preset"],
+                "anchor": alternate["anchor"],
+                "path": alternate_render["path"].relative_to(root / "work").as_posix(),
+                "sha256": alternate_render["sha256"],
+                "probe": alternate_render["probe"],
+            }
+        shot_records.append(record)
     record = {
         "schema_version": 1,
         "analysis_sha256": plan["speaker_inset"]["analysis"]["sha256"],
@@ -1217,8 +1453,6 @@ def render_context_previews(plan, analysis, agent_input, timeline, review_video,
         "review_video_sha256": plan["input_hashes"]["review_video_sha256"],
         "shots": shot_records,
     }
-    if size_review is not None:
-        record["size_review"] = size_review
     output = root / "work/b-roll/speaker-inset-preview.json"
     _atomic_json(output, record)
     result = copy.deepcopy(plan)
@@ -1259,6 +1493,8 @@ def preview_errors(preview, plan, analysis, agent_input, timeline, *,
     errors = []
     if preview.get("schema_version") != 1:
         errors.append("speaker inset preview schema_version must be 1")
+    if "size_review" in preview:
+        errors.append("speaker inset preview size_review is unsupported")
     expected = {
         "analysis_sha256": plan.get("speaker_inset", {}).get("analysis", {}).get("sha256"),
         "agent_input_sha256": plan.get("speaker_inset", {}).get("agent_input", {}).get("sha256"),
@@ -1271,17 +1507,15 @@ def preview_errors(preview, plan, analysis, agent_input, timeline, *,
             errors.append(f"speaker inset preview {field} does not match")
     if preview.get("analysis_sha256") != analysis.get("analysis_sha256", expected["analysis_sha256"]):
         errors.append("speaker inset preview analysis binding is stale")
-    if preview.get("agent_input_sha256") != _canonical_sha256(agent_input):
-        binding = plan.get("speaker_inset", {}).get("agent_input", {}).get("sha256")
-        if preview.get("agent_input_sha256") != binding:
-            errors.append("speaker inset preview Agent input binding is stale")
+    if preview.get("agent_input_sha256") != _json_document_sha256(agent_input):
+        errors.append("speaker inset preview Agent input binding is stale")
     try:
         _fps(timeline)
     except ValueError as exc:
         errors.append(str(exc))
     expected_shots = {
         shot.get("id"): shot for shot in plan.get("shots", [])
-        if isinstance(shot, dict) and shot.get("status") == "composite_pending"
+        if isinstance(shot, dict) and shot.get("status") in ARTIFACT_SHOT_STATUSES
     }
     shots = preview.get("shots")
     if not isinstance(shots, list):
@@ -1289,46 +1523,10 @@ def preview_errors(preview, plan, analysis, agent_input, timeline, *,
     if [shot.get("shot_id") for shot in shots if isinstance(shot, dict)] != list(expected_shots):
         errors.append("speaker inset preview shots do not match composite_pending shots")
     root = Path(project_root).resolve() if project_root is not None else None
-    allowed = plan.get("speaker_inset_style", {}).get("allowed_anchors", [])
-    enabled_shot_ids = []
-    for agent_shot in agent_input.get("shots", []):
-        if (isinstance(agent_shot, dict) and any(
-                isinstance(item, dict) and item.get("display_mode") == "enabled"
-                for item in agent_shot.get("subshots", []))):
-            enabled_shot_ids.append(agent_shot.get("shot_id"))
-    size_review = preview.get("size_review")
-    if enabled_shot_ids:
-        if not isinstance(size_review, dict):
-            errors.append("speaker inset project size review is required")
-        else:
-            expected_ratios = [
-                float(value) for value in plan.get("speaker_inset_style", {}).get(
-                    "size_candidates", []
-                ) if _number(value) is not None
-            ]
-            candidates = size_review.get("candidates")
-            if size_review.get("shot_id") != enabled_shot_ids[0]:
-                errors.append("speaker inset size review must use the first enabled shot")
-            if _number(size_review.get("selected_width_ratio")) is None or abs(
-                    float(size_review.get("selected_width_ratio", 0))
-                    - float(plan.get("speaker_inset_style", {}).get("width_ratio", 0))
-            ) > RANGE_EPSILON:
-                errors.append("speaker inset size review selected width does not match style")
-            if (not isinstance(candidates, list)
-                    or [float(item.get("width_ratio")) for item in candidates
-                        if isinstance(item, dict) and _number(item.get("width_ratio")) is not None]
-                    != expected_ratios
-                    or len(candidates or []) != len(expected_ratios)):
-                errors.append("speaker inset size review candidates do not match style")
-            else:
-                for candidate in candidates:
-                    errors.extend(_preview_binding_errors(
-                        candidate,
-                        f"speaker inset size review {candidate['width_ratio']}",
-                        root=root, verify_files=verify_files,
-                    ))
-    elif size_review is not None:
-        errors.append("speaker inset size review requires an enabled speaker subshot")
+    agent_shots = {
+        shot.get("shot_id"): shot for shot in agent_input.get("shots", [])
+        if isinstance(shot, dict)
+    }
     for shot in shots:
         if not isinstance(shot, dict) or shot.get("shot_id") not in expected_shots:
             continue
@@ -1343,31 +1541,33 @@ def preview_errors(preview, plan, analysis, agent_input, timeline, *,
             shot.get("preview"), f"{shot_id} contextual preview",
             root=root, verify_files=verify_files,
         ))
+        recommendation = agent_shots.get(shot_id, {}).get("layout_recommendation", {})
+        preset = recommendation.get("preset")
+        allowed = list(PRESET_ANCHORS.get(preset, ()))
         anchor_previews = shot.get("anchor_previews")
         if not isinstance(anchor_previews, dict) or list(anchor_previews) != allowed:
-            errors.append(f"{shot_id} anchor previews must match allowed anchors")
+            errors.append(f"{shot_id} anchor previews must match recommended preset anchors")
             continue
         for anchor, binding in anchor_previews.items():
             errors.extend(_preview_binding_errors(
                 binding, f"{shot_id} {anchor} preview",
                 root=root, verify_files=verify_files,
             ))
-    if enabled_shot_ids and isinstance(size_review, dict):
-        selected = next((
-            candidate for candidate in size_review.get("candidates", [])
-            if isinstance(candidate, dict)
-            and _number(candidate.get("width_ratio")) is not None
-            and abs(float(candidate["width_ratio"]) - float(
-                plan["speaker_inset_style"]["width_ratio"])) <= RANGE_EPSILON
-        ), None)
-        selected_shot = next((
-            item for item in shots if isinstance(item, dict)
-            and item.get("shot_id") == size_review.get("shot_id")
-        ), None)
-        if (not isinstance(selected, dict) or not isinstance(selected_shot, dict)
-                or selected.get("path") != selected_shot.get("preview", {}).get("path")
-                or selected.get("sha256") != selected_shot.get("preview", {}).get("sha256")):
-            errors.append("speaker inset selected size review must bind the contextual preview")
+        alternate = recommendation.get("alternate")
+        alternate_preview = shot.get("alternate_preview")
+        if alternate is None:
+            if alternate_preview is not None:
+                errors.append(f"{shot_id} alternate preview requires an alternate recommendation")
+        elif not isinstance(alternate_preview, dict):
+            errors.append(f"{shot_id} alternate preview is required")
+        else:
+            if (alternate_preview.get("preset") != alternate.get("preset")
+                    or alternate_preview.get("anchor") != alternate.get("anchor")):
+                errors.append(f"{shot_id} alternate preview does not match recommendation")
+            errors.extend(_preview_binding_errors(
+                alternate_preview, f"{shot_id} alternate preview",
+                root=root, verify_files=verify_files,
+            ))
     return errors
 
 
@@ -1428,31 +1628,8 @@ def clearance_errors(clearance, preview, agent_input, analysis, plan):
     if clearance.get("agent_input_sha256") != preview.get("agent_input_sha256"):
         errors.append("speaker inset clearance Agent input binding does not match preview")
 
-    size_assessment = clearance.get("size_assessment")
-    size_review = preview.get("size_review")
-    if not isinstance(size_assessment, dict):
-        errors.append("speaker inset project size assessment is required")
-    else:
-        rationale = size_assessment.get("rationale")
-        if not isinstance(rationale, str) or not rationale.strip():
-            errors.append("speaker inset size assessment rationale is required")
-        if isinstance(size_review, dict):
-            expected_widths = [
-                candidate.get("width_ratio")
-                for candidate in size_review.get("candidates", [])
-                if isinstance(candidate, dict)
-            ]
-            if (size_assessment.get("status") != "pass"
-                    or size_assessment.get("calibration_shot_id") != size_review.get("shot_id")
-                    or _number(size_assessment.get("selected_width_ratio")) is None
-                    or abs(float(size_assessment.get("selected_width_ratio", 0)) - float(
-                        size_review.get("selected_width_ratio", 0))) > RANGE_EPSILON
-                    or size_assessment.get("checked_width_ratios") != expected_widths):
-                errors.append(
-                    "speaker inset size assessment must pass and bind every project size preview"
-                )
-        elif size_assessment.get("status") != "not_applicable":
-            errors.append("speaker inset size assessment must be not_applicable without an enabled inset")
+    if "size_assessment" in clearance:
+        errors.append("speaker inset clearance size_assessment is unsupported")
 
     analysis_shots = {
         shot.get("shot_id"): shot for shot in analysis.get("shots", [])
@@ -1471,7 +1648,6 @@ def clearance_errors(clearance, preview, agent_input, analysis, plan):
         return errors + ["speaker inset clearance shots must be a list"]
     if [shot.get("shot_id") for shot in shots if isinstance(shot, dict)] != list(analysis_shots):
         errors.append("speaker inset clearance shots do not match analysis")
-    allowed = plan.get("speaker_inset_style", {}).get("allowed_anchors", [])
     for shot in shots:
         shot_id = shot.get("shot_id") if isinstance(shot, dict) else None
         if shot_id not in analysis_shots or shot_id not in agent_shots:
@@ -1509,6 +1685,8 @@ def clearance_errors(clearance, preview, agent_input, analysis, plan):
                     or not continuity["rationale"].strip()):
                 errors.append(f"{shot_id} continuity rationale is required")
         available = preview_shots.get(shot_id, {}).get("anchor_previews", {})
+        recommendation = agent_shots[shot_id].get("layout_recommendation", {})
+        allowed = list(PRESET_ANCHORS.get(recommendation.get("preset"), ()))
         for item in items:
             label = item.get("id") if isinstance(item, dict) else None
             if label not in analysis_subshots or label not in agent_subshots:
@@ -1542,7 +1720,7 @@ def clearance_errors(clearance, preview, agent_input, analysis, plan):
                 anchor = item.get("anchor")
                 if (item.get("display_mode") != "enabled"
                         or agent_choice.get("display_mode") != "enabled"
-                        or anchor != agent_choice.get("anchor")
+                        or anchor != recommendation.get("anchor")
                         or anchor not in checked
                         or anchor not in available):
                     errors.append(f"{label} passing clearance must bind the enabled checked anchor")
@@ -1576,6 +1754,74 @@ def attach_clearance(plan, analysis, agent_input, preview, clearance, project_ro
         "timestamp": clearance["timestamp"],
     }
     return result
+
+
+def normalized_composition_errors(plan, shot, *, agent_input=None):
+    """Validate one normalized speaker composition against its frozen plan bindings."""
+    normalized = shot.get("normalized") if isinstance(shot, dict) else None
+    composition = normalized.get("composition") if isinstance(normalized, dict) else None
+    base = normalized.get("broll_base") if isinstance(normalized, dict) else None
+    enabled = style_enabled(plan.get("speaker_inset_style")) if isinstance(plan, dict) else False
+    status = shot.get("status") if isinstance(shot, dict) else None
+    if not enabled:
+        if composition is not None or base is not None:
+            return ["speaker inset normalized composition requires enabled style"]
+        return []
+    if status not in {"normalized", "verified"}:
+        return []
+    if not isinstance(composition, dict):
+        return ["speaker inset normalized composition is missing"]
+    errors = []
+    required = {
+        "kind", "layout_preset", "project_primary_preset", "review_id",
+        "selection_sha256", "analysis_sha256", "agent_input_sha256",
+        "preview_sha256", "clearance_sha256", "style_sha256",
+        "review_video_sha256",
+    }
+    if set(composition) != required:
+        errors.append("speaker inset normalized composition fields are invalid")
+    speaker = plan.get("speaker_inset") if isinstance(plan.get("speaker_inset"), dict) else {}
+    review = plan.get("review") if isinstance(plan.get("review"), dict) else {}
+    expected = {
+        "kind": "speaker-inset",
+        "review_id": review.get("review_id"),
+        "selection_sha256": plan.get("selection", {}).get("sha256"),
+        "analysis_sha256": speaker.get("analysis", {}).get("sha256"),
+        "agent_input_sha256": speaker.get("agent_input", {}).get("sha256"),
+        "preview_sha256": speaker.get("preview", {}).get("sha256"),
+        "clearance_sha256": speaker.get("clearance", {}).get("sha256"),
+        "style_sha256": _canonical_sha256(plan.get("speaker_inset_style")),
+        "review_video_sha256": plan.get("input_hashes", {}).get("review_video_sha256"),
+    }
+    for field, value in expected.items():
+        if composition.get(field) != value:
+            errors.append(f"speaker inset normalized composition {field} is stale")
+    for field in ("layout_preset", "project_primary_preset"):
+        if composition.get(field) not in LAYOUT_PRESETS:
+            errors.append(f"speaker inset normalized composition {field} is invalid")
+    if agent_input is not None:
+        strategy = agent_input.get("project_layout_strategy", {})
+        recommendation = next((
+            item.get("layout_recommendation", {})
+            for item in agent_input.get("shots", [])
+            if isinstance(item, dict) and item.get("shot_id") == shot.get("id")
+        ), {})
+        if composition.get("layout_preset") != recommendation.get("preset"):
+            errors.append("speaker inset normalized composition layout_preset is stale")
+        if composition.get("project_primary_preset") != strategy.get("primary_preset"):
+            errors.append("speaker inset normalized composition project_primary_preset is stale")
+    if not isinstance(base, dict) or set(base) != {"path", "sha256", "probe"}:
+        errors.append("speaker inset normalized composition B-roll base is invalid")
+    else:
+        path = base.get("path")
+        if (not isinstance(path, str)
+                or not re.fullmatch(r"cache/b-roll/normalized/broll-\d{3}-base\.mp4", path)):
+            errors.append("speaker inset normalized composition B-roll base path is invalid")
+        if not _is_sha256(base.get("sha256")):
+            errors.append("speaker inset normalized composition B-roll base SHA-256 is invalid")
+        if not isinstance(base.get("probe"), dict):
+            errors.append("speaker inset normalized composition B-roll base probe is invalid")
+    return errors
 
 
 def artifact_errors(plan, timeline, transcript, *, project_root=None, verify_files=False):
@@ -1621,6 +1867,11 @@ def artifact_errors(plan, timeline, transcript, *, project_root=None, verify_fil
     agent_input = documents.get("agent_input")
     if agent_input is not None and analysis is not None:
         errors.extend(agent_input_errors(agent_input, analysis, plan, timeline))
+        for shot in plan.get("shots", []):
+            if isinstance(shot, dict):
+                errors.extend(normalized_composition_errors(
+                    plan, shot, agent_input=agent_input,
+                ))
     preview = documents.get("preview")
     if preview is not None and analysis is not None and agent_input is not None:
         errors.extend(preview_errors(

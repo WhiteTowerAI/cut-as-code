@@ -216,22 +216,6 @@ def _composite_payload(plan, root, assets_dir):
             "sha256": digest,
         }
 
-    size_review = preview.get("size_review")
-    speaker_size_review = None
-    if isinstance(size_review, dict):
-        speaker_size_review = {
-            "shot_id": size_review["shot_id"],
-            "selected_width_ratio": size_review["selected_width_ratio"],
-            "assessment": copy.deepcopy(clearance["size_assessment"]),
-            "candidates": [{
-                "width_ratio": candidate["width_ratio"],
-                **freeze(
-                    candidate,
-                    f"project speaker size {candidate['width_ratio']}",
-                ),
-            } for candidate in size_review["candidates"]],
-        }
-
     payload_shots = []
     pre_skipped_ids = []
     for shot_index, shot in enumerate(plan["shots"], 1):
@@ -301,10 +285,13 @@ def _composite_payload(plan, root, assets_dir):
                 "evidence_frames": evidence_frames,
             })
         preview_shot = preview_shots[shot_id]
-        payload_shots.append({
+        payload_shot = {
             "id": shot_id,
             "program_range": copy.deepcopy(shot["program_range"]),
             "locked_selection": copy.deepcopy(shot["selected"]),
+            "layout_recommendation": copy.deepcopy(
+                agent_shots[shot_id]["layout_recommendation"]
+            ),
             "selected_candidates": selected_candidates,
             "base_broll": freeze(preview_shot["base_broll"], f"{shot_id} base B-roll"),
             "preview": freeze(preview_shot["preview"], f"{shot_id} contextual preview"),
@@ -314,8 +301,19 @@ def _composite_payload(plan, root, assets_dir):
             },
             "continuity": copy.deepcopy(clearance_shots[shot_id]["continuity"]),
             "subshots": subshots,
-        })
-    return payload_shots, asset_specs, pre_skipped_ids, speaker_size_review
+        }
+        if isinstance(preview_shot.get("alternate_preview"), dict):
+            alternate = preview_shot["alternate_preview"]
+            payload_shot["alternate_preview"] = {
+                "preset": alternate["preset"],
+                "anchor": alternate["anchor"],
+                **freeze(alternate, f"{shot_id} alternate preview"),
+            }
+        payload_shots.append(payload_shot)
+    return (
+        payload_shots, asset_specs, pre_skipped_ids,
+        copy.deepcopy(agent_input["project_layout_strategy"]),
+    )
 
 
 def _write_alias(page, alias):
@@ -388,7 +386,7 @@ def build_review_page(plan, timeline, transcript, video, output_dir, *, project_
         ) else "selection" if speaker_enabled else "standard"
     )
     if review_mode == "composite":
-        shots, candidate_specs, pre_skipped_ids, speaker_size_review = _composite_payload(
+        shots, candidate_specs, pre_skipped_ids, speaker_layout_strategy = _composite_payload(
             plan, root, assets_dir,
         )
     else:
@@ -421,7 +419,7 @@ def build_review_page(plan, timeline, transcript, video, output_dir, *, project_
                 speaker = plan["speaker_inset"]
                 payload.update({
                     "speaker_style": copy.deepcopy(plan["speaker_inset_style"]),
-                    "speaker_size_review": speaker_size_review,
+                    "speaker_layout_strategy": speaker_layout_strategy,
                     "speaker_bindings": {
                         "selection_sha256": plan["selection"]["sha256"],
                         "analysis_sha256": speaker["analysis"]["sha256"],

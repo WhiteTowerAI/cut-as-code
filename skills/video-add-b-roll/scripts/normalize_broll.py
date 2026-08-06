@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "video-understand" 
 import projectlib
 
 import broll_plan
+import speaker_inset
 
 
 KEN_BURNS_DIRECTIONS = {"zoom-in", "pan-left", "pan-right"}
@@ -420,6 +421,42 @@ def normalize_selection(candidates, shot, timeline, destination, *, lut=None):
 def _validate_normalized(record, candidate, shot, timeline, output, root, grade_hashes):
     if not isinstance(record, dict):
         raise ValueError("normalized record is required")
+    if "composition" in record or "broll_base" in record:
+        composition = record.get("composition")
+        base = record.get("broll_base")
+        if not isinstance(composition, dict) or composition.get("kind") != "speaker-inset":
+            raise ValueError("speaker inset normalized composition is missing")
+        if not isinstance(base, dict):
+            raise ValueError("speaker inset normalized B-roll base is missing")
+        base_output = output.with_name(f"{output.stem}-base.mp4")
+        expected_base_path = base_output.relative_to(root / "work").as_posix()
+        if base.get("path") != expected_base_path:
+            raise ValueError("speaker inset normalized B-roll base path is stale")
+        base_record = copy.deepcopy(record)
+        base_record.update({
+            "path": base.get("path"), "sha256": base.get("sha256"),
+            "probe": copy.deepcopy(base.get("probe")),
+        })
+        base_record.pop("composition", None)
+        base_record.pop("broll_base", None)
+        _validate_normalized(
+            base_record, candidate, shot, timeline, base_output, root, grade_hashes,
+        )
+        expected_path = output.relative_to(root / "work").as_posix()
+        if record.get("path") != expected_path or not output.is_file():
+            raise ValueError("normalized output path is stale")
+        if record.get("sha256") != broll_plan.sha256_file(output):
+            raise ValueError("normalized output SHA-256 is stale")
+        width, height, num, den = _timeline_spec(timeline)
+        probe = _probe(output)
+        _check_probe(probe, width, height, num, den, _shot_duration(shot, timeline))
+        if record.get("probe") != probe:
+            raise ValueError("normalized probe is stale")
+        subprocess.run([
+            "ffmpeg", "-v", "error", "-i", str(output),
+            "-map", "0:v:0", "-f", "null", "-",
+        ], check=True, capture_output=True)
+        return
     expected_path = output.relative_to(root / "work").as_posix()
     if record.get("path") != expected_path or not output.is_file():
         raise ValueError("normalized output path is stale")
@@ -519,7 +556,51 @@ def _validate_normalized(record, candidate, shot, timeline, output, root, grade_
     subprocess.run(["ffmpeg", "-v", "error", "-i", str(output), "-map", "0:v:0", "-f", "null", "-"], check=True, capture_output=True)
 
 
-def normalize_plan(plan_path, timeline_path, project_root, *, lut=None):
+def _speaker_documents(plan, root):
+    speaker = plan.get("speaker_inset")
+    if not isinstance(speaker, dict):
+        raise ValueError("enabled speaker inset requires delivery composite artifacts")
+    documents = {}
+    for name in ("analysis", "agent_input", "preview", "clearance"):
+        binding = speaker.get(name)
+        if not isinstance(binding, dict) or not isinstance(binding.get("path"), str):
+            raise ValueError(f"enabled speaker inset requires {name} artifact")
+        path = root / "work" / binding["path"]
+        try:
+            path.resolve().relative_to((root / "work").resolve())
+        except ValueError as exc:
+            raise ValueError(f"speaker inset {name} path escapes work") from exc
+        if not path.is_file() or binding.get("sha256") != broll_plan.sha256_file(path):
+            raise ValueError(f"speaker inset {name} artifact is missing or stale")
+        try:
+            documents[name] = projectlib.load_json(path)
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError(f"speaker inset {name} artifact is invalid") from exc
+    return documents
+
+
+def _composition_record(plan, agent_input, shot):
+    recommendation = next(
+        item["layout_recommendation"]
+        for item in agent_input["shots"] if item.get("shot_id") == shot.get("id")
+    )
+    speaker = plan["speaker_inset"]
+    return {
+        "kind": "speaker-inset",
+        "layout_preset": recommendation["preset"],
+        "project_primary_preset": agent_input["project_layout_strategy"]["primary_preset"],
+        "review_id": plan["review"]["review_id"],
+        "selection_sha256": plan["selection"]["sha256"],
+        "analysis_sha256": speaker["analysis"]["sha256"],
+        "agent_input_sha256": speaker["agent_input"]["sha256"],
+        "preview_sha256": speaker["preview"]["sha256"],
+        "clearance_sha256": speaker["clearance"]["sha256"],
+        "style_sha256": broll_plan.canonical_sha256(plan["speaker_inset_style"]),
+        "review_video_sha256": plan["input_hashes"]["review_video_sha256"],
+    }
+
+
+def normalize_plan(plan_path, timeline_path, project_root, *, lut=None, review_video=None):
     """Validate, resume, and durably normalize each selected shot."""
     root = Path(project_root).resolve()
     plan_path, timeline_path = Path(plan_path).resolve(), Path(timeline_path).resolve()
@@ -539,6 +620,19 @@ def normalize_plan(plan_path, timeline_path, project_root, *, lut=None):
         raise ValueError("plan shots must be a list")
     if plan.get("review_status") != "approved":
         raise ValueError("review_status must be approved")
+    inset_selected = (
+        speaker_inset.style_enabled(plan.get("speaker_inset_style"))
+        and any(
+            isinstance(shot, dict) and shot.get("status") != "skipped"
+            for shot in plan["shots"]
+        )
+    )
+    if inset_selected and review_video is None:
+        raise ValueError(
+            "enabled speaker inset requires delivery composite and explicit review_video"
+        )
+    if not inset_selected and review_video is not None:
+        raise ValueError("review_video is only valid for enabled speaker inset")
     errors = broll_plan.validate_plan(
         plan, timeline, transcript, project=project, project_root=root, verify_files=True
     )
@@ -555,6 +649,13 @@ def normalize_plan(plan_path, timeline_path, project_root, *, lut=None):
     for key, digest in grade_hashes.items():
         if input_hashes.get(key) != digest:
             raise ValueError(f"{key} is stale")
+    speaker_documents = None
+    review_path = None
+    if inset_selected:
+        review_path, timeline = speaker_inset.validate_review_video(
+            plan, timeline, review_video, root,
+        )
+        speaker_documents = _speaker_documents(plan, root)
     result = copy.deepcopy(plan)
     for index, shot in enumerate(result["shots"], 1):
         if not isinstance(shot, dict):
@@ -578,13 +679,45 @@ def normalize_plan(plan_path, timeline_path, project_root, *, lut=None):
             continue
         if shot.get("status") != "selected":
             raise ValueError("normalize_plan requires selected, normalized, or skipped shots")
+        normalized_output = output
+        if inset_selected:
+            normalized_output = output.with_name(f"{output.stem}-base.mp4")
         if "segments" in selected:
-            record = normalize_selection(selected_candidates, shot, timeline, output, lut=lut_path)
+            record = normalize_selection(
+                selected_candidates, shot, timeline, normalized_output, lut=lut_path,
+            )
         else:
             if len(selected_candidates) != 1:
                 raise ValueError("legacy selection requires exactly one candidate")
-            record = normalize_shot(selected_candidates[0], shot, timeline, output, lut=lut_path)
-        record["path"] = output.relative_to(root / "work").as_posix()
+            record = normalize_shot(
+                selected_candidates[0], shot, timeline, normalized_output, lut=lut_path,
+            )
+        record["path"] = normalized_output.relative_to(root / "work").as_posix()
+        if inset_selected:
+            base_binding = {
+                "path": record["path"],
+                "sha256": record["sha256"],
+                "probe": copy.deepcopy(record["probe"]),
+            }
+            composite = speaker_inset.render_delivery_composite(
+                plan=plan, shot=shot,
+                analysis=speaker_documents["analysis"],
+                agent_input=speaker_documents["agent_input"],
+                preview=speaker_documents["preview"],
+                clearance=speaker_documents["clearance"],
+                timeline=timeline, style=plan["speaker_inset_style"],
+                base_video=normalized_output, review_video=review_path,
+                destination=output, project_root=root,
+            )
+            record.update({
+                "path": output.relative_to(root / "work").as_posix(),
+                "sha256": composite["sha256"],
+                "probe": copy.deepcopy(composite["probe"]),
+                "composition": _composition_record(
+                    plan, speaker_documents["agent_input"], shot,
+                ),
+                "broll_base": base_binding,
+            })
         shot["normalized"], shot["status"] = record, "normalized"
         plan_part = plan_path.with_suffix(".part.json")
         try:

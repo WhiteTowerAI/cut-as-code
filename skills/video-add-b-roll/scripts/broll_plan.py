@@ -27,6 +27,9 @@ VISUAL_REVIEW_CHECKS = (
     "semantic_fit", "unwanted_logos_or_text", "jump_cuts",
     "entry_exit_boundaries", "grade_match",
 )
+SPEAKER_VISUAL_REVIEW_CHECKS = (
+    "speaker_layout_fidelity", "speaker_legibility", "broll_focal_clearance",
+)
 PEXELS_LICENSE_URL = "https://www.pexels.com/license/"
 PEXELS_TERMS_URL = "https://www.pexels.com/terms-of-service/"
 _INVALID_NUMBER = object()
@@ -42,6 +45,13 @@ def sha256_file(path):
 
 def canonical_sha256(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+
+
+def visual_review_checks(plan):
+    checks = VISUAL_REVIEW_CHECKS
+    if isinstance(plan, dict) and speaker_inset.style_enabled(plan.get("speaker_inset_style")):
+        checks += SPEAKER_VISUAL_REVIEW_CHECKS
+    return checks
 
 
 def visual_review_subject(plan):
@@ -517,7 +527,16 @@ def _review_errors(plan, shots):
         input_hashes = {}
     if review.get("review_video_sha256") != input_hashes.get("review_video_sha256"):
         errors.append("review video SHA-256 does not match")
-    if speaker_inset.style_enabled(plan.get("speaker_inset_style")):
+    speaker_review_required = (
+        speaker_inset.style_enabled(plan.get("speaker_inset_style"))
+        and any(
+            isinstance(shot, dict) and shot.get("status") in {
+                "composite_pending", "selected", "normalized", "verified",
+            }
+            for shot in shots
+        )
+    )
+    if speaker_review_required:
         if review.get("review_stage") != "composite":
             errors.append("speaker inset approval review_stage must be composite")
         speaker = plan.get("speaker_inset")
@@ -601,9 +620,10 @@ def _visual_review_errors(plan, *, project_root=None, verify_files=False):
         errors.append("visual review timestamp is invalid")
     if review.get("mode") == "human" and review.get("explicit_user_action") is not True:
         errors.append("human visual review requires explicit_user_action true")
+    required_checks = visual_review_checks(plan)
     checks = review.get("checks")
-    if (not isinstance(checks, dict) or set(checks) != set(VISUAL_REVIEW_CHECKS)
-            or any(checks[key] is not True for key in VISUAL_REVIEW_CHECKS)):
+    if (not isinstance(checks, dict) or set(checks) != set(required_checks)
+            or any(checks[key] is not True for key in required_checks)):
         errors.append("all visual checks must be true booleans")
     for name, expected_path in (
         ("receipt", "work/b-roll/b-roll-visual-review.json"),
@@ -1046,6 +1066,14 @@ def _verified_overlays(plan):
         shot_ids.add(shot_id)
     if plan.get("review_status") != "approved":
         raise ValueError("review_status must be approved")
+    inset_enabled = speaker_inset.style_enabled(plan.get("speaker_inset_style"))
+    if inset_enabled:
+        for shot in plan["shots"]:
+            if shot.get("status") == "skipped":
+                continue
+            composition_errors = speaker_inset.normalized_composition_errors(plan, shot)
+            if composition_errors:
+                raise ValueError("; ".join(composition_errors))
     errors = _review_errors(plan, plan["shots"])
     if errors:
         raise ValueError("; ".join(errors))
@@ -1075,6 +1103,9 @@ def _verified_overlays(plan):
         digest = normalized.get("sha256")
         if not _is_sha256(digest):
             raise ValueError("verified shot normalized SHA-256 is invalid")
+        if inset_enabled and verification.get("composition_sha256") != canonical_sha256(
+                normalized.get("composition")):
+            raise ValueError("speaker inset verification composition SHA-256 is stale")
         if "source_path" in normalized and len(candidates) == 1 and normalized["source_path"] != candidates[0].get("cache_path"):
             raise ValueError("verified shot normalized source path does not match selected candidate")
         if "source_paths" in normalized and normalized["source_paths"] != [candidate.get("cache_path") for candidate in candidates]:
@@ -1353,12 +1384,17 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
                     errors.append(f"{shot_id} normalized path is invalid")
                 if not _is_sha256(normalized.get("sha256")):
                     errors.append(f"{shot_id} normalized SHA-256 is invalid")
+                errors.extend(speaker_inset.normalized_composition_errors(plan, shot))
         elif "normalized" in shot:
             errors.append(f"{shot_id} {status} shot must not carry normalized")
         if status == "verified":
             verification = shot.get("verification")
             if not isinstance(verification, dict) or verification.get("status") != "pass":
                 errors.append(f"{shot_id} verified verification must pass")
+            elif (speaker_inset.style_enabled(style)
+                  and verification.get("composition_sha256") != canonical_sha256(
+                      shot.get("normalized", {}).get("composition"))):
+                errors.append(f"{shot_id} speaker inset verification composition SHA-256 is stale")
         elif "verification" in shot:
             errors.append(f"{shot_id} {status} shot must not carry verification")
     if any(isinstance(shot, dict) and shot.get("status") == "composite_pending" for shot in shots):
@@ -1993,7 +2029,17 @@ def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None,
         "candidate_manifest_sha256": canonical_sha256(candidate_manifest(plan)),
         "review_video_sha256": input_hashes.get("review_video_sha256"),
     }
-    composite_review = speaker_inset.style_enabled(plan.get("speaker_inset_style"))
+    all_skipped = (
+        len(entries) == len(plan_shots)
+        and all(
+            isinstance(entry, dict) and entry.get("decision") == "skip"
+            for entry in entries
+        )
+    )
+    composite_review = (
+        speaker_inset.style_enabled(plan.get("speaker_inset_style"))
+        and not all_skipped
+    )
     if composite_review:
         if review.get("review_stage") != "composite":
             raise ValueError("speaker inset approval review_stage must be composite")

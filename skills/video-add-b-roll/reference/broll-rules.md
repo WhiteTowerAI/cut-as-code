@@ -142,13 +142,10 @@
 
 ## Speaker Inset Review
 
-- Omit `speaker_inset_style` for the legacy one-page workflow. When enabled, require one strict
-  project-level circle or rounded-rectangle style with fixed size, aspect ratio, border, margins,
-  subtitle-safe bottom area, and unique allowed anchors.
-- Require two or three unique, ascending project `size_candidates`; `width_ratio` must equal one of
-  them. Render the candidates from the first enabled shot, let the Agent recommend the smallest
-  legible safe size, and show that one project-level comparison in the composite review. Do not
-  repeat size approval per shot or silently use one shot's custom size.
+- Omit `speaker_inset_style` for the ordinary one-page workflow. When enabled, require
+  `shape: "rounded-rectangle"`, `width_ratio: 0.39`, `aspect_ratio: 0.80`, a 3px `#9E9E9E` border,
+  `corner_radius_ratio: 0.10`, `margin_ratio: 0.04`, and `reserved_bottom_ratio: 0.20`. Keep only
+  common appearance in this project-level style; preset and anchor belong to the Agent input.
 - The first-page `prepare_composite` action freezes exact B-roll segments in
   `broll-selection.json` and moves selected shots to `composite_pending`. It is not approval,
   creates no `review_status`, and never authorizes normalization or registration.
@@ -165,36 +162,69 @@
 - Use the delegated Agent only for visual speaker judgment, sparse normalized ROI annotation, and
   composition review. Do not install or invoke a face detector, person segmentation/tracking model,
   or external identity service.
+- In `speaker-inset-agent-input.json`, require one `project_layout_strategy` with a primary preset,
+  one or two used presets by default, and a specific rationale. Require one
+  `layout_recommendation` per selected shot with preset, fixed anchor, high/medium/low confidence,
+  rationale, and pass/warn/fail assessments for all three presets. A low-confidence recommendation
+  requires one non-failing alternate; recommendation never grants approval.
+- Use `focused-panel` when the exact B-roll benefits from a distinct upper presentation area. Build
+  the frame from a blurred full-frame copy plus a crisp cover-scaled panel at normalized bounds
+  `x=0.04`, `y=0.08`, `width=0.92`, `height=0.40`, surrounded by a 3px `#9E9E9E` border; place the
+  speaker at `lower-center` directly above the subtitle-safe area.
+- Use `full-bleed-wash` for atmospheric or supporting B-roll that tolerates lower contrast. Keep it
+  full-frame, apply one uniform white layer at opacity `0.30`, and place the speaker at
+  `upper-center`. Do not use this preset for text, charts, interfaces, or required fine detail.
+- Use `corner-pip` for information-dense B-roll that must remain full-frame and full-contrast. Keep
+  B-roll unchanged and choose exactly one shot-level `top-left` or `top-right` anchor. Only upper
+  corners are supported so the subtitle-safe lower area remains clear.
+- Default every shot to the project primary preset. Use a secondary preset only when the primary is
+  warn/fail for that exact shot and the secondary passes with a visible benefit. Three presets need
+  three distinct documented shot needs and approval of the exact previews. Keep one preset and one
+  anchor for the complete shot; never switch corners inside a shot.
 - Require `confirmed`, `ambiguous`, `absent`, or `occluded` for every subshot and a specific
   rationale. Only confirmed tracks may enable the window. Every other status must use
   `pure_broll`, no anchor, and no keyframes.
 - Keep confirmed ROI values finite, positive, inside the A-roll frame, strictly ordered, frame
   aligned, and covering the complete subshot. Interpolate only within that subshot.
+- Fit each speaker ROI into the configured window with an aspect-preserving cover crop, centered
+  horizontally and anchored to the top. Never resize speaker pixels non-uniformly. Preserve the
+  complete head, forehead, face, chin, and visible headroom before lower-body coverage. If that
+  framing still removes important subject content, revise and reapprove the ROI instead of
+  stretching it.
 - Render the user's exact B-roll bytes, trims, segment order, speeds, timeline geometry, rational
   FPS, and selected LUT. Read speaker pixels from the already graded upstream review video; never
   apply the LUT to those pixels again.
-- Freeze the current composite, pure B-roll, and a full-shot exact preview for every allowed anchor.
-  Agent clearance must inspect these composited pixels, not isolated A-roll and B-roll sources.
-- Freeze one additional project-level size comparison from the first enabled shot. Bind every
-  candidate ratio and the selected ratio; the selected candidate must be the exact current
-  contextual preview.
-- Record `subject_legibility: pass` for every enabled subshot after inspecting its final-size pixels.
-  Tighten the ROI and rebuild when the subject occupies too little of the window. Use
-  `not_applicable` for pure B-roll; never enlarge only one shot or approve a blurred enlargement.
+- Apply the recommended B-roll treatment to every frame, including a `pure_broll` subshot; only the
+  speaker pixels toggle. Freeze the exact recommended composite, every supported anchor preview for
+  that preset, and the single required low-confidence alternate. Agent clearance must inspect these
+  composited pixels, not isolated A-roll and B-roll sources.
+- Record `subject_legibility: pass` for every enabled subshot only when its final-size pixels keep
+  the complete face and head inside the border and rounded mask with visible headroom. Tighten the
+  ROI and rebuild when the subject occupies too little of the window. Use
+  `not_applicable` for pure B-roll. When the user asks for a larger or smaller speaker, translate the
+  request into one explicit numeric `width_ratio`, state it, and invalidate every style-bound
+  artifact and approval before rebuilding. Do not silently change one shot.
 - Record one continuity assessment per shot. Derive `short_flash` when an enabled run is shorter
   than 1.5 seconds and is followed by a longer pure-B-roll run. Resolve it by independently
   confirming and extending the later subshot, disabling the whole shot inset, or explicitly
   justifying an intentional transition. Do not use a fade or a guessed identity to mask it.
-- `pass` binds the enabled anchor actually checked. `no_safe_position` must list every allowed
+- `pass` binds the recommended enabled anchor actually checked. `no_safe_position` must list every
   anchor and resolve the subshot to `pure_broll`; never shrink the project style, cover focal B-roll
   content, replace the selected B-roll, or invent a fallback speaker image.
 - The second immutable page must show the locked selection, temporal evidence, ROI keyframes,
-  current composite, pure B-roll, anchor previews, and clearance reasoning. Approval requires
+  project strategy, recommendation rationale, three assessments, exact recommended composite,
+  supported anchor previews, optional alternate, common style, and clearance reasoning. Approval requires
   `review_stage: composite` and current selection, analysis, Agent input, preview, clearance, and
   style hashes. Any modification requests a new immutable page.
-- The implemented speaker-inset path currently stops at the second-page review gate. Do not send an
-  enabled inset plan to normalization or delivery until the normalizer precomposes the approved
-  speaker pixels into the one existing per-shot overlay and that stage has been reviewed.
+- After composite approval, normalize a reusable pure B-roll base and precompose the preset
+  treatment plus clearance-effective speaker pixels into the one existing per-shot overlay. Bind
+  selection, analysis, Agent input, preview, clearance, style, review video, and composite review
+  UUID by SHA-256. Verification stills, contact sheet, and boundary reel must read this final
+  composite, never the base.
+- Pre-register the verified final composite as the existing approved/pending overlay, render final
+  delivery once, then inspect the actual normalized and final pixels. In addition to the ordinary
+  checks, require `speaker_layout_fidelity`, `speaker_legibility`, and `broll_focal_clearance` before
+  final registration becomes verified.
 
 ## Segment Timing And Playback
 

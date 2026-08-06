@@ -283,6 +283,9 @@ def _visual_review_report(receipt):
         "jump_cuts": "Jump cuts",
         "entry_exit_boundaries": "Entry and exit boundaries",
         "grade_match": "Grade match",
+        "speaker_layout_fidelity": "Speaker layout fidelity",
+        "speaker_legibility": "Speaker legibility",
+        "broll_focal_clearance": "B-roll focal clearance",
     }
     lines = [
         "# B-roll visual review", "", "Visual review status: completed", "",
@@ -292,7 +295,7 @@ def _visual_review_report(receipt):
         f"- Reviewed plan SHA-256: `{receipt['plan_sha256']}`",
         f"- Rationale: {receipt['rationale']}", "", "## Visual checks", "",
     ]
-    lines.extend(f"- [x] {labels[key]}: pass" for key in broll_plan.VISUAL_REVIEW_CHECKS)
+    lines.extend(f"- [x] {labels[key]}: pass" for key in receipt["checks"])
     lines.extend(["", "## Bound artifacts", ""])
     artifacts = receipt["artifacts"]
     for still in artifacts["stills"]:
@@ -361,16 +364,17 @@ def complete_visual_review(plan_path, project_root, review, final_video):
         raise ValueError("visual review timestamp is invalid")
     if mode == "human" and review.get("explicit_user_action") is not True:
         raise ValueError("human visual review requires explicit_user_action true")
+    required_checks = broll_plan.visual_review_checks(plan)
     checks = review.get("checks")
-    if (not isinstance(checks, dict) or set(checks) != set(broll_plan.VISUAL_REVIEW_CHECKS)
-            or any(checks[key] is not True for key in broll_plan.VISUAL_REVIEW_CHECKS)):
+    if (not isinstance(checks, dict) or set(checks) != set(required_checks)
+            or any(checks[key] is not True for key in required_checks)):
         raise ValueError("all visual checks must be true booleans")
     artifacts = _visual_review_artifacts(plan, root, final_video)
     receipt = {
         "schema_version": 1, "status": "completed", "review_id": active["review_id"],
         "plan_sha256": plan_sha256, "mode": mode, "actor": actor.strip(),
         "rationale": rationale.strip(), "timestamp": review["timestamp"],
-        "checks": {key: True for key in broll_plan.VISUAL_REVIEW_CHECKS},
+        "checks": {key: True for key in required_checks},
         "artifacts": artifacts,
     }
     if mode == "human":
@@ -412,6 +416,17 @@ def complete_visual_review(plan_path, project_root, review, final_video):
 
 def _summary(plan, selected, records, artifacts, root, stage, destination, path):
     review = plan["review"]
+    recommendations = {}
+    agent_binding = plan.get("speaker_inset", {}).get("agent_input", {})
+    if isinstance(agent_binding, dict) and isinstance(agent_binding.get("path"), str):
+        agent_path = root / "work" / agent_binding["path"]
+        if (agent_path.is_file()
+                and broll_plan.sha256_file(agent_path) == agent_binding.get("sha256")):
+            agent_input = projectlib.load_json(agent_path)
+            recommendations = {
+                item.get("shot_id"): item.get("layout_recommendation", {})
+                for item in agent_input.get("shots", []) if isinstance(item, dict)
+            }
     lines = [
         "# B-roll verification summary", "", "Manual review status: pending.", "",
         f"- Timeline ID: `{plan.get('timeline_id')}`",
@@ -439,6 +454,20 @@ def _summary(plan, selected, records, artifacts, root, stage, destination, path)
             f"- Grade plan SHA-256: `{normalized.get('grade_plan_sha256', 'not active')}`",
             f"- Selected LUT SHA-256: `{normalized.get('selected_lut_sha256', 'not active')}`",
         ])
+        composition = normalized.get("composition")
+        base = normalized.get("broll_base")
+        if isinstance(composition, dict) and isinstance(base, dict):
+            lines.extend([
+                f"- Project primary preset: `{composition.get('project_primary_preset')}`",
+                f"- Shot layout preset: `{composition.get('layout_preset')}`",
+                f"- Layout recommendation rationale: {recommendations.get(shot.get('id'), {}).get('rationale', '')}",
+                f"- Final composite SHA-256: `{normalized['sha256']}`",
+                f"- B-roll base SHA-256: `{base.get('sha256')}`",
+            ])
+            lines.extend(
+                f"- Composition {field}: `{value}`"
+                for field, value in composition.items()
+            )
         component_records = normalized.get("segments")
         if isinstance(component_records, list):
             candidate_map = {candidate.get("id"): candidate for candidate in candidates}
@@ -822,6 +851,11 @@ def verify_plan(plan_path, timeline_path, project_root, video_path, *, review_di
                 "boundary_reel": _hash_binding(reel, final_reel, root),
                 "report": _hash_binding(summary, final_summary, root),
             }
+            composition = shot["normalized"].get("composition")
+            if isinstance(composition, dict):
+                shot["verification"]["composition_sha256"] = broll_plan.canonical_sha256(
+                    composition
+                )
         errors = broll_plan.validate_plan(
             result, timeline, transcript, project=project, project_root=root, verify_files=True
         )

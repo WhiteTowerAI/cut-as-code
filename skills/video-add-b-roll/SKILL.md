@@ -144,10 +144,15 @@ For each proposed shot:
 Keep `brief.density` equal to `selective`. Do not pad the plan to meet a count. If no moment
 earns B-roll, an approved all-skipped plan is a valid no-op.
 
-For a simultaneous speaker window, add one strict project-level `speaker_inset_style`; otherwise
-omit it. Include two or three ascending `size_candidates`, select one `width_ratio` from that list,
-and review that size once for the project rather than once per shot. Never introduce a face
-detector, segmentation model, cross-cut identity tracker, or guessed ROI.
+For a simultaneous speaker window, add the strict project-level rounded-rectangle
+`speaker_inset_style` from the example; otherwise omit it. Keep `width_ratio: 0.39`, gray border,
+aspect ratio, corner radius, margins, and subtitle-safe bottom area at project level. Do not place a
+preset or anchor in the style. The Agent records `project_layout_strategy` plus one per-shot
+`layout_recommendation` after inspecting the exact selected media. Never introduce a face detector,
+segmentation model, cross-cut identity tracker, or guessed ROI. Fit speaker ROI pixels into the
+window with aspect-preserving cover scaling; never stretch them to the configured aspect ratio.
+Center the crop horizontally and anchor it to the top so the complete head and face take priority
+over lower-body coverage.
 
 Validate the draft after every material edit:
 
@@ -399,13 +404,16 @@ the page's factual `review_ui_explicit_action` rationale; it does not claim to q
 reason. Agent mode still requires the real Agent actor and a specific exported Agent rationale.
 
 For an enabled inset, apply first-page `prepare_composite`, then use `speaker_inset.py` for evidence,
-Agent ROI, exact anchor previews, and clearance; follow `reference/broll-rules.md`. Only the republished
-page's hash-bound `review_stage: composite` approval may select shots. Stop there: do not normalize
-or deliver until the normalizer precomposes the speaker window and that stage is reviewed.
+Agent ROI, layout recommendation, exact anchor previews, and clearance; follow
+`reference/broll-rules.md`. The Agent must assess `focused-panel`, `full-bleed-wash`, and
+`corner-pip`, choose a project primary preset, and keep one preset and anchor for each complete
+shot. `corner-pip` supports only the shot-level `top-left` and `top-right` anchors. Only the
+republished page's hash-bound `review_stage: composite` approval may select shots.
+Agent recommendation is advisory; present the exact composite page and stop for user approval.
 
 Before accepting `ambiguous`, request dense supplemental evidence inside that subshot and rebuild
-the analysis hash. Render the project size candidates once from the first enabled shot. Require
-`subject_legibility: pass` for every displayed subshot and a shot-level continuity decision. Treat
+the analysis hash. Require `subject_legibility: pass` for every displayed subshot and a shot-level
+continuity decision. Treat
 an enabled run shorter than 1.5 seconds followed by a longer pure-B-roll run as `short_flash`; extend
 the independently confirmed ROI, disable the whole shot inset, or record a specific intentional
 transition. Never relax the confirmed-speaker rule to hide a continuity problem.
@@ -419,10 +427,26 @@ python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]); sys.pat
 ```
 
 Without active color grade, call the same API with `lut=None`. Never omit the LUT when color
-grade is active and never apply an unselected look. The normalizer produces silent H.264
+grade is active and never apply an unselected look. For an enabled inset without active color
+grade, pass the exact hash-bound review video explicitly:
+
+```powershell
+python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]); sys.path.insert(0,sys.argv[2]); import normalize_broll; normalize_broll.normalize_plan(root/'work/b-roll/broll-plan.json',root/'work/timeline.json',root,lut=None,review_video=Path(sys.argv[3]).resolve())" $ProjectRoot $BrollScripts $ReviewVideo
+```
+
+With active color grade and an enabled inset, pass both exact inputs:
+
+```powershell
+python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]); sys.path.insert(0,sys.argv[2]); import normalize_broll; normalize_broll.normalize_plan(root/'work/b-roll/broll-plan.json',root/'work/timeline.json',root,lut=Path(sys.argv[3]).resolve(),review_video=Path(sys.argv[4]).resolve())" $ProjectRoot $BrollScripts "$ProjectRoot/final/selected-color-look.cube" $ReviewVideo
+```
+
+The normalizer produces silent H.264
 overlays at timeline dimensions and exact rational FPS, preserves aspect ratio, reads the complete
 canonical source range, permits at most one frame of final quantization adjustment, and publishes
-each validated result atomically. It never silently removes a multi-second canonical tail.
+each validated result atomically. For an enabled inset it preserves a reusable `broll-NNN-base.mp4`
+and publishes one preset-treated, clearance-effective speaker composite as `broll-NNN.mp4`; the
+registered overlay is always the final composite. It never silently removes a multi-second
+canonical tail.
 
 Rerun `normalize_plan()` after interruption. It validates and preserves completed normalized
 shots before continuing; do not hand-promote `.part.mp4` or `.part.json` files.
@@ -479,7 +503,8 @@ After actual inspection, create an Agent- or human-authored JSON export containi
 `review_id`, the canonical SHA-256 of the verified plan without `visual_review`, a timezone-aware
 `timestamp`, `mode`, real `actor`, non-empty `rationale`, and exactly these boolean results:
 `semantic_fit`, `unwanted_logos_or_text`, `jump_cuts`, `entry_exit_boundaries`, and
-`grade_match`. Every result must be `true`. Use `mode: "human"` and
+`grade_match`. When the inset is enabled, also require `speaker_layout_fidelity`,
+`speaker_legibility`, and `broll_focal_clearance`. Every applicable result must be `true`. Use `mode: "human"` and
 `explicit_user_action: true` only after an explicit user action; otherwise use delegated
 `mode: "agent"`. Never infer or fabricate a human pass.
 
