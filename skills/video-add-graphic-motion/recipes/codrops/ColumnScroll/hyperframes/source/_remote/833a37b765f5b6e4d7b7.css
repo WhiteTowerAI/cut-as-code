@@ -1,0 +1,52 @@
+/*
+ * The Typekit service used to deliver this font or fonts for use on websites
+ * is provided by Adobe and is subject to these Terms of Use
+ * http://www.adobe.com/products/eulas/tou_typekit. For font license
+ * information, see the list below.
+ *
+ * meno-banner:
+ *   - http://typekit.com/eulas/00000000000000003b9af036
+ *   - http://typekit.com/eulas/00000000000000003b9af037
+ * nimbus-sans:
+ *   - http://typekit.com/eulas/00000000000000000001518d
+ *   - http://typekit.com/eulas/000000000000000000012544
+ *   - http://typekit.com/eulas/00000000000000000001011c
+ *
+ * © 2009-2026 Adobe Systems Incorporated. All Rights Reserved.
+ */
+/*{"last_published":"2021-12-08 10:37:44 UTC"}*/
+
+@import url("/source/_remote/696b088cf1a7d765b6d1.css");
+
+@font-face {
+font-family:"nimbus-sans";
+src:url("/source/_remote/b8bfaf63af10adca403d.woff2") format("woff2"),url("/source/_remote/a7672e3d7bf33403289f.woff") format("woff"),url("/source/_remote/aec7703eaf4169745707.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"nimbus-sans";
+src:url("/source/_remote/40a771477e2373b2d419.woff2") format("woff2"),url("/source/_remote/9790ba42c08ba8bd4737.woff") format("woff"),url("/source/_remote/4ae9e810e55f01aeafd1.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:700;font-stretch:normal;
+}
+
+@font-face {
+font-family:"nimbus-sans";
+src:url("/source/_remote/8e7909e7542753b57c22.woff2") format("woff2"),url("/source/_remote/fdef5c18931cd47a1ce5.woff") format("woff"),url("/source/_remote/d7e6a8615b26909155c9.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:300;font-stretch:normal;
+}
+
+@font-face {
+font-family:"meno-banner";
+src:url("/source/_remote/9cc4dbc88c5226938481.woff2") format("woff2"),url("/source/_remote/3acfe0c20c1c9a5007ed.woff") format("woff"),url("/source/_remote/9d32326c25a252a130e1.otf") format("opentype");
+font-display:auto;font-style:italic;font-weight:300;font-stretch:normal;
+}
+
+@font-face {
+font-family:"meno-banner";
+src:url("/source/_remote/64d959ee630d373d41b2.woff2") format("woff2"),url("/source/_remote/7a9f217265b2b3c4caa5.woff") format("woff"),url("/source/_remote/5db1154bbf1b9ff92ec9.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:300;font-stretch:normal;
+}
+
+.tk-nimbus-sans { font-family: "nimbus-sans",sans-serif; }
+.tk-meno-banner { font-family: "meno-banner",serif; }

@@ -1,0 +1,72 @@
+/*
+ * The Typekit service used to deliver this font or fonts for use on websites
+ * is provided by Adobe and is subject to these Terms of Use
+ * http://www.adobe.com/products/eulas/tou_typekit. For font license
+ * information, see the list below.
+ *
+ * arnika-variable:
+ *   - http://typekit.com/eulas/0000000000000000774b976d
+ * aziga:
+ *   - http://typekit.com/eulas/0000000000000000774ba04d
+ * stadio-now-variable:
+ *   - http://typekit.com/eulas/0000000000000000774afb65
+ * tenon:
+ *   - http://typekit.com/eulas/00000000000000007735ec19
+ *   - http://typekit.com/eulas/00000000000000007735ec15
+ *   - http://typekit.com/eulas/00000000000000007735ec18
+ * zeitung-pro-variable:
+ *   - http://typekit.com/eulas/0000000000000000774b9728
+ *
+ * © 2009-2026 Adobe Systems Incorporated. All Rights Reserved.
+ */
+/*{"last_published":"2023-03-14 10:05:40 UTC"}*/
+
+@import url("/source/_remote/7fb3d797a7f66f21cfbc.css");
+
+@font-face {
+font-family:"tenon";
+src:url("/source/_remote/5cdea24f3da0a385ff6c.woff2") format("woff2"),url("/source/_remote/eaceea633ef02168e352.woff") format("woff"),url("/source/_remote/f200e6a4c9430690951e.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:300;font-stretch:normal;
+}
+
+@font-face {
+font-family:"tenon";
+src:url("/source/_remote/476f83405f2277be2667.woff2") format("woff2"),url("/source/_remote/f5d8018af226ea6bcd18.woff") format("woff"),url("/source/_remote/622f1ff9fcca81f1b42d.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"tenon";
+src:url("/source/_remote/6609aef2b1a5ef45f714.woff2") format("woff2"),url("/source/_remote/57e061efa9ac0dd83006.woff") format("woff"),url("/source/_remote/646fe938b24b779e3e37.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:700;font-stretch:normal;
+}
+
+@font-face {
+font-family:"stadio-now-variable";
+src:url("/source/_remote/9d893756533394ed827a.woff2") format("woff2"),url("/source/_remote/b8578fceee5b2c0bc490.woff") format("woff"),url("/source/_remote/a39c65ae98cb41488b3c.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"zeitung-pro-variable";
+src:url("/source/_remote/c72e95ad682c1c4e9d67.woff2") format("woff2"),url("/source/_remote/b1926bcccb355f59f803.woff") format("woff"),url("/source/_remote/f3b856d9ab1b32ddfc84.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"arnika-variable";
+src:url("/source/_remote/0517c8d89fbc3d74a2e6.woff2") format("woff2"),url("/source/_remote/85ad3a98ae174c9fef32.woff") format("woff"),url("/source/_remote/6c2e4d9c74adf509dddd.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"aziga";
+src:url("/source/_remote/ef348bf54ab587983d69.woff2") format("woff2"),url("/source/_remote/e6c6d1960fbaa4081e74.woff") format("woff"),url("/source/_remote/aba629a2eda2768fca91.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+.tk-tenon { font-family: "tenon",sans-serif; }
+.tk-stadio-now-variable { font-family: "stadio-now-variable",sans-serif; }
+.tk-zeitung-pro-variable { font-family: "zeitung-pro-variable",sans-serif; }
+.tk-arnika-variable { font-family: "arnika-variable",sans-serif; }
+.tk-aziga { font-family: "aziga",sans-serif; }

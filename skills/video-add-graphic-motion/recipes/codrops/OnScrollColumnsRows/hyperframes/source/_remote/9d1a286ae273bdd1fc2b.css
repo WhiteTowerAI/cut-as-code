@@ -1,0 +1,22 @@
+/*
+ * The Typekit service used to deliver this font or fonts for use on websites
+ * is provided by Adobe and is subject to these Terms of Use
+ * http://www.adobe.com/products/eulas/tou_typekit. For font license
+ * information, see the list below.
+ *
+ * marlide-display-variable:
+ *   - http://typekit.com/eulas/0000000000000000774ba8d7
+ *
+ * © 2009-2026 Adobe Systems Incorporated. All Rights Reserved.
+ */
+/*{"last_published":"2023-08-13 22:58:12 UTC"}*/
+
+@import url("/source/_remote/2dc61dc9abdaabd46185.css");
+
+@font-face {
+font-family:"marlide-display-variable";
+src:url("/source/_remote/a8405a4bb2f49adafcb9.woff2") format("woff2"),url("/source/_remote/60a20cfbd64d0ebfe134.woff") format("woff"),url("/source/_remote/e136be8b1f9474f40024.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+.tk-marlide-display-variable { font-family: "marlide-display-variable",sans-serif; }

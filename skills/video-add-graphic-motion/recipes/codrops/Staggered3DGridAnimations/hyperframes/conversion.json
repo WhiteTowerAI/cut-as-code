@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "project_id": "Staggered3DGridAnimations",
+  "demo_url": "https://tympanus.net/Development/Staggered3DGridAnimations/",
+  "article_url": "https://tympanus.net/codrops/2024/10/16/staggered-3d-grid-animations-with-scroll-triggered-effects/",
+  "source_url": "https://github.com/codrops/Staggered3DGridAnimations",
+  "source_commit": "7c2703d41f55005c2758e1031b593d2493d392f8",
+  "license": {
+    "type": "MIT",
+    "evidence": "repository-file",
+    "file": "LICENSE",
+    "sha256": "a5ad4d98a7970bd09ba775c7e237fb93c60139f8e0e261ebb470e580b213c226"
+  },
+  "source_copy": "source",
+  "variants": [
+    {
+      "name": "index",
+      "composition_id": "codrops-staggered3dgridanimations-index",
+      "source_entry": "index.html",
+      "runtime_entry": "index.html",
+      "source_sha256": "2d3ff82632909189d17c8e1745640242033b01e2750b3b950930b0c136cae801",
+      "runtime_sha256": "2d3ff82632909189d17c8e1745640242033b01e2750b3b950930b0c136cae801",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index/index.html"
+    }
+  ]
+}

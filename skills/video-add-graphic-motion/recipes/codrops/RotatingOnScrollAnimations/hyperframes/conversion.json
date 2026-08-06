@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "project_id": "RotatingOnScrollAnimations",
+  "source_copy": "source",
+  "variants": [
+    {
+      "name": "index",
+      "composition_id": "codrops-rotatingonscrollanimations-index",
+      "source_entry": "index.html",
+      "runtime_entry": "index.html",
+      "source_sha256": "a74d1bf84ddf2c8c165dfc7c62434fcf1ffacb6882ed6b6753f8f3676cd34ebc",
+      "runtime_sha256": "a74d1bf84ddf2c8c165dfc7c62434fcf1ffacb6882ed6b6753f8f3676cd34ebc",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index/index.html"
+    },
+    {
+      "name": "index2",
+      "composition_id": "codrops-rotatingonscrollanimations-index2",
+      "source_entry": "index2.html",
+      "runtime_entry": "index2.html",
+      "source_sha256": "badb87b244e8e47721499c81e18ad0866422f8000dcd9dec463e9563bf9f6ff8",
+      "runtime_sha256": "badb87b244e8e47721499c81e18ad0866422f8000dcd9dec463e9563bf9f6ff8",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": [],
+        "synchronousInitialization": true
+      },
+      "output": "index2/index.html"
+    },
+    {
+      "name": "index3",
+      "composition_id": "codrops-rotatingonscrollanimations-index3",
+      "source_entry": "index3.html",
+      "runtime_entry": "index3.html",
+      "source_sha256": "c74474a39d37fd39edf8db2c04029de2ba951f03285925f01784d8cb0f8c39e6",
+      "runtime_sha256": "c74474a39d37fd39edf8db2c04029de2ba951f03285925f01784d8cb0f8c39e6",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index3/index.html"
+    },
+    {
+      "name": "index4",
+      "composition_id": "codrops-rotatingonscrollanimations-index4",
+      "source_entry": "index4.html",
+      "runtime_entry": "index4.html",
+      "source_sha256": "2d74865794c88a77c755bd65a0054120562d088a9403f986b060d867b40ec88b",
+      "runtime_sha256": "2d74865794c88a77c755bd65a0054120562d088a9403f986b060d867b40ec88b",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index4/index.html"
+    },
+    {
+      "name": "index5",
+      "composition_id": "codrops-rotatingonscrollanimations-index5",
+      "source_entry": "index5.html",
+      "runtime_entry": "index5.html",
+      "source_sha256": "2082c50ca6b5cc4b00256e20ac6a84b229499dc87eaf865cab8d42d20f387cb3",
+      "runtime_sha256": "2082c50ca6b5cc4b00256e20ac6a84b229499dc87eaf865cab8d42d20f387cb3",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index5/index.html"
+    }
+  ]
+}

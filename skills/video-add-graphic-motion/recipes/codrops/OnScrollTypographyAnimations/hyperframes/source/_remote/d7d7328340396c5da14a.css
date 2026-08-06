@@ -1,0 +1,135 @@
+/*
+ * The Typekit service used to deliver this font or fonts for use on websites
+ * is provided by Adobe and is subject to these Terms of Use
+ * http://www.adobe.com/products/eulas/tou_typekit. For font license
+ * information, see the list below.
+ *
+ * area-normal:
+ *   - http://typekit.com/eulas/0000000000000000774b9fbd
+ *   - http://typekit.com/eulas/0000000000000000774b9fc8
+ * arsenica-variable:
+ *   - http://typekit.com/eulas/0000000000000000774afb61
+ *   - http://typekit.com/eulas/0000000000000000774afb64
+ * borax-variable:
+ *   - http://typekit.com/eulas/0000000000000000774af664
+ * capsule:
+ *   - http://typekit.com/eulas/0000000000000000774ba058
+ * gigantic:
+ *   - http://typekit.com/eulas/0000000000000000774ba06c
+ * halogen:
+ *   - http://typekit.com/eulas/00000000000000007735a374
+ * inge-variable:
+ *   - http://typekit.com/eulas/0000000000000000774ba8d3
+ * june-expt-variable:
+ *   - http://typekit.com/eulas/0000000000000000774bdcf9
+ * marlide-display-variable:
+ *   - http://typekit.com/eulas/0000000000000000774ba8d7
+ * nagel-variable:
+ *   - http://typekit.com/eulas/0000000000000000774b9789
+ * norman-stencil:
+ *   - http://typekit.com/eulas/00000000000000007736d741
+ * vinila-variable:
+ *   - http://typekit.com/eulas/0000000000000000774b97d8
+ *
+ * © 2009-2026 Adobe Systems Incorporated. All Rights Reserved.
+ */
+/*{"last_published":"2023-02-19 16:53:03 UTC"}*/
+
+@import url("/source/_remote/988ab3dfe47b5985bd2e.css");
+
+@font-face {
+font-family:"halogen";
+src:url("/source/_remote/a58affac67f9c8d9e2e5.woff2") format("woff2"),url("/source/_remote/00c0b3428a6c80732336.woff") format("woff"),url("/source/_remote/311cbca52d7d853701b0.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:700;font-stretch:normal;
+}
+
+@font-face {
+font-family:"norman-stencil";
+src:url("/source/_remote/83a1961f0b17f6dbb093.woff2") format("woff2"),url("/source/_remote/dbd5d1ef5b48dcd76ac2.woff") format("woff"),url("/source/_remote/523b4ed69e721704dde4.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:800;font-stretch:normal;
+}
+
+@font-face {
+font-family:"borax-variable";
+src:url("/source/_remote/d8d98aa0e0467763db93.woff2") format("woff2"),url("/source/_remote/abc469c00401ec61df16.woff") format("woff"),url("/source/_remote/e1c5e9e089f6a124c4d6.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"arsenica-variable";
+src:url("/source/_remote/3bf3d25f8854d6f99d61.woff2") format("woff2"),url("/source/_remote/832e25bb633c233ba50f.woff") format("woff"),url("/source/_remote/132392e61cb2c0a3f673.otf") format("opentype");
+font-display:auto;font-style:italic;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"arsenica-variable";
+src:url("/source/_remote/51119ac22e1c12c44067.woff2") format("woff2"),url("/source/_remote/48500debab440666e0f1.woff") format("woff"),url("/source/_remote/b85eaa6027bf8a218e54.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"nagel-variable";
+src:url("/source/_remote/96f76a99651940760187.woff2") format("woff2"),url("/source/_remote/369be02a3777aa9c7274.woff") format("woff"),url("/source/_remote/8654fe19ba8aae219c59.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"vinila-variable";
+src:url("/source/_remote/ac22cd41835aaf36a832.woff2") format("woff2"),url("/source/_remote/ef7c4efb2f70958ed81e.woff") format("woff"),url("/source/_remote/2ec928ecec2ed52f5698.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"area-normal";
+src:url("/source/_remote/a7c1ec851e7b3217ab1a.woff2") format("woff2"),url("/source/_remote/211f7efeea0bf3b24158.woff") format("woff"),url("/source/_remote/6ef29a1a4fd437881871.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"area-normal";
+src:url("/source/_remote/cac1db0b7df27c154347.woff2") format("woff2"),url("/source/_remote/5451a9f633032068a6a7.woff") format("woff"),url("/source/_remote/737805c4ac6500b674e6.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:600;font-stretch:normal;
+}
+
+@font-face {
+font-family:"capsule";
+src:url("/source/_remote/f6551776c28064c4fa0f.woff2") format("woff2"),url("/source/_remote/ce7a66a9e1c0b7d39caf.woff") format("woff"),url("/source/_remote/4fa3fab9a2755208a60e.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"gigantic";
+src:url("/source/_remote/3d13b5e70bca278f3aeb.woff2") format("woff2"),url("/source/_remote/bad90f205a825cb4661f.woff") format("woff"),url("/source/_remote/43a037309a827b07cfc6.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:900;font-stretch:normal;
+}
+
+@font-face {
+font-family:"marlide-display-variable";
+src:url("/source/_remote/a8405a4bb2f49adafcb9.woff2") format("woff2"),url("/source/_remote/60a20cfbd64d0ebfe134.woff") format("woff"),url("/source/_remote/e136be8b1f9474f40024.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"inge-variable";
+src:url("/source/_remote/385bd0d1f7bc51285ae3.woff2") format("woff2"),url("/source/_remote/fb1772d7b40d6c0e8af9.woff") format("woff"),url("/source/_remote/63e93d83b2d60b026afa.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"june-expt-variable";
+src:url("/source/_remote/348f27d241efe80bf880.woff2") format("woff2"),url("/source/_remote/13245feb8f3fde8d9c12.woff") format("woff"),url("/source/_remote/f20a61cc842feb101c9a.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+.tk-halogen { font-family: "halogen",sans-serif; }
+.tk-norman-stencil { font-family: "norman-stencil",sans-serif; }
+.tk-borax-variable { font-family: "borax-variable",sans-serif; }
+.tk-arsenica-variable { font-family: "arsenica-variable",sans-serif; }
+.tk-nagel-variable { font-family: "nagel-variable",sans-serif; }
+.tk-vinila-variable { font-family: "vinila-variable",sans-serif; }
+.tk-area-normal { font-family: "area-normal",sans-serif; }
+.tk-capsule { font-family: "capsule",sans-serif; }
+.tk-gigantic { font-family: "gigantic",sans-serif; }
+.tk-marlide-display-variable { font-family: "marlide-display-variable",sans-serif; }
+.tk-inge-variable { font-family: "inge-variable",sans-serif; }
+.tk-june-expt-variable { font-family: "june-expt-variable",sans-serif; }

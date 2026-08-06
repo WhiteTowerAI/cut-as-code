@@ -1,0 +1,269 @@
+{
+  "schema_version": 1,
+  "project_id": "TextBlockTransitions",
+  "demo_url": "http://tympanus.net/Development/TextBlockTransitions/",
+  "article_url": "https://tympanus.net/codrops/2023/07/13/inspiration-for-text-block-transitions/",
+  "source_url": "https://github.com/codrops/TextBlockTransitions/",
+  "source_commit": "f26255f089e20df46a4844ab1205e3b07565889a",
+  "license": {
+    "type": "MIT",
+    "evidence": "repository-file",
+    "file": "LICENSE",
+    "sha256": "85131f2bb7714dc895ff5d7d68db65acc5ad0e5dfd72162869fc8d63dec06056"
+  },
+  "source_copy": "source",
+  "variants": [
+    {
+      "name": "index",
+      "composition_id": "codrops-textblocktransitions-index",
+      "source_entry": "index.html",
+      "runtime_entry": "index.html",
+      "source_sha256": "2b893f48266f47a67c124fe5602be3de339727032ed70d26cbff132e130ae82a",
+      "runtime_sha256": "2b893f48266f47a67c124fe5602be3de339727032ed70d26cbff132e130ae82a",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".trigger"
+          }
+        ]
+      },
+      "output": "index/index.html"
+    },
+    {
+      "name": "index2",
+      "composition_id": "codrops-textblocktransitions-index2",
+      "source_entry": "index2.html",
+      "runtime_entry": "index2.html",
+      "source_sha256": "3736cb742b3d95e11e757c8ebbc20afd4542b8b78c014f016e233c358944911f",
+      "runtime_sha256": "3736cb742b3d95e11e757c8ebbc20afd4542b8b78c014f016e233c358944911f",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".trigger"
+          }
+        ]
+      },
+      "output": "index2/index.html"
+    },
+    {
+      "name": "index3",
+      "composition_id": "codrops-textblocktransitions-index3",
+      "source_entry": "index3.html",
+      "runtime_entry": "index3.html",
+      "source_sha256": "edd797bcb349aa9ab3cec34918460d9a447e9039af3c2e5a0f3b53c753795b0e",
+      "runtime_sha256": "edd797bcb349aa9ab3cec34918460d9a447e9039af3c2e5a0f3b53c753795b0e",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".trigger"
+          }
+        ]
+      },
+      "output": "index3/index.html"
+    },
+    {
+      "name": "index4",
+      "composition_id": "codrops-textblocktransitions-index4",
+      "source_entry": "index4.html",
+      "runtime_entry": "index4.html",
+      "source_sha256": "16219990f65bf0feda02cfca125d2752180745cafdf752bebb34f024bfcd1ea7",
+      "runtime_sha256": "16219990f65bf0feda02cfca125d2752180745cafdf752bebb34f024bfcd1ea7",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".trigger"
+          }
+        ]
+      },
+      "output": "index4/index.html"
+    },
+    {
+      "name": "index5",
+      "composition_id": "codrops-textblocktransitions-index5",
+      "source_entry": "index5.html",
+      "runtime_entry": "index5.html",
+      "source_sha256": "05aa9294476bbe81bd361c2cff55b48470ced23dbb29f18434197be80919f5be",
+      "runtime_sha256": "05aa9294476bbe81bd361c2cff55b48470ced23dbb29f18434197be80919f5be",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".trigger"
+          }
+        ]
+      },
+      "output": "index5/index.html"
+    },
+    {
+      "name": "index6",
+      "composition_id": "codrops-textblocktransitions-index6",
+      "source_entry": "index6.html",
+      "runtime_entry": "index6.html",
+      "source_sha256": "0e2f5402582bd3ae4d5929489da26bad9e2130e8a6670f0d08f865c212247e7f",
+      "runtime_sha256": "0e2f5402582bd3ae4d5929489da26bad9e2130e8a6670f0d08f865c212247e7f",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".trigger"
+          }
+        ]
+      },
+      "output": "index6/index.html"
+    },
+    {
+      "name": "index7",
+      "composition_id": "codrops-textblocktransitions-index7",
+      "source_entry": "index7.html",
+      "runtime_entry": "index7.html",
+      "source_sha256": "7e1615643f0032feacd03b9071ba7f6ad4572333ccb9486325070f711cc9d97d",
+      "runtime_sha256": "7e1615643f0032feacd03b9071ba7f6ad4572333ccb9486325070f711cc9d97d",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".trigger"
+          }
+        ]
+      },
+      "output": "index7/index.html"
+    },
+    {
+      "name": "index8",
+      "composition_id": "codrops-textblocktransitions-index8",
+      "source_entry": "index8.html",
+      "runtime_entry": "index8.html",
+      "source_sha256": "1b7a290fbfc818179a05ff974bf9ea2403b8e1ac3c4696d26190f707872a90d6",
+      "runtime_sha256": "1b7a290fbfc818179a05ff974bf9ea2403b8e1ac3c4696d26190f707872a90d6",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".trigger"
+          }
+        ]
+      },
+      "output": "index8/index.html"
+    },
+    {
+      "name": "index9",
+      "composition_id": "codrops-textblocktransitions-index9",
+      "source_entry": "index9.html",
+      "runtime_entry": "index9.html",
+      "source_sha256": "4f5545b43c106776ccbad87e3cd12123270c38f2f543b48b8bb78f0ed0cf33f5",
+      "runtime_sha256": "4f5545b43c106776ccbad87e3cd12123270c38f2f543b48b8bb78f0ed0cf33f5",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".trigger"
+          }
+        ]
+      },
+      "output": "index9/index.html"
+    },
+    {
+      "name": "index10",
+      "composition_id": "codrops-textblocktransitions-index10",
+      "source_entry": "index10.html",
+      "runtime_entry": "index10.html",
+      "source_sha256": "18d1884f27fff52b6c49ae93ba7521b26e58b05c81ecafcbc92321e981bafd72",
+      "runtime_sha256": "18d1884f27fff52b6c49ae93ba7521b26e58b05c81ecafcbc92321e981bafd72",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".trigger"
+          }
+        ]
+      },
+      "output": "index10/index.html"
+    },
+    {
+      "name": "index11",
+      "composition_id": "codrops-textblocktransitions-index11",
+      "source_entry": "index11.html",
+      "runtime_entry": "index11.html",
+      "source_sha256": "eb344282288c6ffb3a62bb01793029321f7f74077f7dc88625aebb672fd115ed",
+      "runtime_sha256": "eb344282288c6ffb3a62bb01793029321f7f74077f7dc88625aebb672fd115ed",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".trigger"
+          }
+        ]
+      },
+      "output": "index11/index.html"
+    },
+    {
+      "name": "index12",
+      "composition_id": "codrops-textblocktransitions-index12",
+      "source_entry": "index12.html",
+      "runtime_entry": "index12.html",
+      "source_sha256": "0c066eb32d4344bc9ac9214adfb387a8d525306cddb48ff15a6cb0d4aadd71a7",
+      "runtime_sha256": "0c066eb32d4344bc9ac9214adfb387a8d525306cddb48ff15a6cb0d4aadd71a7",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".trigger"
+          }
+        ]
+      },
+      "output": "index12/index.html"
+    }
+  ]
+}

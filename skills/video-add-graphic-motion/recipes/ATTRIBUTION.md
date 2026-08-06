@@ -53,7 +53,7 @@ They embed no upstream code — each card links to the original source and licen
 ## Codrops Kinetic Images
 
 - **Kinetic Images** by Dominik Fojcik / Codrops is bundled as
-  `codrops/kinetic-images` from
+  `codrops/codrops-kinetic-images` from
   [DGFX/codrops-kinetic-images](https://github.com/DGFX/codrops-kinetic-images)
   at revision `965dda362a8f9e5d522ed675493897200d273e49`.
 - Codrops publishes downloadable demos under the MIT License unless otherwise stated:

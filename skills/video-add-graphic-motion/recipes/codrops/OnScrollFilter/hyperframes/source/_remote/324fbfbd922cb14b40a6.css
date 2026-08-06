@@ -1,0 +1,56 @@
+/*
+ * The Typekit service used to deliver this font or fonts for use on websites
+ * is provided by Adobe and is subject to these Terms of Use
+ * http://www.adobe.com/products/eulas/tou_typekit. For font license
+ * information, see the list below.
+ *
+ * area-variable:
+ *   - http://typekit.com/eulas/0000000000000000774ee012
+ * ringold-slab:
+ *   - http://typekit.com/eulas/0000000000000000774ee001
+ * stinger-variable:
+ *   - http://typekit.com/eulas/0000000000000000774b90b7
+ *   - http://typekit.com/eulas/0000000000000000774bf526
+ * tenon:
+ *   - http://typekit.com/eulas/00000000000000007735ec15
+ *
+ * © 2009-2026 Adobe Systems Incorporated. All Rights Reserved.
+ */
+/*{"last_published":"2023-07-04 09:55:28 UTC"}*/
+
+@import url("/source/_remote/4ea8e0b9a7207cd94313.css");
+
+@font-face {
+font-family:"tenon";
+src:url("/source/_remote/476f83405f2277be2667.woff2") format("woff2"),url("/source/_remote/f5d8018af226ea6bcd18.woff") format("woff"),url("/source/_remote/622f1ff9fcca81f1b42d.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"stinger-variable";
+src:url("/source/_remote/9e79e64599032766c33f.woff2") format("woff2"),url("/source/_remote/1ac6d25568f8bef4a46e.woff") format("woff"),url("/source/_remote/2158715f0140abb1069f.otf") format("opentype");
+font-display:auto;font-style:italic;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"stinger-variable";
+src:url("/source/_remote/def21ea6ab25e12d4297.woff2") format("woff2"),url("/source/_remote/57f5d7d9e10983e6a957.woff") format("woff"),url("/source/_remote/86f1c1aae15d21455f37.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"ringold-slab";
+src:url("/source/_remote/61934afad0a10f9dc280.woff2") format("woff2"),url("/source/_remote/2bad3693011d0511cdb8.woff") format("woff"),url("/source/_remote/8bc21cda4eed4d6f72cf.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"area-variable";
+src:url("/source/_remote/43db19a44563be70b4c8.woff2") format("woff2"),url("/source/_remote/0eaa8ea98a0d0665a9f0.woff") format("woff"),url("/source/_remote/11d87dda1d72370d7c2a.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+.tk-tenon { font-family: "tenon",sans-serif; }
+.tk-stinger-variable { font-family: "stinger-variable",sans-serif; }
+.tk-ringold-slab { font-family: "ringold-slab",sans-serif; }
+.tk-area-variable { font-family: "area-variable",sans-serif; }

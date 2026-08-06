@@ -1,0 +1,22 @@
+/*
+ * The Typekit service used to deliver this font or fonts for use on websites
+ * is provided by Adobe and is subject to these Terms of Use
+ * http://www.adobe.com/products/eulas/tou_typekit. For font license
+ * information, see the list below.
+ *
+ * moret-variable:
+ *   - http://typekit.com/eulas/0000000000000000774f3b44
+ *
+ * © 2009-2026 Adobe Systems Incorporated. All Rights Reserved.
+ */
+/*{"last_published":"2023-08-02 09:54:00 UTC"}*/
+
+@import url("/source/_remote/e8b31394ac9dff81e352.css");
+
+@font-face {
+font-family:"moret-variable";
+src:url("/source/_remote/009bb82b54d4ca41409b.woff2") format("woff2"),url("/source/_remote/272d9cd814dfa796edde.woff") format("woff"),url("/source/_remote/d56ac5088ee7f6c1b9a9.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+.tk-moret-variable { font-family: "moret-variable",serif; }

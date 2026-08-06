@@ -1,0 +1,122 @@
+/*
+ * The Typekit service used to deliver this font or fonts for use on websites
+ * is provided by Adobe and is subject to these Terms of Use
+ * http://www.adobe.com/products/eulas/tou_typekit. For font license
+ * information, see the list below.
+ *
+ * adonis-web:
+ *   - http://typekit.com/eulas/00000000000000000001007d
+ * area-normal:
+ *   - http://typekit.com/eulas/0000000000000000774b9fbd
+ * arsenica-variable:
+ *   - http://typekit.com/eulas/0000000000000000774afb64
+ * hoss-sharp:
+ *   - http://typekit.com/eulas/00000000000000007735f436
+ * interstate-mono:
+ *   - http://typekit.com/eulas/00000000000000003b9ae812
+ * lemonde-journal:
+ *   - http://typekit.com/eulas/000000000000000077359921
+ * marlide-display-variable:
+ *   - http://typekit.com/eulas/0000000000000000774ba8d7
+ * stinger-variable:
+ *   - http://typekit.com/eulas/0000000000000000774b90b7
+ *   - http://typekit.com/eulas/0000000000000000774bf526
+ * tenon:
+ *   - http://typekit.com/eulas/00000000000000007735ec16
+ *   - http://typekit.com/eulas/00000000000000007735ec19
+ *   - http://typekit.com/eulas/00000000000000007735ec15
+ *   - http://typekit.com/eulas/00000000000000007735ec14
+ *
+ * © 2009-2026 Adobe Systems Incorporated. All Rights Reserved.
+ */
+/*{"last_published":"2023-07-13 09:44:10 UTC"}*/
+
+@import url("/source/_remote/48281db4edb1cef275dd.css");
+
+@font-face {
+font-family:"lemonde-journal";
+src:url("/source/_remote/1e0cec40be71f7e4d240.woff2") format("woff2"),url("/source/_remote/3ccdcfdb6a062c5e6286.woff") format("woff"),url("/source/_remote/6f0c941e44029a36f673.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"adonis-web";
+src:url("/source/_remote/494cb4096312d663cbac.woff2") format("woff2"),url("/source/_remote/a4cf949007325b1a0aef.woff") format("woff"),url("/source/_remote/73e489ef2104ad25cb75.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"interstate-mono";
+src:url("/source/_remote/82bdbd51a4497b4d9bd2.woff2") format("woff2"),url("/source/_remote/54b97759f213914677fd.woff") format("woff"),url("/source/_remote/ce237161a41e72808a9b.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:300;font-stretch:normal;
+}
+
+@font-face {
+font-family:"tenon";
+src:url("/source/_remote/37d3fff3f69f2bcee23f.woff2") format("woff2"),url("/source/_remote/7185ed070f00a11f0f52.woff") format("woff"),url("/source/_remote/ee983b51e7ce8e6fd571.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:200;font-stretch:normal;
+}
+
+@font-face {
+font-family:"tenon";
+src:url("/source/_remote/5cdea24f3da0a385ff6c.woff2") format("woff2"),url("/source/_remote/eaceea633ef02168e352.woff") format("woff"),url("/source/_remote/f200e6a4c9430690951e.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:300;font-stretch:normal;
+}
+
+@font-face {
+font-family:"tenon";
+src:url("/source/_remote/476f83405f2277be2667.woff2") format("woff2"),url("/source/_remote/f5d8018af226ea6bcd18.woff") format("woff"),url("/source/_remote/622f1ff9fcca81f1b42d.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"tenon";
+src:url("/source/_remote/0f712929cb4d56eca41f.woff2") format("woff2"),url("/source/_remote/61aa1fa297ec7b8b5241.woff") format("woff"),url("/source/_remote/853f21409db06fdfa772.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:500;font-stretch:normal;
+}
+
+@font-face {
+font-family:"hoss-sharp";
+src:url("/source/_remote/ffecd471c105e9ac54b7.woff2") format("woff2"),url("/source/_remote/216b76d41f2489e0f26a.woff") format("woff"),url("/source/_remote/b415b7de7b4bfb47434e.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:300;font-stretch:normal;
+}
+
+@font-face {
+font-family:"arsenica-variable";
+src:url("/source/_remote/51119ac22e1c12c44067.woff2") format("woff2"),url("/source/_remote/48500debab440666e0f1.woff") format("woff"),url("/source/_remote/b85eaa6027bf8a218e54.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"stinger-variable";
+src:url("/source/_remote/9e79e64599032766c33f.woff2") format("woff2"),url("/source/_remote/1ac6d25568f8bef4a46e.woff") format("woff"),url("/source/_remote/2158715f0140abb1069f.otf") format("opentype");
+font-display:auto;font-style:italic;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"stinger-variable";
+src:url("/source/_remote/def21ea6ab25e12d4297.woff2") format("woff2"),url("/source/_remote/57f5d7d9e10983e6a957.woff") format("woff"),url("/source/_remote/86f1c1aae15d21455f37.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"area-normal";
+src:url("/source/_remote/a7c1ec851e7b3217ab1a.woff2") format("woff2"),url("/source/_remote/211f7efeea0bf3b24158.woff") format("woff"),url("/source/_remote/6ef29a1a4fd437881871.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"marlide-display-variable";
+src:url("/source/_remote/a8405a4bb2f49adafcb9.woff2") format("woff2"),url("/source/_remote/60a20cfbd64d0ebfe134.woff") format("woff"),url("/source/_remote/e136be8b1f9474f40024.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+.tk-lemonde-journal { font-family: "lemonde-journal",serif; }
+.tk-adonis-web { font-family: "adonis-web",serif; }
+.tk-interstate-mono { font-family: "interstate-mono",monospace; }
+.tk-tenon { font-family: "tenon",sans-serif; }
+.tk-hoss-sharp { font-family: "hoss-sharp",sans-serif; }
+.tk-arsenica-variable { font-family: "arsenica-variable",sans-serif; }
+.tk-stinger-variable { font-family: "stinger-variable",sans-serif; }
+.tk-area-normal { font-family: "area-normal",sans-serif; }
+.tk-marlide-display-variable { font-family: "marlide-display-variable",sans-serif; }

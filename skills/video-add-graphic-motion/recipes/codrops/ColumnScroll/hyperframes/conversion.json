@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "project_id": "ColumnScroll",
+  "demo_url": "http://tympanus.net/Development/ColumnScroll/",
+  "article_url": "https://tympanus.net/codrops/2021/12/21/alternate-column-scroll-animation/",
+  "source_url": "https://github.com/codrops/ColumnScroll/",
+  "source_commit": "f9211e8bcb5b0a55f08e0cfff3f71da450cef4e6",
+  "license": {
+    "type": "MIT",
+    "evidence": "repository-file",
+    "file": "LICENSE",
+    "sha256": "1f6db3d0b162eaa534ff5585db684f00c41f776325f7fd11ebf9373650099ce1"
+  },
+  "source_copy": "source",
+  "variants": [
+    {
+      "name": "index",
+      "composition_id": "codrops-columnscroll-index",
+      "source_entry": "src/index.html",
+      "runtime_entry": "dist/index.html",
+      "source_sha256": "19c8e41079c94c763288847c4e8e249371acc6b4491aa120effd1247980827d1",
+      "runtime_sha256": "ade3a804d0a7bd2be8b93334b5069164ec6b87670e37078fe701366733b6ae2a",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index/index.html"
+    }
+  ]
+}

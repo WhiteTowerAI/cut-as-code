@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "project_id": "3DCarousel",
+  "source_copy": "source",
+  "variants": [
+    {
+      "name": "index",
+      "composition_id": "codrops-3dcarousel-index",
+      "source_entry": "index.html",
+      "runtime_entry": "index.html",
+      "source_sha256": "4d69781b5cb04730a881fe1465dde7a1e4b54178be57de390498205aa091d054",
+      "runtime_sha256": "4d69781b5cb04730a881fe1465dde7a1e4b54178be57de390498205aa091d054",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": [],
+        "synchronousInitialization": true
+      },
+      "output": "index/index.html"
+    }
+  ]
+}

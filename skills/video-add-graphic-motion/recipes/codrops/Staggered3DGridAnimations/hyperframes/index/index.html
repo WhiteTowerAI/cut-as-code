@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="icon" href="data:,">
+  <script defer src="/index/hf-recipe.js" data-hf-recipe></script>
+  <script defer src="/index/hf-adapter.js" data-hf-adapter></script>
+  <base href="/source/">
+
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Staggered (3D) Grid Animations | Codrops</title>
+  <meta name="keywords" content="scroll animation, grid, gsap, 3d, filter" />
+  <meta name="author" content="Codrops" />
+  
+  <link rel="stylesheet" href="/source/_remote/19a085ae97dde1e88ead.css">
+  <link rel="stylesheet" type="text/css" href="css/base.css" />
+  
+  
+
+  <style data-hf-codrops-frame>
+    html { width: 1920px; height: 1080px; scrollbar-width: none; }
+    body[data-composition-id] { margin: 0; width: 1920px; min-height: 1080px; position: relative; }
+    ::-webkit-scrollbar { display: none; }
+  </style>
+<style data-hf-codrops-chrome>
+html, body { overflow-anchor: none !important; }
+html, body, body * { cursor: none !important; }
+.codrops-header,
+.codrops-links,
+.github,
+.sponsor,
+[class*="sponsor"],
+.demos,
+.effects,
+.trigger,
+.frame__links,
+.frame__tags,
+.frame__nav,
+.frame__info,
+.frame__demo,
+.frame__demos,
+.frame__archive,
+.frame__github,
+.frame__author,
+.frame__hire,
+.frame--footer,
+.frame .modal,
+.frame__title,
+.frame__title-back,
+.frame__back,
+.frame__prev,
+.slidenav,
+.slides-nav,
+.nav__arrow,
+.cover__button,
+.content__enter,
+.enter,
+.item__enter,
+.content__nav,
+.content__footer,
+.intro__title-sub,
+.intro__info,
+.credits,
+.related,
+footer,
+.footer,
+.copyright,
+.cursor { display: none !important; }
+[data-composition-id^="codrops-scrollbasedlayoutanimations-"] .caption,
+[data-composition-id^="codrops-scrollbasedlayoutanimations-"] .project--details:has(a[href*="twitter.com/intent/tweet"]),
+[data-composition-id^="codrops-scrollspiral-"] .content__text,
+[data-composition-id^="codrops-scrollspiral-"] .main-title,
+[data-composition-id^="codrops-scrollspiral-"] .main-tagline,
+[data-composition-id^="codrops-scrollspiral-"] .media-item { visibility: hidden !important; }
+body[data-composition-id^="codrops-scrollspiral-"].loading::before,
+body[data-composition-id^="codrops-scrollspiral-"].loading::after,
+[data-composition-id^="codrops-scrollspiral-"] .content--main::before,
+[data-composition-id^="codrops-scrollspiral-"] .content--main::after { display: none !important; }
+</style></head>
+<body class="loading" data-composition-id="codrops-staggered3dgridanimations-index" data-start="0" data-width="1920" data-height="1080" data-duration="8" data-no-timeline>
+
+  <main class="shadow">
+    <div class="frame">
+      <a class="frame__back" href="https://tympanus.net/codrops/?p=81462">Article</a>
+      <a class="frame__archive" href="https://tympanus.net/codrops/demos">All demos</a>
+      <a class="frame__github" href="https://github.com/codrops/Staggered3DGridAnimations">GitHub</a>
+    </div>
+    <div class="intro"> 
+      <h1 class="intro__title font-alt">Staggered (3D) <br>Grid Animations</h1> 
+      <nav class="tags">
+        <a href="https://tympanus.net/codrops/demos/?tag=scroll">#scroll</a>
+        <a href="https://tympanus.net/codrops/demos/?tag=3d">#3d</a>
+        <a href="https://tympanus.net/codrops/demos/?tag=grid">#grid</a>
+      </nav>
+      <span class="intro__info">Scroll gently &amp; enjoy</span> 
+    </div>
+    <section>
+      <div class="grid">
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/1.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/2.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/3.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/4.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/5.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/6.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/7.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/8.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/9.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/10.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/11.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/12.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/13.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/14.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/15.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/16.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/17.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/18.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/19.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/20.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/1.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/2.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/3.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/4.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/5.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/6.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/7.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/8.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/9.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/10.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/11.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/12.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/13.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/14.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/15.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/16.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/17.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/18.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/19.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/20.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/1.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/2.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/3.jpg)"></div>
+          </div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-imgwrap">
+            <div class="grid__item-img" style="background-image:url(/source/img/4.jpg)"></div>
+          </div>
+        </figure>
+      </div><!-- grid -->
+      <div class="mark">
+        <div class="mark__inner font-alt">
+          <span>Sora Takahashi</span> <span>空 高橋</span>
+          <span>Aoi Nakamura</span> <span>葵 中村</span>
+          <span>Ren Fujimoto</span> <span>蓮 藤本</span>
+          <span>Mio Sakurai</span> <span>澪 桜井</span>
+          <span>Shin Yamamoto</span> <span>真 山本</span>
+          <span>Kaori Kobayashi</span> <span>香織 小林</span>
+          <span>Hikari Inoue</span> <span>光 井上</span>
+          <span>Yuki Kinoshita</span> <span>雪 木下</span>
+          <span>Rina Ishikawa</span> <span>莉奈 石川</span>
+          <span>Kaito Matsumoto</span> <span>海斗 松本</span>
+        </div>
+      </div>
+    </section>
+    <section>
+      <div class="text font-alt">Halcyon</div>
+    </section>
+    <section>
+      <div class="grid grid--full">
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/1.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/2.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/3.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/4.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/5.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/6.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/7.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/8.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/9.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/10.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/11.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/12.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/13.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/14.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/15.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/16.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/17.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/18.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/19.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/20.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/1.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/2.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/3.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/4.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/5.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/6.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/7.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/8.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/9.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/10.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/11.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/12.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/13.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/14.jpg)"></div>
+        </figure>
+        <figure class="grid__item">
+          <div class="grid__item-img" style="background-image:url(/source/img/15.jpg)"></div>
+        </figure>
+      </div>
+    </section>
+    <p class="credits font-alt">Made by <a href="https://x.com/codrops">@codrops</a></p>
+    <p class="credits font-alt"><a href="https://tympanus.net/codrops/demos">More demos</a></p>
+  </main>
+  
+  <!-- GSAP library -->
+  
+  <!-- GSAP ScrollTrigger plugin -->
+  
+  <!-- GSAP SplitText (Club Membership), Trial only https://gsap.com/resources/trial/ -->
+  
+
+  <!-- ImagesLoaded -->
+  
+  
+  <!-- Add (Lenis) smooth scroll -->
+  
+  
+
+  <!-- Scripts for the effect -->
+  
+
+</body>
+</html>

@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "project_id": "OnScrollLayoutFormations",
+  "demo_url": "https://tympanus.net/Development/OnScrollLayoutFormations",
+  "article_url": "https://tympanus.net/codrops/2024/09/18/exploration-of-on-scroll-layout-formations/",
+  "source_url": "https://github.com/codrops/OnScrollLayoutFormations",
+  "source_commit": "68910ecf85275bdd7e4d0e47013ba4bf9ec94bde",
+  "license": {
+    "type": "MIT",
+    "evidence": "repository-file",
+    "file": "LICENSE",
+    "sha256": "a5ad4d98a7970bd09ba775c7e237fb93c60139f8e0e261ebb470e580b213c226"
+  },
+  "source_copy": "source",
+  "variants": [
+    {
+      "name": "index",
+      "composition_id": "codrops-onscrolllayoutformations-index",
+      "source_entry": "index.html",
+      "runtime_entry": "index.html",
+      "source_sha256": "ae7c9803754dd8ee08bfe0cdc7133396bd7cfd2977b6cd1a416e5b44f640c9c3",
+      "runtime_sha256": "ae7c9803754dd8ee08bfe0cdc7133396bd7cfd2977b6cd1a416e5b44f640c9c3",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index/index.html"
+    }
+  ]
+}

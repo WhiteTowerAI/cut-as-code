@@ -1,0 +1,47 @@
+/*
+ * The Typekit service used to deliver this font or fonts for use on websites
+ * is provided by Adobe and is subject to these Terms of Use
+ * http://www.adobe.com/products/eulas/tou_typekit. For font license
+ * information, see the list below.
+ *
+ * brisbane:
+ *   - http://typekit.com/eulas/00000000000000007757292e
+ * lores-12:
+ *   - http://typekit.com/eulas/00000000000000007735bf82
+ * sztos-variable:
+ *   - http://typekit.com/eulas/0000000000000000774d3ebb
+ *   - http://typekit.com/eulas/0000000000000000774d3eba
+ *
+ * © 2009-2026 Adobe Systems Incorporated. All Rights Reserved.
+ */
+/*{"last_published":"2024-10-16 07:50:44 UTC"}*/
+
+@import url("/source/_remote/26c0f090fb2ec2274f7a.css");
+
+@font-face {
+font-family:"lores-12";
+src:url("/source/_remote/c36b4fbb4e7955e61ea2.woff2") format("woff2"),url("/source/_remote/67e91d3aadab178b930e.woff") format("woff"),url("/source/_remote/c8487cf44eb10286a9b3.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"sztos-variable";
+src:url("/source/_remote/ef23737a428c6f9c084c.woff2") format("woff2"),url("/source/_remote/63d11157d4df01dd5825.woff") format("woff"),url("/source/_remote/4ff120035bf6b8cd7cd6.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"sztos-variable";
+src:url("/source/_remote/faf19cf70b979ad759d1.woff2") format("woff2"),url("/source/_remote/ce520074a511fb33482c.woff") format("woff"),url("/source/_remote/26694f112f7ba78a2e4c.otf") format("opentype");
+font-display:auto;font-style:italic;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"brisbane";
+src:url("/source/_remote/fd6d424079f8df44406e.woff2") format("woff2"),url("/source/_remote/7bfa979cc60da1e30b99.woff") format("woff"),url("/source/_remote/812d75c12eda81d367b1.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+.tk-lores-12 { font-family: "lores-12",sans-serif; }
+.tk-sztos-variable { font-family: "sztos-variable",sans-serif; }
+.tk-brisbane { font-family: "brisbane",sans-serif; }

@@ -1,0 +1,48 @@
+@font-face {
+  font-family: 'Arbutus Slab';
+  font-style: normal;
+  font-weight: 400;
+  src: url(/source/_remote/fb86ad82ef14a15aa656.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Bungee Outline';
+  font-style: normal;
+  font-weight: 400;
+  src: url(/source/_remote/90f7cae1692c32806e94.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Hammersmith One';
+  font-style: normal;
+  font-weight: 400;
+  src: url(/source/_remote/d8b1c043a7260a236c4a.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Josefin Sans';
+  font-style: normal;
+  font-weight: 700;
+  src: url(/source/_remote/70f7ae7e1b81537ecb53.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Montserrat Alternates';
+  font-style: normal;
+  font-weight: 700;
+  src: url(/source/_remote/94ebc843536af867bed7.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 800;
+  src: url(/source/_remote/9c2adccb671cc524eca0.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Questrial';
+  font-style: normal;
+  font-weight: 400;
+  src: url(/source/_remote/0ef2878f9fa258264ad3.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Volkhov';
+  font-style: normal;
+  font-weight: 700;
+  src: url(/source/_remote/f63521dd8156ab513c07.ttf) format('truetype');
+}

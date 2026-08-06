@@ -230,8 +230,9 @@ function stripDemoChrome(body) {
     .replace(/<([a-z][\w:-]*)\b(?=[^>]*\bclass\s*=\s*(["'])[^"']*\breplay\b[^"']*\2)[^>]*>[\s\S]*?<\/\1>/gi, "");
 }
 
-function transformRuntimeCode(source) {
+export function transformRuntimeCode(source) {
   return source
+    .replace(/\bnormalizeScroll\s*:\s*true\b/g, "normalizeScroll: false")
     .replace(/\brequestAnimationFrame\s*\(/g, "__hf.requestAnimationFrame(")
     .replace(/\bcancelAnimationFrame\s*\(/g, "__hf.cancelAnimationFrame(")
     .replace(/\bsetTimeout\s*\(/g, "__hf.setTimeout(")
@@ -422,19 +423,39 @@ function svgSmilAdapterSource({ id, duration }) {
 `;
 }
 
-function adapterSource({ id, duration, body, runtime }) {
+export function deterministicReplayAdapterSource({
+  id,
+  duration,
+  body,
+  runtime,
+  interaction = { mode: "none", actions: [] },
+  rewriteAssets = true,
+  deferReplay = false,
+  auditAllowances = {},
+  resetRuntimeGlobals = [],
+}) {
   return `/* Generated deterministic HyperFrames adapter for ${id}. */
 (function () {
   "use strict";
   const FRAME_STEP = ${FRAME_STEP_SECONDS};
   const TRACK_CSS = ${runtime.includes("css")};
-  const SOURCE_BODY = ${JSON.stringify(rewriteLocalAssetPaths(body))};
+  const INTERACTION = ${JSON.stringify(interaction)};
+  const AUDIT_ALLOWANCES = ${JSON.stringify(auditAllowances)};
+  const RESET_RUNTIME_GLOBALS = ${JSON.stringify(resetRuntimeGlobals)};
+  const SOURCE_BODY = ${JSON.stringify(rewriteAssets ? rewriteLocalAssetPaths(body) : body)};
+  const SOURCE_BODY_ATTRIBUTES = Array.from(document.body.attributes || [])
+    .map((attribute) => [attribute.name, attribute.value]);
+  const FONT_WARMUP = document.fonts
+    ? Promise.all([...document.fonts].map((fontFace) => fontFace.load().catch(() => null)))
+    : null;
   const nativeDocumentGetAnimations = typeof document.getAnimations === "function"
     ? document.getAnimations.bind(document)
     : null;
   const NativeCSSAnimation = window.CSSAnimation;
   const NativeCSSTransition = window.CSSTransition;
   let state = null;
+  let seekGeneration = 0;
+  let renderedTime = null;
 
   function isCssManagedAnimation(animation) {
     return (NativeCSSAnimation && animation instanceof NativeCSSAnimation)
@@ -444,6 +465,27 @@ function adapterSource({ id, duration, body, runtime }) {
   if (TRACK_CSS && nativeDocumentGetAnimations) {
     document.getAnimations = (...args) => nativeDocumentGetAnimations(...args)
       .filter((animation) => !isCssManagedAnimation(animation));
+  }
+
+  function applyAuditAllowances() {
+    for (const [attribute, selectors] of Object.entries(AUDIT_ALLOWANCES)) {
+      for (const selector of selectors) {
+        for (const element of document.querySelectorAll(selector)) {
+          if (attribute !== "data-layout-ignore-text") {
+            element.setAttribute(attribute, "");
+            continue;
+          }
+          for (const node of [...element.childNodes]) {
+            if (node.nodeType !== 3 || !node.textContent?.trim()) continue;
+            const wrapper = document.createElement("span");
+            wrapper.style.display = "contents";
+            wrapper.setAttribute("data-layout-ignore", "");
+            node.replaceWith(wrapper);
+            wrapper.append(node);
+          }
+        }
+      }
+    }
   }
 
   function createState() {
@@ -457,10 +499,34 @@ function adapterSource({ id, duration, body, runtime }) {
     const nativeAdd = EventTarget.prototype.addEventListener;
     const nativeRemove = EventTarget.prototype.removeEventListener;
     const nativeGetContext = HTMLCanvasElement.prototype.getContext;
+    const NativeImage = window.Image;
     const NativeResizeObserver = window.ResizeObserver;
     const NativeIntersectionObserver = window.IntersectionObserver;
+    const NativeWheelEvent = window.WheelEvent;
+    const NativePointerEvent = window.PointerEvent;
+    const NativeMouseEvent = window.MouseEvent;
+    const nativeScrollTo = typeof window.scrollTo === "function" ? window.scrollTo.bind(window) : null;
+    const nativeRequestAnimationFrame = window.requestAnimationFrame;
+    const nativeCancelAnimationFrame = window.cancelAnimationFrame;
+    const nativeSetTimeout = window.setTimeout;
+    const nativeClearTimeout = window.clearTimeout;
+    const nativeSetInterval = window.setInterval;
+    const nativeClearInterval = window.clearInterval;
+    const nativeDateNow = Date.now;
+    const NativeWebSocket = window.WebSocket;
+    let disposed = false;
+    let runtimeGlobalsInstalled = false;
+    let actionCursor = 0;
+    let scrollExtent = null;
+    const imageReadiness = [];
 
     function trackedAdd(type, listener, options) {
+      if (this === document && type === "DOMContentLoaded" && document.readyState !== "loading") {
+        const event = new Event("DOMContentLoaded");
+        if (typeof listener === "function") listener.call(this, event);
+        else if (listener && typeof listener.handleEvent === "function") listener.handleEvent(event);
+        return;
+      }
       listeners.push({ target: this, type, listener, options });
       return nativeAdd.call(this, type, listener, options);
     }
@@ -473,6 +539,63 @@ function adapterSource({ id, duration, body, runtime }) {
       const context = nativeGetContext.call(this, type, resolvedOptions);
       if (webgl && context) webglContexts.add(context);
       return context;
+    }
+
+    function TrackedImage(...args) {
+      const image = new NativeImage(...args);
+      const readiness = new Promise((resolve) => {
+        const settle = (event) => {
+          nativeRemove.call(image, "load", settle);
+          nativeRemove.call(image, "error", settle);
+          if (disposed) {
+            event.stopImmediatePropagation?.();
+            resolve();
+            return;
+          }
+          const restoreAfterEvent = !runtimeGlobalsInstalled;
+          installRuntimeGlobals();
+          nativeSetTimeout(() => {
+            if (restoreAfterEvent) restoreRuntimeGlobals();
+            resolve();
+          }, 0);
+        };
+        nativeAdd.call(image, "load", settle);
+        nativeAdd.call(image, "error", settle);
+      });
+      imageReadiness.push({ image, readiness });
+      return image;
+    }
+    if (NativeImage) {
+      TrackedImage.prototype = NativeImage.prototype;
+      Object.setPrototypeOf(TrackedImage, NativeImage);
+    }
+
+    function installRuntimeGlobals() {
+      if (runtimeGlobalsInstalled) return;
+      runtimeGlobalsInstalled = true;
+      window.requestAnimationFrame = api.requestAnimationFrame;
+      window.cancelAnimationFrame = api.cancelAnimationFrame;
+      window.setTimeout = api.setTimeout;
+      window.clearTimeout = api.clearTimeout;
+      window.setInterval = api.setInterval;
+      window.clearInterval = api.clearInterval;
+      if (NativeImage) window.Image = TrackedImage;
+      Date.now = api.dateNow;
+      window.WebSocket = undefined;
+    }
+
+    function restoreRuntimeGlobals() {
+      if (!runtimeGlobalsInstalled) return;
+      runtimeGlobalsInstalled = false;
+      window.requestAnimationFrame = nativeRequestAnimationFrame;
+      window.cancelAnimationFrame = nativeCancelAnimationFrame;
+      window.setTimeout = nativeSetTimeout;
+      window.clearTimeout = nativeClearTimeout;
+      window.setInterval = nativeSetInterval;
+      window.clearInterval = nativeClearInterval;
+      if (window.Image === TrackedImage) window.Image = NativeImage;
+      Date.now = nativeDateNow;
+      window.WebSocket = NativeWebSocket;
     }
 
     class DeterministicResizeObserver {
@@ -516,10 +639,59 @@ function adapterSource({ id, duration, body, runtime }) {
       takeRecords() { return []; }
     }
 
+    function smoothstep(value) {
+      const clamped = Math.max(0, Math.min(1, value));
+      return clamped * clamped * (3 - 2 * clamped);
+    }
+
+    function dispatchWheel(deltaY) {
+      if (!NativeWheelEvent) return;
+      window.dispatchEvent(new NativeWheelEvent("wheel", {
+        bubbles: true,
+        cancelable: true,
+        deltaY,
+        deltaMode: 0,
+      }));
+    }
+
+    function dispatchPointer(time) {
+      const progress = smoothstep(time / Math.max(FRAME_STEP, INTERACTION.duration || api.duration));
+      const inverse = 1 - progress;
+      const points = INTERACTION.pointerPath || [
+        [0.12, 0.65], [0.32, 0.18], [0.72, 0.82], [0.88, 0.36],
+      ];
+      const x = (
+        inverse * inverse * inverse * points[0][0]
+        + 3 * inverse * inverse * progress * points[1][0]
+        + 3 * inverse * progress * progress * points[2][0]
+        + progress * progress * progress * points[3][0]
+      ) * window.innerWidth;
+      const y = (
+        inverse * inverse * inverse * points[0][1]
+        + 3 * inverse * inverse * progress * points[1][1]
+        + 3 * inverse * progress * progress * points[2][1]
+        + progress * progress * progress * points[3][1]
+      ) * window.innerHeight;
+      const target = document.elementFromPoint(x, y) || document.body;
+      const init = { bubbles: true, cancelable: true, clientX: x, clientY: y };
+      if (NativePointerEvent) target.dispatchEvent(new NativePointerEvent("pointermove", init));
+      if (NativeMouseEvent) target.dispatchEvent(new NativeMouseEvent("mousemove", init));
+    }
+
+    function dispatchAction(action) {
+      if (action.type === "wheel") {
+        dispatchWheel(Number(action.deltaY) || 480);
+        return;
+      }
+      const targets = document.querySelectorAll(action.selector || "body");
+      const target = targets[Math.max(0, Number(action.index) || 0)] || targets[0];
+      if (target && typeof target.click === "function") target.click();
+    }
+
     const api = {
       time: 0,
       duration: ${duration},
-      seek(time) { renderAt(time); },
+      seek(time) { return queueSeek(time); },
       random() {
         seed |= 0;
         seed = (seed + 0x6d2b79f5) | 0;
@@ -567,7 +739,38 @@ function adapterSource({ id, duration, body, runtime }) {
           try { animation.currentTime = Math.max(0, target - startedAt) * 1000; } catch {}
         }
       },
+      applyInteraction(target) {
+        if (INTERACTION.mode === "scroll") {
+          const progress = smoothstep(
+            (target + (Number(INTERACTION.startAt) || 0))
+              / Math.max(FRAME_STEP, INTERACTION.duration || api.duration),
+          );
+          scrollExtent = Math.max(
+            scrollExtent ?? 0,
+            0,
+            document.documentElement.scrollHeight - window.innerHeight,
+            document.body.scrollHeight - window.innerHeight,
+          );
+          const maxScroll = scrollExtent;
+          const scrollY = Math.max(0, maxScroll * progress);
+          if (nativeScrollTo) nativeScrollTo(0, scrollY);
+          document.documentElement.scrollTop = scrollY;
+          document.body.scrollTop = scrollY;
+          document.body.dispatchEvent(new Event("scroll"));
+          window.dispatchEvent(new Event("scroll"));
+          window.ScrollSmoother?.get?.()?.scrollTop?.(scrollY);
+        } else if (INTERACTION.mode === "pointer") {
+          dispatchPointer(target);
+        }
+        const actions = INTERACTION.actions || [];
+        while (actionCursor < actions.length && actions[actionCursor].at <= target + 1e-9) {
+          dispatchAction(actions[actionCursor++]);
+        }
+      },
       dispose() {
+        disposed = true;
+        try { window.ScrollTrigger?.disable?.(true, true); } catch {}
+        restoreRuntimeGlobals();
         if (EventTarget.prototype.addEventListener === trackedAdd) {
           EventTarget.prototype.addEventListener = nativeAdd;
         }
@@ -589,7 +792,7 @@ function adapterSource({ id, duration, body, runtime }) {
         webglContexts.clear();
         tasks.clear();
       },
-      runTo(target) {
+      runTasksTo(target) {
         let guard = 0;
         while (guard++ < 100000) {
           const due = [...tasks.values()]
@@ -607,6 +810,98 @@ function adapterSource({ id, duration, body, runtime }) {
         }
         api.time = target;
       },
+      async runTo(target, isCurrent, from = -FRAME_STEP) {
+        const step = (time) => {
+          if (!isCurrent()) return false;
+          installRuntimeGlobals();
+          try {
+            api.time = time;
+            if (INTERACTION.mode === "scroll") api.runTasksTo(time);
+            api.applyInteraction(time);
+            if (INTERACTION.mode !== "scroll") api.runTasksTo(time);
+            api.seekAnimations(time);
+          } finally {
+            restoreRuntimeGlobals();
+          }
+          return isCurrent();
+        };
+        if (target < from - 1e-9) return step(target);
+        const frameCount = Math.floor(target / FRAME_STEP + 1e-9);
+        let frameTime = from;
+        const firstFrame = Math.max(0, Math.floor(from / FRAME_STEP + 1e-9) + 1);
+        for (let frame = firstFrame; frame <= frameCount; frame += 1) {
+          frameTime = frame * FRAME_STEP;
+          if (!step(frameTime)) return false;
+          if (INTERACTION.mode !== "scroll") await Promise.resolve();
+        }
+        if (target > frameTime + 1e-9) {
+          if (!step(target)) return false;
+          if (INTERACTION.mode !== "scroll") await Promise.resolve();
+        }
+        return true;
+      },
+      runToAsync(target, isCurrent) {
+        return new Promise((resolve, reject) => {
+          installRuntimeGlobals();
+          try {
+            api.time = 0;
+            api.applyInteraction(0);
+            api.runTasksTo(0);
+            api.seekAnimations(0);
+          } finally {
+            restoreRuntimeGlobals();
+          }
+          async function replay() {
+            if (!isCurrent()) {
+              restoreRuntimeGlobals();
+              resolve(false);
+              return;
+            }
+            try {
+              scrollExtent = Math.max(
+                0,
+                document.documentElement.scrollHeight,
+                document.body.scrollHeight,
+              ) - window.innerHeight;
+              resolve(await api.runTo(target, isCurrent));
+            } catch (error) {
+              reject(error);
+            } finally {
+              restoreRuntimeGlobals();
+            }
+          }
+          queueMicrotask(() => queueMicrotask(() => {
+            const pendingImages = imageReadiness
+              .filter(({ image }) => image.currentSrc || image.getAttribute?.("src"))
+              .map(({ readiness }) => readiness);
+            void document.body.offsetWidth;
+            const pendingFonts = document.fonts
+              ? [...document.fonts].map((fontFace) => fontFace.load().catch(() => null))
+              : [];
+            if (document.fonts) pendingFonts.push(document.fonts.ready);
+            if (window.__hfWebFontReady) pendingFonts.push(window.__hfWebFontReady);
+            Promise.all([...pendingFonts, ...pendingImages]).then(async () => {
+              await Promise.resolve();
+              if (document.fonts && document.body && typeof getComputedStyle === "function") {
+                const usedFonts = new Map();
+                for (const element of document.body.querySelectorAll("*")) {
+                  const text = element.childElementCount === 0 ? element.textContent?.trim() : "";
+                  const font = text && getComputedStyle(element).font;
+                  if (font && !usedFonts.has(font)) usedFonts.set(font, text.slice(0, 128));
+                }
+                await Promise.all([...usedFonts].map(([font, text]) =>
+                  document.fonts.load(font, text).catch(() => null)));
+                await document.fonts.ready;
+              }
+              void document.body.offsetWidth;
+              applyAuditAllowances();
+              queueMicrotask(replay);
+            }, reject).catch(reject);
+          }));
+        });
+      },
+      installRuntimeGlobals,
+      restoreRuntimeGlobals,
     };
 
     EventTarget.prototype.addEventListener = trackedAdd;
@@ -618,22 +913,93 @@ function adapterSource({ id, duration, body, runtime }) {
 
   function reset() {
     if (state) state.dispose();
+    for (const name of RESET_RUNTIME_GLOBALS) {
+      try { delete window[name]; } catch {}
+      if (Object.prototype.hasOwnProperty.call(window, name)) {
+        try { window[name] = undefined; } catch {}
+      }
+    }
+    for (const attribute of Array.from(document.body.attributes || [])) {
+      document.body.removeAttribute(attribute.name);
+    }
+    for (const [name, value] of SOURCE_BODY_ATTRIBUTES) document.body.setAttribute(name, value);
     document.body.innerHTML = SOURCE_BODY;
+    window.scrollTo?.(0, 0);
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
     state = createState();
     window.__hf = state;
-    for (const factory of window.__hfRecipeFactories || []) factory(state);
+    state.installRuntimeGlobals();
+    try {
+      for (const factory of window.__hfRecipeFactories || []) factory(state);
+    } finally {
+      state.restoreRuntimeGlobals();
+    }
+    try { window.ScrollTrigger?.enable?.(); } catch {}
+    applyAuditAllowances();
     state.captureAnimations();
   }
 
-  function renderAt(time) {
+  async function renderAt(time) {
     const target = Math.max(0, Math.min(${duration}, Number(time) || 0));
+    const generation = ++seekGeneration;
+    if (state && renderedTime !== null && Math.abs(target - renderedTime) <= 1e-9) {
+      applyAuditAllowances();
+      return true;
+    }
+    if (state && renderedTime !== null && target > renderedTime + 1e-9) {
+      const current = state;
+      const complete = await current.runTo(
+        target,
+        () => state === current && generation === seekGeneration,
+        renderedTime,
+      );
+      if (complete && state === current && generation === seekGeneration) {
+        applyAuditAllowances();
+        renderedTime = target;
+      }
+      return complete;
+    }
+    renderedTime = null;
     reset();
-    state.runTo(target);
-    state.seekAnimations(target);
+${deferReplay ? `    const current = state;
+    const complete = await current.runToAsync(
+      target,
+      () => state === current && generation === seekGeneration,
+    );` : `    const current = state;
+    const complete = await current.runTo(
+      target,
+      () => state === current && generation === seekGeneration,
+    );`}
+    if (complete && state === current && generation === seekGeneration) {
+      applyAuditAllowances();
+      renderedTime = target;
+    }
+    return complete;
   }
 
-  window.addEventListener("hf-seek", (event) => renderAt(event.detail.time));
-  renderAt(window.__hfThreeTime || 0);
+  let requestedTime = window.__hfThreeTime || 0;
+  let fontsReady = !FONT_WARMUP;
+  let pendingSeek = Promise.resolve();
+
+  function queueSeek(time) {
+    requestedTime = time;
+    pendingSeek = Promise.resolve(fontsReady ? renderAt(requestedTime) : readyForSeek);
+    return pendingSeek;
+  }
+
+  window.addEventListener("hf-seek", (event) => {
+    const completion = queueSeek(event.detail.time);
+    event.detail.waitUntil?.(completion);
+  });
+  const readyForSeek = FONT_WARMUP
+    ? FONT_WARMUP.then(() => {
+        fontsReady = true;
+        return renderAt(requestedTime);
+      })
+    : renderAt(requestedTime);
+  pendingSeek = readyForSeek;
+  window.__hfWaitForSeekCompletion = () => pendingSeek;
 })();
 `;
 }
@@ -783,7 +1149,11 @@ export async function convertRecipe({ recipesRoot, recipeDir }) {
     await writeFile(path.join(outputDir, "hf-adapter.js"), svgSmilAdapterSource({ id, duration }), "utf8");
   } else {
     await writeFile(path.join(outputDir, "hf-recipe.js"), await bundleRecipeScripts(recipeDir, blocks), "utf8");
-    await writeFile(path.join(outputDir, "hf-adapter.js"), adapterSource({ id, duration, body, runtime }), "utf8");
+    await writeFile(
+      path.join(outputDir, "hf-adapter.js"),
+      deterministicReplayAdapterSource({ id, duration, body, runtime }),
+      "utf8",
+    );
   }
 
   const html = runtime.includes("three")

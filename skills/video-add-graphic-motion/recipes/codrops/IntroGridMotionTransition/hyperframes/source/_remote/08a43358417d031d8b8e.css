@@ -1,0 +1,61 @@
+/*
+ * The Typekit service used to deliver this font or fonts for use on websites
+ * is provided by Adobe and is subject to these Terms of Use
+ * http://www.adobe.com/products/eulas/tou_typekit. For font license
+ * information, see the list below.
+ *
+ * new-science:
+ *   - http://typekit.com/eulas/00000000000000007753f71f
+ *   - http://typekit.com/eulas/00000000000000007753f725
+ *   - http://typekit.com/eulas/00000000000000007753f721
+ * new-science-extended:
+ *   - http://typekit.com/eulas/00000000000000007753f727
+ * new-science-mono:
+ *   - http://typekit.com/eulas/00000000000000007753f70a
+ *   - http://typekit.com/eulas/00000000000000007753f707
+ *
+ * © 2009-2026 Adobe Systems Incorporated. All Rights Reserved.
+ */
+/*{"last_published":"2024-05-29 10:41:51 UTC"}*/
+
+@import url("/source/_remote/f74f7c40052033b1602a.css");
+
+@font-face {
+font-family:"new-science";
+src:url("/source/_remote/0ef985ce95d3b21e96a1.woff2") format("woff2"),url("/source/_remote/430f44d47769bd16718a.woff") format("woff"),url("/source/_remote/3ec3e2f31fa25e86f173.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:300;font-stretch:normal;
+}
+
+@font-face {
+font-family:"new-science";
+src:url("/source/_remote/893ecdb66c903210c71b.woff2") format("woff2"),url("/source/_remote/225484030d9d363d22c8.woff") format("woff"),url("/source/_remote/e992e39fa6251816a307.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:700;font-stretch:normal;
+}
+
+@font-face {
+font-family:"new-science";
+src:url("/source/_remote/47524e8d9d3d7632df46.woff2") format("woff2"),url("/source/_remote/490e6b7a00b586c7199d.woff") format("woff"),url("/source/_remote/15a2b0341902c80b175e.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"new-science-extended";
+src:url("/source/_remote/86ada0313da18f0f1fb7.woff2") format("woff2"),url("/source/_remote/6fc93a926bc392ca7c95.woff") format("woff"),url("/source/_remote/b88832d66ade21578f92.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"new-science-mono";
+src:url("/source/_remote/24840a49e14dc0e72ff6.woff2") format("woff2"),url("/source/_remote/c19e284c5dd462b8788c.woff") format("woff"),url("/source/_remote/71de26bfb76bbd5678a7.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:700;font-stretch:normal;
+}
+
+@font-face {
+font-family:"new-science-mono";
+src:url("/source/_remote/15aeb00cd217bed25e1d.woff2") format("woff2"),url("/source/_remote/e14cbe6809d684647073.woff") format("woff"),url("/source/_remote/4066e1c5ec9b366e14ff.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+.tk-new-science { font-family: "new-science",sans-serif; }
+.tk-new-science-extended { font-family: "new-science-extended",sans-serif; }
+.tk-new-science-mono { font-family: "new-science-mono",sans-serif; }

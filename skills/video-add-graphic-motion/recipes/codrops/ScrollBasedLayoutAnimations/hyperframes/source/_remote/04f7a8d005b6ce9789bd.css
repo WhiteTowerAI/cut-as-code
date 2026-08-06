@@ -1,0 +1,36 @@
+/*
+ * The Typekit service used to deliver this font or fonts for use on websites
+ * is provided by Adobe and is subject to these Terms of Use
+ * http://www.adobe.com/products/eulas/tou_typekit. For font license
+ * information, see the list below.
+ *
+ * tenon:
+ *   - http://typekit.com/eulas/00000000000000007735ec19
+ *   - http://typekit.com/eulas/00000000000000007735ec15
+ *   - http://typekit.com/eulas/00000000000000007735ec18
+ *
+ * © 2009-2026 Adobe Systems Incorporated. All Rights Reserved.
+ */
+/*{"last_published":"2023-07-16 22:44:26 UTC"}*/
+
+@import url("/source/_remote/b893982910533d0f3e9d.css");
+
+@font-face {
+font-family:"tenon";
+src:url("/source/_remote/5cdea24f3da0a385ff6c.woff2") format("woff2"),url("/source/_remote/eaceea633ef02168e352.woff") format("woff"),url("/source/_remote/f200e6a4c9430690951e.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:300;font-stretch:normal;
+}
+
+@font-face {
+font-family:"tenon";
+src:url("/source/_remote/476f83405f2277be2667.woff2") format("woff2"),url("/source/_remote/f5d8018af226ea6bcd18.woff") format("woff"),url("/source/_remote/622f1ff9fcca81f1b42d.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"tenon";
+src:url("/source/_remote/6609aef2b1a5ef45f714.woff2") format("woff2"),url("/source/_remote/57e061efa9ac0dd83006.woff") format("woff"),url("/source/_remote/646fe938b24b779e3e37.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:700;font-stretch:normal;
+}
+
+.tk-tenon { font-family: "tenon",sans-serif; }
