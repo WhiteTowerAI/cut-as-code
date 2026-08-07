@@ -268,10 +268,12 @@ def main():
     ffprobe = resolve_tool("ffprobe", args.ffprobe) if args.ffprobe else shutil.which("ffprobe")
     video_duration = probe_video_duration(video_path, ffprobe)
     duration = transcript_duration(transcript, video_duration)
-    if args.timeline and video_duration is not None and abs(video_duration - duration) > 0.1:
+    if args.timeline and video_duration is not None and abs(
+        video_duration - float(timeline["source_duration_s"])
+    ) > 0.1:
         fail(
-            f"program transcript duration {duration:.3f}s does not match final video "
-            f"duration {video_duration:.3f}s"
+            f"project source duration {video_duration:.3f}s does not match timeline source "
+            f"duration {float(timeline['source_duration_s']):.3f}s"
         )
     metadata.update({"video": str(video_path), "duration_s": round(duration, 3)})
     stats = minute_stats(transcript, duration)

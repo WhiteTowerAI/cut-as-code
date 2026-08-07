@@ -116,9 +116,28 @@ export async function auditConvertedRecipes(recipesRoot) {
 
   for (const recipe of recipes) {
     const outputDir = path.join(recipe.recipeDir, "hyperframes");
-    const indexPath = path.join(outputDir, "index.html");
     const receiptPath = path.join(outputDir, "conversion.json");
-    if (!(await fileExists(indexPath)) || !(await fileExists(receiptPath))) {
+    if (!(await fileExists(receiptPath))) {
+      errors.push(`${recipe.id}: missing converted index or receipt`);
+      continue;
+    }
+
+    let receipt;
+    try {
+      receipt = JSON.parse(await readFile(receiptPath, "utf8"));
+    } catch (error) {
+      errors.push(`${recipe.id}: conversion receipt is invalid JSON (${error.message})`);
+      continue;
+    }
+
+    const receiptVariant = Array.isArray(receipt.variants)
+      ? receipt.variants.find((variant) => variant.composition_id === recipe.id) || receipt.variants[0]
+      : null;
+    const indexPath = receiptVariant?.output
+      ? path.join(outputDir, ...receiptVariant.output.split("/"))
+      : path.join(outputDir, "index.html");
+    const artifactDir = path.dirname(indexPath);
+    if (!(await fileExists(indexPath))) {
       errors.push(`${recipe.id}: missing converted index or receipt`);
       continue;
     }
@@ -134,24 +153,29 @@ export async function auditConvertedRecipes(recipesRoot) {
       errors.push(`${recipe.id}: converted entry contains a remote active reference`);
     }
     for (const reference of activeLocalReferences(html)) {
-      if (!(await fileExists(path.resolve(outputDir, reference)))) {
+      if (!(await fileExists(path.resolve(artifactDir, reference)))) {
         errors.push(`${recipe.id}: missing local reference ${reference}`);
       }
     }
 
-    let receipt;
-    try {
-      receipt = JSON.parse(await readFile(receiptPath, "utf8"));
-    } catch (error) {
-      errors.push(`${recipe.id}: conversion receipt is invalid JSON (${error.message})`);
-      continue;
-    }
-    if (receipt.recipe_id !== recipe.id || receipt.source_manifest_sha256 !== sha256(recipe.manifest)) {
+    if (receiptVariant) {
+      const copiedManifestPath = path.join(
+        outputDir,
+        receipt.source_copy || "source",
+        "recipe.motion.yaml",
+      );
+      const copiedManifest = (await fileExists(copiedManifestPath))
+        ? await readFile(copiedManifestPath, "utf8")
+        : "";
+      if (receiptVariant.composition_id !== recipe.id || sha256(copiedManifest) !== sha256(recipe.manifest)) {
+        errors.push(`${recipe.id}: conversion receipt does not bind the current manifest`);
+      }
+    } else if (receipt.recipe_id !== recipe.id || receipt.source_manifest_sha256 !== sha256(recipe.manifest)) {
       errors.push(`${recipe.id}: conversion receipt does not bind the current manifest`);
     }
 
     for (const name of ["hf-recipe.js", "hf-adapter.js"]) {
-      const scriptPath = path.join(outputDir, name);
+      const scriptPath = path.join(artifactDir, name);
       if (!(await fileExists(scriptPath))) continue;
       const script = await readFile(scriptPath, "utf8");
       if (!(name === "hf-recipe.js" && recipe.runtime.includes("three"))) {
@@ -166,7 +190,7 @@ export async function auditConvertedRecipes(recipesRoot) {
       }
     }
 
-    const generatedRecipePath = path.join(outputDir, "hf-recipe.js");
+    const generatedRecipePath = path.join(artifactDir, "hf-recipe.js");
     const generatedRecipe = (await fileExists(generatedRecipePath))
       ? await readFile(generatedRecipePath, "utf8")
       : "";
@@ -947,7 +971,7 @@ export function deterministicReplayAdapterSource({
       applyAuditAllowances();
       return true;
     }
-    if (state && renderedTime !== null && target > renderedTime + 1e-9) {
+    if (state && renderedTime !== null && (target > renderedTime + 1e-9 || INTERACTION.bidirectionalSeek)) {
       const current = state;
       const complete = await current.runTo(
         target,

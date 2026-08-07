@@ -15,29 +15,29 @@
  */
 /*{"last_published":"2023-09-27 09:35:46 UTC"}*/
 
-@import url("/source/_remote/ab5ed44a8fa89b72a818.css");
+@import url("ab5ed44a8fa89b72a818.css");
 
 @font-face {
 font-family:"anonymous-pro";
-src:url("/source/_remote/45b5fae77085c8e9185c.woff2") format("woff2"),url("/source/_remote/02c0121c637e21079bcd.woff") format("woff"),url("/source/_remote/c09a054f2ac6d9c38b5a.otf") format("opentype");
+src:url("45b5fae77085c8e9185c.woff2") format("woff2"),url("02c0121c637e21079bcd.woff") format("woff"),url("c09a054f2ac6d9c38b5a.otf") format("opentype");
 font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
 }
 
 @font-face {
 font-family:"anonymous-pro";
-src:url("/source/_remote/826cbada3dbfde81d3a8.woff2") format("woff2"),url("/source/_remote/fb860f280f68dcb5d8b0.woff") format("woff"),url("/source/_remote/9362f074b411ae15c2b4.otf") format("opentype");
+src:url("826cbada3dbfde81d3a8.woff2") format("woff2"),url("fb860f280f68dcb5d8b0.woff") format("woff"),url("9362f074b411ae15c2b4.otf") format("opentype");
 font-display:auto;font-style:normal;font-weight:700;font-stretch:normal;
 }
 
 @font-face {
 font-family:"area-normal";
-src:url("/source/_remote/ee1be03c26cd59299378.woff2") format("woff2"),url("/source/_remote/e3df738be4df451098d9.woff") format("woff"),url("/source/_remote/df1c86062dc2d2bd64b0.otf") format("opentype");
+src:url("ee1be03c26cd59299378.woff2") format("woff2"),url("e3df738be4df451098d9.woff") format("woff"),url("df1c86062dc2d2bd64b0.otf") format("opentype");
 font-display:auto;font-style:normal;font-weight:700;font-stretch:normal;
 }
 
 @font-face {
 font-family:"area-normal";
-src:url("/source/_remote/a7c1ec851e7b3217ab1a.woff2") format("woff2"),url("/source/_remote/211f7efeea0bf3b24158.woff") format("woff"),url("/source/_remote/6ef29a1a4fd437881871.otf") format("opentype");
+src:url("a7c1ec851e7b3217ab1a.woff2") format("woff2"),url("211f7efeea0bf3b24158.woff") format("woff"),url("6ef29a1a4fd437881871.otf") format("opentype");
 font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
 }
 

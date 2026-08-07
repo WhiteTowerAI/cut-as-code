@@ -6,12 +6,13 @@
   const TRACK_CSS = true;
   const INTERACTION = {"mode":"scroll","duration":8,"actions":[]};
   const AUDIT_ALLOWANCES = {"data-layout-allow-overlap":[".char",".word",".oh",".oh__inner","[data-splitting]"],"data-layout-allow-occlusion":[".oh__inner"]};
+  const RESET_RUNTIME_GLOBALS = [];
   const SOURCE_BODY = "\n\t\t<main>\n\t\t\t<div class=\"frame\">\n\t\t\t\t<h1 class=\"frame__title\">On-Scroll Column & Row Animations</h1> \n\t\t\t\t<a class=\"frame__back\" href=\"https://tympanus.net/codrops/?p=73182\">Article</a>\n\t\t\t\t<a class=\"frame__prev\" href=\"https://tympanus.net/Development/Scroll3DGrid/\">Previous demo</a>\n\t\t\t\t<nav class=\"frame__demos\">\n\t\t\t\t\t<span class=\"frame__demos-item\">Variations: </span>\n\t\t\t\t\t<a class=\"frame__demos-item\" href=\"index.html\">1</a>\n\t\t\t\t\t<a class=\"frame__demos-item\" href=\"index2.html\">2</a>\n\t\t\t\t\t<a class=\"frame__demos-item\" href=\"index3.html\">3</a>\n\t\t\t\t\t<a class=\"frame__demos-item\" href=\"index4.html\">4</a>\n\t\t\t\t\t<a class=\"frame__demos-item\" href=\"index5.html\">5</a>\n\t\t\t\t\t<a class=\"frame__demos-item\" href=\"index6.html\">6</a>\n\t\t\t\t\t<a class=\"frame__demos-item\" href=\"index7.html\">7</a>\n\t\t\t\t\t<a class=\"frame__demos-item\" href=\"index8.html\">8</a>\n                    <span class=\"frame__demos-item\">9</span>\n\t\t\t\t\t<a class=\"frame__demos-item\" href=\"index10.html\">10</a>\n\t\t\t\t</nav>\n\t\t\t</div>\n\t\t\t<div class=\"columns\">\n\t\t       <div class=\"column\">\n\t\t            <figure class=\"column__item\">\n\t\t                <div class=\"column__item-imgwrap\">\n\t\t                    <div class=\"column__item-img\" style=\"background-image:url(img/35.jpg)\"></div>\n\t\t                </div>\n\t\t            </figure>\n\t\t            <figure class=\"column__item\">\n\t\t                <div class=\"column__item-imgwrap\">\n\t\t                    <div class=\"column__item-img\" style=\"background-image:url(img/6.jpg)\"></div>\n\t\t                </div>\n\t\t            </figure>\n\t\t            <figure class=\"column__item\">\n\t\t                <div class=\"column__item-imgwrap\">\n\t\t                    <div class=\"column__item-img\" style=\"background-image:url(img/34.jpg)\"></div>\n\t\t                </div>\n\t\t            </figure>\n\t\t            <figure class=\"column__item\">\n\t\t                <div class=\"column__item-imgwrap\">\n\t\t                    <div class=\"column__item-img\" style=\"background-image:url(img/40.jpg)\"></div>\n\t\t                </div>\n\t\t            </figure>\n\t\t            <figure class=\"column__item\">\n\t\t                <div class=\"column__item-imgwrap\">\n\t\t                    <div class=\"column__item-img\" style=\"background-image:url(img/33.jpg)\"></div>\n\t\t                </div>\n\t\t            </figure>\n\t\t            <figure class=\"column__item\">\n\t\t                <div class=\"column__item-imgwrap\">\n\t\t                    <div class=\"column__item-img\" style=\"background-image:url(img/32.jpg)\"></div>\n\t\t                </div>\n\t\t            </figure>\n\t\t            <figure class=\"column__item\">\n\t\t                <div class=\"column__item-imgwrap\">\n\t\t                    <div class=\"column__item-img\" style=\"background-image:url(img/31.jpg)\"></div>\n\t\t                </div>\n\t\t            </figure>\n\t\t            <figure class=\"column__item\">\n\t\t                <div class=\"column__item-imgwrap\">\n\t\t                    <div class=\"column__item-img\" style=\"background-image:url(img/30.jpg)\"></div>\n\t\t                </div>\n\t\t            </figure>\n\t\t        </div><!-- /column -->\n\t\t        <div class=\"column\">\n\t\t            <figure class=\"column__item\">\n\t\t                <div class=\"column__item-imgwrap\">\n\t\t                    <div class=\"column__item-img\" style=\"background-image:url(img/17.jpg)\"></div>\n\t\t                </div>\n\t\t            </figure>\n\t\t            <figure class=\"column__item\">\n\t\t                <div class=\"column__item-imgwrap\">\n\t\t                    <div class=\"column__item-img\" style=\"background-image:url(img/18.jpg)\"></div>\n\t\t                </div>\n\t\t            </figure>\n\t\t            <figure class=\"column__item\">\n\t\t                <div class=\"column__item-imgwrap\">\n\t\t                    <div class=\"column__item-img\" style=\"background-image:url(img/19.jpg)\"></div>\n\t\t                </div>\n\t\t            </figure>\n\t\t            <figure class=\"column__item\">\n\t\t                <div class=\"column__item-imgwrap\">\n\t\t                    <div class=\"column__item-img\" style=\"background-image:url(img/20.jpg)\"></div>\n\t\t                </div>\n\t\t            </figure>\n\t\t            <figure class=\"column__item\">\n\t\t                <div class=\"column__item-imgwrap\">\n\t\t                    <div class=\"column__item-img\" style=\"background-image:url(img/21.jpg)\"></div>\n\t\t                </div>\n\t\t            </figure>\n\t\t            <figure class=\"column__item\">\n\t\t                <div class=\"column__item-imgwrap\">\n\t\t                    <div class=\"column__item-img\" style=\"background-image:url(img/1.jpg)\"></div>\n\t\t                </div>\n\t\t            </figure>\n\t\t            <figure class=\"column__item\">\n\t\t                <div class=\"column__item-imgwrap\">\n\t\t                    <div class=\"column__item-img\" style=\"background-image:url(img/2.jpg)\"></div>\n\t\t                </div>\n\t\t            </figure>\n\t\t            <figure class=\"column__item\">\n\t\t                <div class=\"column__item-imgwrap\">\n\t\t                    <div class=\"column__item-img\" style=\"background-image:url(img/3.jpg)\"></div>\n\t\t                </div>\n\t\t            </figure>\n\t\t        </div><!-- /column -->\n\t\t\t\t<div class=\"column\">\n\t\t            <figure class=\"column__item\">\n\t\t                <div class=\"column__item-imgwrap\">\n\t\t                    <div class=\"column__item-img\" style=\"background-image:url(img/10.jpg)\"></div>\n\t\t                </div>\n\t\t            </figure>\n\t\t            <figure class=\"column__item\">\n\t\t                <div class=\"column__item-imgwrap\">\n\t\t                    <div class=\"column__item-img\" style=\"background-image:url(img/11.jpg)\"></div>\n\t\t                </div>\n\t\t            </figure>\n\t\t            <figure class=\"column__item\">\n\t\t                <div class=\"column__item-imgwrap\">\n\t\t                    <div class=\"column__item-img\" style=\"background-image:url(img/12.jpg)\"></div>\n\t\t                </div>\n\t\t            </figure>\n\t\t            <figure class=\"column__item\">\n\t\t                <div class=\"column__item-imgwrap\">\n\t\t                    <div class=\"column__item-img\" style=\"background-image:url(img/13.jpg)\"></div>\n\t\t                </div>\n\t\t            </figure>\n\t\t            <figure class=\"column__item\">\n\t\t                <div class=\"column__item-imgwrap\">\n\t\t                    <div class=\"column__item-img\" style=\"background-image:url(img/14.jpg)\"></div>\n\t\t                </div>\n\t\t            </figure>\n\t\t            <figure class=\"column__item\">\n\t\t                <div class=\"column__item-imgwrap\">\n\t\t                    <div class=\"column__item-img\" style=\"background-image:url(img/15.jpg)\"></div>\n\t\t                </div>\n\t\t            </figure>\n\t\t            <figure class=\"column__item\">\n\t\t                <div class=\"column__item-imgwrap\">\n\t\t                    <div class=\"column__item-img\" style=\"background-image:url(img/16.jpg)\"></div>\n\t\t                </div>\n\t\t            </figure>\n\t\t            <figure class=\"column__item\">\n\t\t                <div class=\"column__item-imgwrap\">\n\t\t                    <div class=\"column__item-img\" style=\"background-image:url(img/17.jpg)\"></div>\n\t\t                </div>\n\t\t            </figure>\n\t\t        </div><!-- /column -->\n\t\t\t</div><!-- columns -->\n\t\t\t<section class=\"outro\">\n\t\t\t\t<h2 class=\"outro__title\">More you might like</h2>\n\t\t\t\t<div class=\"card-wrap\">\n\t\t\t\t\t<div class=\"card\">\n\t\t\t\t\t\t<a href=\"https://tympanus.net/Development/TileScroll/\" class=\"card__image\" style=\"background-image:none\"></a>\n\t\t\t\t\t\t<h3 class=\"card__title\"><a href=\"https://tympanus.net/Development/ColumnScroll/\">On-Scroll SVG Filter Effect</a></h3>\n\t\t\t\t\t</div>\n\t\t\t\t</div>\n\t\t\t</section>\n\t\t\t<p class=\"credits\">Made by <a href=\"https://twitter.com/codrops\">@codrops</a></p>\n\t\t</main>\n\t\t\n\t\t\n\t\t\n\t\t\n\t\t\n\t\t\n\t";
-  const SOURCE_BODY_ATTRIBUTES = [...document.body.attributes]
+  const SOURCE_BODY_ATTRIBUTES = Array.from(document.body.attributes || [])
     .map((attribute) => [attribute.name, attribute.value]);
   const FONT_WARMUP = document.fonts
     ? Promise.all([...document.fonts].map((fontFace) => fontFace.load().catch(() => null)))
-    : Promise.resolve();
+    : null;
   const nativeDocumentGetAnimations = typeof document.getAnimations === "function"
     ? document.getAnimations.bind(document)
     : null;
@@ -389,6 +390,7 @@
           }
           return isCurrent();
         };
+        if (target < from - 1e-9) return step(target);
         const frameCount = Math.floor(target / FRAME_STEP + 1e-9);
         let frameTime = from;
         const firstFrame = Math.max(0, Math.floor(from / FRAME_STEP + 1e-9) + 1);
@@ -476,13 +478,19 @@
 
   function reset() {
     if (state) state.dispose();
-    for (const attribute of [...document.body.attributes]) {
+    for (const name of RESET_RUNTIME_GLOBALS) {
+      try { delete window[name]; } catch {}
+      if (Object.prototype.hasOwnProperty.call(window, name)) {
+        try { window[name] = undefined; } catch {}
+      }
+    }
+    for (const attribute of Array.from(document.body.attributes || [])) {
       document.body.removeAttribute(attribute.name);
     }
     for (const [name, value] of SOURCE_BODY_ATTRIBUTES) document.body.setAttribute(name, value);
     document.body.innerHTML = SOURCE_BODY;
-    window.scrollTo(0, 0);
-    document.documentElement.scrollTop = 0;
+    window.scrollTo?.(0, 0);
+    if (document.documentElement) document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
     state = createState();
     window.__hf = state;
@@ -504,7 +512,7 @@
       applyAuditAllowances();
       return true;
     }
-    if (state && renderedTime !== null && target > renderedTime + 1e-9) {
+    if (state && renderedTime !== null && (target > renderedTime + 1e-9 || INTERACTION.bidirectionalSeek)) {
       const current = state;
       const complete = await current.runTo(
         target,
@@ -532,7 +540,7 @@
   }
 
   let requestedTime = window.__hfThreeTime || 0;
-  let fontsReady = false;
+  let fontsReady = !FONT_WARMUP;
   let pendingSeek = Promise.resolve();
 
   function queueSeek(time) {
@@ -545,10 +553,12 @@
     const completion = queueSeek(event.detail.time);
     event.detail.waitUntil?.(completion);
   });
-  const readyForSeek = FONT_WARMUP.then(() => {
-    fontsReady = true;
-    return renderAt(requestedTime);
-  });
+  const readyForSeek = FONT_WARMUP
+    ? FONT_WARMUP.then(() => {
+        fontsReady = true;
+        return renderAt(requestedTime);
+      })
+    : renderAt(requestedTime);
   pendingSeek = readyForSeek;
   window.__hfWaitForSeekCompletion = () => pendingSeek;
 })();

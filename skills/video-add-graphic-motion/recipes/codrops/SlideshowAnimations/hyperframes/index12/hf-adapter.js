@@ -504,7 +504,7 @@
       applyAuditAllowances();
       return true;
     }
-    if (state && renderedTime !== null && target > renderedTime + 1e-9) {
+    if (state && renderedTime !== null && (target > renderedTime + 1e-9 || INTERACTION.bidirectionalSeek)) {
       const current = state;
       const complete = await current.runTo(
         target,

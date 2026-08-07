@@ -23,7 +23,7 @@ CONTRIBUTION_KINDS = {
     "output-constraint",
 }
 CANONICAL_PIXEL_ORDER = (
-    "cut", "color-grade", "b-roll", "graphic-motion", "content-cards", "captions",
+    "cut", "color-grade", "b-roll", "captions", "content-cards", "graphic-motion",
 )
 POINT_WORD_DURATION_S = 0.001
 
@@ -1253,7 +1253,9 @@ def build_render_plan(project, project_root):
             required_dependencies = [
                 "understanding",
                 *[
-                    dependency for dependency in ("cut", "color-grade", "b-roll")
+                    dependency for dependency in (
+                        "cut", "color-grade", "b-roll", "captions", "content-cards",
+                    )
                     if dependency in sequence.get("operations", []) and dependency in operations
                 ],
             ]

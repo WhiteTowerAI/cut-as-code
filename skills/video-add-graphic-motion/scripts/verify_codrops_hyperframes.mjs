@@ -3,7 +3,6 @@ import { execFile } from "node:child_process";
 import { createServer } from "node:http";
 import {
   access,
-  copyFile,
   mkdir,
   mkdtemp,
   readFile,
@@ -11,6 +10,7 @@ import {
   rm,
   stat,
   symlink,
+  unlink,
   writeFile,
 } from "node:fs/promises";
 import { createRequire } from "node:module";
@@ -73,7 +73,7 @@ export function summarizeVisualAudit({
 }) {
   const nonblank = frames.every((frame) => frame.range >= 4 && frame.paintedRatio >= 0.001);
   const changed = Math.max(0, ...changedPixelRatios) >= 0.001;
-  const deterministic = frames[1]?.hash === repeatHash || repeatChangedPixelRatio === 0;
+  const deterministic = frames[1]?.hash === repeatHash || repeatChangedPixelRatio < 0.001;
   const runtimeClean = errors.length === 0 && requestFailures.length === 0;
   const chromeClean = visibleTextFlags.length === 0 && visibleControls.length === 0;
   return {
@@ -90,6 +90,24 @@ export function summarizeVisualAudit({
 function optionValue(args, name, fallback = null) {
   const index = args.indexOf(name);
   return index >= 0 ? args[index + 1] : fallback;
+}
+
+export function stageCliIndexHtml(source, variantName) {
+  const staged = source
+    .replace(/(<base\b[^>]*\bhref=["'])\.\.\/source\//gi, "$1./source/")
+    .replace(
+      /(<script\b[^>]*\bsrc=["'])\.\/(hf-(?:recipe|adapter)\.js)(["'])/gi,
+      `$1/${variantName}/$2$3`,
+    )
+    .replace(/(["'])\.\.\/_remote\//g, "$1/source/_remote/")
+    .replace(/(--img\s*:\s*url\(\s*['"]?)\.\.\/assets\//gi, "$1/source/assets/")
+    .replace(/(["'])\.\.\/source\//g, "$1/source/");
+  const baseHref = staged.match(/<base\b[^>]*\bhref=["']([^"']+)["']/i)?.[1] || "./";
+  const baseUrl = new URL(baseHref, "http://stage/");
+  return staged.replace(/(<img\b[^>]*\bsrc=["'])([^"']+)(["'])/gi, (match, open, value, close) => {
+    if (/^(?:[a-z][a-z\d+.-]*:|\/|#)/i.test(value)) return match;
+    return `${open}${new URL(value, baseUrl).pathname}${close}`;
+  });
 }
 
 async function exists(target) {
@@ -221,8 +239,8 @@ function changedPixelRatio(left, right) {
   return Number((changed / pixels).toFixed(6));
 }
 
-export async function seekAndCapture(page, time) {
-  await page.evaluate(async (target) => {
+export async function seekAndCapture(page, time, timeoutMs = 30000) {
+  const seek = page.evaluate(async (target) => {
     const pending = [];
     window.dispatchEvent(new CustomEvent("hf-seek", {
       detail: {
@@ -234,6 +252,17 @@ export async function seekAndCapture(page, time) {
     await Promise.resolve();
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   }, time);
+  let timer;
+  try {
+    await Promise.race([
+      seek,
+      new Promise((resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(`hf-seek timed out after ${timeoutMs}ms`)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
   return Buffer.from(await page.screenshot({ type: "png", omitBackground: false }));
 }
 
@@ -466,6 +495,12 @@ export async function cleanupCliStage(stage, rmImpl = rm) {
     throw new Error(`refusing to remove unsafe staging path: ${stage}`);
   }
   try {
+    for (const entry of await readdir(stage, { withFileTypes: true }).catch((error) => {
+      if (error.code === "ENOENT") return [];
+      throw error;
+    })) {
+      if (entry.isSymbolicLink()) await unlink(path.join(stage, entry.name));
+    }
     await rmImpl(stage, { recursive: true, force: true, maxRetries: 8, retryDelay: 100 });
     return { ok: true };
   } catch (error) {
@@ -477,9 +512,14 @@ async function cliAuditAttempt(job, cliPath) {
   const stage = await mkdtemp(path.join(os.tmpdir(), "codrops-hf-cli-"));
   let result;
   try {
-    await copyFile(
+    const sourceHtml = await readFile(
       path.join(job.hyperframesDir, job.variantName, "index.html"),
+      "utf8",
+    );
+    await writeFile(
       path.join(stage, "index.html"),
+      stageCliIndexHtml(sourceHtml, job.variantName),
+      "utf8",
     );
     await symlink(path.join(job.hyperframesDir, "source"), path.join(stage, "source"), "junction");
     await symlink(

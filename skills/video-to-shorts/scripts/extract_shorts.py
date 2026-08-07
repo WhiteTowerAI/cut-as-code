@@ -116,6 +116,8 @@ def canonical_output_paths(project_root, short_item):
 def validate_project_input(project_root, plan, video_path):
     root = Path(project_root).resolve()
     project = projectlib.load_json(root / "work/project.json")
+    if plan.get("delivery_status") != "ready" or not plan.get("source_render"):
+        fail("shorts plan is awaiting the verified main render; run plan.py again after delivery rendering")
     if project.get("render", {}).get("status") != "verified":
         fail("project main render is not verified")
     expected = projectlib.resolve_project_path(root, project["render"]["output"])
@@ -129,8 +131,11 @@ def validate_project_input(project_root, plan, video_path):
         or fingerprint.get("modified_ns") != stat.st_mtime_ns
         or fingerprint.get("sha256") != sha256_file(video_path)
     ):
-        fail("verified main render changed after shorts review")
+        fail("verified main render changed after shorts plan finalization")
     operations = projectlib.operation_map(project)
+    sequence = project["sequences"][project["active_sequence"]]
+    if plan.get("depends_on") != list(sequence.get("operations", [])):
+        fail("shorts plan does not include the current main-sequence operations")
     for dependency, revision in plan.get("based_on", {}).items():
         if operations.get(dependency, {}).get("revision") != revision:
             fail(f"shorts plan dependency revision is stale: {dependency}")

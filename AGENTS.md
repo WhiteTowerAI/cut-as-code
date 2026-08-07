@@ -69,7 +69,16 @@ slash-command trigger for that skill.
   `work/content-cards/cards-plan.json`, `work/captions/captions-plan.json`, and
   `work/shorts/shorts-plan.json`.
 - When several pixel operations are active on one sequence, the canonical order is
-  `cut -> color-grade -> b-roll -> graphic-motion -> content-cards -> captions`.
+  `cut -> color-grade -> b-roll -> captions -> content-cards -> graphic-motion`.
+  This relative order applies to every selected pair among captions, content cards,
+  and graphic motion. Captions establish a reserved subtitle region that neither
+  downstream operation may occupy.
+- For content cards and graphic motion, the visible face and head silhouette of every
+  primary or foreground person, speaker, presenter, interviewee, or semantically important
+  person is a hard exclusion zone throughout the complete cue. An incidental background-only
+  person who is not a narrative or visual focus is exempt; when classification is uncertain,
+  protect the person. If an overlay intersects a protected face or head, reposition it first,
+  then scale or redesign it; skip the cue if no compliant placement exists.
 - B-roll adds a `b-roll` track and changes video pixels only; it leaves timeline, geometry,
   and audio untouched. Shots carry real probe/byte/SHA-256/provenance records, are normalized
   to timeline dimensions and exact rational FPS with the selected LUT pre-applied when color

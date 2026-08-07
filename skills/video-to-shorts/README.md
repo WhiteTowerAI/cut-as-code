@@ -1,9 +1,10 @@
 # Video To Shorts
 
-`video-to-shorts` turns a verified Open Recut main delivery into reviewed
-horizontal and optional vertical derivatives. Project mode consumes the shared
-source transcript and `timeline.json`, so every candidate uses the same program
-clock as `final/final-video.mp4` and retains source traceability.
+`video-to-shorts` plans reviewed short-form ranges before the shared main render,
+then turns the verified delivery into horizontal and optional vertical derivatives.
+Project mode consumes the shared source transcript and `timeline.json`, so every
+candidate uses the same program clock as `final/final-video.mp4` and retains source
+traceability.
 
 `/video-understand` is a prerequisite.
 
@@ -13,9 +14,9 @@ The canonical workflow is:
 2. Inspect transcript and visual context; author complete candidate moments.
 3. Validate word-exact excerpts and six-dimension scores.
 4. Review an interactive candidate page and record a hash-bound human or explicitly delegated agent selection.
-5. Write `work/shorts/shorts-plan.json` with dependency revisions and ranges.
-6. Extract seeked keep ranges into `final/shorts/*-horizontal.mp4`.
-7. Optionally review an interactive vertical page, approve, and render a deterministic 9:16 plan.
+5. Write the approved `work/shorts/shorts-plan.json`; stop while it is `awaiting_main_render`.
+6. Finish captions, content cards, graphic motion, and the one shared main render in canonical order, then rerun planning to bind the verified delivery.
+7. Extract seeked keep ranges and optionally review/render deterministic 9:16 outputs under `final/shorts/`.
 
 Extraction treats the selected final word and the media endpoint separately. Every
 short targets 0.30 seconds and requires at least 0.25 seconds of release audio after

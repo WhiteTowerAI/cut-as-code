@@ -46,7 +46,8 @@ Match the requested output, not a keyword mentioned in passing.
 | Add titles, lower-thirds, statistics, quotes, chapters, or calls to action | `/video-add-content-cards` after `/video-understand` |
 | Add subtitles, captions, or karaoke captions | `/video-add-captions` after `/video-understand` |
 | Compare the original with actual final pixels in source time | `/video-edit-compare` after the verified main delivery exists |
-| Extract horizontal or vertical short-form derivatives | `/video-to-shorts` after the verified main delivery exists |
+| Select, review, and plan short-form ranges | `/video-to-shorts` after `/video-understand`; do this before requested content cards and captions |
+| Finalize and extract approved horizontal or vertical short-form derivatives | Resume `/video-to-shorts` after the verified main delivery exists |
 | Compile or render an existing Project Protocol delivery | Use `build_render_plan.py` and `render_project.py` from `/video-understand` after every selected active operation passes its own gate |
 
 A generic request such as "edit this video" does not uniquely select `/video-cut`.
@@ -60,14 +61,41 @@ default package. Run the shared understanding prerequisite once. Execute selecte
 main-sequence operations in canonical order:
 
 ```text
-cut -> color-grade -> b-roll -> graphic-motion -> content-cards -> captions
+cut -> color-grade -> b-roll -> captions -> content-cards -> graphic-motion
 ```
 
-Re-read `work/project.json` before each handoff. Do not run leaf skills concurrently
-when they can write `work/project.json`, `work/timeline.json`, an operation plan, or
-shared render artifacts. Build and render the main delivery once, after all selected
-active operations validate. Run `/video-edit-compare` and `/video-to-shorts` only
-against that verified delivery; shorts remain outside `sequences.main.operations`.
+For a request that includes Shorts, content cards, or captions, use this staged flow:
+
+```text
+/video-understand
+-> /video-to-shorts plan and candidate review only
+-> /video-add-captions
+-> /video-add-content-cards
+-> /video-add-graphic-motion
+-> compile and render the shared main delivery once
+-> /video-to-shorts finalize and extract approved derivatives
+```
+
+Complete any requested timeline-changing operation, such as `/video-cut`, before
+Shorts planning; a changed `work/timeline.json` invalidates candidate approval.
+Shorts planning writes shared plan/review state and must not create `final.mp4` or
+anything under `final/shorts/`. Captions, content cards, and graphic motion then add
+their own shared plans and overlay contributions in that relative order. The same
+order applies when only any pair is selected: captions first, content cards second,
+graphic motion last. Re-read `work/project.json` before each handoff. Do not
+run leaf skills concurrently when they can write `work/project.json`,
+`work/timeline.json`, an operation plan, or shared render artifacts. Build and render
+the main delivery once, after all selected active operations validate. Run
+`/video-edit-compare` and only the finalization/extraction phase of
+`/video-to-shorts` against that verified delivery; shorts remain outside
+`sequences.main.operations`.
+
+For `/video-add-content-cards` and `/video-add-graphic-motion`, reserve the visible face
+and head silhouette of every primary or foreground person, speaker, presenter, interviewee,
+or semantically important person for the complete cue. Incidental background-only people
+who are not a narrative or visual focus are exempt; protect uncertain cases. If an overlay
+touches a protected face or head, reposition it first, then scale or redesign it; skip the
+cue when no compliant placement exists.
 
 An all-skipped or zero-cue result is valid when the owning skill permits it. Do not
 invent filler work to keep an operation active.

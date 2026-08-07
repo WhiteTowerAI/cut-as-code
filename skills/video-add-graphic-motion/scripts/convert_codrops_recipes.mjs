@@ -36,6 +36,14 @@ export function stabilizeCodropsCanvasResizes(source) {
     );
 }
 
+export function stabilizeCodropsInlineAssetVariables(source, projectId) {
+  if (projectId !== "3DCarousel") return source;
+  return source.replace(
+    /(--img\s*:\s*url\(\s*(['"]?))assets\//gi,
+    "$1../assets/",
+  );
+}
+
 export function stabilizeSynchronousCodropsInitialization(source, projectId, variantName) {
   if (projectId === "3DCarousel") {
     return source.replace(
@@ -469,7 +477,7 @@ async function freezeRemoteStylesheet({ url, sourceDir, fetchImpl, cache }) {
       const extension = extensionForRemote(assetUrl, assetResponse.headers?.get?.("content-type") || "");
       const fileName = `${sha256(assetUrl).slice(0, 20)}${extension}`;
       await writeFile(path.join(remoteDir, fileName), bytes);
-      return `url(${quote}/source/_remote/${fileName}${quote})`;
+      return `url(${quote}./${fileName}${quote})`;
     },
   );
   css = css.replace(/,\s*mono(?=\s*[;}])/gi, ", monospace");
@@ -524,6 +532,15 @@ function runtimeAssetPath(value, runtimeEntry) {
   const rooted = resolved === ".." ? "" : resolved.replace(/^(?:\.\.\/)+/, "");
   if (!rooted || rooted === ".") throw new Error(`asset path has no local target: ${value}`);
   return `/source/${rooted}${suffix}`;
+}
+
+function relativizeSourceRootReferences(source, runtimeEntry) {
+  const runtimeDirectory = path.posix.dirname(runtimeEntry);
+  const from = runtimeDirectory === "." ? "" : runtimeDirectory;
+  return source.replace(
+    /(^|[="'(\s:])\/source\/([^"'()\s<>]+)/g,
+    (_full, prefix, target) => `${prefix}${path.posix.relative(from, target)}`,
+  );
 }
 
 function anchorRuntimeAssetReferences(html, runtimeEntry) {
@@ -593,7 +610,11 @@ async function localizeCopiedCss({ sourceDir, importsRoot, fetchImpl, cache }) {
           async (_full, _quote, rawUrl) => {
             const url = rawUrl.startsWith("//") ? `https:${rawUrl}` : rawUrl;
             const href = await freezeRemoteStylesheet({ url, sourceDir, fetchImpl, cache });
-            return `@import url("${href}");`;
+            const relativeHref = href.startsWith("/source/")
+              ? path.relative(directory, path.join(sourceDir, href.slice("/source/".length)))
+                .split(path.sep).join("/")
+              : href;
+            return `@import url("${relativeHref}");`;
           },
         );
         if (localized !== css) await writeFile(target, localized, "utf8");
@@ -694,13 +715,40 @@ async function runtimeEntryForVariant(project, variant) {
   return variant.sourceEntry;
 }
 
-function compositionHtml({ id, duration, sourceHtml, runtimeEntry, variantName }) {
-  sourceHtml = normalizeShaderScriptTypes(anchorRuntimeAssetReferences(sourceHtml, runtimeEntry));
+export function stripCodropsNonVideoContent(html) {
+  return html.replace(
+    /<section\b[^>]*\bclass=["'][^"']*\bcontent--related\b[^"']*["'][^>]*>[\s\S]*?<\/section\s*>/gi,
+    "",
+  );
+}
+
+function stripGeneratedAdapterBody(source) {
+  return source.replace(
+    /(const SOURCE_BODY = )("(?:\\.|[^"\\])*")(;)/,
+    (match, prefix, encodedBody, suffix) => {
+      try {
+        return `${prefix}${JSON.stringify(stripCodropsNonVideoContent(JSON.parse(encodedBody)))}${suffix}`;
+      } catch {
+        return match;
+      }
+    },
+  );
+}
+
+function compositionHtml({ id, duration, sourceHtml, runtimeEntry, variantName, projectId }) {
+  sourceHtml = stabilizeCodropsInlineAssetVariables(
+    relativizeSourceRootReferences(
+      normalizeShaderScriptTypes(anchorRuntimeAssetReferences(sourceHtml, runtimeEntry)),
+      runtimeEntry,
+    ),
+    projectId,
+  );
   const { withoutScripts } = extractScripts(sourceHtml);
-  const { head, bodyAttributes, body } = documentParts(withoutScripts);
+  const { head, bodyAttributes, body: sourceBody } = documentParts(withoutScripts);
+  const body = stripCodropsNonVideoContent(sourceBody);
   const runtimeDirectory = path.posix.dirname(runtimeEntry);
   const runtimeSuffix = runtimeDirectory === "." ? "" : `${runtimeDirectory}/`;
-  const baseHref = `/source/${runtimeSuffix}`;
+  const baseHref = `../source/${runtimeSuffix}`;
   const rootAttributes = [
     bodyAttributes.trim(),
     `data-composition-id="${id}"`,
@@ -714,8 +762,8 @@ function compositionHtml({ id, duration, sourceHtml, runtimeEntry, variantName }
 <html lang="en">
 <head>
   <link rel="icon" href="data:,">
-  <script defer src="/${variantName}/hf-recipe.js" data-hf-recipe></script>
-  <script defer src="/${variantName}/hf-adapter.js" data-hf-adapter></script>
+  <script defer src="./hf-recipe.js" data-hf-recipe></script>
+  <script defer src="./hf-adapter.js" data-hf-adapter></script>
   <base href="${baseHref}">
 ${head}
   <style data-hf-codrops-frame>
@@ -775,6 +823,7 @@ export function interactionSpecForVariant(projectId, variantName) {
       duration: 8,
       actions: [],
       synchronousInitialization: true,
+      ...(projectId === "3DCarousel" ? { bidirectionalSeek: true } : {}),
     };
   }
   if (projectId === "DecorativeLetterAnimations") {
@@ -951,21 +1000,28 @@ export async function convertCodropsProject({
       cache: dependencyCache,
     });
     const { blocks, withoutScripts } = extractScripts(runtimeHtml);
-    const { body } = documentParts(withoutScripts);
+    const { body: runtimeBody } = documentParts(withoutScripts);
+    const body = stripCodropsNonVideoContent(stabilizeCodropsInlineAssetVariables(
+      relativizeSourceRootReferences(
+        anchorRuntimeAssetReferences(runtimeBody, runtimeEntry),
+        runtimeEntry,
+      ),
+      project.id,
+    ));
     const interaction = interactionSpecForVariant(project.id, variant.name);
     const id = `codrops-${project.id.toLowerCase()}-${variant.name.toLowerCase()}`;
     const variantDir = path.join(outputDir, variant.name);
     await mkdir(variantDir, { recursive: true });
 
     const runtimeDir = path.dirname(runtimePath);
-    const recipe = await recipeSource({
+    const recipe = relativizeSourceRootReferences(await recipeSource({
       blocks,
       runtimeDir,
       importsRoot: path.dirname(projectDir),
       esbuildCommand,
       projectId: project.id,
       variantName: variant.name,
-    });
+    }), runtimeEntry);
     const adapter = `/* Original Codrops project: ${project.id}. */\n${codropsReplayAdapterSource({
       id,
       duration: interaction.duration,
@@ -982,6 +1038,7 @@ export async function convertCodropsProject({
       sourceHtml: runtimeHtml,
       runtimeEntry,
       variantName: variant.name,
+      projectId: project.id,
     });
     await Promise.all([
       writeFile(path.join(variantDir, "index.html"), html, "utf8"),
@@ -1047,12 +1104,111 @@ export async function convertAllCodrops({
   return receipts;
 }
 
+async function rewriteFrozenSourceCss(sourceDir) {
+  const pending = [sourceDir];
+  let changed = 0;
+  while (pending.length) {
+    const directory = pending.pop();
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const target = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        pending.push(target);
+      } else if (entry.isFile() && entry.name.toLowerCase().endsWith(".css")) {
+        const runtimeEntry = path.relative(sourceDir, target).split(path.sep).join("/");
+        const source = await readFile(target, "utf8");
+        const rewritten = relativizeSourceRootReferences(source, runtimeEntry);
+        if (rewritten !== source) {
+          await writeFile(target, rewritten, "utf8");
+          changed += 1;
+        }
+      }
+    }
+  }
+  return changed;
+}
+
+export async function rewriteExistingCodropsPaths(importsRoot) {
+  const root = path.resolve(importsRoot);
+  let projects = 0;
+  let variants = 0;
+  let files = 0;
+  for (const entry of await readdir(root, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const hyperframes = path.join(root, entry.name, "hyperframes");
+    const receiptPath = path.join(hyperframes, "conversion.json");
+    if (!(await fileExists(receiptPath))) continue;
+    const receipt = JSON.parse(await readFile(receiptPath, "utf8"));
+    if (!Array.isArray(receipt.variants)) continue;
+    projects += 1;
+    let receiptChanged = false;
+
+    for (const variant of receipt.variants) {
+      const interaction = receipt.project_id === "codrops-kinetic-images"
+        ? variant.interaction
+        : interactionSpecForVariant(receipt.project_id, variant.name);
+      if (JSON.stringify(variant.interaction) !== JSON.stringify(interaction)) {
+        variant.interaction = interaction;
+        receiptChanged = true;
+      }
+      const runtimeEntry = variant.runtime_entry || variant.source_entry;
+      const variantDir = path.dirname(path.join(hyperframes, ...variant.output.split("/")));
+      const targets = ["index.html", "hf-recipe.js", "hf-adapter.js"];
+      for (const name of targets) {
+        const target = path.join(variantDir, name);
+        if (!(await fileExists(target))) continue;
+        const source = await readFile(target, "utf8");
+        let rewritten = source;
+        if (name === "index.html") {
+          rewritten = rewritten
+            .replace(/(<script\b[^>]*\bsrc=["'])\/[^"']+\/(hf-(?:recipe|adapter)\.js)(["'])/gi, "$1./$2$3")
+            .replace(/(<base\b[^>]*\bhref=["'])\/source\/([^"']*)(["'])/gi, "$1../source/$2$3");
+          rewritten = stabilizeCodropsInlineAssetVariables(rewritten, receipt.project_id);
+          rewritten = stripCodropsNonVideoContent(rewritten);
+        } else if (name === "hf-adapter.js") {
+          rewritten = rewritten
+            .replace(
+              /const INTERACTION = \{[^\r\n]*\};/,
+              `const INTERACTION = ${JSON.stringify(interaction)};`,
+            )
+            .replace(
+              /target > renderedTime \+ 1e-9\)/,
+              "(target > renderedTime + 1e-9 || INTERACTION.bidirectionalSeek))",
+            )
+            .replace(
+              /const RESET_RUNTIME_GLOBALS = \[[^\r\n]*\];/,
+              `const RESET_RUNTIME_GLOBALS = ${JSON.stringify(runtimeGlobalsForProject(receipt.project_id, variant.name))};`,
+            );
+          rewritten = stripGeneratedAdapterBody(rewritten);
+        }
+        rewritten = relativizeSourceRootReferences(rewritten, runtimeEntry);
+        if (rewritten !== source) {
+          await writeFile(target, rewritten, "utf8");
+          files += 1;
+        }
+      }
+      variants += 1;
+    }
+    if (receiptChanged) {
+      await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, "utf8");
+      files += 1;
+    }
+    files += await rewriteFrozenSourceCss(path.join(hyperframes, receipt.source_copy || "source"));
+  }
+  return { projects, variants, files };
+}
+
 async function main() {
   const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+  const rootArg = process.argv.slice(2).find((arg) => !arg.startsWith("--"));
   const importsRoot = path.resolve(
-    process.argv[2]
+    rootArg
       || path.join(scriptDir, "..", "recipes", "codrops"),
   );
+  if (process.argv.includes("--rewrite-existing")) {
+    const result = await rewriteExistingCodropsPaths(importsRoot);
+    process.stdout.write(`rewrote ${result.projects} Codrops projects / ${result.variants} variants / ${result.files} files\n`);
+    return;
+  }
   const receipts = await convertAllCodrops({ importsRoot });
   const variants = receipts.reduce((count, receipt) => count + receipt.variants.length, 0);
   process.stdout.write(`converted ${receipts.length} Codrops projects / ${variants} variants\n`);

@@ -836,6 +836,54 @@ def check_dependency_revision_coverage():
     assert not [error for error in errors if error.startswith("compare based_on")]
 
 
+def check_caption_reserved_pixel_order():
+    def project_for(order):
+        effects = {
+            "changes_timeline": False,
+            "changes_geometry": False,
+            "changes_video_pixels": True,
+            "changes_audio": False,
+            "adds_track": None,
+        }
+        return {
+            "schema_version": 1,
+            "active_sequence": "main",
+            "sequences": {"main": {"operations": list(order), "timeline": "timeline.json"}},
+            "operations": [
+                {
+                    "id": operation_id,
+                    "skill": f"video-add-{operation_id}",
+                    "revision": 1,
+                    "depends_on": [],
+                    "based_on": {},
+                    "status": "draft",
+                    "target": {"sequence": "main", "scope": operation_id},
+                    "effects": effects,
+                }
+                for operation_id in order
+            ],
+            "reviews": [],
+        }
+
+    valid_orders = (
+        ("captions", "content-cards", "graphic-motion"),
+        ("captions", "content-cards"),
+        ("captions", "graphic-motion"),
+        ("content-cards", "graphic-motion"),
+    )
+    for order in valid_orders:
+        errors = projectlib.validate_project(project_for(order), Path("."), check_files=False)
+        assert "active sequence operations violate canonical pixel order" not in errors, (order, errors)
+
+    for order in (
+        ("content-cards", "captions"),
+        ("graphic-motion", "captions"),
+        ("graphic-motion", "content-cards"),
+    ):
+        errors = projectlib.validate_project(project_for(order), Path("."), check_files=False)
+        assert "active sequence operations violate canonical pixel order" in errors, (order, errors)
+
+
 def check_verified_durable_outputs():
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
@@ -974,6 +1022,7 @@ def main():
     check_broll_compiler_consistency()
     check_graphic_motion_compiler_consistency()
     check_dependency_revision_coverage()
+    check_caption_reserved_pixel_order()
     check_verified_durable_outputs()
     print("[protocol-extensions] program transcript mapping passed")
     print("[protocol-extensions] image-sequence overlay passed")
@@ -981,6 +1030,7 @@ def main():
     print("[protocol-extensions] B-roll compiler consistency passed")
     print("[protocol-extensions] graphic-motion compiler consistency passed")
     print("[protocol-extensions] dependency revision coverage passed")
+    print("[protocol-extensions] caption-reserved pixel order passed")
     print("[protocol-extensions] verified durable outputs passed")
 
 

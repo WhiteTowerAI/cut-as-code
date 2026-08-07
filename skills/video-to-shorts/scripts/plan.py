@@ -337,11 +337,9 @@ def source_ranges_for_program(timeline, start, end):
     return ranges
 
 
-def canonical_project_plan(legacy, project_root, out_dir, transcript, review):
+def canonical_project_plan(legacy, project_root, out_dir, transcript, review, candidates_data):
     root = Path(project_root).resolve()
     project = projectlib.load_json(root / "work/project.json")
-    if project.get("render", {}).get("status") != "verified":
-        fail("project mode requires a verified main delivery render")
     sequence = project.get("sequences", {}).get(project.get("active_sequence"), {})
     timeline = projectlib.load_json(
         projectlib.resolve_project_path(root, sequence.get("timeline", ""))
@@ -351,12 +349,25 @@ def canonical_project_plan(legacy, project_root, out_dir, transcript, review):
         fail("invalid project timeline: " + "; ".join(errors))
     if transcript.get("timebase") != "program" or transcript.get("timeline_id") != timeline["timeline_id"]:
         fail("project shorts transcript must use the active program timeline")
-    source_render_value = project.get("render", {}).get("output")
-    source_render = projectlib.resolve_project_path(root, source_render_value)
-    if not source_render.is_file():
-        fail(f"verified main render is missing: {source_render}")
-    if Path(review["artifacts"]["source_video"]["path"]).resolve() != source_render:
-        fail("candidate review is not bound to the verified main render")
+    source_value = project.get("source", {}).get("path")
+    source_video = projectlib.resolve_project_path(root, source_value)
+    if not source_video.is_file():
+        fail(f"project source is missing: {source_video}")
+    if Path(review["artifacts"]["source_video"]["path"]).resolve() != source_video:
+        fail("candidate review is not bound to the project source")
+    candidate_video = candidates_data.get("video", {})
+    if (
+        Path(candidate_video.get("source", "")).resolve() != source_video
+        or candidate_video.get("sha256") != sha256_file(source_video)
+    ):
+        fail("approved candidates are not bound to the current project source")
+    timeline_binding = candidate_video.get("timeline", {})
+    timeline_path = projectlib.resolve_project_path(root, sequence.get("timeline", ""))
+    if (
+        Path(timeline_binding.get("path", "")).resolve() != timeline_path
+        or timeline_binding.get("sha256") != sha256_file(timeline_path)
+    ):
+        fail("approved candidates are not bound to the active timeline")
     operations = projectlib.operation_map(project)
     depends_on = list(sequence.get("operations", []))
     based_on = {operation_id: operations[operation_id]["revision"] for operation_id in depends_on}
@@ -388,18 +399,16 @@ def canonical_project_plan(legacy, project_root, out_dir, transcript, review):
                 ),
             },
         })
-    stat = source_render.stat()
     decision = review["decision"]
-    return {
+    result = {
         "schema_version": 1,
         "target": "derived",
         "timebase": "program",
         "timeline_id": timeline["timeline_id"],
-        "source_render": {
-            "path": source_render_value,
-            "sha256": sha256_file(source_render),
-            "size": stat.st_size,
-            "modified_ns": stat.st_mtime_ns,
+        "delivery_status": "awaiting_main_render",
+        "planning_source": {
+            "path": source_value,
+            "sha256": sha256_file(source_video),
         },
         "source_transcript": "understand/transcript.json",
         "source_candidates": legacy["source_candidates"],
@@ -421,6 +430,21 @@ def canonical_project_plan(legacy, project_root, out_dir, transcript, review):
             "approved_candidates_path": legacy["source_candidates"]["path"],
         },
     }
+    render = project.get("render", {})
+    if render.get("status") == "verified":
+        source_render_value = render.get("output")
+        source_render = projectlib.resolve_project_path(root, source_render_value)
+        if not source_render.is_file():
+            fail(f"verified main render is missing: {source_render}")
+        stat = source_render.stat()
+        result["delivery_status"] = "ready"
+        result["source_render"] = {
+            "path": source_render_value,
+            "sha256": sha256_file(source_render),
+            "size": stat.st_size,
+            "modified_ns": stat.st_mtime_ns,
+        }
+    return result
 
 
 def run_plan(args):
@@ -460,7 +484,9 @@ def run_plan(args):
     }
     out_dir.mkdir(parents=True, exist_ok=True)
     if args.project_root:
-        plan = canonical_project_plan(plan, args.project_root, out_dir, transcript_data, review)
+        plan = canonical_project_plan(
+            plan, args.project_root, out_dir, transcript_data, review, candidates_data
+        )
         plan_path = out_dir / "shorts-plan.json"
     else:
         plan_path = out_dir / "shorts_plan.json"

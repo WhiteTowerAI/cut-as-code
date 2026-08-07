@@ -15,29 +15,29 @@
  */
 /*{"last_published":"2022-05-17 09:27:39 UTC"}*/
 
-@import url("/source/_remote/030bd9c7bdb75fdd35c8.css");
+@import url("030bd9c7bdb75fdd35c8.css");
 
 @font-face {
 font-family:"halyard-display";
-src:url("/source/_remote/4ed4b4143d049af86a8b.woff2") format("woff2"),url("/source/_remote/fc2a1c159188c62a5166.woff") format("woff"),url("/source/_remote/418acee003dff757aa26.otf") format("opentype");
+src:url("4ed4b4143d049af86a8b.woff2") format("woff2"),url("fc2a1c159188c62a5166.woff") format("woff"),url("418acee003dff757aa26.otf") format("opentype");
 font-display:auto;font-style:normal;font-weight:300;font-stretch:normal;
 }
 
 @font-face {
 font-family:"halyard-display";
-src:url("/source/_remote/c38b28ba66d03a3a88bc.woff2") format("woff2"),url("/source/_remote/b76e36db308dbf2ecd05.woff") format("woff"),url("/source/_remote/58f10b8242860b36ca0d.otf") format("opentype");
+src:url("c38b28ba66d03a3a88bc.woff2") format("woff2"),url("b76e36db308dbf2ecd05.woff") format("woff"),url("58f10b8242860b36ca0d.otf") format("opentype");
 font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
 }
 
 @font-face {
 font-family:"ivymode";
-src:url("/source/_remote/a760b285b934919fb821.woff2") format("woff2"),url("/source/_remote/78686706184e9a8b8644.woff") format("woff"),url("/source/_remote/2dca825e3c6993c01c76.otf") format("opentype");
+src:url("a760b285b934919fb821.woff2") format("woff2"),url("78686706184e9a8b8644.woff") format("woff"),url("2dca825e3c6993c01c76.otf") format("opentype");
 font-display:auto;font-style:normal;font-weight:200;font-stretch:normal;
 }
 
 @font-face {
 font-family:"ivymode";
-src:url("/source/_remote/5ccff4923e78757f07e9.woff2") format("woff2"),url("/source/_remote/b0612d24ac0b09c0eaad.woff") format("woff"),url("/source/_remote/7ae1283aae2f501ffb26.otf") format("opentype");
+src:url("5ccff4923e78757f07e9.woff2") format("woff2"),url("b0612d24ac0b09c0eaad.woff") format("woff"),url("7ae1283aae2f501ffb26.otf") format("opentype");
 font-display:auto;font-style:italic;font-weight:200;font-stretch:normal;
 }
 

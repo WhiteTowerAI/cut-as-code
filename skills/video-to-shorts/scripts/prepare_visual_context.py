@@ -2,6 +2,7 @@
 """Generate deterministic, timestamped contact sheets for optional visual review."""
 
 import argparse
+import hashlib
 import json
 import math
 import shutil
@@ -44,11 +45,24 @@ def label_time(seconds):
     return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
 
+def source_time(timeline, program_time):
+    for index, clip in enumerate(timeline.get("clips") or []):
+        program = clip["program_range"]
+        if float(program["start_s"]) <= program_time < float(program["end_s"]) or (
+            index == len(timeline["clips"]) - 1
+            and math.isclose(program_time, float(program["end_s"]), abs_tol=1e-6)
+        ):
+            offset = min(program_time, float(program["end_s"])) - float(program["start_s"])
+            return float(clip["source_range"]["start_s"]) + offset * float(clip["speed"])
+    fail(f"program time {program_time:.6f}s is outside the active timeline")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Prepare paged contact sheets for text_visual candidate review.")
     parser.add_argument("video")
     parser.add_argument("--out", required=True)
     parser.add_argument("--interval", type=float, default=60.0)
+    parser.add_argument("--timeline", help="Map program-time review samples onto the project source video.")
     parser.add_argument("--frames-per-sheet", type=int, default=12)
     parser.add_argument("--columns", type=int, default=3)
     parser.add_argument("--ffmpeg")
@@ -64,13 +78,17 @@ def main():
     sheets_dir.mkdir(parents=True, exist_ok=True)
     ffmpeg = resolve_tool("ffmpeg", args.ffmpeg)
     ffprobe = resolve_tool("ffprobe", args.ffprobe)
-    duration, width, height = probe(ffprobe, video)
+    source_duration, width, height = probe(ffprobe, video)
+    timeline_path = Path(args.timeline).resolve() if args.timeline else None
+    timeline = json.loads(timeline_path.read_text(encoding="utf-8-sig")) if timeline_path else None
+    duration = float(timeline["program_duration_s"]) if timeline else source_duration
     timestamps = [min(index * args.interval, max(0, duration - 0.05)) for index in range(math.ceil(duration / args.interval))]
     manifest_frames = []
     for index, timestamp in enumerate(timestamps, 1):
         frame_path = frames_dir / f"frame_{index:04d}_{int(timestamp):06d}s.jpg"
-        run([ffmpeg, "-y", "-ss", f"{timestamp:.3f}", "-i", str(video), "-frames:v", "1", "-vf", "scale=480:-2", "-q:v", "2", str(frame_path)])
-        manifest_frames.append({"index": index, "timestamp_s": round(timestamp, 3), "timecode": label_time(timestamp), "path": str(frame_path)})
+        seek = source_time(timeline, timestamp) if timeline else timestamp
+        run([ffmpeg, "-y", "-ss", f"{seek:.3f}", "-i", str(video), "-frames:v", "1", "-vf", "scale=480:-2", "-q:v", "2", str(frame_path)])
+        manifest_frames.append({"index": index, "timestamp_s": round(timestamp, 3), "source_timestamp_s": round(seek, 3), "timecode": label_time(timestamp), "path": str(frame_path)})
     rows = math.ceil(args.frames_per_sheet / args.columns)
     cell_width, image_height, label_height = 480, round(480 * height / width), 34
     sheet_paths = []
@@ -90,6 +108,8 @@ def main():
         sheet.save(sheet_path, quality=92)
         sheet_paths.append(str(sheet_path))
     manifest = {"video": str(video), "duration_s": round(duration, 3), "source_width": width, "source_height": height, "interval_s": args.interval, "frames_per_sheet": args.frames_per_sheet, "contact_sheets": sheet_paths, "frames": manifest_frames, "purpose": "Optional review context only; visual evidence does not affect candidate scoring."}
+    if timeline_path:
+        manifest["timeline"] = {"path": str(timeline_path), "sha256": hashlib.sha256(timeline_path.read_bytes()).hexdigest()}
     (out / "visual_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"[video-to-shorts] visual manifest: {out / 'visual_manifest.json'}")
     print(f"[video-to-shorts] contact sheets: {len(sheet_paths)}")

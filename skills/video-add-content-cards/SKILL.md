@@ -23,7 +23,18 @@ Require `ffmpeg` on PATH, Python, and Node.js >= 22 (for `npx hyperframes`, fetc
 - `work/timeline.json`: source-to-program mapping, or an identity timeline when no cut exists
 - optional selected color-grade revision when contrast or palette is judged against that look
 
-The skill is valid without a cut or color grade. Declare only dependencies actually consumed and record their current revisions in `based_on`.
+The skill is valid without a cut or color grade. When captions are active, run them first,
+depend on their current revision, and treat their occupied region as a hard exclusion zone.
+Content cards must precede graphic motion whenever both are active. These relative rules apply
+to every selected pair. Declare only dependencies actually consumed and record their current
+revisions in `based_on`.
+
+Treat the visible face and head silhouette of every primary or foreground person, speaker,
+presenter, interviewee, or semantically important person as a hard exclusion zone throughout
+the complete card cue, including entrances and exits. An incidental background-only person
+who is not a narrative or visual focus is exempt; protect uncertain cases. If a card intersects
+a protected face or head, reposition it first, then scale or redesign it. Skip the card when no
+compliant placement exists.
 
 ## Working Files
 
@@ -119,11 +130,12 @@ fields remain accepted for compatibility but are not part of the normal intervie
 
 ### 3. Make editorial choices
 
-Read the evidence at each card time. Correct ASR names and numbers, prune weak candidates, write concise copy, choose placement that clears faces and captions, and approve the visual treatment. Never treat analyzer text as final copy.
+Read the evidence at each card time. Correct ASR names and numbers, prune weak candidates, write concise copy, choose placement that clears protected faces, visible head silhouettes, and captions, and approve the visual treatment. Never treat analyzer text as final copy.
 
 Store all on-screen copy under `copy.display` (for example `eyebrow`, `title`, and `detail`),
 not only a summary or suggested title. Set `placement.face_clearance` to `verified` only after
-reviewing a composited still, and store that still's protocol-relative path in
+reviewing a composited still against the protected face-and-head definition above, and store
+that still's protocol-relative path in
 `placement.review_still`. Store the HyperFrames composition, alpha asset, and exact rational
 FPS under `renderer`.
 
@@ -231,16 +243,19 @@ than a hidden decision stored only in disposable cache.
 ### 6. Review small artifacts
 
 Capture a still near the middle of every cue by compositing the card over the actual base-video
-frame at that timestamp. Transparent-only HyperFrames screenshots prove alpha, not face
-clearance, and are insufficient for approval. Render short motion windows only for timing or
-transition decisions. Do not render a full preview by default.
+frame at that timestamp, with the approved caption overlay composited first when active.
+Transparent-only HyperFrames screenshots prove alpha, not face
+clearance, and are insufficient for approval. Also inspect a short composited motion window
+whenever an entrance, exit, or moving element approaches a protected face or head. Reposition
+the card before approval if any frame intersects the protected region. Do not render a full
+preview by default.
 
 Check:
 
 - copy is true to its `evidence_ref`;
 - source and program times map correctly;
 - text is legible and fits;
-- faces and captions remain clear;
+- protected faces, visible head silhouettes, and captions remain clear throughout the cue;
 - animation lands on the spoken phrase;
 - alpha is transparent outside card regions.
 
@@ -258,7 +273,9 @@ transparent video. Render each at the source dimensions and exact source FPS, th
 render contribution with its program-time window. A single full-length sparse overlay remains
 valid only when it is demonstrably smaller or required by the composition.
 
-Record this operation contribution in `project.json`:
+Record this operation contribution in `project.json`. Insert `content-cards` after
+`captions` and before `graphic-motion`; include `captions` in `depends_on`/`based_on`
+when it is active:
 
 ```json
 {
@@ -298,4 +315,6 @@ python skills/video-understand/scripts/render_project.py work/render/render-plan
 
 ## Combining With Captions
 
-Treat captions and cards as separate overlay contributions. Resolve their placement conflict before rendering, then composite them in declared sequence in the shared delivery pass. Keep captions at the bottom and move cards to the top when both would occupy the same safe area.
+Treat captions and cards as separate overlay contributions. Captions are upstream and their
+occupied region is unavailable to cards. Composite captions first in the shared delivery pass;
+move cards to another safe area rather than covering or displacing subtitles.

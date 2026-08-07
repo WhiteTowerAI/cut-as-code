@@ -17,35 +17,35 @@
  */
 /*{"last_published":"2024-04-23 09:41:20 UTC"}*/
 
-@import url("/source/_remote/b429c54f94b34c9492b2.css");
+@import url("b429c54f94b34c9492b2.css");
 
 @font-face {
 font-family:"iki-mono-variable";
-src:url("/source/_remote/3028db1fe8722ec54f07.woff2") format("woff2"),url("/source/_remote/68a8d34d8ce013260461.woff") format("woff"),url("/source/_remote/a58e27379f84435ae613.otf") format("opentype");
+src:url("3028db1fe8722ec54f07.woff2") format("woff2"),url("68a8d34d8ce013260461.woff") format("woff"),url("a58e27379f84435ae613.otf") format("opentype");
 font-display:auto;font-style:normal;font-weight:100;font-stretch:normal;
 }
 
 @font-face {
 font-family:"iki-mono-variable";
-src:url("/source/_remote/c549904f8c1b156bba61.woff2") format("woff2"),url("/source/_remote/009dc7e377d68d940bee.woff") format("woff"),url("/source/_remote/c0cf87fc2cdcb55e758b.otf") format("opentype");
+src:url("c549904f8c1b156bba61.woff2") format("woff2"),url("009dc7e377d68d940bee.woff") format("woff"),url("c0cf87fc2cdcb55e758b.otf") format("opentype");
 font-display:auto;font-style:italic;font-weight:100;font-stretch:normal;
 }
 
 @font-face {
 font-family:"instrument-sans-variable";
-src:url("/source/_remote/9c5851aae1214d5af296.woff2") format("woff2"),url("/source/_remote/ed9e0ba00569976e1398.woff") format("woff"),url("/source/_remote/112e1d02334fdee10da5.otf") format("opentype");
+src:url("9c5851aae1214d5af296.woff2") format("woff2"),url("ed9e0ba00569976e1398.woff") format("woff"),url("112e1d02334fdee10da5.otf") format("opentype");
 font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
 }
 
 @font-face {
 font-family:"instrument-sans-variable";
-src:url("/source/_remote/242df3757de77579f4ec.woff2") format("woff2"),url("/source/_remote/4f207e098c0a14bf5e25.woff") format("woff"),url("/source/_remote/7ee2dab4a141b7185f81.otf") format("opentype");
+src:url("242df3757de77579f4ec.woff2") format("woff2"),url("4f207e098c0a14bf5e25.woff") format("woff"),url("7ee2dab4a141b7185f81.otf") format("opentype");
 font-display:auto;font-style:italic;font-weight:400;font-stretch:normal;
 }
 
 @font-face {
 font-family:"scale-variable";
-src:url("/source/_remote/093ed7c6798383a9f1f7.woff2") format("woff2"),url("/source/_remote/0598d7839d8d96c14b94.woff") format("woff"),url("/source/_remote/f8386a7442cb2b58fe02.otf") format("opentype");
+src:url("093ed7c6798383a9f1f7.woff2") format("woff2"),url("0598d7839d8d96c14b94.woff") format("woff"),url("f8386a7442cb2b58fe02.otf") format("opentype");
 font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
 }
 

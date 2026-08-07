@@ -1,5 +1,5 @@
 /* Generated HyperFrames entry; scene implementation remains in source/scene.js. */
-import { createRecipe } from "./source/scene.js";
+import { createRecipe } from "../source/scene.js";
 
 const canvas = document.getElementById("three-layer");
 createRecipe({ canvas })

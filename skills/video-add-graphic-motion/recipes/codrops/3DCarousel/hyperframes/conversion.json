@@ -15,7 +15,8 @@
         "mode": "scroll",
         "duration": 8,
         "actions": [],
-        "synchronousInitialization": true
+        "synchronousInitialization": true,
+        "bidirectionalSeek": true
       },
       "output": "index/index.html"
     }

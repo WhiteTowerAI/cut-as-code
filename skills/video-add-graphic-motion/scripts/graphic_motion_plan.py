@@ -55,7 +55,15 @@ def active_dependencies(project):
     active = sequence.get("operations", []) if isinstance(sequence, dict) else []
     operations = project.get("operations") if isinstance(project.get("operations"), list) else []
     nodes = {item.get("id"): item for item in operations if isinstance(item, dict)}
-    return ["understanding", *[item for item in ("cut", "color-grade", "b-roll") if item in active and item in nodes]]
+    return [
+        "understanding",
+        *[
+            item for item in (
+                "cut", "color-grade", "b-roll", "captions", "content-cards",
+            )
+            if item in active and item in nodes
+        ],
+    ]
 
 
 def _understanding_evidence_valid(media, transcript, analysis):
@@ -1026,8 +1034,11 @@ def register_operation(project, plan, timeline, project_root, *, plan_path="grap
     result["operations"] = [item for item in result["operations"] if item.get("id") != "graphic-motion"]
     result["operations"].append({**common, "revision": revision})
     ids = [item for item in sequence["operations"] if item != "graphic-motion"]
-    anchors = [index for index, item in enumerate(ids) if item in {"cut", "color-grade", "b-roll"}]
-    index = anchors[-1] + 1 if anchors else next((i for i, item in enumerate(ids) if item in {"content-cards", "captions"}), len(ids))
+    anchors = [
+        index for index, item in enumerate(ids)
+        if item in {"cut", "color-grade", "b-roll", "captions", "content-cards"}
+    ]
+    index = anchors[-1] + 1 if anchors else len(ids)
     ids.insert(index, "graphic-motion")
     sequence["operations"] = ids
     result.setdefault("render", {})["status"] = "draft"

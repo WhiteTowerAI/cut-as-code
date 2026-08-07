@@ -3,6 +3,7 @@
 
 import argparse
 import base64
+import hashlib
 import json
 import math
 import os
@@ -92,6 +93,33 @@ def verify_jpeg(path):
         fail(f"ffmpeg JPEG must be 960 pixels wide with a positive even height: {path}")
 
 
+def load_timeline(data):
+    binding = data.get("video", {}).get("timeline")
+    if not binding:
+        return None
+    path = Path(binding.get("path", "")).resolve()
+    if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != binding.get("sha256"):
+        fail("candidate timeline binding is stale")
+    timeline = json.loads(path.read_text(encoding="utf-8-sig"))
+    if timeline.get("timeline_id") != data.get("transcript", {}).get("timeline_id"):
+        fail("candidate timeline_id does not match the program transcript")
+    return timeline
+
+
+def source_time(timeline, program_time):
+    if timeline is None:
+        return program_time
+    clips = timeline.get("clips") or []
+    for index, clip in enumerate(clips):
+        program = clip["program_range"]
+        if float(program["start_s"]) <= program_time < float(program["end_s"]) or (
+            index == len(clips) - 1 and math.isclose(program_time, float(program["end_s"]), abs_tol=1e-6)
+        ):
+            offset = min(program_time, float(program["end_s"])) - float(program["start_s"])
+            return float(clip["source_range"]["start_s"]) + offset * float(clip["speed"])
+    fail(f"program time {program_time:.6f}s is outside the active timeline")
+
+
 def build_candidate_review(source_video, candidates_path, review_out, review_id, template_path=TEMPLATE, run_ffmpeg=None):
     source_video = Path(source_video).resolve()
     candidates_path = Path(candidates_path).resolve()
@@ -99,6 +127,7 @@ def build_candidate_review(source_video, candidates_path, review_out, review_id,
     if not source_video.is_file():
         fail(f"source video not found: {source_video}")
     data = load_candidates(candidates_path, source_video)
+    timeline = load_timeline(data)
     template = Path(template_path).read_text(encoding="utf-8")
     if template.count(MARKER) != 1:
         fail(f"template must contain exactly one {MARKER}")
@@ -124,7 +153,8 @@ def build_candidate_review(source_video, candidates_path, review_out, review_id,
             start = float(candidate["start_time"])
             duration = float(candidate["duration"])
             for label, fraction in POSITIONS:
-                seek = start + duration * fraction
+                program_seek = start + duration * fraction
+                seek = source_time(timeline, program_seek)
                 name = f"{index:03d}-{int(fraction * 100):02d}.jpg"
                 staged_frame = staged_assets / name
                 command = [
@@ -139,7 +169,7 @@ def build_candidate_review(source_video, candidates_path, review_out, review_id,
                     fail(f"ffmpeg produced an empty candidate frame: {staged_frame}")
                 verify_jpeg(staged_frame)
                 candidate_frames.append({
-                    "label": label, "time": round(seek, 3),
+                    "label": label, "time": round(program_seek, 3),
                     "src": f"assets/candidates-{review_id}/{name}",
                     "alt": f"{candidate['title']} at {label.lower()} frame",
                 })

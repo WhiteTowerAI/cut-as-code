@@ -14,23 +14,23 @@
  */
 /*{"last_published":"2021-09-27 20:40:51 UTC"}*/
 
-@import url("/source/_remote/5933078504c60c45fa87.css");
+@import url("5933078504c60c45fa87.css");
 
 @font-face {
 font-family:"halyard-display";
-src:url("/source/_remote/c38b28ba66d03a3a88bc.woff2") format("woff2"),url("/source/_remote/b76e36db308dbf2ecd05.woff") format("woff"),url("/source/_remote/58f10b8242860b36ca0d.otf") format("opentype");
+src:url("c38b28ba66d03a3a88bc.woff2") format("woff2"),url("b76e36db308dbf2ecd05.woff") format("woff"),url("58f10b8242860b36ca0d.otf") format("opentype");
 font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
 }
 
 @font-face {
 font-family:"halyard-display";
-src:url("/source/_remote/6972181afbc54a0434d8.woff2") format("woff2"),url("/source/_remote/8a792e3e2f07b1b5e03b.woff") format("woff"),url("/source/_remote/a05add5cb1468527a019.otf") format("opentype");
+src:url("6972181afbc54a0434d8.woff2") format("woff2"),url("8a792e3e2f07b1b5e03b.woff") format("woff"),url("a05add5cb1468527a019.otf") format("opentype");
 font-display:auto;font-style:normal;font-weight:600;font-stretch:normal;
 }
 
 @font-face {
 font-family:"quiche-sans";
-src:url("/source/_remote/f709c9261f37f866e4c3.woff2") format("woff2"),url("/source/_remote/35b317dc9a0f7da8bfd7.woff") format("woff"),url("/source/_remote/2ae76d8b1eda86c68a4f.otf") format("opentype");
+src:url("f709c9261f37f866e4c3.woff2") format("woff2"),url("35b317dc9a0f7da8bfd7.woff") format("woff"),url("2ae76d8b1eda86c68a4f.otf") format("opentype");
 font-display:auto;font-style:normal;font-weight:700;font-stretch:normal;
 }
 
