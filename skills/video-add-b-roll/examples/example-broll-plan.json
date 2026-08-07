@@ -21,7 +21,19 @@
     "review_video_sha256": "5555555555555555555555555555555555555555555555555555555555555555"
   },
   "brief": {
-    "density": "selective",
+    "density": "dynamic-social",
+    "search_context": {
+      "topic": "Manufacturing automation workflow",
+      "visual_direction": "Visible precision manufacturing and operations software",
+      "keywords": [
+        "manufacturing",
+        "automation",
+        "precision parts",
+        "assembly line",
+        "operations dashboard",
+        "industrial software"
+      ]
+    },
     "style": "literal documentary footage",
     "avoid": [
       "logos",
@@ -114,9 +126,11 @@
       },
       "editorial_reason": "Shows the physical process named in the claim.",
       "visual_intent": "A readable view of precision parts moving through a factory line.",
+      "semantic_role": "direct",
       "queries": [
         "precision parts factory line",
-        "manufacturing assembly process wide shot"
+        "manufacturing assembly process wide shot",
+        "industrial automation workflow detail"
       ],
       "candidates": [
         {
@@ -223,9 +237,11 @@
       },
       "editorial_reason": "A literal interface could clarify the software claim.",
       "visual_intent": "A readable product interface showing the exact workflow described.",
+      "semantic_role": "supportive",
       "queries": [
         "manufacturing workflow software interface",
-        "factory operations dashboard close up"
+        "factory operations dashboard close up",
+        "industrial data flow screen"
       ],
       "candidates": [],
       "selected": null,

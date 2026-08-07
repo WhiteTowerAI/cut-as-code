@@ -53,7 +53,7 @@ class _BrollFixture:
         asset.write_bytes(b"asset")
         self.mapped_words = projectlib.map_transcript_to_timeline(self.transcript, self.timeline)["segments"][0]["words"]
         candidate = {"id": "asset", "media_type": "video", "cache_path": "cache/b-roll/factory.mp4", "sha256": broll_plan.sha256_file(asset), "bytes": asset.stat().st_size, "duration_s": 2.0, "probe": {"duration_s": 2.0, "width": 1920, "height": 1080}, "provenance": {"source_type": "local", "creator": "me", "license": "owned", "retrieval_time": "2026-07-23T00:00:00Z", "original_path": "input/factory.mp4"}}
-        self.plan = {"schema_version": 1, "timeline_id": "main", "timebase": "program", "program_duration_s": 10.0, "dependencies": ["understanding", "cut", "color-grade"], "based_on": {"understanding": 1, "cut": 2, "color-grade": 3}, "input_hashes": {"transcript_sha256": broll_plan.sha256_file(self.transcript_path), "timeline_sha256": broll_plan.sha256_file(self.timeline_path), "grade_plan_sha256": broll_plan.sha256_file(self.grade_plan_path), "selected_lut_sha256": broll_plan.sha256_file(self.selected_lut_path), "review_video_sha256": "b" * 64}, "brief": {"density": "selective"}, "decision": None, "review": None, "shots": [{"id": "shot", "program_range": {"start_s": 1.0, "end_s": 2.0}, "source_ranges": [{"clip_id": "one", "start_s": 1.0, "end_s": 2.0}], "transcript_evidence": {"words": [self.mapped_words[0]]}, "editorial_reason": "Supports the statement.", "visual_intent": "Factory work.", "queries": ["factory assembly", "manufacturing line"], "candidates": [candidate], "selected": None, "status": "candidates_ready"}]}
+        self.plan = {"schema_version": 1, "timeline_id": "main", "timebase": "program", "program_duration_s": 10.0, "dependencies": ["understanding", "cut", "color-grade"], "based_on": {"understanding": 1, "cut": 2, "color-grade": 3}, "input_hashes": {"transcript_sha256": broll_plan.sha256_file(self.transcript_path), "timeline_sha256": broll_plan.sha256_file(self.timeline_path), "grade_plan_sha256": broll_plan.sha256_file(self.grade_plan_path), "selected_lut_sha256": broll_plan.sha256_file(self.selected_lut_path), "review_video_sha256": "b" * 64}, "brief": {"density": "dynamic-social"}, "decision": None, "review": None, "shots": [{"id": "shot", "program_range": {"start_s": 1.0, "end_s": 2.0}, "source_ranges": [{"clip_id": "one", "start_s": 1.0, "end_s": 2.0}], "transcript_evidence": {"words": [self.mapped_words[0]]}, "editorial_reason": "Supports the statement.", "visual_intent": "Factory work.", "queries": ["factory assembly", "manufacturing line"], "candidates": [candidate], "selected": None, "status": "candidates_ready"}]}
         self.project = {"active_sequence": "main", "sequences": {"main": {"operations": ["cut", "color-grade"]}}, "operations": [{"id": "understanding", "revision": 1}, {"id": "cut", "revision": 2}, {"id": "color-grade", "revision": 3, "render": {"plan": "color-grade/grade-plan.json"}}]}
         self.project_path = self.root / "work/project.json"
         projectlib.write_json(self.project_path, self.project)
@@ -123,6 +123,75 @@ class _BrollFixture:
 
 
 class BrollPlanTests(_BrollFixture, unittest.TestCase):
+
+    def test_dynamic_social_density_is_required_without_coverage_validation(self):
+        self.assertEqual([], broll_plan.validate_plan(
+            self.plan, self.timeline, self.transcript,
+        ))
+        selective = copy.deepcopy(self.plan)
+        selective["brief"]["density"] = "selective"
+        self.assertIn("brief density must be dynamic-social", broll_plan.validate_plan(
+            selective, self.timeline, self.transcript,
+        ))
+        for start_s, end_s, status in (
+            (1.0, 2.0, "below_target"),
+            (0.0, 8.0, "above_target"),
+        ):
+            with self.subTest(coverage_status=status):
+                plan = copy.deepcopy(self.plan)
+                plan["shots"][0].update({
+                    "program_range": {"start_s": start_s, "end_s": end_s},
+                    "source_ranges": [{"clip_id": "one", "start_s": start_s, "end_s": end_s}],
+                    "candidates": [],
+                    "selected": None,
+                    "status": "planned",
+                })
+                summary = broll_plan.coverage_summary(plan, planned=plan["shots"])
+                self.assertEqual(status, summary["planned"]["status"])
+                self.assertEqual([], broll_plan.validate_plan(
+                    plan, self.timeline, self.transcript,
+                ))
+
+    def test_coverage_summary_merges_ranges_and_reports_stage_status(self):
+        summary = broll_plan.coverage_summary(
+            self.plan,
+            [
+                {"program_range": {"start_s": 0.0, "end_s": 4.0}},
+                {"program_range": {"start_s": 3.0, "end_s": 5.0}},
+            ],
+            [
+                {"start_s": 0.0, "end_s": 2.0},
+                {"start_s": 3.0, "end_s": 4.0},
+            ],
+            [{"program_range": {"start_s": 0.0, "end_s": 8.0}}],
+        )
+
+        self.assertEqual("dynamic-social", summary["profile"])
+        self.assertEqual(0.40, summary["target_min_ratio"])
+        self.assertEqual(0.70, summary["target_max_ratio"])
+        self.assertEqual({"duration_s": 5.0, "ratio": 0.5, "status": "within_target"}, summary["planned"])
+        self.assertEqual({"duration_s": 3.0, "ratio": 0.3, "status": "below_target"}, summary["shortlisted"])
+        self.assertEqual({"duration_s": 8.0, "ratio": 0.8, "status": "above_target"}, summary["selected"])
+
+    def test_coverage_summary_empty_stage_and_zero_duration_are_below(self):
+        empty = broll_plan.coverage_summary(self.plan, planned=[], shortlisted=[], selected=[])
+        self.assertEqual(0.0, empty["planned"]["duration_s"])
+        self.assertEqual(0.0, empty["planned"]["ratio"])
+        self.assertEqual("below_target", empty["planned"]["status"])
+
+        zero_duration = copy.deepcopy(self.plan)
+        zero_duration["program_duration_s"] = 0.0
+        zero = broll_plan.coverage_summary(
+            zero_duration,
+            planned=[{"start_s": 0.0, "end_s": 1.0}],
+            shortlisted=[{"start_s": 0.0, "end_s": 1.0}],
+            selected=[{"start_s": 0.0, "end_s": 1.0}],
+        )
+        for stage in ("planned", "shortlisted", "selected"):
+            with self.subTest(stage=stage):
+                self.assertEqual(0.0, zero[stage]["duration_s"])
+                self.assertEqual(0.0, zero[stage]["ratio"])
+                self.assertEqual("below_target", zero[stage]["status"])
 
     @staticmethod
     def _speaker_style():
@@ -285,6 +354,46 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         self.assertEqual("chosen", example["presentation"]["status"])
         self.assertEqual("speaker-inset", example["presentation"]["mode"])
         self.assertEqual("b-roll/presentation-decision.json", example["presentation"]["path"])
+
+    def test_dynamic_social_docs_and_example_define_search_context_and_semantic_ranking_contract(self):
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        rules = (ROOT / "reference/broll-rules.md").read_text(encoding="utf-8")
+        example = json.loads((
+            ROOT / "examples/example-broll-plan.json"
+        ).read_text(encoding="utf-8"))
+
+        for text in (skill, rules):
+            normalized = " ".join(text.split())
+            for value in (
+                    "dynamic-social", "0.40", "0.70",
+                    "brief.search_context", "topic", "visual_direction", "1-12 unique keywords",
+                    "semantic_role", "direct", "supportive", "atmospheric",
+                    "direct subject/action", "defensible context/process", "theme-enhancing variant",
+                    "visible frozen-frame evidence", "weak_semantic_match",
+                    "semantic-first lexicographic", "tech", "entertainment",
+                    "Both `semantic_fit == 0` and `context_fit == 0` are retained hard ineligibility protections",
+                    "then the combined `composition_fit + style_fit` score"):
+                self.assertIn(value, normalized)
+            self.assertIn("complete A-roll scan", normalized)
+            self.assertNotIn("selective", text.lower())
+            self.assertNotIn("no minimum coverage", text.lower())
+
+        self.assertEqual("dynamic-social", example["brief"]["density"])
+        self.assertEqual(
+            {"topic", "visual_direction", "keywords"},
+            set(example["brief"]["search_context"]),
+        )
+        self.assertTrue(example["brief"]["search_context"]["topic"].strip())
+        self.assertTrue(example["brief"]["search_context"]["visual_direction"].strip())
+        keywords = example["brief"]["search_context"]["keywords"]
+        self.assertGreaterEqual(len(keywords), 1)
+        self.assertLessEqual(len(keywords), 12)
+        self.assertEqual(len(keywords), len({item.casefold().strip() for item in keywords}))
+        self.assertTrue(all(item.strip() for item in keywords))
+        self.assertTrue(all(
+            shot["semantic_role"] in {"direct", "supportive", "atmospheric"}
+            for shot in example["shots"]
+        ))
 
     def test_prepare_composite_writes_non_approval_selection_snapshot(self):
         candidates = self._canonical_candidates(1)
@@ -602,6 +711,16 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         plan = copy.deepcopy(self.plan); plan["shots"][0]["program_range"] = {"start_s": -1, "end_s": 1}
         self.assertIn("shot program range is outside timeline", broll_plan.validate_plan(plan, self.timeline, self.transcript))
 
+    def test_rejects_non_frame_aligned_program_range_before_review_publication(self):
+        plan = copy.deepcopy(self.plan)
+        plan["shots"][0]["program_range"]["end_s"] = 2.01
+        plan["shots"][0]["source_ranges"][0]["end_s"] = 2.01
+
+        self.assertIn(
+            "shot program range must align to timeline frames",
+            broll_plan.validate_plan(plan, self.timeline, self.transcript),
+        )
+
     def test_evidence_word_must_exactly_match_mapped_transcript_word(self):
         plan = copy.deepcopy(self.plan); plan["shots"][0]["transcript_evidence"]["words"][0]["source_range"]["start_s"] = 1.1
         self.assertIn("shot transcript evidence word is not mapped from transcript", broll_plan.validate_plan(plan, self.timeline, self.transcript))
@@ -745,6 +864,34 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
                             broll_plan.validate_revision_request(
                                 self.plan, out_of_bounds, self.timeline, self.transcript,
                             )))
+
+    def test_revision_rebuild_clears_stale_presentation_route(self):
+        presented = self.record_presentation(self.plan, "speaker-inset")
+        request = self.review_for(
+            presented,
+            [{
+                "id": "shot", "decision": "select",
+                "requested_program_range": {"start_s": 1.0, "end_s": 3.0},
+                "segments": [{
+                    "candidate_id": "asset",
+                    "source_range": {"start_s": 0.0, "end_s": 2.0},
+                    "program_range": {"start_s": 1.0, "end_s": 3.0},
+                    "playback_rate": 1.0,
+                }],
+            }],
+            submission_intent="request_revision",
+            explicit_user_action=True,
+            revision_notes="Use the revised range.",
+        )
+        request.pop("rationale")
+
+        rebuilt = broll_plan.rebuild_plan_from_revision(
+            presented, request, self.timeline, self.transcript,
+        )
+
+        self.assertNotIn("presentation", rebuilt)
+        self.assertNotIn("speaker_inset_style", rebuilt)
+        self.assertEqual("ordinary", self.record_presentation(rebuilt, "ordinary")["presentation"]["mode"])
 
     def test_legacy_long_trim_exposes_requested_and_effective_ranges(self):
         review = self.review_for(self.plan, [{
@@ -3975,6 +4122,19 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
         self.output = self.root / "work/cache/b-roll/normalized/broll-001.mp4"
         self.timeline.update({"width": 96, "height": 54, "fps": {"num": 30000, "den": 1001}})
         projectlib.write_json(self.timeline_path, self.timeline)
+        frame = self.timeline["fps"]["den"] / self.timeline["fps"]["num"]
+        self.transcript["segments"][0]["words"] = [
+            {
+                "word": word,
+                "start": round(index * 30 * frame, 9),
+                "end": round((index + 1) * 30 * frame, 9),
+            }
+            for index, word in enumerate(("factory", "process", "output", "quality"), 1)
+        ]
+        projectlib.write_json(self.transcript_path, self.transcript)
+        self.mapped_words = projectlib.map_transcript_to_timeline(
+            self.transcript, self.timeline,
+        )["segments"][0]["words"]
         self.selected_lut_path.write_text(
             'TITLE "Identity"\nLUT_3D_SIZE 2\nDOMAIN_MIN 0 0 0\nDOMAIN_MAX 1 1 1\n'
             "0 0 0\n0 0 1\n0 1 0\n0 1 1\n1 0 0\n1 0 1\n1 1 0\n1 1 1\n",
@@ -3988,14 +4148,27 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
             "duration_s": 2.0, "probe": {"duration_s": 2.0, "width": 128, "height": 96},
         })
         self.plan["input_hashes"].update({
+            "transcript_sha256": broll_plan.sha256_file(self.transcript_path),
             "timeline_sha256": broll_plan.sha256_file(self.timeline_path),
             "grade_plan_sha256": broll_plan.sha256_file(self.grade_plan_path),
             "selected_lut_sha256": broll_plan.sha256_file(self.selected_lut_path),
+        })
+        start = round(30 * frame, 9)
+        end = round(60 * frame, 9)
+        self.plan["shots"][0].update({
+            "program_range": {"start_s": start, "end_s": end},
+            "source_ranges": [{"clip_id": "one", "start_s": start, "end_s": end}],
+            "transcript_evidence": {"words": [self.mapped_words[0]]},
         })
         self.base_plan = copy.deepcopy(self.plan)
         self.plan = self._approve(self.base_plan)
         self.plan_path = self.root / "work/b-roll/broll-plan.json"
         projectlib.write_json(self.plan_path, self.plan)
+
+    def test_base_plan_matches_final_timeline_frame_grid(self):
+        self.assertEqual([], broll_plan.validate_plan(
+            self.base_plan, self.timeline, self.transcript,
+        ))
 
     def _approve(self, plan):
         decisions = [
@@ -4009,9 +4182,11 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
     def _two_shot_plan(self):
         plan = copy.deepcopy(self.base_plan)
         second = copy.deepcopy(plan["shots"][0])
+        frame = self.timeline["fps"]["den"] / self.timeline["fps"]["num"]
+        start, end = round(60 * frame, 9), round(90 * frame, 9)
         second.update({
-            "id": "second", "program_range": {"start_s": 2, "end_s": 3},
-            "source_ranges": [{"clip_id": "one", "start_s": 2, "end_s": 3}],
+            "id": "second", "program_range": {"start_s": start, "end_s": end},
+            "source_ranges": [{"clip_id": "one", "start_s": start, "end_s": end}],
             "transcript_evidence": {"words": [self.mapped_words[1]]},
         })
         second["candidates"][0]["id"] = "asset-2"
@@ -4058,6 +4233,14 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
                                clearance_mode="enabled", secondary=None):
         self.timeline["fps"] = {"num": 30, "den": 1}
         projectlib.write_json(self.timeline_path, self.timeline)
+        self.transcript["segments"][0]["words"] = [
+            {"word": word, "start": float(index), "end": float(index + 1)}
+            for index, word in enumerate(("factory", "process", "output", "quality"), 1)
+        ]
+        projectlib.write_json(self.transcript_path, self.transcript)
+        self.mapped_words = projectlib.map_transcript_to_timeline(
+            self.transcript, self.timeline,
+        )["segments"][0]["words"]
         frame = self.timeline["fps"]["den"] / self.timeline["fps"]["num"]
         start = round(30 * frame, 9)
         end = round(60 * frame, 9)
@@ -4065,18 +4248,20 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
         plan = copy.deepcopy(self.base_plan)
         plan["speaker_inset_style"] = BrollPlanTests._speaker_style()
         plan["input_hashes"]["timeline_sha256"] = broll_plan.sha256_file(self.timeline_path)
+        plan["input_hashes"]["transcript_sha256"] = broll_plan.sha256_file(self.transcript_path)
         plan["input_hashes"]["review_video_sha256"] = broll_plan.sha256_file(review_video)
         shot = plan["shots"][0]
         shot["program_range"] = {"start_s": start, "end_s": end}
         shot["source_ranges"] = [{"clip_id": "one", "start_s": start, "end_s": end}]
+        shot["transcript_evidence"] = {"words": [self.mapped_words[0]]}
         layouts = [{"shot_id": "shot", "preset": preset, "anchor": anchor}]
         if secondary is not None:
             second = copy.deepcopy(shot)
             second.update({
                 "id": "second",
-                "program_range": {"start_s": end, "end_s": round(end + 1.0, 9)},
+                "program_range": {"start_s": end, "end_s": round(end + 30 * frame, 9)},
                 "source_ranges": [{
-                    "clip_id": "one", "start_s": end, "end_s": round(end + 1.0, 9),
+                    "clip_id": "one", "start_s": end, "end_s": round(end + 30 * frame, 9),
                 }],
                 "transcript_evidence": {"words": [self.mapped_words[1]]},
             })
@@ -4641,6 +4826,142 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
             self.plan_path, self.timeline_path, self.root, lut=self.selected_lut_path
         )
 
+    def _selected_and_skipped_for_check(self):
+        video = self._review_video()
+        frame = self.timeline["fps"]["den"] / self.timeline["fps"]["num"]
+        plan = copy.deepcopy(self.base_plan)
+        plan["input_hashes"]["review_video_sha256"] = broll_plan.sha256_file(video)
+        skipped = copy.deepcopy(plan["shots"][0])
+        skipped.update({
+            "id": "skipped",
+            "program_range": {"start_s": round(90 * frame, 9), "end_s": round(120 * frame, 9)},
+            "source_ranges": [{"clip_id": "one", "start_s": round(90 * frame, 9), "end_s": round(120 * frame, 9)}],
+            "transcript_evidence": {"words": [self.mapped_words[2]]},
+        })
+        skipped["candidates"][0]["id"] = "skipped-asset"
+        plan["shots"].append(skipped)
+        decisions = [
+            {"id": "shot", "decision": "select", "candidate_id": "asset",
+             "source_trim": {"start_s": 0.25, "end_s": 1.25}},
+            {"id": "skipped", "decision": "skip"},
+        ]
+        approved = broll_plan.apply_review(
+            plan, self.review_for(plan, decisions), mode="agent", actor="agent",
+            rationale="Relevant footage.",
+        )
+        projectlib.write_json(self.plan_path, approved)
+        ranking_path = self.root / "work/b-roll/candidate-ranking.json"
+        projectlib.write_json(ranking_path, {
+            "schema_version": 1,
+            "shots": [
+                {"shot_id": "shot", "top3": ["asset"]},
+                {"shot_id": "skipped", "top3": []},
+            ],
+        })
+        return video, normalize_broll.normalize_plan(
+            self.plan_path, self.timeline_path, self.root, lut=self.selected_lut_path
+        ), ranking_path
+
+    def test_verify_writes_internal_coverage_summary_for_selected_and_skipped_shots(self):
+        video, _, _ = self._selected_and_skipped_for_check()
+
+        verified, artifacts = check_broll.verify_plan(
+            self.plan_path, self.timeline_path, self.root, video,
+        )
+
+        coverage_path = self.root / "work/b-roll/coverage-summary.json"
+        self.assertTrue(coverage_path.is_file(), "verify_plan must publish coverage-summary.json")
+        coverage = projectlib.load_json(coverage_path)
+        self.assertEqual(1, coverage["schema_version"])
+        self.assertEqual("main", coverage["timeline_id"])
+        self.assertEqual(10.0, coverage["program_duration_s"])
+        self.assertEqual("dynamic-social", coverage["profile"])
+        self.assertEqual(0.40, coverage["target_min_ratio"])
+        self.assertEqual(0.70, coverage["target_max_ratio"])
+        frame = 1001 / 30000
+        selected_duration = round(30 * frame, 9)
+        planned_duration = round(60 * frame, 9)
+        self.assertEqual(
+            {"duration_s": selected_duration, "ratio": round(selected_duration / 10.0, 9), "status": "below_target"},
+            coverage["selected"],
+        )
+        self.assertEqual(
+            {"duration_s": planned_duration, "ratio": round(planned_duration / 10.0, 9), "status": "below_target"},
+            coverage["planned"],
+        )
+        self.assertEqual(
+            {"duration_s": 0.0, "ratio": 0.0, "status": "below_target"},
+            coverage["shortlisted"],
+        )
+        self.assertEqual(broll_plan.sha256_file(self.plan_path), coverage["plan_sha256"])
+        self.assertIsNone(coverage["ranking_sha256"])
+        self.assertEqual("verified", verified["shots"][0]["status"])
+        self.assertEqual("skipped", verified["shots"][1]["status"])
+
+        final_video = self.root / "final/final-video.mp4"
+        final_video.write_bytes(video.read_bytes())
+        visual_subject = broll_plan.canonical_sha256(broll_plan.visual_review_subject(verified))
+        _, published = check_broll.complete_visual_review(
+            self.plan_path, self.root, self._visual_review(visual_subject), final_video,
+        )
+        user_facing = (
+            artifacts["summary"].read_text(encoding="utf-8"),
+            projectlib.load_json(published["receipt"]),
+            verified["review"]["rationale"],
+            verified["decision"]["rationale"],
+        )
+        forbidden = (
+            "coverage_summary", "target_min_ratio", "target_max_ratio",
+            "planned_ratio", "shortlist_ratio", "selected_ratio",
+            "below_target", "within_target", "above_target",
+        )
+        for value in forbidden:
+            for output in user_facing:
+                with self.subTest(value=value, output_type=type(output).__name__):
+                    self.assertNotIn(value, json.dumps(output, sort_keys=True))
+
+    def test_verify_writes_below_target_selected_coverage_for_all_skipped_plan(self):
+        video = self._review_video()
+        plan = copy.deepcopy(self.base_plan)
+        plan["input_hashes"]["review_video_sha256"] = broll_plan.sha256_file(video)
+        approved = broll_plan.apply_review(
+            plan, self.review_for(plan, [{"id": "shot", "decision": "skip"}]),
+            mode="agent", actor="agent", rationale="Relevant footage.",
+        )
+        projectlib.write_json(self.plan_path, approved)
+
+        verified, _ = check_broll.verify_plan(
+            self.plan_path, self.timeline_path, self.root, video,
+        )
+
+        coverage_path = self.root / "work/b-roll/coverage-summary.json"
+        self.assertTrue(coverage_path.is_file(), "verify_plan must publish coverage-summary.json")
+        coverage = projectlib.load_json(coverage_path)
+        self.assertEqual(
+            {"duration_s": 0.0, "ratio": 0.0, "status": "below_target"},
+            coverage["selected"],
+        )
+        self.assertEqual("skipped", verified["shots"][0]["status"])
+
+    def test_verify_ignores_unbound_malformed_ranking_for_coverage(self):
+        video, _, ranking_path = self._selected_and_skipped_for_check()
+        ranking_path.write_text(
+            json.dumps({"shots": [{"shot_id": "shot", "top3": ["asset"]}]}),
+            encoding="utf-8",
+        )
+
+        verified, _ = check_broll.verify_plan(
+            self.plan_path, self.timeline_path, self.root, video,
+        )
+
+        coverage = projectlib.load_json(self.root / "work/b-roll/coverage-summary.json")
+        self.assertEqual(
+            {"duration_s": 0.0, "ratio": 0.0, "status": "below_target"},
+            coverage["shortlisted"],
+        )
+        self.assertIsNone(coverage["ranking_sha256"])
+        self.assertEqual("verified", verified["shots"][0]["status"])
+
     def _seed_review_outputs(self):
         review_dir = self.root / "review/03-b-roll"
         (review_dir / "stills").mkdir(parents=True, exist_ok=True)
@@ -4835,6 +5156,43 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
                     self.output.with_name("invalid.mp4"),
                 )
             run.assert_not_called()
+
+    def test_canonical_segment_normalization_keeps_exact_timeline_frame_count(self):
+        self.timeline.update({"fps": {"num": 60, "den": 1}})
+        source = self.candidates / "25fps-frame-boundary.mp4"
+        subprocess.run([
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-f", "lavfi", "-i", "testsrc2=size=128x96:rate=25",
+            "-t", "7", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            "-video_track_timescale", "25",
+            str(source),
+        ], check=True, capture_output=True)
+        candidate, shot = self._video_shot(source)
+        candidate.update({
+            "sha256": broll_plan.sha256_file(source),
+            "probe": {"duration_s": 7.0},
+        })
+        expected_frames = 243
+        duration = expected_frames / 60
+        shot["program_range"] = {"start_s": 0.0, "end_s": duration}
+        shot["selected"] = {"segments": [{
+            "candidate_id": "asset",
+            "source_range": {"start_s": 0.0, "end_s": duration * 1.5},
+            "program_range": {"start_s": 0.0, "end_s": duration},
+            "playback_rate": 1.5,
+        }]}
+
+        output = self.output.with_name("25fps-frame-boundary.mp4")
+        normalize_broll.normalize_shot(candidate, shot, self.timeline, output)
+
+        probe = subprocess.run([
+            "ffprobe", "-v", "error", "-count_frames", "-select_streams", "v:0",
+            "-show_entries", "stream=nb_read_frames", "-of", "json", str(output),
+        ], check=True, capture_output=True, text=True)
+        self.assertEqual(
+            expected_frames,
+            int(json.loads(probe.stdout)["streams"][0]["nb_read_frames"]),
+        )
 
     def test_fixed_speed_segments_normalize_individually_and_hard_concat(self):
         frame = 1001 / 30000
@@ -6115,6 +6473,7 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
 
     def test_boundary_reel_clips_short_shots_at_program_edges(self):
         video = self._review_video()
+        frame = self.timeline["fps"]["den"] / self.timeline["fps"]["num"]
         self.transcript = {"segments": [{"words": [
             {"word": "opening", "start": 0.05, "end": 0.35},
             {"word": "closing", "start": 9.65, "end": 9.95},
@@ -6124,14 +6483,14 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
         plan = copy.deepcopy(self.base_plan)
         first = plan["shots"][0]
         first.update({
-            "id": "opening", "program_range": {"start_s": 0, "end_s": 0.4},
-            "source_ranges": [{"clip_id": "one", "start_s": 0, "end_s": 0.4}],
+            "id": "opening", "program_range": {"start_s": 0, "end_s": round(12 * frame, 9)},
+            "source_ranges": [{"clip_id": "one", "start_s": 0, "end_s": round(12 * frame, 9)}],
             "transcript_evidence": {"words": [mapped[0]]},
         })
         second = copy.deepcopy(first)
         second.update({
-            "id": "closing", "program_range": {"start_s": 9.6, "end_s": 10},
-            "source_ranges": [{"clip_id": "one", "start_s": 9.6, "end_s": 10}],
+            "id": "closing", "program_range": {"start_s": round(288 * frame, 9), "end_s": round(299 * frame, 9)},
+            "source_ranges": [{"clip_id": "one", "start_s": round(288 * frame, 9), "end_s": round(299 * frame, 9)}],
             "transcript_evidence": {"words": [mapped[1]]},
         })
         second["candidates"][0]["id"] = "asset-2"
@@ -6186,7 +6545,7 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
 class CandidateAnalysisTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         (self.root / "work/cache/b-roll/candidate-analysis/media").mkdir(parents=True)
         (self.root / "work/cache/b-roll/candidate-analysis/frames").mkdir(parents=True)
 
@@ -6222,12 +6581,44 @@ class CandidateAnalysisTests(unittest.TestCase):
             **extra,
         }
 
+    @staticmethod
+    def _search_plan():
+        return {
+            "brief": {
+                "density": "dynamic-social",
+                "search_context": {
+                    "topic": "Factory automation",
+                    "visual_direction": "Precise hands-on industrial work",
+                    "keywords": ["robotics", " precision "],
+                },
+            },
+            "shots": [{
+                "id": "shot",
+                "semantic_role": "direct",
+                "queries": ["factory process", "assembly line"],
+                "candidates": [],
+            }],
+        }
+
+    @staticmethod
+    def _pexels_search_candidate():
+        return {
+            "id": "shot-101-202",
+            "provider_id": 101,
+            "duration_s": 2.0,
+            "analysis_variant": {"file_id": 202, "download_url": "https://videos.pexels.com/analysis.mp4", "width": 720, "height": 1280},
+            "delivery_variant": {"file_id": 303, "download_url": "https://videos.pexels.com/delivery.mp4", "width": 720, "height": 1280},
+            "provenance": {"source_type": "pexels", "provider_id": 101, "source_url": "https://www.pexels.com/video/test-101/", "license_url": pexels.LICENSE_URL, "terms_url": pexels.TERMS_URL},
+        }
+
     def _analysis_and_scores(self):
         analysis = {
             "schema_version": 1,
+            "search_context": copy.deepcopy(self._search_plan()["brief"]["search_context"]),
             "search_sha256": "a" * 64,
             "shots": [{
                 "shot_id": "shot",
+                "semantic_role": "direct",
                 "candidates": [
                     self._candidate("a", 30, warning_count=4),
                     self._candidate("b", 20),
@@ -6272,6 +6663,238 @@ class CandidateAnalysisTests(unittest.TestCase):
         )
         self.assertEqual("precision process", merged[-1]["search"]["query"])
 
+    def test_search_plan_persists_exact_context_and_semantic_role(self):
+        plan = self._search_plan()
+
+        result = candidate_analysis.search_plan(plan, orientation="portrait", include_pexels=False)
+
+        self.assertEqual(plan["brief"]["search_context"], result["search_context"])
+        self.assertIsNot(plan["brief"]["search_context"], result["search_context"])
+        self.assertEqual("direct", result["shots"][0]["semantic_role"])
+        self.assertEqual(plan["shots"][0]["queries"], result["shots"][0]["queries"])
+
+    def test_search_and_ranking_write_internal_coverage_summary_without_ui_fields(self):
+        plan = self._search_plan()
+        plan["program_duration_s"] = 10.0
+        plan["shots"][0]["program_range"] = {"start_s": 1.0, "end_s": 2.0}
+        plan_path = self.root / "work/b-roll/broll-plan.json"
+        search_path = self.root / "work/b-roll/candidate-search.json"
+        ranking_path = self.root / "work/b-roll/candidate-ranking.json"
+        projectlib.write_json(plan_path, plan)
+
+        with contextlib.redirect_stdout(io.StringIO()):
+            candidate_analysis.main([
+                "search", str(self.root), str(plan_path), str(search_path),
+                "--orientation", "portrait", "--local-only",
+            ])
+
+        coverage_path = self.root / "work/b-roll/coverage-summary.json"
+        planned = projectlib.load_json(coverage_path)
+        self.assertEqual({"duration_s": 1.0, "ratio": 0.1, "status": "below_target"}, planned["planned"])
+        self.assertEqual({"duration_s": 0.0, "ratio": 0.0, "status": "below_target"}, planned["shortlisted"])
+        self.assertEqual({"duration_s": 0.0, "ratio": 0.0, "status": "below_target"}, planned["selected"])
+
+        analysis, scores = self._analysis_and_scores()
+        analysis_path = self.root / "work/b-roll/candidate-analysis.json"
+        scores_path = self.root / "work/cache/b-roll/candidate-ranking-input.json"
+        projectlib.write_json(analysis_path, analysis)
+        projectlib.write_json(scores_path, scores)
+        with contextlib.redirect_stdout(io.StringIO()):
+            candidate_analysis.main([
+                "rank", str(self.root), str(analysis_path), str(scores_path), str(ranking_path),
+            ])
+
+        shortlisted = projectlib.load_json(coverage_path)
+        self.assertEqual({"duration_s": 1.0, "ratio": 0.1, "status": "below_target"}, shortlisted["planned"])
+        self.assertEqual({"duration_s": 1.0, "ratio": 0.1, "status": "below_target"}, shortlisted["shortlisted"])
+        self.assertEqual({"duration_s": 0.0, "ratio": 0.0, "status": "below_target"}, shortlisted["selected"])
+
+    def test_coverage_summary_publication_stages_then_atomically_replaces(self):
+        plan = self._search_plan()
+        plan["program_duration_s"] = 10.0
+        plan["shots"][0]["program_range"] = {"start_s": 1.0, "end_s": 2.0}
+        final_path = self.root / "work/b-roll/coverage-summary.json"
+        original_write_json = projectlib.write_json
+        original_replace = os.replace
+        original_payload = {"profile": "previous"}
+        original_write_json(final_path, original_payload)
+        write_paths = []
+        replacements = []
+
+        def staged_write(path, value):
+            path = Path(path)
+            if path == final_path:
+                raise AssertionError("coverage summary must not write directly to final path")
+            write_paths.append(path)
+            return original_write_json(path, value)
+
+        def atomic_replace(source, destination):
+            replacements.append((Path(source), Path(destination)))
+            return original_replace(source, destination)
+
+        with mock.patch.object(candidate_analysis.projectlib, "write_json", side_effect=staged_write), \
+             mock.patch.object(candidate_analysis.os, "replace", side_effect=atomic_replace):
+            candidate_analysis._write_coverage_summary(self.root, plan)
+
+        self.assertEqual(1, len(write_paths))
+        self.assertEqual(1, len(replacements))
+        self.assertEqual(final_path, replacements[0][1])
+        self.assertEqual(final_path.parent, write_paths[0].parent)
+        self.assertNotEqual(final_path, write_paths[0])
+        self.assertFalse(write_paths[0].exists())
+        self.assertEqual("dynamic-social", projectlib.load_json(final_path)["profile"])
+
+    def test_search_plan_requires_strict_search_context(self):
+        valid = self._search_plan()["brief"]["search_context"]
+        missing = self._search_plan()
+        missing["brief"].pop("search_context")
+        with self.assertRaises(ValueError):
+            candidate_analysis.search_plan(missing, orientation="portrait", include_pexels=False)
+
+        invalid_contexts = [
+            None,
+            [],
+            {**valid, "extra": "not allowed"},
+            {"visual_direction": valid["visual_direction"], "keywords": valid["keywords"]},
+            {**valid, "topic": " "},
+            {**valid, "visual_direction": " "},
+            {**valid, "keywords": []},
+            {**valid, "keywords": [f"keyword-{index}" for index in range(13)]},
+            {**valid, "keywords": ["factory", " "]},
+            {**valid, "keywords": ["Factory", " factory "]},
+            {**valid, "keywords": [1]},
+        ]
+        for context in invalid_contexts:
+            with self.subTest(context=context):
+                plan = self._search_plan()
+                plan["brief"]["search_context"] = context
+                with self.assertRaises(ValueError):
+                    candidate_analysis.search_plan(plan, orientation="portrait", include_pexels=False)
+
+        for keyword_count in (1, 12):
+            with self.subTest(keyword_count=keyword_count):
+                plan = self._search_plan()
+                plan["brief"]["search_context"]["keywords"] = [f"keyword-{index}" for index in range(keyword_count)]
+                candidate_analysis.search_plan(plan, orientation="portrait", include_pexels=False)
+
+    def test_search_plan_requires_known_semantic_role(self):
+        for role in (None, "primary"):
+            with self.subTest(role=role):
+                plan = self._search_plan()
+                if role is None:
+                    plan["shots"][0].pop("semantic_role")
+                else:
+                    plan["shots"][0]["semantic_role"] = role
+                with self.assertRaises(ValueError):
+                    candidate_analysis.search_plan(plan, orientation="portrait", include_pexels=False)
+
+    def test_analyze_search_binds_exact_context_role_and_queries(self):
+        plan = self._search_plan()
+        plan["shots"][0]["program_range"] = {"start_s": 0.0, "end_s": 1.0}
+        search = candidate_analysis.search_plan(plan, orientation="portrait", include_pexels=False)
+
+        analysis = candidate_analysis.analyze_search(
+            plan, search, {"width": 720, "height": 1280, "fps": {"num": 30, "den": 1}}, self.root,
+        )
+
+        self.assertEqual(plan["brief"]["search_context"], analysis.get("search_context"))
+        self.assertEqual(plan["shots"][0]["semantic_role"], analysis["shots"][0].get("semantic_role"))
+        self.assertEqual(plan["shots"][0]["queries"], analysis["shots"][0]["queries"])
+
+    def test_analyze_search_rejects_stale_context_role_and_queries(self):
+        plan = self._search_plan()
+        plan["shots"][0]["program_range"] = {"start_s": 0.0, "end_s": 1.0}
+        search = candidate_analysis.search_plan(plan, orientation="portrait", include_pexels=False)
+        search["shots"][0]["merged_candidates"] = [self._pexels_search_candidate()]
+        timeline = {"width": 720, "height": 1280, "fps": {"num": 30, "den": 1}}
+
+        for mismatch in ("topic", "semantic_role", "queries"):
+            with self.subTest(mismatch=mismatch):
+                stale = copy.deepcopy(search)
+                if mismatch == "topic":
+                    stale["search_context"]["topic"] = "Stale topic"
+                elif mismatch == "semantic_role":
+                    stale["shots"][0]["semantic_role"] = "supportive"
+                else:
+                    stale["shots"][0]["queries"].reverse()
+                downloader = mock.Mock(side_effect=AssertionError("stale input must fail before download"))
+                with self.assertRaises(ValueError):
+                    candidate_analysis.analyze_search(
+                        plan, stale, timeline, self.root, downloader=downloader,
+                    )
+                downloader.assert_not_called()
+
+    def test_analyze_search_rejects_unbound_search_shots_before_download(self):
+        plan = self._search_plan()
+        plan["shots"][0]["program_range"] = {"start_s": 0.0, "end_s": 1.0}
+        search = candidate_analysis.search_plan(plan, orientation="portrait", include_pexels=False)
+        search["shots"][0]["merged_candidates"] = [self._pexels_search_candidate()]
+        timeline = {"width": 720, "height": 1280, "fps": {"num": 30, "den": 1}}
+
+        invalid_shots = {
+            "duplicate": search["shots"] + [copy.deepcopy(search["shots"][0])],
+            "extra": search["shots"] + [{**copy.deepcopy(search["shots"][0]), "shot_id": "extra"}],
+            "non_object": search["shots"] + [None],
+            "missing_id": search["shots"] + [{}],
+            "invalid_id": search["shots"] + [{"shot_id": 1}],
+        }
+        for case, shots in invalid_shots.items():
+            with self.subTest(case=case):
+                invalid = copy.deepcopy(search)
+                invalid["shots"] = shots
+                downloader = mock.Mock(side_effect=AssertionError("unbound search must fail before download"))
+                with self.assertRaises(ValueError):
+                    candidate_analysis.analyze_search(
+                        plan, invalid, timeline, self.root, downloader=downloader,
+                    )
+                downloader.assert_not_called()
+
+        ordered_plan = self._search_plan()
+        ordered_plan["shots"].append({
+            "id": "second-shot",
+            "semantic_role": "supportive",
+            "queries": ["factory detail", "industrial closeup"],
+            "candidates": [],
+        })
+        ordered_search = candidate_analysis.search_plan(
+            ordered_plan, orientation="portrait", include_pexels=False,
+        )
+        ordered_search["shots"].reverse()
+        downloader = mock.Mock(side_effect=AssertionError("reordered search must fail before download"))
+        with self.assertRaises(ValueError):
+            candidate_analysis.analyze_search(
+                ordered_plan, ordered_search, timeline, self.root, downloader=downloader,
+            )
+        downloader.assert_not_called()
+
+    def test_analysis_validation_requires_strict_context_and_semantic_role(self):
+        analysis = {
+            "schema_version": 1,
+            "search_context": copy.deepcopy(self._search_plan()["brief"]["search_context"]),
+            "search_sha256": "a" * 64,
+            "shots": [{"shot_id": "shot", "semantic_role": "direct", "candidates": []}],
+        }
+        self.assertEqual([], candidate_analysis.validate_analysis_document(analysis))
+
+        invalid_documents = []
+        for field in ("search_context", "semantic_role"):
+            missing = copy.deepcopy(analysis)
+            if field == "search_context":
+                missing.pop(field)
+            else:
+                missing["shots"][0].pop(field)
+            invalid_documents.append(missing)
+        invalid_context = copy.deepcopy(analysis)
+        invalid_context["search_context"]["topic"] = " "
+        invalid_documents.append(invalid_context)
+        invalid_role = copy.deepcopy(analysis)
+        invalid_role["shots"][0]["semantic_role"] = "primary"
+        invalid_documents.append(invalid_role)
+
+        for document in invalid_documents:
+            with self.subTest(document=document):
+                self.assertTrue(candidate_analysis.validate_analysis_document(document))
+
     def test_duration_classification_has_frame_tolerance_and_trim_pad_warning(self):
         frame = 1 / 30
         self.assertEqual("reject", candidate_analysis.duration_classification(0.96, 1.0, frame))
@@ -6288,11 +6911,13 @@ class CandidateAnalysisTests(unittest.TestCase):
         candidate["samples"][0]["marker"] = "preserve"
         analysis = {
             "schema_version": 1,
+            "search_context": copy.deepcopy(self._search_plan()["brief"]["search_context"]),
             "search_sha256": "a" * 64,
             "timeline": {"width": 100, "height": 100, "fps": {"num": 30, "den": 1}},
             "sample_fractions": [0.1, 0.3, 0.5, 0.7, 0.9],
             "shots": [{
                 "shot_id": "shot",
+                "semantic_role": "direct",
                 "program_range": {"start_s": 0.0, "end_s": 1.0},
                 "transcript_evidence": {"words": [{"word": "old"}]},
                 "candidates": [candidate],
@@ -6336,11 +6961,13 @@ class CandidateAnalysisTests(unittest.TestCase):
         candidate["analysis_media"]["probe"] = {"duration_s": 1.5}
         analysis = {
             "schema_version": 1,
+            "search_context": copy.deepcopy(self._search_plan()["brief"]["search_context"]),
             "search_sha256": "a" * 64,
             "timeline": {"width": 100, "height": 100, "fps": {"num": 30, "den": 1}},
             "sample_fractions": [0.1, 0.3, 0.5, 0.7, 0.9],
             "shots": [{
                 "shot_id": "shot",
+                "semantic_role": "direct",
                 "program_range": {"start_s": 0.0, "end_s": 2.0},
                 "transcript_evidence": {"words": [{"word": "same"}]},
                 "candidates": [candidate],
@@ -6460,8 +7087,9 @@ class CandidateAnalysisTests(unittest.TestCase):
         frame.write_bytes(b"frame")
         analysis = {
             "schema_version": 1,
+            "search_context": copy.deepcopy(self._search_plan()["brief"]["search_context"]),
             "search_sha256": "a" * 64,
-            "shots": [{"shot_id": "shot", "candidates": [{
+            "shots": [{"shot_id": "shot", "semantic_role": "direct", "candidates": [{
                 "candidate_id": "a", "analysis_status": "analyzed",
                 "analysis_media": {"path": media.relative_to(self.root).as_posix(), "sha256": broll_plan.sha256_file(media), "bytes": media.stat().st_size},
                 "samples": [{"frame_path": frame.relative_to(self.root).as_posix(), "sha256": broll_plan.sha256_file(frame)} for _ in range(5)],
@@ -6494,10 +7122,11 @@ class CandidateAnalysisTests(unittest.TestCase):
     def test_agent_global_duplicate_groups_require_truthful_complete_evidence(self):
         analysis = {
             "schema_version": 1,
+            "search_context": copy.deepcopy(self._search_plan()["brief"]["search_context"]),
             "search_sha256": "a" * 64,
             "shots": [
-                {"shot_id": "first", "candidates": [self._candidate("a", 1)]},
-                {"shot_id": "second", "candidates": [self._candidate("b", 2)]},
+                {"shot_id": "first", "semantic_role": "direct", "candidates": [self._candidate("a", 1)]},
+                {"shot_id": "second", "semantic_role": "supportive", "candidates": [self._candidate("b", 2)]},
             ],
         }
         scores = {
@@ -6557,6 +7186,102 @@ class CandidateAnalysisTests(unittest.TestCase):
         self.assertEqual([], empty["top3"])
         self.assertEqual("no_eligible_candidates", empty["outcome"])
 
+    def test_semantic_gate_ranks_lexicographically_and_warns_on_weak_match(self):
+        candidate_ids = ["direct-three", "fact-two", "weak-one", "unrelated-zero"]
+        analysis = {
+            "schema_version": 1,
+            "search_context": copy.deepcopy(self._search_plan()["brief"]["search_context"]),
+            "search_sha256": "a" * 64,
+            "shots": [{
+                "shot_id": "concrete-fact",
+                "semantic_role": "direct",
+                "candidates": [
+                    self._candidate(candidate_id, provider_id)
+                    for candidate_id, provider_id in zip(candidate_ids, range(1, 5))
+                ],
+            }],
+        }
+        scores = {
+            "schema_version": 1,
+            "analysis_sha256": candidate_analysis.canonical_sha256(analysis),
+            "mode": "agent",
+            "actor": "Codex",
+            "timestamp": "2026-08-06T12:00:00+08:00",
+            "overall_rationale": "Compared each candidate against the concrete fact.",
+            "shots": [{
+                "shot_id": "concrete-fact",
+                "candidates": [
+                    self._score("direct-three", 3, 1, 1, 1),
+                    self._score("fact-two", 2, 4, 4, 4),
+                    self._score("weak-one", 1, 4, 4, 4),
+                    self._score("unrelated-zero", 0, 4, 4, 4),
+                ],
+            }],
+        }
+
+        shot = candidate_analysis.rank_candidates(analysis, scores)["shots"][0]
+
+        self.assertEqual(["direct-three", "fact-two", "weak-one"], shot["top3"])
+        weak = next(item for item in shot["candidates"] if item["candidate_id"] == "weak-one")
+        self.assertTrue(weak["eligible"])
+        self.assertIn("weak_semantic_match", weak["warnings"])
+        self.assertGreater(weak["base_rank"], next(
+            item["base_rank"] for item in shot["candidates"] if item["candidate_id"] == "fact-two"
+        ))
+        unrelated = next(item for item in shot["candidates"] if item["candidate_id"] == "unrelated-zero")
+        self.assertFalse(unrelated["eligible"])
+        self.assertEqual(scores["shots"][0]["candidates"][0]["rationale"], shot["candidates"][0]["rationale"])
+        self.assertEqual(3, shot["candidates"][0]["scores"]["semantic_fit"])
+
+    def test_semantic_gate_all_zero_returns_no_eligible_candidates(self):
+        analysis, scores = self._analysis_and_scores()
+        for item in scores["shots"][0]["candidates"]:
+            item["semantic_fit"] = 0
+
+        shot = candidate_analysis.rank_candidates(analysis, scores)["shots"][0]
+
+        self.assertEqual([], shot["top3"])
+        self.assertEqual("no_eligible_candidates", shot["outcome"])
+
+    def test_semantic_gate_counts_weak_match_before_provider_tiebreak(self):
+        analysis = {
+            "schema_version": 1,
+            "search_context": copy.deepcopy(self._search_plan()["brief"]["search_context"]),
+            "search_sha256": "a" * 64,
+            "shots": [{
+                "shot_id": "weak-fact",
+                "semantic_role": "direct",
+                "candidates": [
+                    self._candidate("fewer-warnings", 20),
+                    self._candidate("more-warnings", 10, warning_count=1),
+                ],
+            }],
+        }
+        scores = {
+            "schema_version": 1,
+            "analysis_sha256": candidate_analysis.canonical_sha256(analysis),
+            "mode": "agent",
+            "actor": "Codex",
+            "timestamp": "2026-08-06T12:00:00+08:00",
+            "overall_rationale": "Both candidates are weak but usable matches for the fact.",
+            "shots": [{
+                "shot_id": "weak-fact",
+                "candidates": [
+                    self._score("fewer-warnings", 1, 3, 3, 3),
+                    self._score("more-warnings", 1, 3, 3, 3),
+                ],
+            }],
+        }
+
+        shot = candidate_analysis.rank_candidates(analysis, scores)["shots"][0]
+        candidates = {item["candidate_id"]: item for item in shot["candidates"]}
+
+        self.assertEqual(["fewer-warnings", "more-warnings"], shot["top3"])
+        self.assertEqual(1, candidates["fewer-warnings"]["warnings"].count("weak_semantic_match"))
+        self.assertEqual(1, candidates["more-warnings"]["warnings"].count("weak_semantic_match"))
+        self.assertEqual(1, candidates["fewer-warnings"]["warning_count"])
+        self.assertEqual(2, candidates["more-warnings"]["warning_count"])
+
     def test_global_allocation_keeps_best_duplicate_refills_and_leaves_hints_eligible(self):
         first_candidates = [self._candidate(name, provider) for name, provider in (("a-exact", 11), ("a-series", 12), ("a-hint", 13), ("a-refill", 14))]
         second_candidates = [self._candidate(name, provider) for name, provider in (("b-exact", 21), ("b-series", 22), ("b-hint", 23), ("b-refill", 24))]
@@ -6564,6 +7289,7 @@ class CandidateAnalysisTests(unittest.TestCase):
         hint_members = [{"shot_id": "first", "candidate_id": "a-hint"}, {"shot_id": "second", "candidate_id": "b-hint"}]
         analysis = {
             "schema_version": 1,
+            "search_context": copy.deepcopy(self._search_plan()["brief"]["search_context"]),
             "search_sha256": "a" * 64,
             "project_duplicate_evidence": {
                 "exact_groups": [{"group_id": "exact-001", "members": exact_members, "evidence": [{"kind": "provider_candidate_id", "value": "shared"}]}],
@@ -6571,8 +7297,8 @@ class CandidateAnalysisTests(unittest.TestCase):
                 "possible_series": [{"hint_id": "possible-series-001", "members": hint_members, "evidence": [{"kind": "same_creator", "value": "creator"}]}],
             },
             "shots": [
-                {"shot_id": "first", "candidates": first_candidates},
-                {"shot_id": "second", "candidates": second_candidates},
+                {"shot_id": "first", "semantic_role": "direct", "candidates": first_candidates},
+                {"shot_id": "second", "semantic_role": "supportive", "candidates": second_candidates},
             ],
         }
         scores = {
@@ -6619,7 +7345,7 @@ class CandidateAnalysisTests(unittest.TestCase):
 
     def test_optional_ranking_binding_is_hash_bound_and_old_plans_remain_valid(self):
         fixture = _BrollFixture(); fixture.setUp(); self.addCleanup(fixture.tearDown)
-        analysis = {"schema_version": 1, "search_sha256": "a" * 64, "shots": [{"shot_id": "shot", "candidates": [self._candidate("asset", 1)]}]}
+        analysis = {"schema_version": 1, "search_context": copy.deepcopy(self._search_plan()["brief"]["search_context"]), "search_sha256": "a" * 64, "shots": [{"shot_id": "shot", "semantic_role": "direct", "candidates": [self._candidate("asset", 1)]}]}
         scores = {
             "schema_version": 1, "analysis_sha256": candidate_analysis.canonical_sha256(analysis),
             "mode": "agent", "actor": "Codex", "timestamp": "2026-07-30T12:00:00+08:00",
@@ -6656,6 +7382,105 @@ class CandidateAnalysisTests(unittest.TestCase):
         self.assertEqual(["low_source_resolution"], ranking["warnings"])
         self.assertIn("matches", ranking["rationale"])
 
+    def test_candidate_review_payload_omits_internal_search_context_and_semantic_role(self):
+        fixture = _BrollFixture(); fixture.setUp(); self.addCleanup(fixture.tearDown)
+        search_context = {
+            "topic": "PRIVATE_TOPIC_SENTINEL_7F31",
+            "visual_direction": "PRIVATE_VISUAL_DIRECTION_SENTINEL_8A42",
+            "keywords": ["PRIVATE_KEYWORD_SENTINEL_9B53"],
+        }
+        fixture.plan["brief"]["search_context"] = search_context
+        fixture.plan["shots"][0]["semantic_role"] = "direct"
+        fixture.plan["coverage_summary"] = {
+            "profile": "PRIVATE_COVERAGE_PROFILE_SENTINEL_6C64",
+            "planned": {"status": "PRIVATE_COVERAGE_STATUS_SENTINEL_5D75"},
+        }
+        analysis = {
+            "schema_version": 1,
+            "search_context": copy.deepcopy(search_context),
+            "search_sha256": "a" * 64,
+            "shots": [{"shot_id": "shot", "semantic_role": "direct", "candidates": [self._candidate("asset", 1)]}],
+        }
+        scores = {
+            "schema_version": 1,
+            "analysis_sha256": candidate_analysis.canonical_sha256(analysis),
+            "mode": "agent",
+            "actor": "Codex",
+            "timestamp": "2026-07-30T12:00:00+08:00",
+            "overall_rationale": "The candidate directly shows the described factory process.",
+            "shots": [{"shot_id": "shot", "candidates": [self._score("asset", 4, 4, 3, 3)]}],
+        }
+        ranking = candidate_analysis.rank_candidates(analysis, scores)
+        ranking_path = fixture.root / "work/b-roll/candidate-ranking.json"
+        projectlib.write_json(ranking_path, ranking)
+        bound = candidate_analysis.bind_ranking(
+            fixture.plan, ranking, ranking_path,
+            {"shot": [fixture.plan["shots"][0]["candidates"][0]]},
+        )
+
+        shots, _, _ = build_review_page._payload(
+            bound, fixture.timeline, fixture.transcript, fixture.root,
+            fixture.root / "review/03-b-roll/assets",
+        )
+        serialized = json.dumps(shots, sort_keys=True)
+
+        self.assertNotIn('"search_context"', serialized)
+        for value in (search_context["topic"], search_context["visual_direction"], *search_context["keywords"]):
+            self.assertNotIn(value, serialized)
+        self.assertNotIn('"semantic_role"', serialized)
+        self.assertNotIn('"direct"', serialized)
+        self.assertNotIn('"coverage_summary"', serialized)
+        self.assertNotIn("PRIVATE_COVERAGE_PROFILE_SENTINEL_6C64", serialized)
+        self.assertNotIn("PRIVATE_COVERAGE_STATUS_SENTINEL_5D75", serialized)
+
+    def test_generated_review_page_payload_and_html_omit_private_context_role_and_coverage(self):
+        fixture = _BrollFixture(); fixture.setUp(); self.addCleanup(fixture.tearDown)
+        video = fixture.root / "input/review.mp4"
+        video.parent.mkdir(parents=True)
+        video.write_bytes(b"review-video")
+        search_context = {
+            "topic": "PRIVATE_TOPIC_SENTINEL_C8A1",
+            "visual_direction": "PRIVATE_DIRECTION_SENTINEL_D9B2",
+            "keywords": ["PRIVATE_KEYWORD_SENTINEL_EAC3"],
+        }
+        fixture.plan["input_hashes"]["review_video_sha256"] = broll_plan.sha256_file(video)
+        fixture.plan["brief"]["search_context"] = search_context
+        fixture.plan["shots"][0]["semantic_role"] = "atmospheric"
+        fixture.plan["coverage_summary"] = {
+            "profile": "PRIVATE_COVERAGE_PROFILE_SENTINEL_FBD4",
+            "planned": {"status": "PRIVATE_COVERAGE_STATUS_SENTINEL_ACE5"},
+        }
+        fixture.plan = fixture.record_presentation(fixture.plan, "ordinary")
+
+        def extract_frame(_video, _timestamp, destination):
+            Image.new("RGB", (960, 540), "gray").save(destination, "JPEG")
+
+        with mock.patch.object(build_review_page, "_probe_video", return_value=10.0), \
+             mock.patch.object(build_review_page, "_extract_frame", side_effect=extract_frame):
+            publication = build_review_page.build_review_page(
+                fixture.plan, fixture.timeline, fixture.transcript, video,
+                fixture.root / "review/03-b-roll", project_root=fixture.root,
+                review_id="123e4567-e89b-12d3-a456-426614174003",
+            )
+
+        html = publication["page"].read_text(encoding="utf-8")
+        encoded = build_review_page.PAYLOAD_RE.search(html)
+        self.assertIsNotNone(encoded)
+        payload = json.loads(base64.b64decode(encoded.group(1)).decode("utf-8"))
+        serialized = json.dumps(payload, sort_keys=True)
+        forbidden = (
+            "coverage", "planned_ratio", "shortlist_ratio", "selected_ratio",
+            "below_target", "within_target", "above_target", "search_context",
+            "semantic_role", "atmospheric", search_context["topic"],
+            search_context["visual_direction"], *search_context["keywords"],
+            "PRIVATE_COVERAGE_PROFILE_SENTINEL_FBD4",
+            "PRIVATE_COVERAGE_STATUS_SENTINEL_ACE5",
+        )
+        for value in forbidden:
+            with self.subTest(value=value):
+                self.assertNotIn(value, serialized)
+                self.assertNotIn(value, html)
+
     def test_synthetic_video_flows_from_analysis_through_shortlist_acquisition(self):
         source = self.root / "source.mp4"
         subprocess.run([
@@ -6673,8 +7498,9 @@ class CandidateAnalysisTests(unittest.TestCase):
             "provenance": {"source_type": "pexels", "provider_id": 101, "source_url": "https://www.pexels.com/video/test-101/", "creator": "Maker", "license": "Pexels License", "license_url": pexels.LICENSE_URL, "terms_url": pexels.TERMS_URL, "retrieval_time": "2026-07-30T12:00:00+08:00", "download_url": "https://videos.pexels.com/delivery.mp4", "dimensions": {"width": 320, "height": 480}, "duration_s": probe["duration_s"]},
             "search": {"query": "factory process", "query_index": 0, "provider_rank": 0, "merge_rank": 0},
         }
-        plan = {"brief": {"density": "selective"}, "shots": [{"id": "shot", "program_range": {"start_s": 0.5, "end_s": 1.5}, "transcript_evidence": {"words": [{"word": "process"}]}, "editorial_reason": "Shows the process.", "visual_intent": "Visible factory process.", "queries": ["factory process", "assembly line"], "candidates": [], "selected": None, "status": "planned"}]}
-        search = {"schema_version": 1, "shots": [{"shot_id": "shot", "queries": plan["shots"][0]["queries"], "query_results": [[candidate], []], "merged_candidates": [candidate]}]}
+        plan = self._search_plan()
+        plan["shots"][0].update({"program_range": {"start_s": 0.5, "end_s": 1.5}, "transcript_evidence": {"words": [{"word": "process"}]}, "editorial_reason": "Shows the process.", "visual_intent": "Visible factory process.", "candidates": [], "selected": None, "status": "planned"})
+        search = {"schema_version": 1, "search_context": copy.deepcopy(plan["brief"]["search_context"]), "shots": [{"shot_id": "shot", "semantic_role": "direct", "queries": plan["shots"][0]["queries"], "query_results": [[candidate], []], "merged_candidates": [candidate]}]}
         timeline = {"width": 720, "height": 1280, "fps": {"num": 30, "den": 1}}
 
         def downloader(value, destination, *, purpose):
@@ -6702,7 +7528,8 @@ class CandidateAnalysisTests(unittest.TestCase):
         media = self.root / "work/cache/b-roll/candidates/local.mp4"
         media.parent.mkdir(parents=True, exist_ok=True); media.write_bytes(b"local")
         candidate = {"id": "local", "media_type": "video", "cache_path": "cache/b-roll/candidates/local.mp4", "sha256": broll_plan.sha256_file(media), "bytes": media.stat().st_size, "probe": {"duration_s": 3.0, "width": 720, "height": 1280}, "provenance": {"source_type": "local", "creator": "Owner", "license": "Owned", "retrieval_time": "2026-07-30T12:00:00+08:00", "original_path": "input/local.mp4"}}
-        plan = {"brief": {"density": "selective"}, "shots": [{"id": "shot", "program_range": {"start_s": 0.0, "end_s": 1.0}, "transcript_evidence": {"words": [{"word": "process"}]}, "editorial_reason": "Shows the process.", "visual_intent": "Visible process.", "queries": ["factory process", "assembly line"], "candidates": [candidate], "selected": None, "status": "candidates_ready"}]}
+        plan = self._search_plan()
+        plan["shots"][0].update({"program_range": {"start_s": 0.0, "end_s": 1.0}, "transcript_evidence": {"words": [{"word": "process"}]}, "editorial_reason": "Shows the process.", "visual_intent": "Visible process.", "candidates": [candidate], "selected": None, "status": "candidates_ready"})
         search = candidate_analysis.search_plan(plan, orientation="portrait", searcher=lambda *args, **kwargs: [])
         self.assertEqual(["local"], [item["id"] for item in search["shots"][0]["merged_candidates"]])
         projectlib.write_json(self.root / "work/understand/media.json", {"width": 720, "height": 1280})

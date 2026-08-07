@@ -1,6 +1,6 @@
 ---
 name: video-add-b-roll
-description: Use when a talking-head, interview, documentary, or explanatory video needs selective transcript-timed visual cutaways from local media or Pexels.
+description: Use when a talking-head, interview, documentary, or explanatory video needs deliberate transcript-timed visual cutaways from local media or Pexels.
 ---
 
 # Video Add B-Roll
@@ -129,7 +129,7 @@ timeline, transcript, dependency revision, grade plan, LUT, review video, candid
 or reviewed asset makes downstream work stale; refresh the plan and repeat review rather than
 carrying an old receipt forward.
 
-### 2. Author A Selective Plan
+### 2. Author A Dynamic-Social Plan
 
 Hand-author `work/b-roll/broll-plan.json`; scripts perform precision, not editorial judgment.
 For each proposed shot:
@@ -138,12 +138,21 @@ For each proposed shot:
 - map it through `work/timeline.json` into exact `source_ranges`;
 - preserve at least one exact mapped transcript word with source/program ranges and clip ID;
 - state a concrete `editorial_reason` and `visual_intent`;
-- write two or three literal English queries containing subject, action, and useful setting;
+- set `brief.search_context` with a concrete `topic`, `visual_direction`, and `1-12 unique keywords`;
+- set each `semantic_role` to `direct`, `supportive`, or `atmospheric`;
+- write two or three layered literal English queries: a `direct subject/action` query, a
+  `defensible context/process` query, and, when a third query is useful, a `theme-enhancing variant`;
 - begin at `planned`, move to `candidates_ready` after acquisition, or use `skipped` when no
   relevant candidate exists.
 
-Keep `brief.density` equal to `selective`. Do not pad the plan to meet a count. If no moment
-earns B-roll, an approved all-skipped plan is a valid no-op.
+Keep `brief.density` equal to `dynamic-social`. Planned coverage begins with a complete A-roll
+scan of the mapped transcript and timeline, followed by hand-authored chronological, non-overlapping,
+editorially valid ranges. Treat `0.40` to `0.70` as a soft target. Below `0.40`, take one second
+pass and only add or extend defensible ranges. Above `0.70`, internally review A-roll concealment.
+Never add irrelevant filler or weaken relevance, rights, quality, or another eligibility gate to hit
+the target. Generic topical terms such as `tech` or `entertainment` may refine a query only; they
+never replace the per-shot visible relationship between the candidate and the transcript claim.
+If no moment earns B-roll, an approved all-skipped plan is a valid no-op.
 
 Do not add `speaker_inset_style` while authoring the draft. After candidate acquisition, the
 explicit Agent-chat presentation decision selects the ordinary or speaker-inset route. The latter
@@ -258,8 +267,14 @@ evidence. Write `work/cache/b-roll/candidate-ranking-input.json` with this shape
 }
 ```
 
-Use integer fit scores from 0 through 4. `text_logo_risk` is 0 through 4 or `uncertain`; never
-claim OCR. Score every analyzable candidate, preserve the real Agent identity, and do not use
+Use integer fit scores from 0 through 4 against visible frozen-frame evidence: 0 is a mismatch or
+unusable, 1 is weak, 2 is acceptable with concerns, 3 is strong, and 4 is unusually strong.
+`text_logo_risk` is 0 through 4 or `uncertain`; never claim OCR. Both `semantic_fit == 0` and
+`context_fit == 0` are retained hard ineligibility protections. `semantic_fit == 0` rejects a
+candidate for semantic mismatch; `context_fit == 0` rejects unsupported context. A
+`semantic_fit` 1 remains eligible as `weak_semantic_match` when it passes the context and other
+independent gates, and ranks below semantic 2-4 matches. Score every analyzable candidate,
+preserve the real Agent identity, and do not use
 `mode: "human"` for ranking. Confirm a project-wide near-duplicate group only after comparing the
 frozen frames, transcript evidence, visual intent, provider identity, creator, and source title.
 Do not confirm from creator identity alone. Omit `near_duplicate_groups` when none are confirmed;
@@ -276,11 +291,13 @@ python $CandidateAnalysis rank `
 ```
 
 See [example-candidate-ranking.json](examples/example-candidate-ranking.json) for the durable
-ranking shape. Exact project duplicates and Agent-confirmed near duplicates are allocated to the
-shot with the strongest semantic/context evidence, then each affected shot refills from its next
-independent eligible candidate. `possible_series` never suppresses automatically. A shortlist
-contains at most three candidates; fewer than three is valid and no eligible result must be
-`no_eligible_candidates`.
+ranking shape. Rank eligible candidates in semantic-first lexicographic order: `semantic_fit`, then
+`context_fit`, then the combined `composition_fit + style_fit` score, fewer deterministic warnings,
+and finally stable provider and candidate IDs. Exact project duplicates and Agent-confirmed near
+duplicates are allocated to the shot with the strongest semantic/context evidence, then each
+affected shot refills from its next independent eligible candidate. `possible_series` never
+suppresses automatically. A shortlist contains at most three candidates; fewer than three is valid
+and no eligible result must be `no_eligible_candidates`.
 
 Only after ranking, acquire the full delivery variants and bind their exact bytes plus the active
 analysis/ranking hashes into the plan:

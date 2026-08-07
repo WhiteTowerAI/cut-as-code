@@ -248,7 +248,7 @@ def normalize_shot(candidate, shot, timeline, destination, *, lut=None):
             input_start, input_end = requested["start_s"], requested["end_s"]
             inputs = ["-ss", f"{input_start:.9f}", "-t", f"{input_end - input_start:.9f}", "-i", str(source)]
             rate = float(segment["playback_rate"])
-            filters = common + [f"setpts=(PTS-STARTPTS)/{rate:g}", f"fps={num}/{den}"]
+            filters = common + [f"setpts=(PTS-STARTPTS)/{rate:g}", f"fps={num}/{den}:round=up"]
             if option["format"] == "legacy":
                 filters.append(f"trim=duration={duration:.9f}")
         else:

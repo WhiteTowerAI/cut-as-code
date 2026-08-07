@@ -2,17 +2,23 @@
 
 ## Editorial Selection
 
-- Default to selective use. Add B-roll only when it clarifies a claim, supplies concrete
-  evidence, or hides a necessary edit without obscuring an important expression.
+- Use the `dynamic-social` profile. Begin planned coverage with a complete A-roll scan, then
+  hand-author chronological, non-overlapping transcript-backed intervals.
+- Treat `0.40` to `0.70` planned coverage as a soft target. Below `0.40`, make a second pass that
+  only adds or extends defensible intervals. Above `0.70`, conduct an internal A-roll concealment
+  review. Never add irrelevant filler or weaken eligibility to hit the target.
 - Prefer literal nouns, actions, products, locations, and processes. Reject generic mood
   footage, loose topical matches, and repeated or near-identical visuals.
 - Preserve the first or last spoken beat when the speaker's face carries the meaning.
 - Keep proposed ranges positive, half-open, chronological, non-overlapping, and supported by
   exact mapped transcript words.
-- Write two or three narrow literal queries per shot. Include the subject, action, setting,
-  or useful framing. Do not search full transcript sentences or abstract adjectives.
-- There is no minimum coverage. Skip a moment when no candidate fits its meaning, quality,
-  duration, framing, and license.
+- Require `brief.search_context` with a concrete `topic`, `visual_direction`, and `1-12 unique
+  keywords`. Give every search shot a `semantic_role`: `direct`, `supportive`, or `atmospheric`.
+- Write two or three layered narrow literal queries per shot: `direct subject/action`,
+  `defensible context/process`, and, when useful, a `theme-enhancing variant`. Do not search full
+  transcript sentences or abstract adjectives. Generic topical terms such as `tech` or
+  `entertainment` may refine queries only; they never replace the per-shot visible relationship.
+- Skip a moment when no candidate fits its meaning, quality, duration, framing, and license.
 
 ## Sources And Provenance
 
@@ -70,19 +76,24 @@
 - Agent ranking requires actual delegated authority, `mode: "agent"`, the real actor name, a
   timezone-aware timestamp, a non-empty overall rationale, and a concrete rationale for every
   analyzable candidate. Ranking is advisory and is never human approval.
-- Score `semantic_fit`, `context_fit`, `composition_fit`, and `style_fit` with integers from 0
-  through 4: 0 mismatch/unusable, 1 weak, 2 acceptable with concerns, 3 strong, and 4 unusually
-  strong. Record `text_logo_risk` from 0 through 4 or `uncertain`; never claim OCR from sampled
-  frames.
-- Mark a candidate ineligible when a hard check fails, semantic or context fit is zero, it clearly
-  violates `brief.avoid`, or its primary subject cannot be identified in the target framing.
+- Score `semantic_fit`, `context_fit`, `composition_fit`, and `style_fit` from visible frozen-frame
+  evidence with integers from 0 through 4: 0 mismatch/unusable, 1 weak, 2 acceptable with concerns,
+  3 strong, and 4 unusually strong. Record `text_logo_risk` from 0 through 4 or `uncertain`; never
+  claim OCR from sampled frames.
+- Both `semantic_fit == 0` and `context_fit == 0` are retained hard ineligibility protections.
+  Mark a candidate ineligible when either applies, a hard check fails, it clearly violates
+  `brief.avoid`, or its primary subject cannot be identified in the target framing.
+  `semantic_fit == 0` rejects a semantic mismatch; `context_fit == 0` rejects unsupported context.
+  A `semantic_fit` of 1 is an eligible `weak_semantic_match` when it passes the context and other
+  independent gates; it ranks below semantic 2-4 matches.
 - Confirm project-wide near-duplicate groups from provider identity, exact/perceptual evidence, and
   visible comparison across the frozen five-frame sets. Record the real Agent actor, timezone-aware
   timestamp, member shot and candidate IDs, match type, and a concrete reason the footage would
   repeat across the named transcript moments. Never confirm from creator identity alone.
-- Rank eligible candidates by: semantic plus context fit; the lower of those two scores;
-  composition plus style fit; fewer deterministic warnings; then stable `provider_id` and candidate
-  ID. Preserve the base order before global allocation.
+- Rank eligible candidates in semantic-first lexicographic order: `semantic_fit`, then
+  `context_fit`, then the combined `composition_fit + style_fit` score, fewer deterministic
+  warnings, then stable `provider_id` and candidate ID. Preserve the base order before global
+  allocation.
   Preserve every sub-score and rationale instead of an opaque total.
 - Allocate every exact or Agent-confirmed duplicate component to its strongest semantic/context
   placement across all shots. Suppress the other members, refill from each shot's next independent

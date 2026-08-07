@@ -179,13 +179,20 @@ def _contact_sheet(records, timeline, path):
 
 def _boundary_reel(selected, timeline, base_video, path):
     total = normalize_broll._number(timeline.get("program_duration_s"), "timeline program_duration_s")
+    width, height, num, den = normalize_broll._timeline_spec(timeline)
+    frame = den / num
+
+    def snap_to_frame(value):
+        return min(total, max(0.0, round(value / frame) * frame))
+
     command = ["ffmpeg", "-y", "-loglevel", "error"]
     filters, outputs, expected = [], [], 0.0
     for _, shot, _, overlay in selected:
         shot_start = float(shot["program_range"]["start_s"])
         shot_end = float(shot["program_range"]["end_s"])
         for boundary in (shot_start, shot_end):
-            window_start, window_end = max(0.0, boundary - 0.5), min(total, boundary + 0.5)
+            window_start = snap_to_frame(max(0.0, boundary - 0.5))
+            window_end = snap_to_frame(min(total, boundary + 0.5))
             overlap_start, overlap_end = max(window_start, shot_start), min(window_end, shot_end)
             command.extend(["-i", str(base_video), "-i", str(overlay)])
             input_index = len(outputs) * 2
@@ -206,7 +213,6 @@ def _boundary_reel(selected, timeline, base_video, path):
     ])
     _run(command, "boundary reel render failed")
     probe = normalize_broll._probe(path)
-    width, height, num, den = normalize_broll._timeline_spec(timeline)
     normalize_broll._check_probe(probe, width, height, num, den, expected)
     _run(["ffmpeg", "-v", "error", "-i", str(path), "-map", "0:v:0", "-f", "null", "-"],
          "boundary reel decode failed")
@@ -796,6 +802,45 @@ def _commit(stage, review_dir, plan_path, result):
             _ignore_remove(plan_part)
 
 
+def _write_coverage_summary(root, plan_path):
+    plan = projectlib.load_json(plan_path)
+    ranking_binding = plan.get("candidate_ranking")
+    ranking_path = None
+    ranking_sha256 = None
+    shortlists = []
+    if isinstance(ranking_binding, dict):
+        ranking_path = root / "work" / ranking_binding["path"]
+        ranking_sha256 = broll_plan.sha256_file(ranking_path)
+        shortlists = ranking_binding["shortlists"]
+    shortlisted_ids = {
+        shortlist.get("shot_id") for shortlist in shortlists
+        if shortlist.get("candidate_ids")
+    }
+    shots = plan.get("shots", [])
+    summary = {
+        "schema_version": 1,
+        "timeline_id": plan.get("timeline_id"),
+        "program_duration_s": plan.get("program_duration_s"),
+        "plan_sha256": broll_plan.sha256_file(plan_path),
+        "ranking_sha256": ranking_sha256,
+        **broll_plan.coverage_summary(
+            plan,
+            planned=shots,
+            shortlisted=[shot for shot in shots if shot.get("id") in shortlisted_ids],
+            selected=[shot for shot in shots if shot.get("status") != "skipped"],
+        ),
+    }
+    target = root / "work/b-roll/coverage-summary.json"
+    part = target.with_suffix(".part.json")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    part.unlink(missing_ok=True)
+    try:
+        projectlib.write_json(part, summary)
+        os.replace(part, target)
+    finally:
+        part.unlink(missing_ok=True)
+
+
 def verify_plan(plan_path, timeline_path, project_root, video_path, *, review_dir=None):
     """Verify canonical normalized shots, publish review artifacts, and persist pass bindings."""
     root = Path(project_root).resolve()
@@ -862,6 +907,7 @@ def verify_plan(plan_path, timeline_path, project_root, video_path, *, review_di
         if errors:
             raise ValueError("invalid verified B-roll plan: " + "; ".join(errors))
         _commit(stage, destination, plan_path, result)
+        _write_coverage_summary(root, plan_path)
         return result, {
             "stills": final_stills, "contact_sheet": final_contact,
             "boundary_reel": final_reel, "summary": final_summary,

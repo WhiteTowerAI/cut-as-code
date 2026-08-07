@@ -18,6 +18,8 @@ import speaker_inset
 
 
 RANGE_EPSILON = 1e-6
+DYNAMIC_SOCIAL_MIN_RATIO = 0.40
+DYNAMIC_SOCIAL_MAX_RATIO = 0.70
 KEN_BURNS_DIRECTIONS = {"zoom-in", "pan-left", "pan-right"}
 HUMAN_APPROVAL_RATIONALE = "Explicit user action approved the exact configuration shown in this review."
 HUMAN_PREPARE_COMPOSITE_RATIONALE = "Explicit user action locked the exact B-roll selection for composite preview."
@@ -837,6 +839,54 @@ def _range(value):
     return start, end
 
 
+def coverage_summary(plan, planned=(), shortlisted=(), selected=()):
+    """Summarize internal B-roll coverage without changing plan validity."""
+    duration = _positive_duration(plan.get("program_duration_s")) if isinstance(plan, dict) else None
+    duration = duration if duration is not None else 0.0
+    shot_ranges = {
+        shot.get("id"): shot.get("program_range")
+        for shot in plan.get("shots", []) if isinstance(plan, dict) and isinstance(shot, dict)
+    }
+
+    def stage_summary(members):
+        if isinstance(members, dict):
+            members = [members]
+        elif not isinstance(members, (list, tuple, set)):
+            members = []
+        ranges = []
+        for member in members:
+            value = shot_ranges.get(member) if isinstance(member, str) else member
+            interval = _range(value.get("program_range")) if isinstance(value, dict) and "program_range" in value else _range(value)
+            if not interval or duration <= 0:
+                continue
+            start, end = max(0.0, interval[0]), min(duration, interval[1])
+            if end > start:
+                ranges.append((start, end))
+        merged = []
+        for start, end in sorted(ranges):
+            if not merged or start > merged[-1][1]:
+                merged.append([start, end])
+            else:
+                merged[-1][1] = max(merged[-1][1], end)
+        covered = round(sum(end - start for start, end in merged), 9)
+        ratio = round(covered / duration, 9) if duration else 0.0
+        status = (
+            "below_target" if ratio < DYNAMIC_SOCIAL_MIN_RATIO
+            else "above_target" if ratio > DYNAMIC_SOCIAL_MAX_RATIO
+            else "within_target"
+        )
+        return {"duration_s": covered, "ratio": ratio, "status": status}
+
+    return {
+        "profile": "dynamic-social",
+        "target_min_ratio": DYNAMIC_SOCIAL_MIN_RATIO,
+        "target_max_ratio": DYNAMIC_SOCIAL_MAX_RATIO,
+        "planned": stage_summary(planned),
+        "shortlisted": stage_summary(shortlisted),
+        "selected": stage_summary(selected),
+    }
+
+
 def _timeline_source_ranges(program, timeline):
     clips = timeline.get("clips") if isinstance(timeline, dict) else None
     if not program or not isinstance(clips, list):
@@ -1419,7 +1469,7 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
         if timeline_duration is not None and plan_duration != timeline_duration: errors.append("plan program_duration_s does not match timeline")
     brief = plan.get("brief")
     if not isinstance(brief, dict): errors.append("brief must be an object")
-    elif brief.get("density") != "selective": errors.append("brief density must be selective")
+    elif brief.get("density") != "dynamic-social": errors.append("brief density must be dynamic-social")
     style = plan.get("speaker_inset_style")
     if style is not None:
         errors.extend(speaker_inset.style_errors(style))
@@ -1445,6 +1495,10 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
         if not program or program[0] < 0 or program[1] <= program[0] or program[1] > duration:
             errors.append(f"{shot_id} program range is outside timeline")
         else:
+            if (frame_duration is not None
+                    and (not _frame_aligned(program[0], frame_duration)
+                         or not _frame_aligned(program[1], frame_duration))):
+                errors.append(f"{shot_id} program range must align to timeline frames")
             if previous_program_start is not None and program[0] < previous_program_start:
                 errors.append("shots must be in chronological program order")
             previous_program_start = program[0]
@@ -1895,8 +1949,11 @@ def rebuild_plan_from_revision(plan, request, timeline, transcript):
     words = _mapped_word_records(transcript, timeline)
     result["decision"] = None
     result["review"] = None
-    result.pop("review_status", None)
-    result.pop("visual_review", None)
+    for key in (
+        "candidate_ranking", "presentation", "speaker_inset_style", "selection",
+        "speaker_inset", "review_status", "visual_review",
+    ):
+        result.pop(key, None)
     for shot in result["shots"]:
         entry = entries[shot["id"]]
         shot.pop("normalized", None)

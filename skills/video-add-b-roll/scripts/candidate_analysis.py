@@ -28,6 +28,7 @@ import pexels
 SAMPLE_FRACTIONS = (0.10, 0.30, 0.50, 0.70, 0.90)
 SCORE_FIELDS = ("semantic_fit", "context_fit", "composition_fit", "style_fit")
 TEXT_LOGO_RISKS = {0, 1, 2, 3, 4, "uncertain"}
+SEMANTIC_ROLES = {"direct", "supportive", "atmospheric"}
 ANALYSIS_CACHE = Path("work/cache/b-roll/candidate-analysis")
 ANALYSIS_MEDIA = ANALYSIS_CACHE / "media"
 ANALYSIS_FRAMES = ANALYSIS_CACHE / "frames"
@@ -147,15 +148,37 @@ def merge_query_results(queries, results_by_query, *, limit=8):
     return merged
 
 
+def _validate_search_context(value):
+    if not isinstance(value, dict) or set(value) != {"topic", "visual_direction", "keywords"}:
+        raise ValueError("brief search_context must contain exactly topic, visual_direction, and keywords")
+    for field in ("topic", "visual_direction"):
+        if not isinstance(value[field], str) or not value[field].strip():
+            raise ValueError(f"brief search_context {field} must be a nonblank string")
+    keywords = value["keywords"]
+    if not isinstance(keywords, list) or not 1 <= len(keywords) <= 12:
+        raise ValueError("brief search_context keywords must contain one to twelve values")
+    if any(not isinstance(keyword, str) or not keyword.strip() for keyword in keywords):
+        raise ValueError("brief search_context keywords must be nonblank strings")
+    normalized = [keyword.strip().casefold() for keyword in keywords]
+    if len(normalized) != len(set(normalized)):
+        raise ValueError("brief search_context keywords must be unique")
+    return copy.deepcopy(value)
+
+
 def search_plan(plan, *, orientation, per_page=8, include_pexels=True, searcher=pexels.search_videos):
     if orientation not in {"landscape", "portrait", "square"}:
         raise ValueError("invalid orientation")
     if not isinstance(plan, dict) or not isinstance(plan.get("shots"), list):
         raise ValueError("plan shots are required")
+    brief = plan.get("brief")
+    search_context = _validate_search_context(brief.get("search_context") if isinstance(brief, dict) else None)
     shots = []
     for shot in plan["shots"]:
         if not isinstance(shot, dict) or not isinstance(shot.get("id"), str):
             raise ValueError("plan shot id is required")
+        semantic_role = shot.get("semantic_role")
+        if not isinstance(semantic_role, str) or semantic_role not in SEMANTIC_ROLES:
+            raise ValueError(f"{shot['id']} semantic_role is invalid")
         queries = shot.get("queries")
         if not isinstance(queries, list) or not 2 <= len(queries) <= 3:
             raise ValueError(f"{shot['id']} queries must contain two or three values")
@@ -174,11 +197,12 @@ def search_plan(plan, *, orientation, per_page=8, include_pexels=True, searcher=
             local_candidates.append(item)
         shots.append({
             "shot_id": shot["id"],
+            "semantic_role": semantic_role,
             "queries": copy.deepcopy(queries),
             "query_results": copy.deepcopy(query_results),
             "merged_candidates": merged + local_candidates,
         })
-    return {"schema_version": 1, "orientation": orientation, "per_page": per_page, "candidate_limit": 8, "shots": shots}
+    return {"schema_version": 1, "search_context": search_context, "orientation": orientation, "per_page": per_page, "candidate_limit": 8, "shots": shots}
 
 
 def duration_classification(candidate_duration, shot_duration, frame_duration):
@@ -653,6 +677,10 @@ def validate_analysis_document(analysis, project_root=None, *, verify_files=Fals
     if not isinstance(analysis, dict):
         return ["candidate analysis must be an object"]
     if analysis.get("schema_version") != 1: errors.append("candidate analysis schema_version must be 1")
+    try:
+        _validate_search_context(analysis.get("search_context"))
+    except ValueError as error:
+        errors.append(f"candidate analysis {error}")
     if not broll_plan._is_sha256(analysis.get("search_sha256")): errors.append("candidate analysis search SHA-256 is invalid")
     shots = analysis.get("shots")
     if not isinstance(shots, list): return errors + ["candidate analysis shots must be a list"]
@@ -664,6 +692,9 @@ def validate_analysis_document(analysis, project_root=None, *, verify_files=Fals
         if not isinstance(shot_id, str) or not shot_id.strip(): errors.append("candidate analysis shot id is required"); shot_id = "<missing>"
         elif shot_id in seen_shots: errors.append(f"duplicate candidate analysis shot id: {shot_id}")
         seen_shots.add(shot_id)
+        semantic_role = shot.get("semantic_role")
+        if not isinstance(semantic_role, str) or semantic_role not in SEMANTIC_ROLES:
+            errors.append(f"{shot_id} candidate analysis semantic_role is invalid")
         candidates = shot.get("candidates")
         if not isinstance(candidates, list): errors.append(f"{shot_id} analysis candidates must be a list"); continue
         for candidate in candidates:
@@ -769,6 +800,44 @@ def analyze_search(plan, search, timeline, project_root, *, downloader=pexels.do
     root = Path(project_root).resolve()
     if not isinstance(plan, dict) or not isinstance(plan.get("shots"), list): raise ValueError("plan shots are required")
     if not isinstance(search, dict) or search.get("schema_version") != 1 or not isinstance(search.get("shots"), list): raise ValueError("candidate search is invalid")
+    brief = plan.get("brief")
+    plan_context = _validate_search_context(brief.get("search_context") if isinstance(brief, dict) else None)
+    search_context = _validate_search_context(search.get("search_context"))
+    if search_context != plan_context:
+        raise ValueError("candidate search context does not match plan")
+    plan_shot_ids = []
+    for shot in plan["shots"]:
+        shot_id = shot.get("id") if isinstance(shot, dict) else None
+        if not isinstance(shot_id, str) or not shot_id.strip():
+            raise ValueError("plan shot id is required")
+        plan_shot_ids.append(shot_id)
+    search_shot_ids = []
+    for item in search["shots"]:
+        if not isinstance(item, dict):
+            raise ValueError("candidate search shot must be an object")
+        shot_id = item.get("shot_id")
+        if not isinstance(shot_id, str) or not shot_id.strip():
+            raise ValueError("candidate search shot id is required")
+        if shot_id in search_shot_ids:
+            raise ValueError(f"duplicate candidate search shot id: {shot_id}")
+        search_shot_ids.append(shot_id)
+    if search_shot_ids != plan_shot_ids:
+        raise ValueError("candidate search shots do not match plan")
+    search_by_shot = dict(zip(search_shot_ids, search["shots"]))
+    for shot in plan["shots"]:
+        shot_id = shot.get("id")
+        search_shot = search_by_shot.get(shot_id)
+        if not isinstance(search_shot, dict): raise ValueError(f"candidate search is missing shot {shot_id}")
+        semantic_role = shot.get("semantic_role")
+        if not isinstance(semantic_role, str) or semantic_role not in SEMANTIC_ROLES:
+            raise ValueError(f"{shot_id} semantic_role is invalid")
+        search_role = search_shot.get("semantic_role")
+        if not isinstance(search_role, str) or search_role not in SEMANTIC_ROLES:
+            raise ValueError(f"candidate search {shot_id} semantic_role is invalid")
+        if search_role != semantic_role:
+            raise ValueError(f"candidate search {shot_id} semantic_role does not match plan")
+        if search_shot.get("queries") != shot.get("queries"):
+            raise ValueError(f"candidate search {shot_id} queries do not match plan")
     width, height, fps = timeline.get("width"), timeline.get("height"), timeline.get("fps")
     if any(not isinstance(value, int) or isinstance(value, bool) or value <= 0 for value in (width, height)):
         media_path = root / "work/understand/media.json"
@@ -779,7 +848,6 @@ def analyze_search(plan, search, timeline, project_root, *, downloader=pexels.do
     num, den = fps.get("num"), fps.get("den")
     if any(not isinstance(value, int) or isinstance(value, bool) or value <= 0 for value in (num, den)):
         raise ValueError("timeline fps is invalid")
-    search_by_shot = {item.get("shot_id"): item for item in search["shots"] if isinstance(item, dict)}
     analysis_shots = []
     for shot in plan["shots"]:
         shot_id = shot.get("id")
@@ -861,6 +929,7 @@ def analyze_search(plan, search, timeline, project_root, *, downloader=pexels.do
                 item["warnings"] = sorted(set(item["warnings"] + ["perceptual_similarity_requires_agent_confirmation"]))
         analysis_shots.append({
             "shot_id": shot_id,
+            "semantic_role": shot["semantic_role"],
             "program_range": copy.deepcopy(shot.get("program_range")),
             "transcript_evidence": copy.deepcopy(shot.get("transcript_evidence")),
             "editorial_reason": shot.get("editorial_reason"),
@@ -873,6 +942,7 @@ def analyze_search(plan, search, timeline, project_root, *, downloader=pexels.do
         })
     result = {
         "schema_version": 1,
+        "search_context": copy.deepcopy(plan_context),
         "search_sha256": canonical_sha256(search),
         "timeline": {"width": width, "height": height, "fps": {"num": num, "den": den}},
         "sample_fractions": list(SAMPLE_FRACTIONS),
@@ -975,8 +1045,8 @@ def _provider_key(candidate):
 def _ranking_key(item):
     score = item.get("scores", {})
     return (
-        -(score.get("semantic_fit", -1) + score.get("context_fit", -1)),
-        -min(score.get("semantic_fit", -1), score.get("context_fit", -1)),
+        -score.get("semantic_fit", -1),
+        -score.get("context_fit", -1),
         -(score.get("composition_fit", -1) + score.get("style_fit", -1)),
         item["warning_count"],
         *_provider_key(item),
@@ -1010,6 +1080,9 @@ def rank_candidates(analysis, scores):
                 if entry["context_fit"] == 0: reasons.append("context_fit is zero")
                 if entry["avoid_violation"]: reasons.append("explicit avoid rule is violated")
                 if not entry["primary_subject_visible"]: reasons.append("primary subject is not identifiable in target framing")
+                warnings = copy.deepcopy(candidate.get("warnings", []))
+                if entry["semantic_fit"] == 1 and "weak_semantic_match" not in warnings:
+                    warnings.append("weak_semantic_match")
                 item = {
                     "candidate_id": candidate_id,
                     "provider_id": candidate.get("provider_id"),
@@ -1018,8 +1091,8 @@ def rank_candidates(analysis, scores):
                     "avoid_violation": entry["avoid_violation"],
                     "primary_subject_visible": entry["primary_subject_visible"],
                     "near_duplicate_group": entry.get("near_duplicate_group"),
-                    "warnings": copy.deepcopy(candidate.get("warnings", [])),
-                    "warning_count": len(candidate.get("warnings", [])),
+                    "warnings": warnings,
+                    "warning_count": len(warnings),
                     "eligible": not reasons,
                     "ineligibility_reasons": reasons,
                     "suppressed_near_duplicate": False,
@@ -1391,6 +1464,35 @@ def _canonical_output(root, value, relative):
     return target
 
 
+def _write_coverage_summary(root, plan, ranking=None):
+    shortlisted_ids = {
+        shot.get("shot_id") for shot in ranking.get("shots", [])
+        if isinstance(shot, dict) and shot.get("top3")
+    } if isinstance(ranking, dict) else set()
+    shortlisted = [
+        shot for shot in plan.get("shots", [])
+        if isinstance(shot, dict) and shot.get("id") in shortlisted_ids
+    ] if isinstance(plan, dict) else []
+    final_path = Path(root) / "work/b-roll/coverage-summary.json"
+    final_path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+            dir=final_path.parent, prefix=f".{final_path.name}.", suffix=".tmp", delete=False) as handle:
+        staged_path = Path(handle.name)
+    try:
+        projectlib.write_json(
+            staged_path,
+            broll_plan.coverage_summary(
+                plan,
+                planned=plan.get("shots", []) if isinstance(plan, dict) else [],
+                shortlisted=shortlisted,
+                selected=[],
+            ),
+        )
+        os.replace(staged_path, final_path)
+    finally:
+        staged_path.unlink(missing_ok=True)
+
+
 def _json_ready(value):
     if isinstance(value, Path): return value.as_posix()
     raise TypeError(f"not JSON serializable: {type(value).__name__}")
@@ -1416,7 +1518,9 @@ def main(argv=None):
     root = Path(args.project_root).resolve()
     if args.command == "search":
         output = _canonical_output(root, args.output, "work/b-roll/candidate-search.json")
-        value = search_plan(projectlib.load_json(args.plan), orientation=args.orientation, per_page=args.per_page, include_pexels=not args.local_only)
+        plan = projectlib.load_json(args.plan)
+        _write_coverage_summary(root, plan)
+        value = search_plan(plan, orientation=args.orientation, per_page=args.per_page, include_pexels=not args.local_only)
         write_json(output, value); result = {"output": output, "sha256": _sha256(output), "search_sha256": canonical_sha256(value)}
     elif args.command == "analyze":
         output = _canonical_output(root, args.output, "work/b-roll/candidate-analysis.json")
@@ -1432,7 +1536,9 @@ def main(argv=None):
     elif args.command == "rank":
         output = _canonical_output(root, args.output, "work/b-roll/candidate-ranking.json")
         value = rank_candidates(projectlib.load_json(args.analysis), projectlib.load_json(args.scores))
-        write_json(output, value); result = {"output": output, "sha256": _sha256(output), "ranking_sha256": canonical_sha256(value)}
+        write_json(output, value)
+        _write_coverage_summary(root, projectlib.load_json(root / "work/b-roll/broll-plan.json"), value)
+        result = {"output": output, "sha256": _sha256(output), "ranking_sha256": canonical_sha256(value)}
     elif args.command == "acquire":
         plan_path = (root / "work/b-roll/broll-plan.json").resolve()
         if Path(args.plan).resolve() != plan_path: raise ValueError(f"plan must be {plan_path}")
