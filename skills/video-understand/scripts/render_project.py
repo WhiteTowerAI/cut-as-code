@@ -165,6 +165,14 @@ def _build(plan, project_root, plan_dir):
                     raise ValueError("delivery cannot use LUTs from multiple folders")
                 lut_cwd = cwd
         elif kind == "overlay":
+            start_s = float(contribution.get("start_s", 0))
+            duration_s = contribution.get("duration_s")
+            start_frame = round(start_s * fps["num"] / fps["den"])
+            end_frame = None
+            if duration_s is not None:
+                end_frame = round(
+                    (start_s + float(duration_s)) * fps["num"] / fps["den"]
+                )
             overlays.append(
                 {
                     "path": _resolve(project_root, plan_dir, contribution["asset"]),
@@ -172,8 +180,8 @@ def _build(plan, project_root, plan_dir):
                     "pattern": contribution.get("pattern"),
                     "start_number": contribution.get("start_number", 1),
                     "fps": contribution.get("fps"),
-                    "start_s": float(contribution.get("start_s", 0)),
-                    "duration_s": contribution.get("duration_s"),
+                    "start_frame": start_frame,
+                    "end_frame": end_frame,
                 }
             )
         elif kind == "audio-filter":
@@ -186,12 +194,20 @@ def _build(plan, project_root, plan_dir):
         elif kind == "precomputed-asset":
             if contribution.get("target") != "overlay":
                 raise ValueError("precomputed-asset currently requires target=overlay")
+            start_s = float(contribution.get("start_s", 0))
+            duration_s = contribution.get("duration_s")
+            start_frame = round(start_s * fps["num"] / fps["den"])
+            end_frame = None
+            if duration_s is not None:
+                end_frame = round(
+                    (start_s + float(duration_s)) * fps["num"] / fps["den"]
+                )
             overlays.append(
                 {
                     "path": _resolve(project_root, plan_dir, contribution["asset"]),
                     "asset_type": "file",
-                    "start_s": float(contribution.get("start_s", 0)),
-                    "duration_s": contribution.get("duration_s"),
+                    "start_frame": start_frame,
+                    "end_frame": end_frame,
                 }
             )
         elif kind == "output-constraint":
@@ -233,14 +249,18 @@ def _build(plan, project_root, plan_dir):
             command += ["-i", str(overlay)]
         overlay_label = f"overlay-{overlay_index}"
         output_label = f"video-{len(graph)}"
-        start_s = overlay_spec["start_s"]
+        start_frame = overlay_spec["start_frame"]
+        end_frame = overlay_spec["end_frame"]
+        duration_filter = ""
+        if end_frame is not None:
+            duration_filter = f"trim=end_frame={end_frame - start_frame},"
         graph.append(
-            f"[{next_input}:v:0]setpts=PTS-STARTPTS+{start_s:.6f}/TB[{overlay_label}]"
+            f"[{next_input}:v:0]{duration_filter}setpts=PTS-STARTPTS+"
+            f"({start_frame}*{fps['den']}/{fps['num']})/TB[{overlay_label}]"
         )
         enable = ""
-        if overlay_spec["duration_s"] is not None:
-            end_s = start_s + float(overlay_spec["duration_s"])
-            enable = f":enable='between(t,{start_s:.6f},{end_s:.6f})'"
+        if end_frame is not None:
+            enable = f":enable='between(n,{start_frame},{end_frame - 1})'"
         graph.append(
             f"[{video_label}][{overlay_label}]overlay=eof_action=pass:shortest=0:format=auto"
             f"{enable}[{output_label}]"
