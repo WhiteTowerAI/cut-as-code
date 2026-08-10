@@ -20,7 +20,7 @@ The bundled `recipes/` tree is the only effect library. Do not search the web, q
 catalog, or author a substitute effect. Every bundled manifest recipe is supported through its
 preconverted `hyperframes/` directory.
 The library contains 1,477 recipes: 218 motion-anything recipes, the MIT-licensed Codrops
-`codrops/codrops-kinetic-images` Three.js recipe, and 1,258 source-backed stickers across
+`codrops/KineticImages` Three.js recipe, and 1,258 source-backed stickers across
 `canvas-confetti/`, `mojs/`, `line-md/`, `meteocons/`, and `tsparticles/`. Library-level
 provenance lives in `recipes/ATTRIBUTION.md`; each source directory also carries its exact
 license and `SOURCE.json` receipt.

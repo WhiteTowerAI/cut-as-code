@@ -24,7 +24,7 @@ decision. `show` returns exact metadata and source hashes. `materialize` copies 
 converted HyperFrames directory and returns project-relative SHA-256 bindings.
 `bind-adaptation` hashes the separate shot-designed composition after the Agent finishes editing.
 
-`codrops/codrops-kinetic-images` is one recipe with three scene modes: `cylinders`, `paper`, and `spiral`.
+`codrops/KineticImages` is one recipe with three scene modes: `cylinders`, `paper`, and `spiral`.
 Its immutable converted base uses `showcase` to review all three; an adaptation selects one mode.
 
 The 1,258 sticker recipes are grouped by upstream implementation: 10 canvas-confetti celebration
