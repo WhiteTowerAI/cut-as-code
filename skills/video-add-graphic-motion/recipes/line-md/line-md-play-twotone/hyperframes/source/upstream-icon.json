@@ -1,5 +1,0 @@
-{
-  "prefix": "line-md",
-  "name": "play-twotone",
-  "body": "<path d=\"M8 6l10 6l-10 6Z\" stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" fill-opacity=\"0\" stroke-dasharray=\"38\"><animate attributeName=\"stroke-dashoffset\" dur=\"0.5s\" fill=\"freeze\" values=\"38;0\"/><animate attributeName=\"fill-opacity\" begin=\"0.5s\" dur=\"0.15s\" fill=\"freeze\" to=\"0.3\"/></path>"
-}
