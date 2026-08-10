@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-bell",
+  "surface": "line-md",
+  "runtime": [
+    "svg-smil"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "svg-smil",
+  "source_manifest_sha256": "31c3bdeae71bf472206affecf9e28dc8a6060ba8fa27a70deea46e6cb6433406"
+}

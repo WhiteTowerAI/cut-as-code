@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-download",
+  "surface": "line-md",
+  "runtime": [
+    "svg-smil"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "svg-smil",
+  "source_manifest_sha256": "9e026a847d8a26761df8b0a3d3667f9a6040689fe55598213544b0e2d378c428"
+}

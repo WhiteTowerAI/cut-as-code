@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "gradual-blur",
+  "surface": "web",
+  "runtime": [
+    "css"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "css",
+  "source_manifest_sha256": "da79e7aeec4175d0eb82fe4bd9bb0a2f5145eb9c4f1f9acdc06362df70fd8f57"
+}

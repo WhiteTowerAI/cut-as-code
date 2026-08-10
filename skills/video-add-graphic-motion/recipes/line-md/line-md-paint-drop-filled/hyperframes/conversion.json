@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-paint-drop-filled",
+  "surface": "line-md",
+  "runtime": [
+    "svg-smil"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "svg-smil",
+  "source_manifest_sha256": "9aee6d9e803d86fca70422e0d54677ce54079d8be86b66856d77d7ba350f35c6"
+}

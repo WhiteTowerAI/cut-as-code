@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-pizza-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "e611eed9de47e9a883cc4f872ae91bc2fd1a830528884a54fba9d1ee62d8fe77",
+    "icon.svg": "e73c63cefbf1207f266e19380b8bf142ed210fe2abbc02aaed89ccc409fcad3f",
+    "upstream-icon.json": "03b57a8fa35cfe5930f33bf2b41d2fe5cc36f18b93d0098a678ec4456fe50061"
+  }
+}

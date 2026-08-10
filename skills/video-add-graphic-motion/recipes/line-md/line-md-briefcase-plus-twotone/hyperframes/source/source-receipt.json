@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-briefcase-plus-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "847805910411b5fe05b0eefe23ac55ee3c29aa8d8bcb2f4a1445dc2eb8aec0a7",
+    "icon.svg": "5878f539cb3d3f3aa6265e03b26a9ed77ecc17574db517f86cdfac8ceb9c452c",
+    "upstream-icon.json": "cde8efb649254489dc6ab6b18f56b80b61090ee26f06b680ca9e0bcb519a50a8"
+  }
+}

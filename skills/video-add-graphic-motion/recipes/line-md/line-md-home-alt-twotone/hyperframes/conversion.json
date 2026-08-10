@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-home-alt-twotone",
+  "surface": "line-md",
+  "runtime": [
+    "svg-smil"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "svg-smil",
+  "source_manifest_sha256": "b382fedd948ffff6d09e9ead872327ba023877fbccc8a7cc3cb20065dc3f364c"
+}

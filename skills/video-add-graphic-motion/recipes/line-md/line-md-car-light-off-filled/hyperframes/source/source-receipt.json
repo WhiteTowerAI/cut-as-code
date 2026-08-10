@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-car-light-off-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "148dd3c9741a04c9f1ea673b5d62640fbe5da1b606461d48ebb0e24116270e7a",
+    "icon.svg": "37009814e0254f2dcf300364dc1c65bddf49aa40916e1191e4782b19fdf5341c",
+    "upstream-icon.json": "da3b7f95e1c66a3c64ffee34ec4193e8d5afad03ca344b411a2fe6784caedbb2"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-brake-parking-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "22f12764fb91e499cd007fc1fe980d051c076c6b1bb313c98fce3eedfa67d2b1",
+    "icon.svg": "2c58474a7645508db35b4325466a2438cc0e0bea32095cebc0ae83c13f3559db",
+    "upstream-icon.json": "4bc9291dfc47270152e115754a92de89a7652ebceaa23a651e15a34d90d602bc"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "confetti-firework-triple",
+  "surface": "canvas-confetti",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "8b49ada72c41a6254d9f3445298a5134bc70194c84153fefe1610f4e9dab7880"
+}

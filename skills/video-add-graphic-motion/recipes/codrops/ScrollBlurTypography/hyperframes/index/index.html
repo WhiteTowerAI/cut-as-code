@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="icon" href="data:,">
+  <script defer src="./hf-recipe.js" data-hf-recipe></script>
+  <script defer src="./hf-adapter.js" data-hf-adapter></script>
+  <base href="../source/">
+
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>On-Scroll Blur Reveal | Codrops</title>
+		<meta name="description" content="A blurry text reveal animation on scroll." />
+		<meta name="keywords" content="blurry text, animation, blur reveal, scroll based, gsap" />
+		<meta name="author" content="Codrops" />
+		
+		<link rel="stylesheet" href="_remote/c93b9106bc0524be0d5e.css">
+		<link rel="stylesheet" type="text/css" href="css/base.css" />
+    	
+		
+	
+  <style data-hf-codrops-frame>
+    html { width: 1920px; height: 1080px; scrollbar-width: none; }
+    body[data-composition-id] { margin: 0; width: 1920px; min-height: 1080px; position: relative; }
+    ::-webkit-scrollbar { display: none; }
+  </style>
+<style data-hf-codrops-chrome>
+html, body { overflow-anchor: none !important; }
+html, body, body * { cursor: none !important; }
+.codrops-header,
+.codrops-links,
+.github,
+.sponsor,
+[class*="sponsor"],
+.demos,
+.effects,
+.trigger,
+.frame__links,
+.frame__tags,
+.frame__nav,
+.frame__info,
+.frame__demo,
+.frame__demos,
+.frame__archive,
+.frame__github,
+.frame__author,
+.frame__hire,
+.frame--footer,
+.frame .modal,
+.frame__title,
+.frame__title-back,
+.frame__back,
+.frame__prev,
+.slidenav,
+.slides-nav,
+.nav__arrow,
+.cover__button,
+.content__enter,
+.enter,
+.item__enter,
+.content__nav,
+.content__footer,
+.intro__title-sub,
+.intro__info,
+.credits,
+.related,
+footer,
+.footer,
+.copyright,
+.cursor { display: none !important; }
+[data-composition-id^="codrops-scrollbasedlayoutanimations-"] .caption,
+[data-composition-id^="codrops-scrollbasedlayoutanimations-"] .project--details:has(a[href*="twitter.com/intent/tweet"]),
+[data-composition-id^="codrops-scrollspiral-"] .content__text,
+[data-composition-id^="codrops-scrollspiral-"] .main-title,
+[data-composition-id^="codrops-scrollspiral-"] .main-tagline,
+[data-composition-id^="codrops-scrollspiral-"] .media-item { visibility: hidden !important; }
+body[data-composition-id^="codrops-scrollspiral-"].loading::before,
+body[data-composition-id^="codrops-scrollspiral-"].loading::after,
+[data-composition-id^="codrops-scrollspiral-"] .content--main::before,
+[data-composition-id^="codrops-scrollspiral-"] .content--main::after { display: none !important; }
+</style></head>
+<body class="demo-1" data-composition-id="codrops-scrollblurtypography-index" data-start="0" data-width="1920" data-height="1080" data-duration="8" data-no-timeline>
+
+		<main>
+			<header class="frame frame--header type-small">
+				<h1 class="frame__title">Blurry Text Reveal on Scroll</h1> 
+				<a class="frame__back" href="https://tympanus.net/codrops/?p=76992">Article</a>
+				<a class="frame__archive" href="https://tympanus.net/codrops/demos/">All demos</a>
+				<a class="frame__github" href="https://github.com/codrops/ScrollBlurTypography/">GitHub</a>
+				
+			</header>
+			<section class="intro">
+				<div class="intro__heading">
+					<nav class="tags type-small">
+						<a href="https://tympanus.net/codrops/demos/?tag=scroll">#scroll</a>
+						<a href="https://tympanus.net/codrops/demos/?tag=typography">#typography</a>
+					</nav>
+					<h2>On-Scroll <br>Blur Reveal</h2>
+					<p class="type-small">Howdy, cowboy! Before you go scrollin', simmer down and savor the ride. Yeehaw, but easy now!</p>
+				</div>
+			</section>
+			<section class="content">
+				<span class="content__number type-small">1</span>
+				<div class="blur-text blur-text--1" data-effect-1>
+			      	Public opinion is the aggregate result of individual opinions—now uniform, now conflicting—of the men and women who make up society or any group of society. In order to understand public opinion, one must go back to the individual who makes up the group.
+			    </div>
+		   	</section>
+		   	<section class="content">
+		   		<span class="content__number type-small">2</span>
+				<div class="blur-text blur-text--2" data-effect-2>
+			       The mental equipment of the average individual consists of a mass of judgments on most of the subjects which touch his daily physical or mental life.
+			    </div>
+		   	</section>
+		   	<section class="content">
+		   		<span class="content__number type-small">3</span>
+				<div class="blur-text blur-text--3" data-effect-3>
+					These judgments are the tools of his daily being and yet they are his judgments, not on a basis of research and logical deduction, but for the most part dogmatic expressions accepted on the authority of his parents, his teachers, his church, and of his social, his economic and other leaders.
+			    </div>
+		   	</section>
+		   	<section class="content">
+		   		<span class="content__number type-small">4</span>
+				<div class="blur-text blur-text--4" data-effect-4>
+			    	In tracing the interaction of institution upon public and public upon institution, one finds a circle of obedience and leadership. The press, the school and other leaders of thought are themselves working in a background which they cannot entirely control.
+			    </div>
+		   	</section>
+		   	<section class="content">
+				<h2 class="content__title type-small">More you might like</h2>
+				<div class="card-wrap">
+					<div class="card">
+						<a href="http://tympanus.net/Development/TextBlockTransitions/" class="card__image" style="background-image:none"></a>
+						<h3 class="card__title type-small"><a href="http://tympanus.net/Development/TextBlockTransitions/">Inspiration for Text Block Transitions</a></h3>
+					</div>
+					<div class="card">
+						<a href="http://tympanus.net/Development/OnScrollTypographyAnimations/" class="card__image" style="background-image:none"></a>
+						<h3 class="card__title type-small"><a href="http://tympanus.net/Development/OnScrollTypographyAnimations/">On-Scroll Typography Animations</a></h3>
+					</div>
+					<div class="card">
+						<a href="https://tympanus.net/Development/OnScrollLetterAnimations/" class="card__image" style="background-image:none"></a>
+						<h3 class="card__title type-small"><a href="https://tympanus.net/Development/OnScrollLetterAnimations/">On-Scroll Letter Animations</a></h3>
+					</div>
+				</div>
+			</section>
+			<footer class="frame frame--footer type-small">
+				<span>Created by <a href="https://x.com/codrops">@codrops</a> 2024</span>
+				<span>Text from <a href="https://www.gutenberg.org/ebooks/61364">Crystallizing Public Opinion</a> by <a href="https://en.wikipedia.org/wiki/Edward_Bernays">Edward L. Bernays</a></span>
+				<a href="https://tympanus.net/codrops/collective/">Subscribe to our frontend newsletter</a>
+			</footer>
+		</main>
+		<!-- JavaScript dependencies -->
+		<!-- GSAP library -->
+		
+		<!-- GSAP ScrollTrigger plugin -->
+		
+
+		<!-- SplitType for text manipulation: https://github.com/lukePeavey/SplitType -->
+		
+
+		<!-- Add (Lenis) smooth scroll -->
+		
+		
+
+		<!-- Scripts for the effect -->
+		
+	
+</body>
+</html>

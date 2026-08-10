@@ -1,10 +1,9 @@
 ---
 name: video-to-shorts
 description: >
-  Select complete short-form moments from a verified Open Recut main delivery,
-  extract approved horizontal derivatives, and optionally render reviewed 9:16
-  versions. Uses the shared program transcript/timeline, hash-bound human or
-  delegated-agent decisions, and Project Protocol V1 output locations.
+  Use when a Project Protocol video needs short-form candidate planning, approval,
+  horizontal extraction, or reviewed 9:16 delivery before or after the shared main
+  render.
 ---
 
 # Video To Shorts
@@ -20,22 +19,35 @@ Require `ffmpeg`/`ffprobe` on PATH and Python with `Pillow`. Check them before p
 
 ## Scope
 
-This skill owns short candidate judgment, deterministic qualification, horizontal
-extraction, short-relative transcripts, and optional deterministic vertical
-delivery. It does not transcribe in project mode, change the main sequence, add
-captions/graphics, grade, publish, or perform continuous subject tracking.
+This skill has two project phases:
 
-Shorts are derivatives of `final/final-video.mp4`. Record the operation in the
-project DAG, but never add it to `sequences.main.operations`; the main delivery and
-its original-vs-final comparison remain unchanged.
+1. **Plan before render:** map the understood transcript to program time, author and
+   approve candidates, and write `work/shorts/shorts-plan.json`. This phase writes no
+   final video.
+2. **Finalize after render:** after every selected main-sequence edit is approved and
+   the shared main delivery is verified, rerun `plan.py` to bind the same approved
+   ranges to that delivery, then extract horizontal and optional vertical outputs.
+
+It owns short candidate judgment, deterministic qualification, horizontal extraction,
+short-relative transcripts, and optional deterministic vertical delivery. It does
+not transcribe in project mode, change the main sequence, add captions/graphics,
+grade, publish, or perform continuous subject tracking.
+
+Delivered Shorts are derivatives of `final/final-video.mp4`, but candidate planning
+precedes that file. Record the operation in the project DAG, but never add it to
+`sequences.main.operations`; the main delivery and its original-vs-final comparison
+remain unchanged.
 
 ## Project Inputs
 
-- `work/project.json`, whose main render status is `verified`
-- `final/final-video.mp4`, exactly matching the project render path
+- `work/project.json`
+- the project source recorded by `project.source.path`
 - `work/understand/transcript.json` in source time
 - `work/timeline.json`
-- active main-operation revisions
+- active main-operation revisions at each phase
+
+Planning does not require `final/final-video.mp4`. Finalization and extraction require
+that exact project render with `render.status: verified`.
 
 `prepare_transcript.py --timeline` calls the shared
 `projectlib.map_transcript_to_timeline`. Candidate/extraction times are therefore
@@ -43,9 +55,10 @@ program seconds on the actual final video. Words removed by the main edit are no
 available to shorts. Each retained word keeps its `source_range`, `program_range`,
 and `clip_id`.
 
-Project transcript metadata binds the final video, source transcript, and timeline
-by absolute path, size, modified time, and SHA-256. Candidate validation refuses a
-changed binding.
+Project transcript metadata binds the project source, source transcript, and timeline
+by absolute path, size, modified time, and SHA-256. Candidate review frames map their
+program timestamps back through `timeline.json` to the source video. Candidate
+validation refuses a changed binding.
 
 ## Output Layout
 
@@ -105,11 +118,12 @@ $SkillRoot = Join-Path $RepoRoot "skills\video-to-shorts"
 $ProjectRoot = (Resolve-Path "<project-root>").Path
 $Work = Join-Path $ProjectRoot "work"
 $ShortsWork = Join-Path $Work "shorts"
+$ProjectSource = (Resolve-Path "<project-source-from-work/project.json>").Path
 $FinalVideo = Join-Path $ProjectRoot "final\final-video.mp4"
 $ShortsReview = Join-Path $ProjectRoot "review\06-shorts"
 New-Item -ItemType Directory -Force $ShortsWork,$ShortsReview | Out-Null
 
-python "$SkillRoot\scripts\prepare_transcript.py" $FinalVideo `
+python "$SkillRoot\scripts\prepare_transcript.py" $ProjectSource `
   --transcript "$Work\understand\transcript.json" `
   --timeline "$Work\timeline.json" `
   --out $ShortsWork
@@ -126,7 +140,8 @@ decision, and hand-author candidate JSON. Deterministic code validates editorial
 judgment; it does not invent candidates or scores.
 
 ```powershell
-python "$SkillRoot\scripts\prepare_visual_context.py" $FinalVideo `
+python "$SkillRoot\scripts\prepare_visual_context.py" $ProjectSource `
+  --timeline "$Work\timeline.json" `
   --out "$Work\cache\shorts\candidate-visual" --interval 15
 ```
 
@@ -260,13 +275,25 @@ python "$SkillRoot\scripts\plan.py" `
 `work/shorts/shorts-plan.json` uses integer `schema_version: 1`. It records:
 
 - `target: derived`, `timebase: program`, and `timeline_id`;
-- the verified main-render path and fingerprint;
+- `delivery_status: awaiting_main_render` during planning;
+- the project source and timeline bindings used for candidate review;
 - exact `depends_on` / `based_on` revisions from the active main sequence;
 - selection mode, rationale, delivery mode, and review ID;
 - stable short IDs;
 - explicit `program_range` and mapped `source_ranges`;
 - scoring/editorial evidence, approved filler drops, and program-time keep spans;
 - work transcript/report paths and `../final/shorts/*.mp4` delivery paths.
+
+The first run is the end of the planning phase. Stop here and continue requested
+captions, content cards, graphic motion, and other remaining main-sequence operations
+in canonical order. Do not run
+`extract_shorts.py` and do not create `final.mp4` from this skill.
+
+After the shared renderer verifies `final/final-video.mp4`, rerun the same `plan.py`
+command. It revalidates the approved project source and timeline, refreshes the full
+active-operation revisions, adds the verified main-render fingerprint, and sets
+`delivery_status: ready`. A timeline change requires new candidates and approval;
+pixel-only operations such as content cards and captions do not.
 
 Qualification remains deterministic: score at least 70, completeness at least 15,
 estimated output duration 20-90 seconds, valid exact excerpt, no greater-than-50%
@@ -285,8 +312,9 @@ python "$SkillRoot\scripts\extract_shorts.py" `
 ```
 
 Before extraction, the script rechecks the main-render fingerprint, project render
-status, dependency revisions, candidate receipt, approved candidate hash, and source
-video. Each keep range becomes its own seeked `-ss/-t/-i` input; ffmpeg concatenates
+status, the complete current main-operation list and revisions, candidate receipt,
+approved candidate hash, and source video. An `awaiting_main_render` plan is rejected.
+Each keep range becomes its own seeked `-ss/-t/-i` input; ffmpeg concatenates
 those inputs and performs one H.264/AAC encode. It does not decode the complete main
 video once per keep range.
 
@@ -452,14 +480,11 @@ Add one derived operation to `work/project.json`, but not to the main sequence:
   "id": "shorts",
   "skill": "video-to-shorts",
   "revision": 1,
-  "depends_on": ["understanding", "captions"],
-  "based_on": {"understanding": 1, "captions": 1},
-  "status": "verified",
+  "depends_on": ["understanding"],
+  "based_on": {"understanding": 1},
+  "status": "approved",
   "plan": "shorts/shorts-plan.json",
-  "outputs": [
-    "../final/shorts/short-001-horizontal.mp4",
-    "../final/shorts/short-001-vertical.mp4"
-  ],
+  "outputs": [],
   "target": {"sequence": "main", "scope": "derivatives"},
   "effects": {
     "changes_timeline": true,
@@ -468,12 +493,15 @@ Add one derived operation to `work/project.json`, but not to the main sequence:
     "changes_audio": true,
     "adds_track": null
   },
-  "check": {"status": "pass", "report": "../review/06-shorts/shorts-summary.md"}
+  "check": {"status": "pending", "report": "../review/06-shorts/shorts-summary.md"}
 }
 ```
 
-Use the actual dependency list/revisions stored in the plan. Project validation checks
-the DAG and files; shorts remain outside the main render plan.
+This is the pre-render state. Use the actual dependency list/revisions stored in the
+plan. After the shared main render, rerun `plan.py`, update the operation from the
+refreshed dependencies, extract and verify outputs, then set the operation/check to
+`verified`/`pass` and list the delivered files. Project validation checks the DAG and
+files; shorts remain outside the main render plan.
 
 ## Compatibility
 

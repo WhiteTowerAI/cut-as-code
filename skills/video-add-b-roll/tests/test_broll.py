@@ -2203,11 +2203,11 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
     def _registration_project(self, sequence=None):
         return {
             "active_sequence": "main",
-            "sequences": {"main": {"operations": sequence or ["cut", "color-grade", "content-cards", "captions"]}},
+            "sequences": {"main": {"operations": sequence or ["cut", "color-grade", "captions", "content-cards"]}},
             "operations": [
                 {"id": "understanding", "revision": 1}, {"id": "cut", "revision": 2},
-                {"id": "color-grade", "revision": 3}, {"id": "content-cards", "revision": 4},
-                {"id": "captions", "revision": 5},
+                {"id": "color-grade", "revision": 3}, {"id": "captions", "revision": 4},
+                {"id": "content-cards", "revision": 5},
             ],
             "render": {"status": "verified"},
         }
@@ -2225,7 +2225,7 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         result = broll_plan.register_operation(project, self._registered_plan((2.0, 4.5)))
         operation = next(item for item in result["operations"] if item["id"] == "b-roll")
         self.assertEqual(before, project)
-        self.assertEqual(["cut", "color-grade", "b-roll", "content-cards", "captions"], result["sequences"]["main"]["operations"])
+        self.assertEqual(["cut", "color-grade", "b-roll", "captions", "content-cards"], result["sequences"]["main"]["operations"])
         self.assertEqual(["understanding", "cut", "color-grade"], operation["depends_on"])
         self.assertEqual({"understanding": 1, "cut": 2, "color-grade": 3}, operation["based_on"])
         self.assertEqual(("video-add-b-roll", 1, "approved"), (operation["skill"], operation["revision"], operation["status"]))
@@ -2238,9 +2238,9 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         self.assertEqual("draft", result["render"]["status"])
 
     def test_register_operation_requires_verified_approved_normalized_shots_and_orders_overlays(self):
-        project = self._registration_project(["cut", "unknown", "content-cards", "captions"])
+        project = self._registration_project(["cut", "unknown", "captions", "content-cards"])
         result = broll_plan.register_operation(project, self._registered_plan((2, 3), (4, 5), dependencies=["understanding", "cut"]))
-        self.assertEqual(["cut", "b-roll", "unknown", "content-cards", "captions"], result["sequences"]["main"]["operations"])
+        self.assertEqual(["cut", "b-roll", "unknown", "captions", "content-cards"], result["sequences"]["main"]["operations"])
         self.assertEqual(["cache/b-roll/normalized/broll-001.mp4", "cache/b-roll/normalized/broll-002.mp4"], [item["asset"] for item in next(item for item in result["operations"] if item["id"] == "b-roll")["render"]])
         for change in (("status", "selected"), ("normalized", {"path": "../bad.mp4", "sha256": "a" * 64}), ("review.status", "draft")):
             plan = self._registered_plan((2, 3))
@@ -2248,6 +2248,17 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             else: plan["shots"][0][change[0]] = change[1]
             with self.subTest(change=change):
                 with self.assertRaises(ValueError): broll_plan.register_operation(project, plan)
+
+    def test_register_operation_stays_before_downstream_overlays_without_upstream_anchors(self):
+        project = self._registration_project(["captions", "content-cards", "graphic-motion"])
+        result = broll_plan.register_operation(
+            project,
+            self._registered_plan((2, 3), dependencies=["understanding"]),
+        )
+        self.assertEqual(
+            ["b-roll", "captions", "content-cards", "graphic-motion"],
+            result["sequences"]["main"]["operations"],
+        )
 
     def test_registered_speaker_inset_requires_composited_normalized_overlay(self):
         plan = self._registered_plan((2, 3))

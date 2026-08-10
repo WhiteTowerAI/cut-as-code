@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-star-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "5081fdcc74d5ab795075d79ce933902d0168089dc7c990e08c704057c785c837",
+    "icon.svg": "df3d625440dd95c99f5f74abfae7b37899588714299405c1c6a635c91e006e4d",
+    "upstream-icon.json": "d7c3872ef5770a64afdbc62b6379af422fa1ce8b9afa8b5fbbf3850ec350117f"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-speed-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "e19ee236652c2a7e2979ead292af9dfc23f133c6d86247e37900d376477a0440",
+    "icon.svg": "5bc33c7cd5e3596b197b2c68af1194c0844e87460fe13a27c71dda0b3808363e",
+    "upstream-icon.json": "62cf63df0a330951fc26b6dfa403bcc30f3433744ea7bf783289981be7cfa797"
+  }
+}

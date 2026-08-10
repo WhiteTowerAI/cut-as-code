@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-arrows-vertical-alt",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "3a91f9c115662c0ff3f6d4d19b397402c100daf80c1573b8236a673787c00249",
+    "icon.svg": "a5a32b57adf46350081c453f2e9079a32ba51484d143250aa412f3c4d16b18e6",
+    "upstream-icon.json": "97d34997e79e0da6a08f478dbc904cfc210a0fffe9c728259370938881934a41"
+  }
+}

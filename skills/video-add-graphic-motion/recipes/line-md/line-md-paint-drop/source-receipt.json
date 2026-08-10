@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-paint-drop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "71299aa241d53b3ba93ac4dce09dd4b76bd92250249c8d09c11a3e09a4d89813",
+    "icon.svg": "eb06f12a290e63553e57e9ed071aa88731aa0fa226092e3b3d4a026184d7a27b",
+    "upstream-icon.json": "28d2d6939df1fbcfce1e9979ae7dbf84131ac57df7e8680dce5757f8e18ffddb"
+  }
+}

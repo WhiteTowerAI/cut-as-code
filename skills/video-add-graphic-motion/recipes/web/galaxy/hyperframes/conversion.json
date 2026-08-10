@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "galaxy",
+  "surface": "web",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "eba27a6529a35c92973a491539aa33afbd8ec052336fbd7eee3ed5984da891ea"
+}

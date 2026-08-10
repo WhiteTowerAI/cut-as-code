@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-person-off-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "cb8f80b526435cf5a7f2d87d1dacf0dd98f66921f68344c93292250626f32dc9",
+    "icon.svg": "d24b0bf40e065a4526c13f078fbba9a0c9182b05de4794e062601ecbb1c0f960",
+    "upstream-icon.json": "a26a5aadaeb9b10c4d22a23f3ab2078fdaba31cd2389e85a30541b0ff54983ad"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-star-alt-twotone-half",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "93bde08b8ac23d7ceae38f8983669961170585f40d2226ff74e925514e95dc5f",
+    "icon.svg": "5453cacbdd7c5890289f3175ef442087474279e78acdd93c914fa4cd521c48d8",
+    "upstream-icon.json": "0e474841efc15b99c66ef503982d07f3e21621cc40e6826f88b231db2a3ee36f"
+  }
+}

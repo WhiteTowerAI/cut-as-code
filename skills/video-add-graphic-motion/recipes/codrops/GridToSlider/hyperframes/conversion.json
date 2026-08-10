@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "project_id": "GridToSlider",
+  "demo_url": "http://tympanus.net/Development/GridToSlider/",
+  "article_url": "https://tympanus.net/codrops/2023/05/04/ideas-for-grid-to-slideshow-switch-animations/",
+  "source_url": "https://github.com/codrops/GridToSlider/",
+  "source_commit": "1d8b2abb52ba9207459d1b2ee6ac372f429ef8de",
+  "license": {
+    "type": "MIT",
+    "evidence": "repository-file",
+    "file": "LICENSE",
+    "sha256": "85131f2bb7714dc895ff5d7d68db65acc5ad0e5dfd72162869fc8d63dec06056"
+  },
+  "source_copy": "source",
+  "variants": [
+    {
+      "name": "index",
+      "composition_id": "codrops-gridtoslider-index",
+      "source_entry": "index.html",
+      "runtime_entry": "index.html",
+      "source_sha256": "c94961b96cf40ba4a1375865874e6fc3b342ca070cb35d3020d49f8e084eb069",
+      "runtime_sha256": "c94961b96cf40ba4a1375865874e6fc3b342ca070cb35d3020d49f8e084eb069",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".intro-grid__img"
+          }
+        ]
+      },
+      "output": "index/index.html"
+    },
+    {
+      "name": "index2",
+      "composition_id": "codrops-gridtoslider-index2",
+      "source_entry": "index2.html",
+      "runtime_entry": "index2.html",
+      "source_sha256": "aa4bfa2f4c5a4d3eb6dc39539792af4b838590a544c59e6543049460d1b95b6c",
+      "runtime_sha256": "aa4bfa2f4c5a4d3eb6dc39539792af4b838590a544c59e6543049460d1b95b6c",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".intro-grid__img"
+          }
+        ]
+      },
+      "output": "index2/index.html"
+    },
+    {
+      "name": "index3",
+      "composition_id": "codrops-gridtoslider-index3",
+      "source_entry": "index3.html",
+      "runtime_entry": "index3.html",
+      "source_sha256": "8cceaf3d6b0ef6d2d29eb57fb1d8fdd7a2f01aac2edabf4f83d1cd782535ba2d",
+      "runtime_sha256": "8cceaf3d6b0ef6d2d29eb57fb1d8fdd7a2f01aac2edabf4f83d1cd782535ba2d",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".intro-grid__img"
+          }
+        ]
+      },
+      "output": "index3/index.html"
+    }
+  ]
+}

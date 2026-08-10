@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-circle-to-confirm-circle-twotone-transition",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "686b0b3e5ea9f9dd02fc61cb89e7831309274996b21000c5b8e439662dee676b",
+    "icon.svg": "234977a4aec0a0f72fbad0edb1d5d0e0d027aaba93bc5cc9d3d63fc5a548c1e1",
+    "upstream-icon.json": "1b3c909f81cbd536888642c1ac7ac07596db9e916aad7cf45ca07691468afa12"
+  }
+}

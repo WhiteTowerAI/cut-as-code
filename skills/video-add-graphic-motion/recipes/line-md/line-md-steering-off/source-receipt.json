@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-steering-off",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "64f1613e45d4afcdd03121be75c77257db453a4b6366f288448aa1982b723528",
+    "icon.svg": "60762b91382b48348c253e11c6670fd3e026e189984ecffded9626ddffc954fd",
+    "upstream-icon.json": "7a94fcd946fbe47d4a4a8b2a8d978aa480d572fc9c876e288120848e2becc11a"
+  }
+}

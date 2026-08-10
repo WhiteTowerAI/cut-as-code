@@ -9,9 +9,11 @@ from types import SimpleNamespace
 
 import extract_shorts
 import boundary_refine
+import build_candidate_review
 import candidates
 import plan as shorts_plan
 import prepare_transcript
+import prepare_visual_context
 import render_vertical
 import review_gate
 import vertical_plan
@@ -123,6 +125,8 @@ def check_program_transcript():
     words = [word for segment in transcript["segments"] for word in segment["words"]]
     assert [word["word"].strip() for word in words] == ["first", "middle", "final"]
     assert words[-1]["program_range"] == {"start_s": 2.0, "end_s": 2.25}
+    assert build_candidate_review.source_time(timeline_fixture(), 2.5) == 5.0
+    assert prepare_visual_context.source_time(timeline_fixture(), 2.5) == 5.0
 
 
 def check_delegated_reviews():
@@ -262,8 +266,19 @@ def check_canonical_plan_and_extraction_command():
         candidate_dir = shorts / "preview" / "text_visual"
         write_json(candidate_dir / "shorts_candidates.json", {
             "schema_version": "shorts-candidates.v2",
-            "video": {"source": str(final_video)},
-            "transcript": {"path": str(shorts / "transcript.json"), "timebase": "program"},
+            "video": {
+                "source": str(source_video),
+                "sha256": review_gate.sha256_file(source_video),
+                "timebase": "source",
+                "timeline": {
+                    "path": str(work / "timeline.json"),
+                    "sha256": review_gate.sha256_file(work / "timeline.json"),
+                },
+            },
+            "transcript": {
+                "path": str(shorts / "transcript.json"), "timebase": "program",
+                "timeline_id": "source",
+            },
             "selection": {"evidence_mode": "text_visual"},
             "candidates": [{
                 "candidate_id": "cand-001", "title": "Complete payoff",
@@ -287,6 +302,7 @@ def check_canonical_plan_and_extraction_command():
         ))
         canonical = load_json(shorts / "shorts-plan.json")
         assert canonical["schema_version"] == 1
+        assert canonical["delivery_status"] == "ready"
         assert canonical["based_on"] == {"understanding": 2, "captions": 3}
         assert canonical["selection"]["mode"] == "agent"
         short = canonical["shorts"][0]
@@ -445,12 +461,15 @@ def check_project_candidate_binding():
         root = Path(temporary)
         work = root / "work"
         final_video = root / "final" / "final-video.mp4"
+        source_video = root / "input" / "source.mp4"
         source_transcript = work / "understand" / "transcript.json"
         timeline_path = work / "timeline.json"
         shorts = work / "shorts"
         candidate_dir = shorts / "preview" / "text_visual"
         final_video.parent.mkdir(parents=True)
         final_video.write_bytes(b"final")
+        source_video.parent.mkdir(parents=True)
+        source_video.write_bytes(b"source")
         transcript = {
             "duration": 20.0,
             "timebase": "program",
@@ -477,14 +496,15 @@ def check_project_candidate_binding():
         }
         write_json(timeline_path, timeline)
         write_json(work / "project.json", {
-            "render": {"status": "verified", "output": "../final/final-video.mp4"},
+            "source": {"path": "../input/source.mp4", "fingerprint": {}},
+            "render": {"status": "draft", "output": "../final/final-video.mp4"},
             "active_sequence": "main",
             "sequences": {"main": {"timeline": "timeline.json", "operations": []}},
         })
         write_json(shorts / "transcript_metadata.json", {
             "timebase": "program", "timeline_id": "source",
             "bindings": {
-                "video": prepare_transcript.file_binding(final_video),
+                "video": prepare_transcript.file_binding(source_video),
                 "source_transcript": prepare_transcript.file_binding(source_transcript),
                 "timeline": prepare_transcript.file_binding(timeline_path),
             },
@@ -506,7 +526,7 @@ def check_project_candidate_binding():
         )
         candidates.run_candidates(args)
         normalized = load_json(candidate_dir / "shorts_candidates.json")
-        assert normalized["video"]["source"] == str(final_video.resolve())
+        assert normalized["video"]["source"] == str(source_video.resolve())
         assert normalized["transcript"]["timebase"] == "program"
         timeline["note"] = "changed"
         write_json(timeline_path, timeline)
@@ -516,6 +536,92 @@ def check_project_candidate_binding():
             assert "timeline changed" in str(error)
         else:
             raise AssertionError("changed project timeline was accepted")
+
+
+def check_prerender_project_planning():
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        work = root / "work"
+        source_video = root / "input" / "source.mp4"
+        source_transcript = work / "understand" / "transcript.json"
+        timeline_path = work / "timeline.json"
+        shorts = work / "shorts"
+        candidate_dir = shorts / "preview" / "text_visual"
+        source_video.parent.mkdir(parents=True)
+        source_video.write_bytes(b"source")
+        transcript = {
+            "duration": 20.0,
+            "timebase": "program",
+            "timeline_id": "source",
+            "segments": [{
+                "start": 0.0, "end": 20.0, "text": "hello payoff",
+                "words": [
+                    {"start": 0.0, "end": 0.5, "word": " hello"},
+                    {"start": 19.0, "end": 19.5, "word": " payoff"},
+                ],
+            }],
+        }
+        timeline = {
+            "schema_version": 1, "timeline_id": "source", "source_asset_id": "source",
+            "fps": {"num": 30, "den": 1}, "source_duration_s": 20.0,
+            "program_duration_s": 20.0,
+            "clips": [{
+                "id": "clip-001", "source_range": {"start_s": 0.0, "end_s": 20.0},
+                "program_range": {"start_s": 0.0, "end_s": 20.0}, "speed": 1.0,
+                "decision_ref": "source",
+            }],
+        }
+        write_json(source_transcript, transcript)
+        write_json(shorts / "transcript.json", transcript)
+        write_json(timeline_path, timeline)
+        write_json(work / "project.json", {
+            "schema_version": 1,
+            "project_id": "shorts-prerender",
+            "source": {"path": "../input/source.mp4", "fingerprint": {}},
+            "active_sequence": "main",
+            "sequences": {"main": {"timeline": "timeline.json", "operations": ["understanding"]}},
+            "operations": [{"id": "understanding", "revision": 1}],
+            "render": {"status": "draft", "output": "../final/final-video.mp4"},
+        })
+        write_json(shorts / "transcript_metadata.json", {
+            "timebase": "program", "timeline_id": "source", "duration_s": 20.0,
+            "bindings": {
+                "video": prepare_transcript.file_binding(source_video),
+                "source_transcript": prepare_transcript.file_binding(source_transcript),
+                "timeline": prepare_transcript.file_binding(timeline_path),
+            },
+        })
+        write_json(candidate_dir / "input.json", {
+            "schema_version": "shorts-candidates.v2",
+            "selection": {"evidence_mode": "text_visual"},
+            "candidates": [{
+                "candidate_id": "cand-001", "title": "Hello payoff",
+                "scene_type": "solo_talk", "start_time": 0.0, "end_time": 20.0,
+                "transcript_excerpt": "hello payoff", "evidence_mode": "text_visual",
+                "score_breakdown": score_breakdown(),
+                "metadata": {"editorial_reason": "The complete claim ends with a payoff."},
+            }],
+        })
+        args = SimpleNamespace(
+            out=str(candidate_dir), candidates=str(candidate_dir / "input.json"),
+            transcript=str(shorts / "transcript.json"), project_root=str(root),
+        )
+        candidates.run_candidates(args)
+        review_gate.open_candidate_review(
+            shorts, decision_mode="agent", delegation_note="User delegated shorts review."
+        )
+        review_gate.answer_candidate_review_agent(
+            shorts, ["text_visual/cand-001"], "horizontal_only", "Complete thought."
+        )
+        shorts_plan.run_plan(SimpleNamespace(
+            out=str(shorts), transcript=None, project_root=str(root),
+            max_shorts=5, min_duration=20.0, max_duration=90.0,
+            min_score=70.0, min_completeness=15.0, allow_overlap=False,
+        ))
+        planned = load_json(shorts / "shorts-plan.json")
+        assert planned["delivery_status"] == "awaiting_main_render"
+        assert "source_render" not in planned
+        assert planned["based_on"] == {"understanding": 1}
 
 
 def normalize_whitespace(value):
@@ -671,6 +777,7 @@ def main():
     check_media_integration()
     check_direct_vertical_rendering()
     check_project_candidate_binding()
+    check_prerender_project_planning()
     check_workflow_ui()
     check_documented_review_workflow()
     print("[shorts-protocol] boundary release guard passed")
@@ -681,6 +788,7 @@ def main():
     print("[shorts-protocol] horizontal and vertical media integration passed")
     print("[shorts-protocol] direct-source vertical rendering passed")
     print("[shorts-protocol] project candidate bindings passed")
+    print("[shorts-protocol] pre-render project planning passed")
     print("[shorts-protocol] documented review workflow passed")
 
 

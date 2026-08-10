@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-cloud-alt-braces-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "d5fb900469de6ba5410b560d60aa30e232d86da98fcf29023313d15bd54dcdca",
+    "icon.svg": "e34005a6947315a764c8e3a4d1b963f53e198716bf63144b2f7a40fc919a5593",
+    "upstream-icon.json": "f64a9a66d9e5a1bf5a37c9fefa9fba811f9844e991c169c96f97b2e2987f152f"
+  }
+}

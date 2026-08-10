@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-rotate-90",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "d6756fb6945f6ac02ec0d0499b291e168de69d43cdb0d0275830a45b2b15d5be",
+    "icon.svg": "ff3c56d20ee61f4444540253cb0470d0969df91a30c0abf86827cac752d0edab",
+    "upstream-icon.json": "6321aa376978b216f0c3b907f6b6a350ae85fee1c35b82ade9c0a969d7e49bac"
+  }
+}

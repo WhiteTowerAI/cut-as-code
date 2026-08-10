@@ -1,0 +1,18 @@
+.footer {
+    position: fixed;
+    left: 1rem;
+    bottom: 1rem;
+    width: 100%;
+    z-index: 1000;
+}
+
+.wrapper {
+    font-weight: 500;
+    display: flex;
+    gap: 1rem;
+    background-color: #ffffff;
+    width: fit-content;
+    padding: 1rem;
+    border-radius: 0.7rem;
+    box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.1);
+}

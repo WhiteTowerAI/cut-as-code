@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-chat-round-dots-twotone-off",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "214eaec2a6bdafd619f0a5e009074ec38ebfa95e9174c0abf14b45042c4b68e6",
+    "icon.svg": "9b557626702cb8114c30ac93afec74967cd0a4e0792769e382dd5d34699c43c7",
+    "upstream-icon.json": "c96f1479ec861c6c1ea8817993973e0c495130dac7fce4e1438b9ce230310880"
+  }
+}

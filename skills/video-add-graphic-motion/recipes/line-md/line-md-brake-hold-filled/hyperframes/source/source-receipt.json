@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-brake-hold-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "cbe47c51a18150454d85ab5d3681406dbcb0b283223244f7bdc181810ee87340",
+    "icon.svg": "d41e76f164e76e9566987db240e1226a380e078600afd75df6e9db18651245e5",
+    "upstream-icon.json": "9346802d5855995bf3712d6d032e9d11819ed96452d1835983b19757b3c12bc9"
+  }
+}

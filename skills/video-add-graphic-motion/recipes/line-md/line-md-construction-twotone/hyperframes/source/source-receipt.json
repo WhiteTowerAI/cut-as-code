@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-construction-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "8be1bac0b155d5debf99cb3e4a4f9075b256cb8a50744740cd10afde69bc4f52",
+    "icon.svg": "82297a9c1800df7af7f28ffc6f6ed9c84735c2ad5c0b72b1de8a386ad1f75bc9",
+    "upstream-icon.json": "bbeba33c41127928044fd28e3145bfb726002f7d8dde4e7648a5983747ab97b9"
+  }
+}

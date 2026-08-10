@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "confetti-star-burst",
+  "surface": "canvas-confetti",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "5389c2e3717db4975e54c96e4eb33a9aab57ce0284fd8fceb415da42112282e6"
+}

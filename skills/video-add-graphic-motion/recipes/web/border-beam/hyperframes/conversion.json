@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "border-beam",
+  "surface": "web",
+  "runtime": [
+    "css"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "css",
+  "source_manifest_sha256": "abe398ce4435a7af9d7a2779ae593e852a3fe5731b3798a099efc70378e2c68d"
+}

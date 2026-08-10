@@ -1,0 +1,28 @@
+.loader {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    position: fixed;
+    top: 0;
+    left: 0;
+    background-color: #ffffff;
+    color: #000000;
+    font-size: 1.5rem;
+    font-weight: bold;
+
+    &__text {
+        animation: fadeInOut 2s ease-in-out infinite;
+    }
+}
+
+@keyframes fadeInOut {
+    0%,
+    100% {
+        opacity: 0.3;
+    }
+
+    50% {
+        opacity: 1;
+    }
+}

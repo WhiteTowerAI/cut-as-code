@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-volume-medium-off-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "edfe6d5cd3543fd490e638c961e5d2a8f336fab19d218b38ad8be2d599a81f2c",
+    "icon.svg": "dbe1fbc161d3b5ff9f47738d95640b37fd0c9d773abfc1d779f5bfbde32050a0",
+    "upstream-icon.json": "b030600aba0f11c3596dc8574a280de0202bfef28e134d63d8bd9cde203e191c"
+  }
+}

@@ -24,6 +24,10 @@ This skill owns caption grouping, style selection, review, and the transparent
 caption track. It does not transcribe, cut, retime, grade, reframe, or choose the
 delivery audio policy.
 
+Run captions before content cards and graphic motion whenever either is selected.
+The approved caption layout establishes a reserved subtitle region that both later
+operations must keep clear. This relative order also applies when only one pair is active.
+
 Use `video-understand` first. If a cut exists, caption the active program
 timeline; do not treat source transcript seconds as program seconds.
 
@@ -557,8 +561,10 @@ Add or revise one `captions` operation in `work/project.json`. Depend on
 }
 ```
 
-Use the actual timeline FPS. Add `captions` to the active sequence operations,
-then compile and render delivery once:
+Use the actual timeline FPS. Insert `captions` before active `content-cards` and
+`graphic-motion` operations. Captions never depend on either downstream operation;
+adding captions to a project that already contains them requires reordering the active
+sequence. Then compile and render delivery once:
 
 ```powershell
 python "$RepoRoot\skills\video-understand\scripts\validate.py" project `

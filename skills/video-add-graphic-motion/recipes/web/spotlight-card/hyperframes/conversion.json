@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "recipe_id": "spotlight-card",
+  "surface": "web",
+  "runtime": [
+    "css",
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "c874731810b4de46b1bdba6d8ccbc7470cbdb0824fbb1ccc3f965f1ea6d16b05"
+}

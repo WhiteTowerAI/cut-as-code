@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-medical-services",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "b91b4a54bc881670dc49b4b0ab24d33be7363d4c3e0d1aacb4f7939d0860b5b8",
+    "icon.svg": "78d7ec5ad64391d4dba8c143ba39ea0bbba356f70af83ff9f14e880337bca91b",
+    "upstream-icon.json": "5ff9fd1ef65a788bed530f02185d4520e0444e350e43189d0f5cfb44a32d8d21"
+  }
+}

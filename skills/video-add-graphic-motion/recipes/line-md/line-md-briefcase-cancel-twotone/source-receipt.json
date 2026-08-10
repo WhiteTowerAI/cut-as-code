@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-briefcase-cancel-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "da4a50d88c856342c030a7273f87c37c5782419a981b8898eb8e875445bdb94c",
+    "icon.svg": "f882af18c9ca9ea711cda8753556664934ac308fa1cd7f2483ddf2be51260193",
+    "upstream-icon.json": "22d85945f2ad05cc9963bc9d4684945455854bfcc915ec7729d3a9d68862bb81"
+  }
+}

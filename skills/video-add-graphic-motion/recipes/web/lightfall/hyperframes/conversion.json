@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "lightfall",
+  "surface": "web",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "5b37a9d07d84667056f75bf8fd9aa670f38fce9dba216aeb723d261d854a02e8"
+}

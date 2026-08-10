@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-medical-services-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "8545875e2044efbb7ff8253d7ba0147724a49887592678934510509f367a444e",
+    "icon.svg": "38ca554e5868ccf1a8bd270d7d2a8fcf06c0b274d458fcdd38ff5d33401e3012",
+    "upstream-icon.json": "dc8125ece0c2d5eec243597de80d13c98d2f2821e3c062e0e1ccf187e692111a"
+  }
+}

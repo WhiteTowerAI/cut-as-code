@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-email-opened",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "0b525f4de8f2de18913295d94b78e106bd46afcdda8723d045607e0cf6795bb4",
+    "icon.svg": "62e9108baab8692d773ede6df2c69864594b200bccab0ba02e2f346eb12aa54d",
+    "upstream-icon.json": "1bf5be391f6d4c4569163ee502be4bbac60fd8d02c10f22c2f7e42956f95464d"
+  }
+}

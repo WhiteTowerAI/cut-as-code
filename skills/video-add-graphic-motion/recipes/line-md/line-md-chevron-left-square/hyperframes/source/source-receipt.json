@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-chevron-left-square",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "f16cfb74644c98acc9a0fdb9a5fe98188e1f0b5a4e14a307bece0ccd41c33124",
+    "icon.svg": "e4d6b0e25f5db57eb754139f948e9881c5ab6f4ee1b2effda8cd64353570829d",
+    "upstream-icon.json": "5557ab0b8889d780daf19f27e2ebecf0bb8ec486b1597591f9e3e683655ddfad"
+  }
+}

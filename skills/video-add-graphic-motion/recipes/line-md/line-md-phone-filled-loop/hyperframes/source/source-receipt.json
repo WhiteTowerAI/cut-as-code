@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-phone-filled-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "992785a0ac16dc265c24102231fb22828aba8b6a1d96a47ad6969456f15e6be9",
+    "icon.svg": "9d4e7e9f530f96b25fbf13fbfa1f4bdd4274b561fe8fafea99bb3866bae076f8",
+    "upstream-icon.json": "97229a63c5d3f0e4749949bd814edc561f25cd924181c869cf5ae2b083441999"
+  }
+}

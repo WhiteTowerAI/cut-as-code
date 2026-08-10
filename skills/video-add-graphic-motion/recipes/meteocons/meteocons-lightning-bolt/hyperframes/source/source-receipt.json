@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "recipe_id": "meteocons-lightning-bolt",
+  "source_id": "meteocons",
+  "upstream_asset": "fill/lightning-bolt.svg",
+  "source_files": {
+    "preview.html": "b21a603b096e8a8fe7c763b732741381af3cd502cf9fa20b961687dd32ca7ba6",
+    "icon.svg": "7f5601005e6308919f3e5f9e653c564e70b8d62503d9ac3fc4b2d1edab28d167"
+  }
+}

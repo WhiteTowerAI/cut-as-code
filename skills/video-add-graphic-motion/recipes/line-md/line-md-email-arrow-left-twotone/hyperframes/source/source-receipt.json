@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-email-arrow-left-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "8b0435a68ab48e03439323f87234a1d29e51628d51b01426fe348df91cb33d73",
+    "icon.svg": "ae3e1f96d490c5d97759f977875b5afc42d190b9896a5b0e5b17c33b195b3bd9",
+    "upstream-icon.json": "7b89609bfc339586ae4d807b1023229637b5197ae8c752164bd9e396900aaf18"
+  }
+}

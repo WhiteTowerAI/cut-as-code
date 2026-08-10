@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-gauge-twotone-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "197197c35b3a8fa50963624c9f1e0589861661a4ca41ba1e0d6814e7d6fbda8f",
+    "icon.svg": "364e133a770bb553c84e4c9c7ee1988c84d788d1d7437d846461a5f423fc7562",
+    "upstream-icon.json": "921ce5e798fe02f97d97e40dd2ca70b544e3a552c778616ba187098123f39280"
+  }
+}

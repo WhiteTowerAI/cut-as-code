@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-menu-to-close-alt-transition",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "fd328e9e9d253d9934049e4050dc6fc1379746a4d7890c204e9ad294f8879fb0",
+    "icon.svg": "f2950c4e8a0eaaa42fbaaaf61119d8bb5b09ff91a4707d672fa32dcaedcf9438",
+    "upstream-icon.json": "e379c5d96fcbf2d0a1d2e6ed57c7e0c44386822d2dfd715b3087c201953e754e"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "meteocons-fog",
+  "surface": "meteocons",
+  "runtime": [
+    "svg-smil"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "svg-smil",
+  "source_manifest_sha256": "2b6289a66ebe66cf433286eb75c562c59079006249f487a89be0447ee7c10a9a"
+}

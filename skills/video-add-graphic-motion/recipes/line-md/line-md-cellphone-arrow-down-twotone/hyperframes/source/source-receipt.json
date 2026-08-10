@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-cellphone-arrow-down-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "987e0ba718fc432c48f3ebd9b6082817010aa2b489d65f111ebf05b487db769e",
+    "icon.svg": "3ae23bd0bc7b27c773332288e689bce493e2f7ff0cebd0d0a2d12858b8a5bfc8",
+    "upstream-icon.json": "5174884d3a80a8cf960914ab7605ff623b8449baf934720aaa3151f438093486"
+  }
+}

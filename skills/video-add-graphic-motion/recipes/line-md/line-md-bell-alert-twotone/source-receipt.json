@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-bell-alert-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "b895e65a673225e094bd4667c32724e0aeb642c6a3cab93a1aae6bbf39e859a0",
+    "icon.svg": "be8072707a9223a65cec10c88d0f5944a063bc3f1c4520e9e216c9deea5262ac",
+    "upstream-icon.json": "c9425f4f66221a15930bcfec527e19006afcc64a2acc7f12647af49452910a19"
+  }
+}

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <title>button-press - HyperFrames</title>
+
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>button-press · motion-anything recipe</title>
+  <style>
+    :root{ --accent:#8b7cf6; color-scheme:light; }
+    html,body{ margin:0; height:100%; }
+    body{ display:grid; place-items:center; background:#f4f5f7; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+.ui-btn{border:0;background:#8b7cf6;color:#fff;padding:15px 30px;border-radius:15px;font:600 16px ui-sans-serif,system-ui;cursor:pointer;transition:transform .16s cubic-bezier(.34,1.56,.64,1)}
+.ui-btn.pressed{transform:scale(.9)}
+@media(prefers-reduced-motion:reduce){.ui-btn{transition:none}.ui-btn.pressed{transform:none}}
+  </style>
+
+  <style>
+    html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; }
+    body[data-composition-id] { position: relative; box-sizing: border-box; background: transparent !important; }
+  </style>
+</head>
+<body data-composition-id="button-press" data-start="0" data-width="1920" data-height="1080" data-duration="6" data-no-timeline>
+
+  <button class="ui-btn">Tap me</button>
+  
+
+  <script src="hf-recipe.js"></script>
+  <script src="hf-adapter.js"></script>
+</body>
+</html>

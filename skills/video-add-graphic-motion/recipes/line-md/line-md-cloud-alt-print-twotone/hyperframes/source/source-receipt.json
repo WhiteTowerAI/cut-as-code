@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-cloud-alt-print-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "4a85adac545011128aee5932228fc95849b16e66729b5b8c1ff694751647b857",
+    "icon.svg": "c81beb9bfecabc7ac0caf56763d4a84023a10c0afac043d0865d7a00cd275d1a",
+    "upstream-icon.json": "7172fa2aed1771930a086d447a15fe5b74990a85ab31b3d12e93fa7b66233ac9"
+  }
+}

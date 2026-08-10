@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "project_id": "ScrollBlurTypography",
+  "demo_url": "https://tympanus.net/Development/ScrollBlurTypography/",
+  "article_url": "https://tympanus.net/codrops/2024/04/23/blurry-text-reveal-on-scroll/",
+  "source_url": "https://github.com/codrops/ScrollBlurTypography/",
+  "source_commit": "3e64d4bdae65b1f291e21a9a9c4b2ac6258c45c1",
+  "license": {
+    "type": "MIT",
+    "evidence": "repository-file",
+    "file": "LICENSE",
+    "sha256": "a5ad4d98a7970bd09ba775c7e237fb93c60139f8e0e261ebb470e580b213c226"
+  },
+  "source_copy": "source",
+  "variants": [
+    {
+      "name": "index",
+      "composition_id": "codrops-scrollblurtypography-index",
+      "source_entry": "index.html",
+      "runtime_entry": "index.html",
+      "source_sha256": "7a245f53855a6677e5db16ffdb8372f4420a78a360dd3f44044be7bfc6418508",
+      "runtime_sha256": "7a245f53855a6677e5db16ffdb8372f4420a78a360dd3f44044be7bfc6418508",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index/index.html"
+    }
+  ]
+}

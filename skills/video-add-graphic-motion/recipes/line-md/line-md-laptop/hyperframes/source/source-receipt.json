@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-laptop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "e5be33f4a82e4ea23c4184bdb0cfb72bcd6ddb9bda7144d636437b70b67693fd",
+    "icon.svg": "3fabd9da1d8d1848831d449c6f1bddd245f2e7be19b51e302bd8a2c9ee9e9bde",
+    "upstream-icon.json": "3e8cea4c77a02a0eb0a24d1ecf08fa95f7c77bca0042c1141aedd5fb4a1e3d8e"
+  }
+}

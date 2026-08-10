@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-circle-to-confirm-circle-twotone-transition",
+  "surface": "line-md",
+  "runtime": [
+    "svg-smil"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "svg-smil",
+  "source_manifest_sha256": "ce7f6b910b45b7b6450c193ea7a067edaa2000c6270404efc0ebc38fda3ee6b4"
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-lightbulb-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "8a833a49a8e7f6085e943e50f269a3466d768a29a42b20bf2e7ed2ed9c5002a2",
+    "icon.svg": "34fbf057fece51c9172bb10572b60c853c343e36ef0b76077e5b84cd05d01b75",
+    "upstream-icon.json": "6868f0e8bc96810c48be605fcfacd16da01a449290c78145f29a98e3863f6d64"
+  }
+}

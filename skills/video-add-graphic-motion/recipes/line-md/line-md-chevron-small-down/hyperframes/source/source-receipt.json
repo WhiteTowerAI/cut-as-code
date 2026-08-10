@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-chevron-small-down",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "a5c85127cbe028e7c9f775fa1da21d179f30b83c6281524bcf33c2e8e9b8d295",
+    "icon.svg": "0c3a50e4dfccf8a02f499a9daf08492f0ba0095200e6ce16667a7caa32d54942",
+    "upstream-icon.json": "4f1c08991ff332f50b018b0c23224637613bc921dde45bc39e13dbbfee9bedfb"
+  }
+}

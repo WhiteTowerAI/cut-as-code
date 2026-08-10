@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-chevron-up",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "27407ee77fb1e5834955dd4f85dc818ce46736f1f6b02848499d997b85877640",
+    "icon.svg": "f3af6cbe748fd8fc08bc7b046d9a255cd9491f1878ba3c38ffda95bd58bc34b0",
+    "upstream-icon.json": "c69c9cc99bb3ac1e8d14f68035246a6993d9b90c6c61962d1aa2e87d2a4164de"
+  }
+}

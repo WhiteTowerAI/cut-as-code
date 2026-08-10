@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <title>kinetic-images - HyperFrames</title>
+  <link rel="icon" href="data:,">
+  <style>
+    html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
+    html, body, body * { cursor: none !important; }
+    [data-composition-id] { position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+    #three-layer { display: block; width: 1920px; height: 1080px; }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "../source/_runtime/three/three.module.js",
+        "three/addons/": "../source/_runtime/three/addons/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div data-composition-id="kinetic-images" data-start="0" data-width="1920" data-height="1080" data-duration="6" data-no-timeline>
+    <canvas id="three-layer" class="clip" data-scene-mode="showcase" data-start="0" data-duration="6" data-track-index="1" width="1920" height="1080"></canvas>
+  </div>
+  <script src="./hf-adapter.js"></script>
+  <script type="module" src="./hf-recipe.js"></script>
+</body>
+</html>

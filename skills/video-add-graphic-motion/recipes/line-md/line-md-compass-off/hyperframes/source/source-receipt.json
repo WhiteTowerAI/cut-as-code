@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-compass-off",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "debd9cac65875fc06869cd242f8fb0b27157d146bbd3a89622c89c19331f05a9",
+    "icon.svg": "40dee3aeef99fae5f77cfdf4910269889a46b42101670c254c4aa1aea8e3a60c",
+    "upstream-icon.json": "f624776802b9c86ef68d528c40aac659bfcce437c9b0e07afaf8dd36a814313a"
+  }
+}

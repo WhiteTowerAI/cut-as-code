@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-lightbulb-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "6d9a7ba76bafc2df987884e4bb2942498f5e1c1dac51dd46734842b4f53a6534",
+    "icon.svg": "472a5efd6daa6a266210bdc9ea561edc3decc001be57547dfb3eeb753826c73c",
+    "upstream-icon.json": "306f97c747e77ae0d3f4008e6d1c3af6d32feaee0306488a5863ca8e0cd63377"
+  }
+}

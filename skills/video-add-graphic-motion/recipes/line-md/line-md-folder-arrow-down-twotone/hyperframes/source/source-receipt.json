@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-folder-arrow-down-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "9b2789aa51a8ab6a6f31ca5cebe3637f23b92d3a93e4abeee67fceb073c58833",
+    "icon.svg": "173cf4859c1bbedd4727cc38f0d2b6a3f0eee77dc7fa0dc3cf73b7321fb5e1e0",
+    "upstream-icon.json": "7bc412ad998466001be2d6ec3100be7ad20095a40520cc89f41222060f718447"
+  }
+}

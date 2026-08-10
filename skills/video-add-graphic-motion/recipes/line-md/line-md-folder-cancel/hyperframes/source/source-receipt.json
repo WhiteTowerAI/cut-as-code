@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-folder-cancel",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "348b626af9e195d930f7239e18725483a4482f9f46b2a6890468627022dc2cc1",
+    "icon.svg": "b7e48fcc51c87ef90d8b57e9dc78ef58e02e87e45218017337e5bb116040b7ce",
+    "upstream-icon.json": "8ea80e5d217e3eba2dde52a088f0c3fbf74dfcdbfd6e1c404642230911b96fde"
+  }
+}

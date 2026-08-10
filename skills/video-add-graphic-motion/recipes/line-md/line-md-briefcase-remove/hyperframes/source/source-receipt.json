@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-briefcase-remove",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "bb7e572a6d53411049f903ae07adddba667797c044a24f7a70019cb083fffede",
+    "icon.svg": "a23d8146bedb13bf71b9908234147d40511782459e386491be6baa13f150f387",
+    "upstream-icon.json": "bb23083b67c1bb7d5998f1d15707a70600d89c8f2982fa05ce7ae44f56bde6a9"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-thumbs-down-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "711c2e4a5b5f810c79781db92db7fd363860e864652fa4f6f3b74c928e9e3b59",
+    "icon.svg": "9872aeba951de5d1dd6abe9519585b230c04f426e1bf3b56dc4a1bd1d4301875",
+    "upstream-icon.json": "df227463853cc1084d6b9a4b8e22521dae65fa85e3391a4cd16693bc8f92bbb3"
+  }
+}

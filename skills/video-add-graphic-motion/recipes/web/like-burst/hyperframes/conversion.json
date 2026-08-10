@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "like-burst",
+  "surface": "web",
+  "runtime": [],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "28f19d15cdb5896af43b1ef8bb5ad957e50103d8f0d4485449c4ef8011ed7cd8"
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-compass-twotone-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "f5ff50c7fe2ef20bae194017c635b1b6dee7d021b137cc31ade393d59263c55f",
+    "icon.svg": "50ae04d4cae62c6f295aa85e831579f77b5d5de87cf0feee2403f47e79681755",
+    "upstream-icon.json": "357ae2df676afc721b25f498e37675b9c8ea36c33a9d8a54d98f55a4f50ff819"
+  }
+}

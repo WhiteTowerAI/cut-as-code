@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "recipe_id": "meteocons-wind",
+  "source_id": "meteocons",
+  "upstream_asset": "fill/wind.svg",
+  "source_files": {
+    "preview.html": "9b927b198a183e675ee6d8bf5a68ecd6764303027df20204acbee0c323f8a879",
+    "icon.svg": "a13f8189aac33dcdbc2945d2b8b01b41f6757f96bc14e45fae35d226874136f3"
+  }
+}

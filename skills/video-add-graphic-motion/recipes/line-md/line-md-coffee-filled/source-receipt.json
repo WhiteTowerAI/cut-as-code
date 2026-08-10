@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-coffee-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "0f4339ade75afa66bdb06d0772cf36f4d49d2028aaaef3278e658a81a92054c8",
+    "icon.svg": "06e9012dc727a4499a51ec63548de6a09accf226d26515729fb4f063345afcf8",
+    "upstream-icon.json": "b302ce7771588a67d1bf1258383a0ecd8629b25cdd3e11cc1a36987d05c79ebc"
+  }
+}

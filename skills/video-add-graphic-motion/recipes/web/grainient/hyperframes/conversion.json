@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "grainient",
+  "surface": "web",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "fd7b99312e5473fdcfc0007f5edbc681cedb6c75b26162f83a7654578c18d83a"
+}

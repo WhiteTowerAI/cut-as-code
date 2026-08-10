@@ -195,10 +195,8 @@ def verify_binding(binding, expected_path, label):
 def validate_project_bindings(project_root, transcript_path, transcript):
     root = Path(project_root).resolve()
     project = projectlib.load_json(root / "work/project.json")
-    if project.get("render", {}).get("status") != "verified":
-        fail("project candidates require a verified main render")
     sequence = project["sequences"][project["active_sequence"]]
-    final_video = projectlib.resolve_project_path(root, project["render"]["output"])
+    source_video = projectlib.resolve_project_path(root, project["source"]["path"])
     timeline_path = projectlib.resolve_project_path(root, sequence["timeline"])
     source_transcript = root / "work" / "understand" / "transcript.json"
     metadata_path = transcript_path.parent / "transcript_metadata.json"
@@ -210,10 +208,10 @@ def validate_project_bindings(project_root, transcript_path, transcript):
     if metadata.get("timeline_id") != transcript.get("timeline_id"):
         fail("project transcript timeline binding is stale")
     bindings = metadata.get("bindings", {})
-    verify_binding(bindings.get("video"), final_video, "video")
+    verify_binding(bindings.get("video"), source_video, "video")
     verify_binding(bindings.get("timeline"), timeline_path, "timeline")
     verify_binding(bindings.get("source_transcript"), source_transcript, "source transcript")
-    return metadata
+    return metadata, timeline_path
 
 
 def run_candidates(args):
@@ -232,7 +230,7 @@ def run_candidates(args):
     require_type(raw.get("candidates"), list, "candidates")
     selection = validate_selection(raw.get("selection"))
     transcript = load_json(transcript_path)
-    project_metadata = (
+    project_binding = (
         validate_project_bindings(args.project_root, transcript_path, transcript)
         if args.project_root else None
     )
@@ -249,12 +247,19 @@ def run_candidates(args):
         "evidence_mode": selection["evidence_mode"],
         "validated_at": datetime.now(timezone.utc).isoformat(),
     }
-    if project_metadata:
+    if project_binding:
+        project_metadata, timeline_path = project_binding
         video_binding = project_metadata["bindings"]["video"]
+        timeline_binding = project_metadata["bindings"]["timeline"]
         result["video"] = {
             "source": video_binding["path"],
             "sha256": video_binding["sha256"],
             "duration_s": project_metadata.get("duration_s", duration),
+            "timebase": "source",
+            "timeline": {
+                "path": str(timeline_path),
+                "sha256": timeline_binding["sha256"],
+            },
         }
         result["transcript"] = {
             "path": str(transcript_path),

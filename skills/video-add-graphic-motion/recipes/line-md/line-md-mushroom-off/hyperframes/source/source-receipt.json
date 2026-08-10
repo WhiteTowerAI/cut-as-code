@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-mushroom-off",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "0a851edbb19905ea84183ae4921eb0f4e3347046d3449ac2addabf868710d3e3",
+    "icon.svg": "99933757d29b66c64cba57a2f06e90a9278e525d063c6034e5715993f9ef7313",
+    "upstream-icon.json": "c30f220833e3b83abeb1b2e4a60d005b7725c55f5a089d272f2a89ffc8ee0f6e"
+  }
+}

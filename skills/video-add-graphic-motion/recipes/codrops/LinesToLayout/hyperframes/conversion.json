@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "project_id": "LinesToLayout",
+  "demo_url": "http://tympanus.net/Development/LinesToLayout/",
+  "article_url": "https://tympanus.net/codrops/2022/04/05/lines-to-content-layout-animation/",
+  "source_url": "https://github.com/codrops/LinesToLayout/",
+  "source_commit": "d4071daba81d188165be6b6254bfc6c28c21ef3a",
+  "license": {
+    "type": "MIT",
+    "evidence": "repository-file",
+    "file": "LICENSE",
+    "sha256": "1f6db3d0b162eaa534ff5585db684f00c41f776325f7fd11ebf9373650099ce1"
+  },
+  "source_copy": "source",
+  "variants": [
+    {
+      "name": "index",
+      "composition_id": "codrops-linestolayout-index",
+      "source_entry": "src/index.html",
+      "runtime_entry": "dist/index.html",
+      "source_sha256": "7e1c658d0333c18bdbeb98d59c203b550f1a1933c8b0ddef0067e539ebfdc144",
+      "runtime_sha256": "461e95d2582669180aaf2cfc42482558c9bb396dc404b40ff93d98b9cf7933c2",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".image"
+          }
+        ]
+      },
+      "output": "index/index.html"
+    }
+  ]
+}

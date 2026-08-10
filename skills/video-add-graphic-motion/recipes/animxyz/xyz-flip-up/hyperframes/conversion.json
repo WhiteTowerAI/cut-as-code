@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "xyz-flip-up",
+  "surface": "animxyz",
+  "runtime": [
+    "css"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "css",
+  "source_manifest_sha256": "347a0817cce4da0b77cdb4bc692e85c646c5edda5dd655aa4345e2969017b159"
+}

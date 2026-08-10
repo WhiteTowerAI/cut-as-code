@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-map-marker-multiple-off-twotone-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "381281697d3fb1738edba8b78651ca521be8b5172ba4371e32390e8b440dbbb8",
+    "icon.svg": "23e2a2db9a4b6682ee61202435fcf76e88ab054066bf3f4381d1d506a99a397f",
+    "upstream-icon.json": "47fee7ddd2048cb872ac01330cfb3c51d7a775a638b31c49783d7862518d63d7"
+  }
+}

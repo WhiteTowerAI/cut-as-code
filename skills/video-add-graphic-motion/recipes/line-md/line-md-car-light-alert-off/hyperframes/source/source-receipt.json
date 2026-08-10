@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-car-light-alert-off",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "be3ead8f2ec6e5d37c394fd444d4df539bd993430637d151b398cdcb89a0e420",
+    "icon.svg": "f9bebb9fc443cbe1ff5eeefe5a2975b55f08b5f19d47a6605c73ef8988e0ba37",
+    "upstream-icon.json": "b63a2df645cbcbafab71a5f724fafee3eec39ca05b293971822c8a0b0dcea785"
+  }
+}

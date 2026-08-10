@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-sunny-filled-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "84edea2185b48153502693dce602378568b460cb427cf4d41641e73825305022",
+    "icon.svg": "904d61917049453b8210c7c8aeed14c3c78d299fca28e6cd526cde322926bd6e",
+    "upstream-icon.json": "69e86359fb56f1db90603e0a1aa52680adaf35ba55e1084d8e23f4f55e44e4f0"
+  }
+}
