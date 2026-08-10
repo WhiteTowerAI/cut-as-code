@@ -60,7 +60,7 @@
     form { display: grid; gap: 10px; padding-top: 14px; }
     .candidate {
       display: grid;
-      grid-template-columns: 40px 150px minmax(220px, 1fr) 140px minmax(280px, 360px);
+      grid-template-columns: 40px 140px minmax(210px, 1fr) 170px 130px minmax(280px, 360px);
       gap: 14px;
       align-items: center;
       min-height: 104px;
@@ -75,7 +75,7 @@
     .identity strong { color: var(--text); font-size: 15px; }
     .identity span { overflow-wrap: anywhere; }
     .field { display: grid; gap: 6px; min-width: 0; color: var(--muted); }
-    input[type="text"], select {
+    input[type="text"], input[type="number"], textarea, select {
       width: 100%;
       min-height: 40px;
       border: 1px solid #50575c;
@@ -85,7 +85,11 @@
       font: inherit;
       padding: 8px 10px;
     }
-    input[type="text"]:focus, select:focus { border-color: var(--accent); outline: 2px solid #265950; }
+    input[type="text"]:focus, input[type="number"]:focus, textarea:focus, select:focus {
+      border-color: var(--accent);
+      outline: 2px solid #265950;
+    }
+    textarea { resize: vertical; }
     .frame-preview {
       position: relative;
       width: 100%;
@@ -135,13 +139,60 @@
     .placement-proxy[data-placement="center"] {
       top: 35%; left: 21%; width: 58%; height: 30%; opacity: 1;
     }
+    .placement-proxy[data-chart="true"][data-placement="top"] {
+      top: 4%; left: 15%; width: 70%; height: 34%;
+    }
+    .placement-proxy[data-chart="true"][data-placement="bottom"] {
+      bottom: 4%; left: 15%; width: 70%; height: 34%;
+    }
+    .placement-proxy[data-chart="true"][data-placement="left"] {
+      top: 15%; left: 3%; width: 42%; height: 70%;
+    }
+    .placement-proxy[data-chart="true"][data-placement="right"] {
+      top: 15%; right: 3%; width: 42%; height: 70%;
+    }
+    .placement-proxy[data-chart="true"][data-placement="center"] {
+      top: 22%; left: 15%; width: 70%; height: 56%;
+    }
     .placement-proxy span {
       display: -webkit-box;
       overflow: hidden;
       overflow-wrap: anywhere;
+      white-space: pre-line;
       -webkit-box-orient: vertical;
       -webkit-line-clamp: 2;
     }
+    [data-caption-occupancy] { position: absolute; inset: 0; pointer-events: none; }
+    .caption-occupancy {
+      position: absolute;
+      z-index: 1;
+      border: 1px dashed rgba(243, 189, 91, 0.95);
+      background: rgba(243, 189, 91, 0.2);
+    }
+    .caption-occupancy[data-region="top"] { top: 6%; left: 16%; width: 68%; height: 24%; }
+    .caption-occupancy[data-region="center"] { top: 35%; left: 12%; width: 76%; height: 30%; }
+    .caption-occupancy[data-region="bottom"] { bottom: 6%; left: 12%; width: 76%; height: 24%; }
+    .chart-editor {
+      grid-column: 2 / -1;
+      min-width: 0;
+      border-top: 1px solid var(--line);
+      padding-top: 10px;
+    }
+    .chart-editor[hidden] { display: none; }
+    .chart-editor summary { color: var(--text); font-weight: 650; cursor: pointer; }
+    .chart-fields { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 10px; margin-top: 12px; }
+    .chart-points { display: grid; gap: 8px; margin-top: 10px; }
+    .chart-point {
+      display: grid;
+      grid-template-columns: minmax(110px, 1fr) minmax(90px, 0.7fr) minmax(180px, 1.6fr) 36px;
+      gap: 8px;
+      align-items: end;
+    }
+    .point-evidence { font: 12px/1.35 ui-monospace, "Cascadia Code", Consolas, monospace; }
+    .remove-point { width: 36px; min-height: 40px; padding: 0; font-size: 20px; }
+    .chart-actions { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+    .chart-error { color: var(--warning); overflow-wrap: anywhere; }
+    button:disabled { cursor: not-allowed; opacity: 0.45; }
     .summary-box {
       margin-top: 20px;
       border: 1px solid var(--line);
@@ -173,7 +224,7 @@
       overflow-wrap: anywhere;
     }
     @media (max-width: 1100px) {
-      .candidate { grid-template-columns: 40px 150px minmax(220px, 1fr) 140px; }
+      .candidate { grid-template-columns: 40px 140px minmax(210px, 1fr) 170px 130px; }
       .frame-preview { grid-column: 2 / -1; width: min(520px, 100%); }
     }
     @media (max-width: 780px) {
@@ -182,8 +233,12 @@
       .toolbar button { width: 100%; }
       .summary { display: grid; gap: 2px; white-space: normal; }
       .candidate { grid-template-columns: 36px 1fr; align-items: start; }
-      .copy-field, .placement-field { grid-column: 2; }
+      .copy-field, .treatment-field, .placement-field { grid-column: 2; }
       .frame-preview { grid-column: 1 / -1; }
+      .chart-editor { grid-column: 1 / -1; }
+      .chart-fields { grid-template-columns: 1fr 1fr; }
+      .chart-point { grid-template-columns: 1fr 1fr 36px; }
+      .chart-point .evidence-field { grid-column: 1 / 3; }
     }
   </style>
 </head>
@@ -221,6 +276,18 @@
         <span>Text</span>
         <input type="text" name="copy">
       </label>
+      <label class="field treatment-field">
+        <span>Visual treatment</span>
+        <select name="visual_treatment">
+          <option value="default">Default</option>
+          <option value="metric-spotlight">Metric spotlight</option>
+          <option value="bar-chart">Bar chart</option>
+          <option value="pie-chart">Pie chart</option>
+          <option value="line-chart">Line chart</option>
+          <option value="side-by-side">Side by side</option>
+          <option value="parallel-columns">Parallel columns</option>
+        </select>
+      </label>
       <label class="field placement-field">
         <span>Placement</span>
         <select name="placement">
@@ -234,11 +301,38 @@
       </label>
       <div class="frame-preview">
         <img alt="">
+        <div data-caption-occupancy></div>
         <div class="placement-proxy" data-placement="">
           <span data-proxy-copy></span>
         </div>
       </div>
+      <details class="chart-editor" data-chart-editor hidden>
+        <summary>Chart data</summary>
+        <div class="chart-fields">
+          <label class="field"><span>Dimension</span><input type="text" name="dimension_label"></label>
+          <label class="field"><span>Metric</span><input type="text" name="metric_label"></label>
+          <label class="field"><span>Unit</span><input type="text" name="unit"></label>
+          <label class="field"><span>Period</span><input type="text" name="period"></label>
+        </div>
+        <div class="chart-points" data-chart-points></div>
+        <div class="chart-actions">
+          <button type="button" data-add-point>Add point</button>
+          <span class="chart-error" data-chart-error aria-live="polite"></span>
+        </div>
+      </details>
     </article>
+  </template>
+
+  <template id="chart-point-template">
+    <div class="chart-point">
+      <label class="field"><span>Label</span><input type="text" name="point_label"></label>
+      <label class="field"><span>Value</span><input type="number" step="any" name="point_value"></label>
+      <label class="field evidence-field">
+        <span>Evidence refs</span>
+        <input class="point-evidence" type="text" name="point_evidence_refs">
+      </label>
+      <button class="remove-point" type="button" data-remove-point title="Remove point" aria-label="Remove point">&times;</button>
+    </div>
   </template>
 
   <script>
@@ -248,10 +342,24 @@
     const reviewData = JSON.parse(new TextDecoder().decode(bytes));
     const form = document.querySelector("#review-form");
     const candidateTemplate = document.querySelector("#candidate-template");
+    const chartPointTemplate = document.querySelector("#chart-point-template");
     const count = document.querySelector("#selection-count");
     const summaryOutput = document.querySelector("#summary-output");
     const copyButton = document.querySelector("#copy-summary");
     const placements = new Set(["", "top", "bottom", "left", "right", "center"]);
+    const treatmentsByType = {
+      "intro": new Set(["default"]),
+      "key-quote": new Set(["default"]),
+      "stat": new Set(["default", "metric-spotlight", "bar-chart", "pie-chart", "line-chart"]),
+      "list": new Set(["default", "side-by-side", "parallel-columns"]),
+      "outro": new Set(["default"]),
+    };
+    const chartLayouts = new Set(["bar-chart", "pie-chart", "line-chart"]);
+    const pointLimits = {
+      "bar-chart": [2, 6],
+      "pie-chart": [2, 6],
+      "line-chart": [3, 8],
+    };
     const target = reviewData.target;
 
     function displayId(id) {
@@ -263,10 +371,22 @@
       const row = fragment.querySelector(".candidate");
       const selected = row.querySelector('[name="selected"]');
       const copy = row.querySelector('[name="copy"]');
+      const treatment = row.querySelector('[name="visual_treatment"]');
       const placement = row.querySelector('[name="placement"]');
       const image = row.querySelector("img");
       const preview = row.querySelector(".placement-proxy");
       const proxyCopy = row.querySelector("[data-proxy-copy]");
+      const captionOccupancy = row.querySelector("[data-caption-occupancy]");
+      const chartEditor = row.querySelector("[data-chart-editor]");
+      const chartPoints = row.querySelector("[data-chart-points]");
+      const chartError = row.querySelector("[data-chart-error]");
+      const addPoint = row.querySelector("[data-add-point]");
+      const chartFields = {
+        dimension_label: row.querySelector('[name="dimension_label"]'),
+        metric_label: row.querySelector('[name="metric_label"]'),
+        unit: row.querySelector('[name="unit"]'),
+        period: row.querySelector('[name="period"]'),
+      };
 
       row.dataset.cardId = card.id;
       row.querySelector("[data-id]").textContent = displayId(card.id);
@@ -275,17 +395,182 @@
       selected.checked = card.selected;
       selected.setAttribute("aria-label", `Select ${card.id}`);
       copy.value = card.copy;
+      const allowedTreatments = treatmentsByType[card.card_type] || treatmentsByType["intro"];
+      for (const option of treatment.options) {
+        option.disabled = !allowedTreatments.has(option.value);
+        option.hidden = option.disabled;
+      }
+      treatment.value = allowedTreatments.has(card.visual_treatment)
+        ? card.visual_treatment : "default";
       placement.value = placements.has(card.placement) ? card.placement : "";
       image.src = card.screenshot;
       image.alt = `Video frame for ${card.id}`;
+      row.chartData = card.data ? JSON.parse(JSON.stringify(card.data)) : null;
+
+      const occupiedRegions = new Set((card.caption_occupancy || []).map((item) => item.region));
+      for (const region of occupiedRegions) {
+        const box = document.createElement("div");
+        box.className = "caption-occupancy";
+        box.dataset.region = region;
+        box.title = `Caption occupancy: ${region}`;
+        captionOccupancy.append(box);
+      }
+
+      function emptyPoint() {
+        return { label: "", value: null, evidence_refs: [] };
+      }
+
+      function ensureChartData() {
+        if (!row.chartData) {
+          row.chartData = {
+            status: "draft",
+            dimension_label: "",
+            metric_label: "",
+            unit: "",
+            period: "",
+            points: [],
+          };
+        }
+        const minimum = pointLimits[treatment.value][0];
+        while (row.chartData.points.length < minimum) row.chartData.points.push(emptyPoint());
+      }
+
+      function syncChartFields() {
+        for (const [name, input] of Object.entries(chartFields)) {
+          input.value = row.chartData?.[name] || "";
+        }
+      }
+
+      function renderPoints() {
+        chartPoints.replaceChildren();
+        if (!row.chartData) return;
+        const [minimum, maximum] = pointLimits[treatment.value];
+        row.chartData.points.forEach((item, index) => {
+          const pointFragment = chartPointTemplate.content.cloneNode(true);
+          const pointRow = pointFragment.querySelector(".chart-point");
+          const labelInput = pointRow.querySelector('[name="point_label"]');
+          const valueInput = pointRow.querySelector('[name="point_value"]');
+          const evidenceInput = pointRow.querySelector('[name="point_evidence_refs"]');
+          const remove = pointRow.querySelector("[data-remove-point]");
+          labelInput.value = item.label || "";
+          valueInput.value = Number.isFinite(item.value) ? item.value : "";
+          evidenceInput.value = Array.isArray(item.evidence_refs) ? item.evidence_refs.join(", ") : "";
+          labelInput.addEventListener("input", () => { item.label = labelInput.value; updateAll(); });
+          valueInput.addEventListener("input", () => {
+            item.value = valueInput.value === "" ? null : valueInput.valueAsNumber;
+            updateAll();
+          });
+          evidenceInput.addEventListener("input", () => {
+            item.evidence_refs = evidenceInput.value.split(",").map((value) => value.trim()).filter(Boolean);
+            updateAll();
+          });
+          remove.disabled = row.chartData.points.length <= minimum;
+          remove.addEventListener("click", () => {
+            row.chartData.points.splice(index, 1);
+            renderPoints();
+            updateAll();
+          });
+          chartPoints.append(pointFragment);
+        });
+        addPoint.disabled = row.chartData.points.length >= maximum;
+      }
+
+      function compactChartData() {
+        if (!row.chartData) return null;
+        return {
+          dimension_label: chartFields.dimension_label.value.trim(),
+          metric_label: chartFields.metric_label.value.trim(),
+          unit: chartFields.unit.value.trim(),
+          period: chartFields.period.value.trim(),
+          points: row.chartData.points.map((item) => ({
+            label: String(item.label || "").trim(),
+            value: item.value,
+            evidence_refs: Array.isArray(item.evidence_refs) ? [...item.evidence_refs] : [],
+          })),
+        };
+      }
+
+      function chartValidationError() {
+        if (!chartLayouts.has(treatment.value)) return "";
+        const data = compactChartData();
+        for (const name of ["dimension_label", "metric_label", "unit", "period"]) {
+          if (!data[name]) return `${name} is required`;
+        }
+        const [minimum, maximum] = pointLimits[treatment.value];
+        if (data.points.length < minimum || data.points.length > maximum) {
+          return `${treatment.value} requires ${minimum}-${maximum} points`;
+        }
+        const labels = new Set();
+        for (const item of data.points) {
+          if (!item.label) return "Every point needs a label";
+          const key = item.label.toLocaleLowerCase();
+          if (labels.has(key)) return "Point labels must be unique";
+          labels.add(key);
+          if (!Number.isFinite(item.value)) return "Every point needs a finite value";
+          if (!item.evidence_refs.length) return "Every point needs evidence refs";
+          if (item.evidence_refs.some((ref) => !card.evidence_refs.includes(ref))) {
+            return "Point evidence must stay within the card evidence scope";
+          }
+        }
+        const values = data.points.map((item) => item.value);
+        if (treatment.value === "bar-chart" && (values.some((value) => value < 0) || !values.some((value) => value > 0))) {
+          return "Bar values must be non-negative with at least one value above zero";
+        }
+        if (treatment.value === "pie-chart") {
+          const total = values.reduce((sum, value) => sum + value, 0);
+          if (values.some((value) => value < 0) || total <= 0) return "Pie values must be non-negative and sum above zero";
+          const unit = data.unit.toLocaleLowerCase();
+          if ((unit.includes("%") || ["percent", "percentage", "pct"].includes(unit)) && Math.abs(total - 100) > 0.000001) {
+            return "Percentage pie values must sum to 100";
+          }
+        }
+        return "";
+      }
+
+      row.compactChartData = compactChartData;
+      row.chartValidationError = chartValidationError;
+
+      for (const [name, input] of Object.entries(chartFields)) {
+        input.addEventListener("input", () => {
+          if (row.chartData) row.chartData[name] = input.value;
+          updateAll();
+        });
+      }
+      addPoint.addEventListener("click", () => {
+        ensureChartData();
+        const maximum = pointLimits[treatment.value][1];
+        if (row.chartData.points.length < maximum) row.chartData.points.push(emptyPoint());
+        renderPoints();
+        updateAll();
+      });
 
       function updatePreview() {
         preview.dataset.placement = placement.value;
-        proxyCopy.textContent = copy.value.trim() || card.card_type;
+        preview.dataset.chart = chartLayouts.has(treatment.value) ? "true" : "false";
+        proxyCopy.textContent = `${treatment.value}\n${copy.value.trim() || card.card_type}`;
+      }
+
+      function updateChartEditor() {
+        const isChart = chartLayouts.has(treatment.value);
+        chartEditor.hidden = !isChart;
+        if (!isChart) {
+          chartError.textContent = "";
+          return;
+        }
+        ensureChartData();
+        syncChartFields();
+        renderPoints();
+        chartError.textContent = chartValidationError();
       }
 
       placement.addEventListener("change", updatePreview);
+      treatment.addEventListener("change", () => {
+        updatePreview();
+        updateChartEditor();
+        updateAll();
+      });
       copy.addEventListener("input", updatePreview);
+      updateChartEditor();
       updatePreview();
       form.append(fragment);
       return row;
@@ -308,19 +593,32 @@
         .map((row) => {
           const id = row.dataset.cardId;
           const copy = row.querySelector('[name="copy"]').value;
+          const treatment = row.querySelector('[name="visual_treatment"]').value;
           const placement = row.querySelector('[name="placement"]').value || "Unplaced";
-          return `${id} | ${placement} | ${copy}`;
+          const firstLine = `${id} | ${treatment} | ${placement} | ${copy.replace(/\s+/g, " ").trim()}`;
+          if (!chartLayouts.has(treatment)) return firstLine;
+          return `${firstLine}\ndata=${JSON.stringify(row.compactChartData())}`;
         })
-        .join("\n");
+        .join("\n\n");
     }
     function updateSummary() {
       summaryOutput.textContent = buildSummary();
     }
     function updateAll() {
       updateCount();
+      let hasInvalidSelectedChart = false;
+      for (const row of candidates) {
+        const treatment = row.querySelector('[name="visual_treatment"]').value;
+        const error = row.chartValidationError();
+        row.querySelector("[data-chart-error]").textContent = error;
+        if (row.querySelector('[name="selected"]').checked && chartLayouts.has(treatment) && error) {
+          hasInvalidSelectedChart = true;
+        }
+      }
+      copyButton.disabled = hasInvalidSelectedChart;
       updateSummary();
     }
-    for (const input of form.querySelectorAll('[name="selected"], [name="copy"], [name="placement"]')) {
+    for (const input of form.querySelectorAll('[name="selected"], [name="copy"], [name="visual_treatment"], [name="placement"]')) {
       input.addEventListener("change", updateAll);
       input.addEventListener("input", updateAll);
     }

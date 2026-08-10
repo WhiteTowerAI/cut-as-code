@@ -81,10 +81,12 @@ function summary(reviewId, choice = "pill-yellow") {
   return `Caption style review\nReview: ${reviewId}\nDecision: select\nChoice: ${choice}`;
 }
 
-function previewSummary(reviewId, decision, detail) {
-  return decision === "approve"
-    ? `Caption preview review\nReview: ${reviewId}\nDecision: approve\nEvidence: ${detail ?? "early, middle, late, no-caption"}`
-    : `Caption preview review\nReview: ${reviewId}\nDecision: revise\nChanges: ${detail ?? "Raise the captions above the lower third."}`;
+function previewSummary(reviewId, decision, detail, karaoke) {
+  if (decision !== "approve") {
+    return `Caption preview review\nReview: ${reviewId}\nDecision: revise\nChanges: ${detail ?? "Raise the captions above the lower third."}`;
+  }
+  const approval = `Caption preview review\nReview: ${reviewId}\nDecision: approve\nEvidence: ${detail ?? "early, middle, late, no-caption"}`;
+  return karaoke === undefined ? approval : `${approval}\nKaraoke: ${karaoke}`;
 }
 
 function crc32(buffer) {
@@ -189,6 +191,29 @@ check("preview response parsers are strict", () => {
     `CAPTION PREVIEW REVIEW\nrEvIeW: ${reviewId}\nDECISION: approve\nEVIDENCE: late, early, no-caption, middle`,
     reviewId,
   ).evidence.sort(), ["early", "late", "middle", "no-caption"]);
+  assert.deepEqual(parseApprove(
+    previewSummary(reviewId, "approve", "expressive-layout-beats", "off"),
+    reviewId,
+    "expressive-layout-beats",
+  ), { reviewId, decision: "approve", evidence: ["expressive-layout-beats"], karaoke: false });
+  assert.deepEqual(parseApprove(
+    previewSummary(reviewId, "approve", "expressive-layout-beats", "on"),
+    reviewId,
+    "expressive-layout-beats",
+  ), { reviewId, decision: "approve", evidence: ["expressive-layout-beats"], karaoke: true });
+  assert.throws(() => parseApprove(
+    previewSummary(reviewId, "approve", undefined, "off"), reviewId, "expressive-layout-beats",
+  ), /expressive-layout-beats/i);
+  for (const invalid of [
+    previewSummary(reviewId, "approve", "expressive-layout-beats"),
+    `${previewSummary(reviewId, "approve", "expressive-layout-beats", "on")}\nKaraoke: off`,
+    previewSummary(reviewId, "approve", "expressive-layout-beats", "auto"),
+    previewSummary(reviewId, "approve", "expressive-layout-beats", "ON"),
+    `${previewSummary(reviewId, "approve", "expressive-layout-beats", "off")}\nUnknown: no`,
+  ]) assert.throws(() => parseApprove(invalid, reviewId, "expressive-layout-beats"));
+  assert.throws(() => parseApprove(
+    previewSummary(reviewId, "approve", undefined, "off"), reviewId,
+  ), /unknown/i);
   assert.deepEqual(parseRevise(previewSummary(reviewId, "revise"), reviewId), {
     reviewId, decision: "revise", changes: "Raise the captions above the lower third.",
   });
@@ -472,6 +497,109 @@ try {
     };
   };
 
+  const prepareExpressivePreview = (name, decisionMode = "human") => {
+    const expressivePlanPath = join(tempRoot, `${name}-captions.json`);
+    const beats = [
+      { id: "beat-001", variant: "bottom-standard", cue_ids: ["cue-001"] },
+      { id: "beat-002", variant: "center-emphasis", cue_ids: ["cue-002"] },
+      { id: "beat-003", variant: "bottom-standard", cue_ids: ["cue-003"] },
+      { id: "beat-004", variant: "center-emphasis", cue_ids: ["cue-004"] },
+    ];
+    writeFileSync(expressivePlanPath, JSON.stringify({
+      timeline_id: "main",
+      presentation: { mode: "expressive", layout_beats: beats },
+    }), "utf8");
+    const statePath = join(tempRoot, `${name}-state.json`);
+    const reviewDir = join(tempRoot, `${name}-style-review`);
+    const startArgs = ["start", "--state", statePath, "--source", sourcePath, "--captions", expressivePlanPath,
+      "--review-dir", reviewDir, "--decision-mode", decisionMode, "--no-open", "true"];
+    if (decisionMode === "agent") startArgs.push("--delegation-note", "Delegated Expressive interaction check.");
+    runInteraction(startArgs);
+    let state = readState(statePath);
+    if (decisionMode === "human") {
+      runInteraction(["select", "--state", statePath, "--response", summary(state.reviewId, "clean")]);
+    } else {
+      runInteraction(["agent-select", "--state", statePath, "--choice", "clean", "--rationale", "Readable default."]);
+    }
+    state = readState(statePath);
+    const evidenceDir = join(tempRoot, `${name}-evidence`);
+    mkdirSync(evidenceDir);
+    const evidence = [...beats.map((beat) => beat.id), "no-caption"].map((label) => {
+      const path = join(evidenceDir, `preview-${label}.png`);
+      writeFileSync(path, tinyPng());
+      return path;
+    });
+    const comparisonEvidence = ["semantic-only", "semantic-plus-karaoke"].map((label) => {
+      const path = join(evidenceDir, `comparison-${label}.png`);
+      writeFileSync(path, tinyPng());
+      return path;
+    });
+    const projectMetaPath = join(evidenceDir, "project-meta.json");
+    writeFileSync(projectMetaPath, JSON.stringify({ interaction: {
+      statePath: resolve(statePath), selectionId: state.selection.choiceId, overridesSha256: null,
+    } }), "utf8");
+    const comparisonProjectMetaPath = join(evidenceDir, "comparison-project-meta.json");
+    writeFileSync(comparisonProjectMetaPath, JSON.stringify({ coexistenceMode: "semantic-plus-karaoke" }), "utf8");
+    const samples = beats.map((beat, index) => ({
+      kind: "layout-beat",
+      label: beat.id,
+      beat_id: beat.id,
+      variant: beat.variant,
+      cue_ids: beat.cue_ids,
+      preview: basename(evidence[index]),
+      sha256: interactionState.hashFile(evidence[index]),
+    }));
+    samples.push({
+      kind: "no-caption",
+      label: "no-caption",
+      preview: basename(evidence.at(-1)),
+      sha256: interactionState.hashFile(evidence.at(-1)),
+    });
+    const payload = Buffer.from(JSON.stringify({
+      schema_version: 1,
+      review_id: state.reviewId,
+      selection_id: state.selection.choiceId,
+      timeline_id: "main",
+      timeline_sha256: interactionState.hashFile(timelinePath),
+      plan_sha256: interactionState.hashFile(expressivePlanPath),
+      presentation_mode: "expressive",
+      primary_evidence_count: samples.length,
+      approval_evidence: "expressive-layout-beats",
+      samples,
+      experimental_comparison: {
+        experimental: true,
+        beat_id: "beat-002",
+        variant: "center-emphasis",
+        cue_ids: ["cue-002"],
+        project_binding: {
+          primary_project_meta: resolve(projectMetaPath),
+          primary_project_meta_sha256: interactionState.hashFile(projectMetaPath),
+          comparison_project_meta: resolve(comparisonProjectMetaPath),
+          comparison_project_meta_sha256: interactionState.hashFile(comparisonProjectMetaPath),
+        },
+        samples: comparisonEvidence.map((path, index) => ({
+          mode: index === 0 ? "semantic-only" : "semantic-plus-karaoke",
+          karaoke: index === 1,
+          preview: basename(path),
+          sha256: interactionState.hashFile(path),
+        })),
+      },
+    }), "utf8").toString("base64");
+    const reviewPage = join(evidenceDir, "captions-review.html");
+    writeFileSync(reviewPage, `<script>const REVIEW_DATA_B64 = "${payload}";</script>`, "utf8");
+    return {
+      statePath,
+      reviewPage,
+      projectMetaPath,
+      comparisonProjectMetaPath,
+      evidence,
+      comparisonEvidence,
+      reviewId: state.reviewId,
+      timelinePath,
+      expressivePlanPath,
+    };
+  };
+
   check("bound preview requires and binds its review page and exact evidence", () => {
     const fixture = preparePreview("bound-preview");
     const baseArgs = ["preview-ready", "--state", fixture.statePath, "--project-meta", fixture.projectMetaPath,
@@ -490,6 +618,100 @@ try {
       sha256: interactionState.hashFile(fixture.timelinePath),
       timelineId: "main",
     });
+  });
+
+  check("Expressive preview binds dynamic primary evidence and separate comparison evidence", () => {
+    const fixture = prepareExpressivePreview("expressive-bound");
+    const baseArgs = ["preview-ready", "--state", fixture.statePath, "--project-meta", fixture.projectMetaPath,
+      "--evidence", fixture.evidence.join(","), "--review-page", fixture.reviewPage,
+      "--timeline", fixture.timelinePath];
+    runInteraction(baseArgs, 1);
+    runInteraction([...baseArgs, "--comparison-evidence", fixture.comparisonEvidence.join(",")]);
+    const state = readState(fixture.statePath);
+    assert.equal(state.phase, "awaiting_preview_confirmation");
+    assert.equal(state.preview.approvalEvidence, "expressive-layout-beats");
+    assert.equal(state.preview.evidence.length, 5);
+    assert.equal(state.preview.comparisonEvidence.length, 2);
+    assert.deepEqual(state.preview.evidence.slice(0, -1).map((item) => item.beatId), [
+      "beat-001", "beat-002", "beat-003", "beat-004",
+    ]);
+    runInteraction(["confirm", "--state", fixture.statePath,
+      "--response", previewSummary(fixture.reviewId, "approve")], 1);
+    runInteraction(["confirm", "--state", fixture.statePath,
+      "--response", previewSummary(fixture.reviewId, "approve", "expressive-layout-beats")], 1);
+    runInteraction(["confirm", "--state", fixture.statePath,
+      "--response", previewSummary(fixture.reviewId, "approve", "expressive-layout-beats", "on")]);
+    const approved = readState(fixture.statePath);
+    assert.equal(approved.phase, "render_approved");
+    assert.equal(approved.approval.karaoke, true);
+    assert.equal(approved.approval.comparisonEvidenceSignature, approved.preview.comparisonEvidenceSignature);
+    const requestedSelection = {
+      preset: "clean", highlightTheme: null, backgroundTheme: null, strokeTheme: null, karaoke: "true",
+    };
+    const validated = interactionState.validateGenerationInteraction({
+      statePath: fixture.statePath,
+      mode: "overlay",
+      sourceVideo: sourcePath,
+      captionsPath: fixture.expressivePlanPath,
+      requestedSelection,
+    });
+    assert.equal(validated.expectedSelection.karaoke, "true");
+    assert.throws(() => interactionState.validateGenerationInteraction({
+      statePath: fixture.statePath,
+      mode: "overlay",
+      sourceVideo: sourcePath,
+      captionsPath: fixture.expressivePlanPath,
+      requestedSelection: { ...requestedSelection, karaoke: "false" },
+    }), /karaoke/i);
+    writeFileSync(fixture.comparisonEvidence[0], tinyPng(2, 1));
+    assert.throws(() => interactionState.validateGenerationInteraction({
+      statePath: fixture.statePath,
+      mode: "overlay",
+      sourceVideo: sourcePath,
+      captionsPath: fixture.expressivePlanPath,
+      requestedSelection,
+    }), /comparison evidence/i);
+  });
+
+  check("Expressive delegated approval requires and stores Karaoke choice", () => {
+    const fixture = prepareExpressivePreview("expressive-agent-approval", "agent");
+    runInteraction(["preview-ready", "--state", fixture.statePath,
+      "--project-meta", fixture.projectMetaPath,
+      "--evidence", fixture.evidence.join(","),
+      "--comparison-evidence", fixture.comparisonEvidence.join(","),
+      "--review-page", fixture.reviewPage, "--timeline", fixture.timelinePath]);
+    const baseArgs = ["agent-confirm", "--state", fixture.statePath,
+      "--rationale", "Semantic-only evidence is clearer for this fixture."];
+    runInteraction(baseArgs, 1);
+    runInteraction([...baseArgs, "--karaoke", "auto"], 1);
+    runInteraction([...baseArgs, "--karaoke", "OFF"], 1);
+    runInteraction([...baseArgs, "--karaoke", "off"]);
+    const approved = readState(fixture.statePath);
+    assert.equal(approved.approval.karaoke, false);
+    assert.equal(approved.approval.comparisonEvidenceSignature, approved.preview.comparisonEvidenceSignature);
+  });
+
+  check("Expressive preview rejects changed plan and comparison evidence", () => {
+    const substituted = prepareExpressivePreview("expressive-substituted");
+    writeFileSync(substituted.comparisonEvidence[1], tinyPng(2, 1));
+    runInteraction(["preview-ready", "--state", substituted.statePath,
+      "--project-meta", substituted.projectMetaPath,
+      "--evidence", substituted.evidence.join(","),
+      "--comparison-evidence", substituted.comparisonEvidence.join(","),
+      "--review-page", substituted.reviewPage, "--timeline", substituted.timelinePath], 1);
+    assert.equal(readState(substituted.statePath).phase, "style_selected");
+
+    const changedPlan = prepareExpressivePreview("expressive-plan-mutation");
+    runInteraction(["preview-ready", "--state", changedPlan.statePath,
+      "--project-meta", changedPlan.projectMetaPath,
+      "--evidence", changedPlan.evidence.join(","),
+      "--comparison-evidence", changedPlan.comparisonEvidence.join(","),
+      "--review-page", changedPlan.reviewPage, "--timeline", changedPlan.timelinePath]);
+    writeFileSync(changedPlan.expressivePlanPath,
+      `${readFileSync(changedPlan.expressivePlanPath, "utf8")} `, "utf8");
+    runInteraction(["confirm", "--state", changedPlan.statePath,
+      "--response", previewSummary(changedPlan.reviewId, "approve", "expressive-layout-beats", "off")], 1);
+    assert.equal(readState(changedPlan.statePath).phase, "awaiting_preview_confirmation");
   });
 
   check("bound preview rejects a same-ID timeline that differs from the review page", () => {
@@ -539,6 +761,19 @@ try {
     assert.equal(state.preview, null);
     assert.equal(state.approval, null);
     assert.equal(state.history.at(-1).response, response);
+
+    const expressive = prepareExpressivePreview("expressive-revise");
+    runInteraction(["preview-ready", "--state", expressive.statePath,
+      "--project-meta", expressive.projectMetaPath,
+      "--evidence", expressive.evidence.join(","),
+      "--comparison-evidence", expressive.comparisonEvidence.join(","),
+      "--review-page", expressive.reviewPage, "--timeline", expressive.timelinePath]);
+    runInteraction(["adjust", "--state", expressive.statePath,
+      "--response", previewSummary(expressive.reviewId, "revise", "Move one beat lower.")]);
+    const expressiveState = readState(expressive.statePath);
+    assert.equal(expressiveState.phase, "style_selected");
+    assert.equal(expressiveState.preview, null);
+    assert.equal(expressiveState.approval, null);
   });
 
   check("agent preview decisions cannot consume human summaries", () => {
@@ -549,7 +784,10 @@ try {
     runInteraction(["confirm", "--state", fixture.statePath, "--response", previewSummary(fixture.reviewId, "approve")], 1);
     runInteraction(["adjust", "--state", fixture.statePath, "--response", previewSummary(fixture.reviewId, "revise")], 1);
     runInteraction(["agent-confirm", "--state", fixture.statePath, "--rationale", "All four frames are readable."]);
-    assert.equal(readState(fixture.statePath).approval.actor, "agent");
+    const approval = readState(fixture.statePath).approval;
+    assert.equal(approval.actor, "agent");
+    assert.equal(Object.hasOwn(approval, "karaoke"), false);
+    assert.equal(Object.hasOwn(approval, "comparisonEvidenceSignature"), false);
   });
 
   check("preview binding mutations block overlay generation", () => {

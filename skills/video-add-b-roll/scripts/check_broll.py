@@ -83,18 +83,22 @@ def _selected_shots(plan, timeline, root, grade_hashes):
         if status not in ("normalized", "verified"):
             raise ValueError("verify_plan requires normalized, verified, or skipped shots")
         choice = shot.get("selected", {})
-        candidate = next((item for item in shot.get("candidates", [])
-                          if item.get("id") == choice.get("candidate_id")), None)
-        if candidate is None:
+        candidate_ids = broll_plan.selected_candidate_ids(choice)
+        candidates = [
+            next((item for item in shot.get("candidates", [])
+                  if isinstance(item, dict) and item.get("id") == candidate_id), None)
+            for candidate_id in candidate_ids
+        ]
+        if not candidate_ids or any(candidate is None for candidate in candidates):
             raise ValueError("selected candidate does not belong to shot")
         output = _inside(normalized_root / f"broll-{index:03d}.mp4", normalized_root, "normalized path")
         try:
             normalize_broll._validate_normalized(
-                shot.get("normalized"), candidate, shot, timeline, output, root, grade_hashes
+                shot.get("normalized"), candidates, shot, timeline, output, root, grade_hashes
             )
         except subprocess.CalledProcessError as exc:
             raise ValueError("normalized media decode failed") from exc
-        selected.append((index, shot, candidate, output))
+        selected.append((index, shot, candidates, output))
     return selected
 
 
@@ -175,13 +179,20 @@ def _contact_sheet(records, timeline, path):
 
 def _boundary_reel(selected, timeline, base_video, path):
     total = normalize_broll._number(timeline.get("program_duration_s"), "timeline program_duration_s")
+    width, height, num, den = normalize_broll._timeline_spec(timeline)
+    frame = den / num
+
+    def snap_to_frame(value):
+        return min(total, max(0.0, round(value / frame) * frame))
+
     command = ["ffmpeg", "-y", "-loglevel", "error"]
     filters, outputs, expected = [], [], 0.0
     for _, shot, _, overlay in selected:
         shot_start = float(shot["program_range"]["start_s"])
         shot_end = float(shot["program_range"]["end_s"])
         for boundary in (shot_start, shot_end):
-            window_start, window_end = max(0.0, boundary - 0.5), min(total, boundary + 0.5)
+            window_start = snap_to_frame(max(0.0, boundary - 0.5))
+            window_end = snap_to_frame(min(total, boundary + 0.5))
             overlap_start, overlap_end = max(window_start, shot_start), min(window_end, shot_end)
             command.extend(["-i", str(base_video), "-i", str(overlay)])
             input_index = len(outputs) * 2
@@ -202,7 +213,6 @@ def _boundary_reel(selected, timeline, base_video, path):
     ])
     _run(command, "boundary reel render failed")
     probe = normalize_broll._probe(path)
-    width, height, num, den = normalize_broll._timeline_spec(timeline)
     normalize_broll._check_probe(probe, width, height, num, den, expected)
     _run(["ffmpeg", "-v", "error", "-i", str(path), "-map", "0:v:0", "-f", "null", "-"],
          "boundary reel decode failed")
@@ -279,6 +289,9 @@ def _visual_review_report(receipt):
         "jump_cuts": "Jump cuts",
         "entry_exit_boundaries": "Entry and exit boundaries",
         "grade_match": "Grade match",
+        "speaker_layout_fidelity": "Speaker layout fidelity",
+        "speaker_legibility": "Speaker legibility",
+        "broll_focal_clearance": "B-roll focal clearance",
     }
     lines = [
         "# B-roll visual review", "", "Visual review status: completed", "",
@@ -288,7 +301,7 @@ def _visual_review_report(receipt):
         f"- Reviewed plan SHA-256: `{receipt['plan_sha256']}`",
         f"- Rationale: {receipt['rationale']}", "", "## Visual checks", "",
     ]
-    lines.extend(f"- [x] {labels[key]}: pass" for key in broll_plan.VISUAL_REVIEW_CHECKS)
+    lines.extend(f"- [x] {labels[key]}: pass" for key in receipt["checks"])
     lines.extend(["", "## Bound artifacts", ""])
     artifacts = receipt["artifacts"]
     for still in artifacts["stills"]:
@@ -357,16 +370,17 @@ def complete_visual_review(plan_path, project_root, review, final_video):
         raise ValueError("visual review timestamp is invalid")
     if mode == "human" and review.get("explicit_user_action") is not True:
         raise ValueError("human visual review requires explicit_user_action true")
+    required_checks = broll_plan.visual_review_checks(plan)
     checks = review.get("checks")
-    if (not isinstance(checks, dict) or set(checks) != set(broll_plan.VISUAL_REVIEW_CHECKS)
-            or any(checks[key] is not True for key in broll_plan.VISUAL_REVIEW_CHECKS)):
+    if (not isinstance(checks, dict) or set(checks) != set(required_checks)
+            or any(checks[key] is not True for key in required_checks)):
         raise ValueError("all visual checks must be true booleans")
     artifacts = _visual_review_artifacts(plan, root, final_video)
     receipt = {
         "schema_version": 1, "status": "completed", "review_id": active["review_id"],
         "plan_sha256": plan_sha256, "mode": mode, "actor": actor.strip(),
         "rationale": rationale.strip(), "timestamp": review["timestamp"],
-        "checks": {key: True for key in broll_plan.VISUAL_REVIEW_CHECKS},
+        "checks": {key: True for key in required_checks},
         "artifacts": artifacts,
     }
     if mode == "human":
@@ -408,6 +422,17 @@ def complete_visual_review(plan_path, project_root, review, final_video):
 
 def _summary(plan, selected, records, artifacts, root, stage, destination, path):
     review = plan["review"]
+    recommendations = {}
+    agent_binding = plan.get("speaker_inset", {}).get("agent_input", {})
+    if isinstance(agent_binding, dict) and isinstance(agent_binding.get("path"), str):
+        agent_path = root / "work" / agent_binding["path"]
+        if (agent_path.is_file()
+                and broll_plan.sha256_file(agent_path) == agent_binding.get("sha256")):
+            agent_input = projectlib.load_json(agent_path)
+            recommendations = {
+                item.get("shot_id"): item.get("layout_recommendation", {})
+                for item in agent_input.get("shots", []) if isinstance(item, dict)
+            }
     lines = [
         "# B-roll verification summary", "", "Manual review status: pending.", "",
         f"- Timeline ID: `{plan.get('timeline_id')}`",
@@ -419,7 +444,7 @@ def _summary(plan, selected, records, artifacts, root, stage, destination, path)
     ]
     if not selected:
         lines.extend(["No B-roll shots were selected; all approved decisions are skips.", ""])
-    for (_, shot, candidate, _), (_, _, times, stills) in zip(selected, records):
+    for (_, shot, candidates, _), (_, _, times, stills) in zip(selected, records):
         normalized = shot["normalized"]
         evidence = ", ".join(str(word.get("word", "")).strip() for word in shot["transcript_evidence"]["words"])
         lines.extend([
@@ -427,13 +452,55 @@ def _summary(plan, selected, records, artifacts, root, stage, destination, path)
             f"- Program range: `{json.dumps(shot['program_range'], sort_keys=True)}`",
             f"- Source ranges: `{json.dumps(shot['source_ranges'], sort_keys=True)}`",
             f"- Transcript evidence: {evidence}",
-            f"- Selected source: `{candidate.get('cache_path')}` (`{candidate.get('sha256')}`)",
-            f"- Source provenance: `{json.dumps(candidate.get('provenance', {}), sort_keys=True)}`",
+            f"- Selection format: `{normalized.get('selection_format', 'legacy')}`",
+            f"- Program duration: `{normalized.get('program_duration_s', 'legacy record')}s`",
             f"- Normalized SHA-256: `{normalized['sha256']}`",
+            f"- Concat SHA-256: `{normalized.get('concat_sha256', normalized['sha256'])}`",
             f"- Normalized probe: `{json.dumps(normalized.get('probe', {}), sort_keys=True)}`",
             f"- Grade plan SHA-256: `{normalized.get('grade_plan_sha256', 'not active')}`",
             f"- Selected LUT SHA-256: `{normalized.get('selected_lut_sha256', 'not active')}`",
         ])
+        composition = normalized.get("composition")
+        base = normalized.get("broll_base")
+        if isinstance(composition, dict) and isinstance(base, dict):
+            lines.extend([
+                f"- Project primary preset: `{composition.get('project_primary_preset')}`",
+                f"- Shot layout preset: `{composition.get('layout_preset')}`",
+                f"- Layout recommendation rationale: {recommendations.get(shot.get('id'), {}).get('rationale', '')}",
+                f"- Final composite SHA-256: `{normalized['sha256']}`",
+                f"- B-roll base SHA-256: `{base.get('sha256')}`",
+            ])
+            lines.extend(
+                f"- Composition {field}: `{value}`"
+                for field, value in composition.items()
+            )
+        component_records = normalized.get("segments")
+        if isinstance(component_records, list):
+            candidate_map = {candidate.get("id"): candidate for candidate in candidates}
+            for index, component in enumerate(component_records, 1):
+                candidate = candidate_map.get(component.get("candidate_id"), {})
+                lines.extend([
+                    f"- Segment {index}: `{component.get('candidate_id')}`",
+                    f"  - Selected source: `{candidate.get('cache_path')}` (`{candidate.get('sha256')}`)",
+                    f"  - Source provenance: `{json.dumps(candidate.get('provenance', {}), sort_keys=True)}`",
+                    f"  - Segment: `{json.dumps(component.get('segment', {}), sort_keys=True)}`",
+                    f"  - Source duration: `{component.get('source_duration_s')}s`",
+                    f"  - Effective duration: `{component.get('effective_duration_s')}s`",
+                    f"  - Program duration: `{component.get('program_duration_s')}s`",
+                    f"  - Playback rate: `{component.get('playback_rate')}x`",
+                    f"  - Normalized segment SHA-256: `{component.get('normalized_sha256')}`",
+                ])
+        else:
+            candidate = candidates[0]
+            lines.extend([
+                f"- Selected source: `{candidate.get('cache_path')}` (`{candidate.get('sha256')}`)",
+                f"- Source provenance: `{json.dumps(candidate.get('provenance', {}), sort_keys=True)}`",
+                f"- Segment: `{json.dumps(normalized.get('segment', {}), sort_keys=True)}`",
+                f"- Source duration: `{normalized.get('source_duration_s', 'legacy record')}s`",
+                f"- Effective duration: `{normalized.get('effective_duration_s', 'legacy record')}s`",
+            ])
+        if "legacy_requested_source_range" in normalized:
+            lines.append(f"- Legacy requested source range: `{json.dumps(normalized['legacy_requested_source_range'], sort_keys=True)}`")
         for label in ("first", "middle", "last"):
             published = destination / stills[label].relative_to(stage)
             lines.append(f"- {label.title()} (+{times[label]:.3f}s): `{_relative(published, root)}` (`{broll_plan.sha256_file(stills[label])}`)")
@@ -735,6 +802,45 @@ def _commit(stage, review_dir, plan_path, result):
             _ignore_remove(plan_part)
 
 
+def _write_coverage_summary(root, plan_path):
+    plan = projectlib.load_json(plan_path)
+    ranking_binding = plan.get("candidate_ranking")
+    ranking_path = None
+    ranking_sha256 = None
+    shortlists = []
+    if isinstance(ranking_binding, dict):
+        ranking_path = root / "work" / ranking_binding["path"]
+        ranking_sha256 = broll_plan.sha256_file(ranking_path)
+        shortlists = ranking_binding["shortlists"]
+    shortlisted_ids = {
+        shortlist.get("shot_id") for shortlist in shortlists
+        if shortlist.get("candidate_ids")
+    }
+    shots = plan.get("shots", [])
+    summary = {
+        "schema_version": 1,
+        "timeline_id": plan.get("timeline_id"),
+        "program_duration_s": plan.get("program_duration_s"),
+        "plan_sha256": broll_plan.sha256_file(plan_path),
+        "ranking_sha256": ranking_sha256,
+        **broll_plan.coverage_summary(
+            plan,
+            planned=shots,
+            shortlisted=[shot for shot in shots if shot.get("id") in shortlisted_ids],
+            selected=[shot for shot in shots if shot.get("status") != "skipped"],
+        ),
+    }
+    target = root / "work/b-roll/coverage-summary.json"
+    part = target.with_suffix(".part.json")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    part.unlink(missing_ok=True)
+    try:
+        projectlib.write_json(part, summary)
+        os.replace(part, target)
+    finally:
+        part.unlink(missing_ok=True)
+
+
 def verify_plan(plan_path, timeline_path, project_root, video_path, *, review_dir=None):
     """Verify canonical normalized shots, publish review artifacts, and persist pass bindings."""
     root = Path(project_root).resolve()
@@ -790,12 +896,18 @@ def verify_plan(plan_path, timeline_path, project_root, video_path, *, review_di
                 "boundary_reel": _hash_binding(reel, final_reel, root),
                 "report": _hash_binding(summary, final_summary, root),
             }
+            composition = shot["normalized"].get("composition")
+            if isinstance(composition, dict):
+                shot["verification"]["composition_sha256"] = broll_plan.canonical_sha256(
+                    composition
+                )
         errors = broll_plan.validate_plan(
             result, timeline, transcript, project=project, project_root=root, verify_files=True
         )
         if errors:
             raise ValueError("invalid verified B-roll plan: " + "; ".join(errors))
         _commit(stage, destination, plan_path, result)
+        _write_coverage_summary(root, plan_path)
         return result, {
             "stills": final_stills, "contact_sheet": final_contact,
             "boundary_reel": final_reel, "summary": final_summary,

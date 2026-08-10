@@ -1,0 +1,223 @@
+{
+  "schema_version": 1,
+  "analysis_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "decision": {
+    "mode": "agent",
+    "actor": "Example Analysis Agent",
+    "timestamp": "2026-07-23T11:30:00Z",
+    "overall_rationale": "The frozen frames were compared across both transcript moments before global allocation."
+  },
+  "project_duplicate_evidence": {
+    "exact_groups": [
+      {
+        "group_id": "exact-001",
+        "members": [
+          {
+            "shot_id": "example-manufacturing-process",
+            "candidate_id": "example-owned-factory-video"
+          },
+          {
+            "shot_id": "example-output-system",
+            "candidate_id": "example-duplicate-factory-video"
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "delivery_sha256",
+            "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      }
+    ],
+    "strict_perceptual_groups": [],
+    "possible_series": [
+      {
+        "hint_id": "possible-series-001",
+        "members": [
+          {
+            "shot_id": "example-manufacturing-process",
+            "candidate_id": "example-owned-factory-video"
+          },
+          {
+            "shot_id": "example-output-system",
+            "candidate_id": "example-factory-control-room"
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "same_creator",
+            "value": "Example Owner"
+          },
+          {
+            "kind": "shared_source_terms",
+            "value": [
+              "factory"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "agent_confirmed_near_duplicates": [],
+  "global_allocations": [
+    {
+      "allocation_id": "global-allocation-001",
+      "source_groups": [
+        {
+          "kind": "exact_duplicate",
+          "group_id": "exact-001"
+        }
+      ],
+      "members": [
+        {
+          "shot_id": "example-manufacturing-process",
+          "candidate_id": "example-owned-factory-video"
+        },
+        {
+          "shot_id": "example-output-system",
+          "candidate_id": "example-duplicate-factory-video"
+        }
+      ],
+      "kept": {
+        "shot_id": "example-manufacturing-process",
+        "candidate_id": "example-owned-factory-video"
+      },
+      "suppressed": [
+        {
+          "shot_id": "example-output-system",
+          "candidate_id": "example-duplicate-factory-video"
+        }
+      ],
+      "reason": "Kept in the manufacturing claim because its semantic and context evidence is stronger there."
+    }
+  ],
+  "shots": [
+    {
+      "shot_id": "example-manufacturing-process",
+      "base_order": [
+        "example-owned-factory-video"
+      ],
+      "base_top3": [
+        "example-owned-factory-video"
+      ],
+      "outcome": "ranked",
+      "top3": [
+        "example-owned-factory-video"
+      ],
+      "refills": [],
+      "duplicate_groups": [],
+      "candidates": [
+        {
+          "candidate_id": "example-owned-factory-video",
+          "provider_id": null,
+          "scores": {
+            "semantic_fit": 4,
+            "context_fit": 4,
+            "composition_fit": 3,
+            "style_fit": 3,
+            "text_logo_risk": 0
+          },
+          "rationale": "The visible manufacturing line directly supports the spoken process claim.",
+          "avoid_violation": false,
+          "primary_subject_visible": true,
+          "near_duplicate_group": null,
+          "warnings": [],
+          "warning_count": 0,
+          "eligible": true,
+          "ineligibility_reasons": [],
+          "suppressed_near_duplicate": false,
+          "suppressed_global_duplicate": false,
+          "base_rank": 1,
+          "rank": 1,
+          "global_allocation": {
+            "status": "kept",
+            "reason": "This is the strongest semantic and context placement for the exact media."
+          },
+          "shortlist_reason": "Retained from the shot base ranking after global allocation.",
+          "similar_footage": [
+            {
+              "shot_id": "example-output-system",
+              "candidate_id": "example-factory-control-room"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "shot_id": "example-output-system",
+      "base_order": [
+        "example-factory-control-room",
+        "example-duplicate-factory-video"
+      ],
+      "base_top3": [
+        "example-factory-control-room",
+        "example-duplicate-factory-video"
+      ],
+      "outcome": "ranked",
+      "top3": [
+        "example-factory-control-room"
+      ],
+      "refills": [],
+      "duplicate_groups": [],
+      "candidates": [
+        {
+          "candidate_id": "example-factory-control-room",
+          "provider_id": null,
+          "scores": {
+            "semantic_fit": 4,
+            "context_fit": 3,
+            "composition_fit": 3,
+            "style_fit": 3,
+            "text_logo_risk": 0
+          },
+          "rationale": "The control room directly supports the output-system claim without repeating the line footage.",
+          "avoid_violation": false,
+          "primary_subject_visible": true,
+          "near_duplicate_group": null,
+          "warnings": [],
+          "warning_count": 0,
+          "eligible": true,
+          "ineligibility_reasons": [],
+          "suppressed_near_duplicate": false,
+          "suppressed_global_duplicate": false,
+          "base_rank": 1,
+          "rank": 1,
+          "shortlist_reason": "Retained from the shot base ranking after global allocation.",
+          "similar_footage": [
+            {
+              "shot_id": "example-manufacturing-process",
+              "candidate_id": "example-owned-factory-video"
+            }
+          ]
+        },
+        {
+          "candidate_id": "example-duplicate-factory-video",
+          "provider_id": null,
+          "scores": {
+            "semantic_fit": 3,
+            "context_fit": 2,
+            "composition_fit": 3,
+            "style_fit": 3,
+            "text_logo_risk": 0
+          },
+          "rationale": "The line is relevant but belongs more strongly to the manufacturing claim.",
+          "avoid_violation": false,
+          "primary_subject_visible": true,
+          "near_duplicate_group": null,
+          "warnings": [],
+          "warning_count": 0,
+          "eligible": true,
+          "ineligibility_reasons": [],
+          "suppressed_near_duplicate": true,
+          "suppressed_global_duplicate": true,
+          "base_rank": 2,
+          "global_allocation": {
+            "status": "suppressed",
+            "reason": "The exact media is kept at the stronger manufacturing placement."
+          },
+          "similar_footage": []
+        }
+      ]
+    }
+  ]
+}
