@@ -33,7 +33,8 @@ export function createEditorStore(initialState: EditorInitialState) {
     setProject: (project) => set({ project }),
     seek: (timeS) => {
       const durationS = get().project?.durationS ?? 0
-      set({ currentTimeS: Math.min(Math.max(timeS, 0), durationS) })
+      const currentTimeS = Number.isFinite(timeS) ? Math.min(Math.max(timeS, 0), durationS) : 0
+      set({ currentTimeS })
     },
     select: (selection) => set({ selection }),
     setActiveTab: (activeTab) => set({ activeTab }),

@@ -34,6 +34,14 @@ test('seek clamps time below zero and after the project duration', () => {
   expect(store.getState().currentTimeS).toBe(120)
 })
 
+test('seek normalizes a non-finite time to zero', () => {
+  const store = createStateStore()
+
+  store.getState().seek(Number.NaN)
+
+  expect(store.getState().currentTimeS).toBe(0)
+})
+
 test('select replaces the existing editor selection', () => {
   const store = createStateStore()
 
