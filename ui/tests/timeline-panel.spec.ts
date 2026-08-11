@@ -57,6 +57,39 @@ test('timeline drag clamps at duration and zoom controls stay in bounds', async 
   await expect(zoomOut).toBeDisabled()
 })
 
+test('zoomed horizontal scroll keeps ruler content and playhead on one scale', async ({ page }) => {
+  await page.setViewportSize({ width: 1008, height: 444 })
+  await page.goto('/?scenario=1-324')
+
+  const surface = page.locator('[data-timeline-surface]')
+  const ruler = page.locator('.timeline-ruler')
+  const content = page.locator('.timeline-content')
+  const playhead = page.locator('.timeline-playhead')
+  const zoomIn = page.getByRole('button', { name: 'Zoom in timeline' })
+  const zoomOut = page.getByRole('button', { name: 'Zoom out timeline' })
+
+  await zoomIn.click()
+  await zoomIn.click()
+  await surface.evaluate((element) => { element.scrollLeft = 240 })
+
+  const [rulerBox, contentBox, playheadBox] = await Promise.all([
+    ruler.boundingBox(),
+    content.boundingBox(),
+    playhead.boundingBox(),
+  ])
+  expect(rulerBox).not.toBeNull()
+  expect(contentBox).not.toBeNull()
+  expect(playheadBox).not.toBeNull()
+  expect(rulerBox!.x).toBeCloseTo(contentBox!.x, 0)
+  expect(rulerBox!.width).toBeCloseTo(contentBox!.width, 0)
+  expect(playheadBox!.x - rulerBox!.x).toBeCloseTo(playheadBox!.x - contentBox!.x, 0)
+
+  await page.getByRole('button', { name: 'Fit timeline' }).click()
+  await zoomOut.click()
+  await zoomOut.click()
+  await expect(ruler).toHaveCSS('width', await content.evaluate((element) => getComputedStyle(element).width))
+})
+
 test('unsupported timeline commands remain disabled with explanations', async ({ page }) => {
   await page.goto('/?scenario=1-324')
   for (const name of ['Reverse', 'Duplicate', 'Copy', 'Reorder tracks', 'Speed']) {

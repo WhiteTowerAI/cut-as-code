@@ -177,6 +177,7 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
   const setTimelineZoom = useStore(store, (state) => state.setTimelineZoom)
   const setSnapEnabled = useStore(store, (state) => state.setSnapEnabled)
   const surfaceRef = useRef<HTMLDivElement>(null)
+  const rulerScrollRef = useRef<HTMLDivElement>(null)
   const durationS = project?.durationS ?? 0
   const tracks = project?.tracks ?? []
   const hasMedia = durationS > 0 && tracks.length > 0
@@ -239,7 +240,7 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
       </header>
       <div className="timeline-body">
         <div className="timeline-ruler-gutter" />
-        <div className="timeline-ruler-scroll">
+        <div className="timeline-ruler-scroll" ref={rulerScrollRef}>
           <div className="timeline-ruler" style={{ width: `${contentWidth}px` }}>
             {rulerTicks.map((tick) => <span key={tick.left} style={{ left: tick.left }}>{tick.label}</span>)}
           </div>
@@ -255,6 +256,9 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
           onPointerMove={handlePointerMove}
           onPointerUp={(event) => event.currentTarget.releasePointerCapture(event.pointerId)}
           onPointerCancel={(event) => event.currentTarget.releasePointerCapture(event.pointerId)}
+          onScroll={(event) => {
+            if (rulerScrollRef.current) rulerScrollRef.current.scrollLeft = event.currentTarget.scrollLeft
+          }}
         >
           <div className="timeline-content" style={{ width: `${contentWidth}px` }}>
             {hasMedia ? visibleTracks.map((track) => (

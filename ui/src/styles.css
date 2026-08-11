@@ -1074,7 +1074,6 @@ button {
 .timeline-ruler {
   position: relative;
   height: 24px;
-  min-width: 100%;
 }
 
 .timeline-ruler::before {
