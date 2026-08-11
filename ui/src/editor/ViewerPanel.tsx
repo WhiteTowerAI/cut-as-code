@@ -50,15 +50,41 @@ function DisabledCommand({
   name,
   descriptionId,
   children,
+  menu = false,
 }: {
   name: string
   descriptionId: string
   children: ReactNode
+  menu?: boolean
 }) {
   const description = `${name} is not available in project protocol V1.`
   return (
-    <span className="viewer-disabled-control" title={description}>
-      <button type="button" disabled aria-label={name} aria-describedby={descriptionId}>
+    <span
+      className={menu ? 'viewer-menu-disabled-control' : 'viewer-disabled-control'}
+      title={description}
+      style={menu ? { display: 'block', width: '200px', minHeight: '36px' } : undefined}
+    >
+      <button
+        type="button"
+        role={menu ? 'menuitem' : undefined}
+        disabled
+        aria-label={name}
+        aria-describedby={descriptionId}
+        style={menu ? {
+          display: 'flex',
+          alignItems: 'center',
+          width: '200px',
+          minHeight: '36px',
+          padding: '0 10px',
+          border: 0,
+          color: '#e8ebf0',
+          background: 'transparent',
+          fontSize: '13px',
+          textAlign: 'left',
+          cursor: 'not-allowed',
+          opacity: 1,
+        } : undefined}
+      >
         {children}
       </button>
       <span className="sr-only" id={descriptionId}>{description}</span>
@@ -124,7 +150,16 @@ function MoreMenu() {
                 </button>
               ))}
             </div>
-          ) : section.items.map((item) => (
+          ) : section.label === 'ARRANGE' ? section.items.map((item) => (
+            <DisabledCommand
+              key={item}
+              name={item}
+              descriptionId={`viewer-${item.toLowerCase().replaceAll(' ', '-')}-description`}
+              menu
+            >
+              {item}
+            </DisabledCommand>
+          )) : section.items.map((item) => (
             <button type="button" role="menuitem" disabled title={`${item} is not available in project protocol V1.`} key={item}>
               {item}
               {item === 'Opacity' && <span className="viewer-opacity-track"><span /></span>}

@@ -57,6 +57,16 @@ test('protocol-incompatible Viewer commands stay disabled with accessible explan
     expect(descriptionId).toBeTruthy()
     await expect(page.locator(`#${descriptionId}`)).toContainText('not available in project protocol V1')
   }
+
+  await page.getByRole('button', { name: 'More viewer actions' }).click()
+  const menu = page.getByRole('menu', { name: 'More viewer actions' })
+  for (const name of ['Bring to Front', 'Send to Back']) {
+    const command = menu.getByRole('menuitem', { name })
+    await expect(command).toBeDisabled()
+    const descriptionId = await command.getAttribute('aria-describedby')
+    expect(descriptionId).toBeTruthy()
+    await expect(page.locator(`#${descriptionId}`)).toContainText('not available in project protocol V1')
+  }
 })
 
 test('the populated preview renders real nonblank local pixels', async ({ page }) => {
