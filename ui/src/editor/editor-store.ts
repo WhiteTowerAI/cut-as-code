@@ -20,12 +20,21 @@ export type EditorState = {
   setPlaying: (isPlaying: boolean) => void
   select: (selection: EditorSelection) => void
   setActiveTab: (tab: LibraryTab) => void
+  setTimelineZoom: (zoom: number) => void
+  setSnapEnabled: (enabled: boolean) => void
   setOpenMenu: (menu: MenuId) => void
 }
 
 export type EditorInitialState = Omit<
   EditorState,
-  'setProject' | 'seek' | 'setPlaying' | 'select' | 'setActiveTab' | 'setOpenMenu'
+  | 'setProject'
+  | 'seek'
+  | 'setPlaying'
+  | 'select'
+  | 'setActiveTab'
+  | 'setTimelineZoom'
+  | 'setSnapEnabled'
+  | 'setOpenMenu'
 >
 
 export function createEditorStore(initialState: EditorInitialState) {
@@ -40,6 +49,11 @@ export function createEditorStore(initialState: EditorInitialState) {
     setPlaying: (isPlaying) => set({ isPlaying }),
     select: (selection) => set({ selection }),
     setActiveTab: (activeTab) => set({ activeTab }),
+    setTimelineZoom: (zoom) => {
+      const timelineZoom = Number.isFinite(zoom) ? Math.min(Math.max(zoom, 0.5), 2) : 1
+      set({ timelineZoom })
+    },
+    setSnapEnabled: (snapEnabled) => set({ snapEnabled }),
     setOpenMenu: (openMenu) => set({ openMenu }),
   }))
 }
