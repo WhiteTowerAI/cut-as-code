@@ -33,6 +33,140 @@ test('selects a project-backed asset by its canonical ID', async ({ page }) => {
   await expect(asset).toHaveAttribute('aria-pressed', 'true')
 })
 
+test('project-backed previews use nonblank frozen local artwork', async ({ page }) => {
+  await page.goto('/?scenario=1-84')
+
+  const previews = page.locator('[data-asset-id] img[data-library-preview]')
+  await expect(previews).toHaveCount(4)
+  for (const preview of await previews.all()) {
+    await expect(preview).toHaveAttribute('src', /^\/fixtures\/library\/[a-z-]+\.png$/)
+    const sample = await preview.evaluate(async (element) => {
+      const image = element as HTMLImageElement
+      if (!image.complete) await image.decode()
+      const canvas = document.createElement('canvas')
+      canvas.width = 8
+      canvas.height = 8
+      const context = canvas.getContext('2d', { willReadFrequently: true })!
+      context.drawImage(image, 0, 0, canvas.width, canvas.height)
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data
+      const colors = new Set<string>()
+      let nonTransparent = 0
+      for (let index = 0; index < pixels.length; index += 4) {
+        colors.add(`${pixels[index]},${pixels[index + 1]},${pixels[index + 2]}`)
+        if (pixels[index + 3] > 0) nonTransparent += 1
+      }
+      const imageBox = image.getBoundingClientRect()
+      const cardBox = image.closest('[data-asset-id]')!.getBoundingClientRect()
+      return {
+        naturalWidth: image.naturalWidth,
+        naturalHeight: image.naturalHeight,
+        renderedWidth: imageBox.width,
+        renderedHeight: imageBox.height,
+        leftInset: imageBox.left - cardBox.left,
+        topInset: imageBox.top - cardBox.top,
+        nonTransparent,
+        colors: colors.size,
+      }
+    })
+    expect(sample.naturalWidth).toBeGreaterThan(0)
+    expect(sample.naturalHeight).toBeGreaterThan(0)
+    expect(sample.renderedWidth).toBe(144)
+    expect(sample.renderedHeight).toBe(96)
+    expect(sample.leftInset).toBe(0)
+    expect(sample.topInset).toBe(0)
+    expect(sample.nonTransparent).toBe(64)
+    expect(sample.colors).toBeGreaterThan(2)
+  }
+})
+
+test('project-backed asset rows keep the reference 16 pixel gap', async ({ page }) => {
+  await page.goto('/?scenario=1-84')
+
+  const rowOffsets = await page.locator('[data-asset-id]').evaluateAll((elements) => {
+    const tops = elements.map((element) => element.getBoundingClientRect().top)
+    return tops.map((top) => top - tops[0])
+  })
+
+  expect(rowOffsets).toEqual([0, 0, 134, 134])
+})
+
+test('caption and content-card previews use frozen official child artwork', async ({ page }) => {
+  await page.goto('/?scenario=123-2')
+
+  for (const { tab, count, prefix } of [
+    { tab: 'Captions', count: 7, prefix: 'caption' },
+    { tab: 'Cards', count: 6, prefix: 'card' },
+  ] as const) {
+    await page.getByRole('tab', { name: tab }).click()
+    const previews = page.locator('.library-tile img[data-library-preview]')
+    await expect(previews).toHaveCount(count)
+
+    for (const preview of await previews.all()) {
+      await expect(preview).toHaveAttribute('src', new RegExp(`^/fixtures/library/${prefix}-[a-z-]+\\.png$`))
+      expect(await preview.evaluate((element) => element.parentElement!.children.length)).toBe(1)
+      const sample = await preview.evaluate(async (element) => {
+        const image = element as HTMLImageElement
+        if (!image.complete) await image.decode()
+        const canvas = document.createElement('canvas')
+        canvas.width = 8
+        canvas.height = 8
+        const context = canvas.getContext('2d', { willReadFrequently: true })!
+        context.drawImage(image, 0, 0, canvas.width, canvas.height)
+        const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data
+        const colors = new Set<string>()
+        for (let index = 0; index < pixels.length; index += 4) {
+          colors.add(`${pixels[index]},${pixels[index + 1]},${pixels[index + 2]},${pixels[index + 3]}`)
+        }
+        const imageBox = image.getBoundingClientRect()
+        const cardBox = image.closest('.library-tile')!.getBoundingClientRect()
+        return {
+          naturalWidth: image.naturalWidth,
+          naturalHeight: image.naturalHeight,
+          renderedWidth: imageBox.width,
+          renderedHeight: imageBox.height,
+          leftInset: imageBox.left - cardBox.left,
+          topInset: imageBox.top - cardBox.top,
+          colors: colors.size,
+        }
+      })
+      expect(sample).toMatchObject({
+        naturalWidth: 144,
+        naturalHeight: 50,
+        renderedWidth: 144,
+        renderedHeight: 50,
+        leftInset: 0,
+        topInset: 0,
+      })
+      expect(sample.colors).toBeGreaterThan(2)
+    }
+  }
+})
+
+test('content-card controls match the official vertical geometry', async ({ page }) => {
+  await page.goto('/?scenario=126-2')
+
+  const geometry = await page.locator('.library-content').evaluate((content) => {
+    const contentBox = content.getBoundingClientRect()
+    const relativeBox = (selector: string) => {
+      const box = content.querySelector(selector)!.getBoundingClientRect()
+      return { top: box.top - contentBox.top, height: box.height }
+    }
+    return {
+      grid: relativeBox('.library-grid'),
+      placement: relativeBox('.placement-control'),
+      options: relativeBox('.placement-options'),
+      action: relativeBox('.library-primary-action'),
+    }
+  })
+
+  expect(geometry).toEqual({
+    grid: { top: 58, height: 236 },
+    placement: { top: 308, height: 50 },
+    options: { top: 330, height: 28 },
+    action: { top: 382, height: 36 },
+  })
+})
+
 test('switches the single library panel across all four tabs', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 688 })
   await page.goto('/?scenario=1-84')

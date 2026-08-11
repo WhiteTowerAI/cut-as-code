@@ -182,7 +182,9 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
   const tracks = project?.tracks ?? []
   const hasMedia = durationS > 0 && tracks.length > 0
   const contentWidth = TIMELINE_WIDTH_PX * timelineZoom
-  const showCaptionTrack = tracks.some((track) => track.kind === 'caption') && selection?.kind === 'caption'
+  const hasCaptionTrack = tracks.some((track) => track.kind === 'caption')
+  const showCaptionTrack = hasCaptionTrack && selection?.kind === 'caption'
+  const reserveCaptionTrack = hasCaptionTrack && !showCaptionTrack
   const trackOrder: Readonly<Record<TrackView['kind'], number>> = { caption: 0, video: 1, audio: 2 }
   const visibleTracks = tracks
     .filter((track) => track.kind !== 'caption' || showCaptionTrack)
@@ -217,7 +219,7 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
   }))
 
   return (
-    <section className="timeline-panel" role="region" aria-label="Timeline">
+    <section className={`timeline-panel${hasMedia ? '' : ' timeline-panel--empty'}`} role="region" aria-label="Timeline">
       <header className="timeline-toolbar" aria-label="Timeline tools">
         <button type="button" aria-label="Add track" disabled={!hasMedia}><Plus aria-hidden size={18} /></button>
         <button type="button" aria-label="Select tool"><MousePointer2 aria-hidden size={18} /></button>
@@ -239,13 +241,18 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
         <button type="button" aria-label="Zoom in timeline" disabled={timelineZoom >= MAX_ZOOM} onClick={() => setTimelineZoom(timelineZoom + ZOOM_STEP)}><ZoomIn aria-hidden size={20} /></button>
       </header>
       <div className="timeline-body">
-        <div className="timeline-ruler-gutter" />
-        <div className="timeline-ruler-scroll" ref={rulerScrollRef}>
-          <div className="timeline-ruler" style={{ width: `${contentWidth}px` }}>
-            {rulerTicks.map((tick) => <span key={tick.left} style={{ left: tick.left }}>{tick.label}</span>)}
-          </div>
-        </div>
+        {hasMedia && (
+          <>
+            <div className="timeline-ruler-gutter" />
+            <div className="timeline-ruler-scroll" ref={rulerScrollRef}>
+              <div className="timeline-ruler" style={{ width: `${contentWidth}px` }}>
+                {rulerTicks.map((tick) => <span key={tick.left} style={{ left: tick.left }}>{tick.label}</span>)}
+              </div>
+            </div>
+          </>
+        )}
         <div className="timeline-gutter">
+          {reserveCaptionTrack && <div className="timeline-track-reserved" aria-hidden="true" />}
           {visibleTracks.map((track) => <TrackHeader key={track.id} track={track} />)}
         </div>
         <div
@@ -260,7 +267,8 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
             if (rulerScrollRef.current) rulerScrollRef.current.scrollLeft = event.currentTarget.scrollLeft
           }}
         >
-          <div className="timeline-content" style={{ width: `${contentWidth}px` }}>
+          <div className="timeline-content" style={{ width: hasMedia ? `${contentWidth}px` : 'calc(100% - 48px)' }}>
+            {hasMedia && reserveCaptionTrack && <div className="timeline-lane timeline-lane--reserved" aria-hidden="true" />}
             {hasMedia ? visibleTracks.map((track) => (
               <div className={`timeline-lane timeline-lane--${track.kind}`} key={track.id}>
                 <Clip track={track} selection={selection} select={select} />
@@ -275,7 +283,7 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
             ><span /></div>
           </div>
         </div>
-        <output className="timeline-playhead-time" aria-label="Playhead time">{formatTimelineTime(currentTimeS)}</output>
+        {hasMedia && <output className="timeline-playhead-time" aria-label="Playhead time">{formatTimelineTime(currentTimeS)}</output>}
       </div>
     </section>
   )

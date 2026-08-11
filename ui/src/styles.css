@@ -207,7 +207,11 @@ button {
 
 .library-grid--assets {
   grid-auto-rows: 118px;
-  gap: 8px;
+  gap: 16px 8px;
+}
+
+.library-grid--cards {
+  height: 236px;
 }
 
 .library-tile {
@@ -248,11 +252,23 @@ button {
   height: 96px;
 }
 
+.library-preview:has(> img) {
+  width: 144px;
+  transform: translate(-1px, -1px);
+}
+
 .library-preview::before,
 .library-preview::after {
   position: absolute;
   z-index: -1;
   content: '';
+}
+
+.library-preview > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .library-preview--product {
@@ -510,6 +526,15 @@ button {
   font-size: 11px;
 }
 
+.library-grid--cards + .placement-control {
+  gap: 9px;
+  line-height: 13px;
+}
+
+.library-grid--cards ~ .library-primary-action {
+  margin-top: 14px;
+}
+
 .placement-options {
   display: flex;
   gap: 8px;
@@ -634,7 +659,7 @@ button {
 }
 
 .viewer-selection-bounds--caption {
-  top: 306px;
+  top: 346px;
   left: 222px;
   display: grid;
   place-items: center;
@@ -694,7 +719,7 @@ button {
 }
 
 .viewer-selection-bounds--caption + .viewer-selection-toolbar {
-  top: 252px;
+  top: 292px;
 }
 
 .viewer-selection-toolbar button,
@@ -1055,6 +1080,26 @@ button {
   background: #202124;
 }
 
+.timeline-panel--empty .timeline-body {
+  grid-template-columns: 48px minmax(0, 1fr);
+  grid-template-rows: 400px;
+}
+
+.timeline-panel--empty .timeline-gutter,
+.timeline-panel--empty .timeline-surface {
+  grid-row: 1;
+}
+
+.timeline-panel--empty .timeline-content {
+  min-height: 400px;
+}
+
+.timeline-panel--empty .timeline-empty-state {
+  top: 151px;
+  left: 0;
+  width: 100%;
+}
+
 .timeline-ruler-gutter {
   grid-column: 1;
   grid-row: 1;
@@ -1108,6 +1153,12 @@ button {
   gap: 4px;
   height: 96px;
   padding: 13px 14px;
+  border-bottom: 1px solid #35363c;
+  background: #292a2e;
+}
+
+.timeline-track-reserved {
+  height: 96px;
   border-bottom: 1px solid #35363c;
   background: #292a2e;
 }
@@ -1170,6 +1221,7 @@ button {
 
 .timeline-lane--audio { height: 76px; padding-top: 8px; }
 .timeline-lane--caption { height: 76px; padding-top: 8px; }
+.timeline-lane--reserved { height: 96px; padding: 0; background: #242529; }
 
 .timeline-clip {
   position: relative;

@@ -1,0 +1,27 @@
+{
+  "label": "user-extension",
+  "nodeId": null,
+  "scenarioId": "graphic-motion",
+  "viewport": {
+    "width": 320,
+    "height": 688
+  },
+  "reference": null,
+  "referenceCompared": null,
+  "browser": {
+    "width": 320,
+    "height": 688
+  },
+  "differentPixels": null,
+  "totalPixels": null,
+  "diffRatio": null,
+  "threshold": null,
+  "pixelChannelTolerance": null,
+  "verdict": "baseline",
+  "artifacts": {
+    "reference": null,
+    "browser": "user-extension-graphic-motion-browser.png",
+    "diff": null,
+    "result": "user-extension-graphic-motion-result.json"
+  }
+}

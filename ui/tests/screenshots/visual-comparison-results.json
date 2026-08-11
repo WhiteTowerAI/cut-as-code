@@ -1,0 +1,658 @@
+{
+  "generatedAt": "2026-08-11T18:59:38.726Z",
+  "strictDiffRatioThreshold": 0.01,
+  "pixelChannelTolerance": 16,
+  "results": [
+    {
+      "label": "figma-match",
+      "nodeId": "1:60",
+      "scenarioId": "1-60",
+      "viewport": {
+        "width": 1440,
+        "height": 1200
+      },
+      "reference": {
+        "width": 1440,
+        "height": 1200
+      },
+      "referenceCompared": {
+        "dimensions": {
+          "width": 1440,
+          "height": 1200
+        },
+        "crop": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "browser": {
+        "width": 1440,
+        "height": 1200
+      },
+      "differentPixels": 174149,
+      "totalPixels": 1728000,
+      "diffRatio": 0.1007806712962963,
+      "threshold": 0.01,
+      "pixelChannelTolerance": 16,
+      "verdict": "fail",
+      "artifacts": {
+        "reference": "figma-1-60-reference.png",
+        "browser": "figma-1-60-browser.png",
+        "diff": "figma-1-60-diff.png",
+        "result": "figma-1-60-result.json"
+      }
+    },
+    {
+      "label": "figma-match",
+      "nodeId": "1:1373",
+      "scenarioId": "1-1373",
+      "viewport": {
+        "width": 1440,
+        "height": 1200
+      },
+      "reference": {
+        "width": 1440,
+        "height": 1200
+      },
+      "referenceCompared": {
+        "dimensions": {
+          "width": 1440,
+          "height": 1200
+        },
+        "crop": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "browser": {
+        "width": 1440,
+        "height": 1200
+      },
+      "differentPixels": 18778,
+      "totalPixels": 1728000,
+      "diffRatio": 0.010866898148148148,
+      "threshold": 0.01,
+      "pixelChannelTolerance": 16,
+      "verdict": "fail",
+      "artifacts": {
+        "reference": "figma-1-1373-reference.png",
+        "browser": "figma-1-1373-browser.png",
+        "diff": "figma-1-1373-diff.png",
+        "result": "figma-1-1373-result.json"
+      }
+    },
+    {
+      "label": "figma-match",
+      "nodeId": "1:84",
+      "scenarioId": "1-84",
+      "viewport": {
+        "width": 320,
+        "height": 688
+      },
+      "reference": {
+        "width": 344,
+        "height": 712
+      },
+      "referenceCompared": {
+        "dimensions": {
+          "width": 320,
+          "height": 688
+        },
+        "crop": {
+          "x": 12,
+          "y": 8
+        }
+      },
+      "browser": {
+        "width": 320,
+        "height": 688
+      },
+      "differentPixels": 4098,
+      "totalPixels": 220160,
+      "diffRatio": 0.018613735465116278,
+      "threshold": 0.01,
+      "pixelChannelTolerance": 16,
+      "verdict": "fail",
+      "artifacts": {
+        "reference": "figma-1-84-reference.png",
+        "browser": "figma-1-84-browser.png",
+        "diff": "figma-1-84-diff.png",
+        "result": "figma-1-84-result.json"
+      }
+    },
+    {
+      "label": "figma-match",
+      "nodeId": "1:282",
+      "scenarioId": "1-282",
+      "viewport": {
+        "width": 680,
+        "height": 688
+      },
+      "reference": {
+        "width": 704,
+        "height": 712
+      },
+      "referenceCompared": {
+        "dimensions": {
+          "width": 680,
+          "height": 688
+        },
+        "crop": {
+          "x": 12,
+          "y": 8
+        }
+      },
+      "browser": {
+        "width": 680,
+        "height": 688
+      },
+      "differentPixels": 5707,
+      "totalPixels": 467840,
+      "diffRatio": 0.01219861491108071,
+      "threshold": 0.01,
+      "pixelChannelTolerance": 16,
+      "verdict": "fail",
+      "artifacts": {
+        "reference": "figma-1-282-reference.png",
+        "browser": "figma-1-282-browser.png",
+        "diff": "figma-1-282-diff.png",
+        "result": "figma-1-282-result.json"
+      }
+    },
+    {
+      "label": "figma-match",
+      "nodeId": "57:152",
+      "scenarioId": "57-152",
+      "viewport": {
+        "width": 216,
+        "height": 462
+      },
+      "reference": {
+        "width": 252,
+        "height": 498
+      },
+      "referenceCompared": {
+        "dimensions": {
+          "width": 216,
+          "height": 462
+        },
+        "crop": {
+          "x": 18,
+          "y": 10
+        }
+      },
+      "browser": {
+        "width": 216,
+        "height": 462
+      },
+      "differentPixels": 11000,
+      "totalPixels": 99792,
+      "diffRatio": 0.11022927689594356,
+      "threshold": 0.01,
+      "pixelChannelTolerance": 16,
+      "verdict": "fail",
+      "artifacts": {
+        "reference": "figma-57-152-reference.png",
+        "browser": "figma-57-152-browser.png",
+        "diff": "figma-57-152-diff.png",
+        "result": "figma-57-152-result.json"
+      }
+    },
+    {
+      "label": "figma-match",
+      "nodeId": "1:1026",
+      "scenarioId": "1-1026",
+      "viewport": {
+        "width": 680,
+        "height": 688
+      },
+      "reference": {
+        "width": 704,
+        "height": 712
+      },
+      "referenceCompared": {
+        "dimensions": {
+          "width": 680,
+          "height": 688
+        },
+        "crop": {
+          "x": 12,
+          "y": 8
+        }
+      },
+      "browser": {
+        "width": 680,
+        "height": 688
+      },
+      "differentPixels": 2583,
+      "totalPixels": 467840,
+      "diffRatio": 0.005521118331053352,
+      "threshold": 0.01,
+      "pixelChannelTolerance": 16,
+      "verdict": "pass",
+      "artifacts": {
+        "reference": "figma-1-1026-reference.png",
+        "browser": "figma-1-1026-browser.png",
+        "diff": "figma-1-1026-diff.png",
+        "result": "figma-1-1026-result.json"
+      }
+    },
+    {
+      "label": "figma-match",
+      "nodeId": "1:324",
+      "scenarioId": "1-324",
+      "viewport": {
+        "width": 1008,
+        "height": 444
+      },
+      "reference": {
+        "width": 1032,
+        "height": 468
+      },
+      "referenceCompared": {
+        "dimensions": {
+          "width": 1008,
+          "height": 444
+        },
+        "crop": {
+          "x": 12,
+          "y": 8
+        }
+      },
+      "browser": {
+        "width": 1008,
+        "height": 444
+      },
+      "differentPixels": 78743,
+      "totalPixels": 447552,
+      "diffRatio": 0.17594156656656657,
+      "threshold": 0.01,
+      "pixelChannelTolerance": 16,
+      "verdict": "fail",
+      "artifacts": {
+        "reference": "figma-1-324-reference.png",
+        "browser": "figma-1-324-browser.png",
+        "diff": "figma-1-324-diff.png",
+        "result": "figma-1-324-result.json"
+      }
+    },
+    {
+      "label": "figma-match",
+      "nodeId": "1:1115",
+      "scenarioId": "1-1115",
+      "viewport": {
+        "width": 1008,
+        "height": 444
+      },
+      "reference": {
+        "width": 1032,
+        "height": 468
+      },
+      "referenceCompared": {
+        "dimensions": {
+          "width": 1008,
+          "height": 444
+        },
+        "crop": {
+          "x": 12,
+          "y": 8
+        }
+      },
+      "browser": {
+        "width": 1008,
+        "height": 444
+      },
+      "differentPixels": 7839,
+      "totalPixels": 447552,
+      "diffRatio": 0.01751528314028314,
+      "threshold": 0.01,
+      "pixelChannelTolerance": 16,
+      "verdict": "fail",
+      "artifacts": {
+        "reference": "figma-1-1115-reference.png",
+        "browser": "figma-1-1115-browser.png",
+        "diff": "figma-1-1115-diff.png",
+        "result": "figma-1-1115-result.json"
+      }
+    },
+    {
+      "label": "figma-match",
+      "nodeId": "1:754",
+      "scenarioId": "1-754",
+      "viewport": {
+        "width": 1008,
+        "height": 444
+      },
+      "reference": {
+        "width": 1032,
+        "height": 468
+      },
+      "referenceCompared": {
+        "dimensions": {
+          "width": 1008,
+          "height": 444
+        },
+        "crop": {
+          "x": 12,
+          "y": 8
+        }
+      },
+      "browser": {
+        "width": 1008,
+        "height": 444
+      },
+      "differentPixels": 80424,
+      "totalPixels": 447552,
+      "diffRatio": 0.1796975546975547,
+      "threshold": 0.01,
+      "pixelChannelTolerance": 16,
+      "verdict": "fail",
+      "artifacts": {
+        "reference": "figma-1-754-reference.png",
+        "browser": "figma-1-754-browser.png",
+        "diff": "figma-1-754-diff.png",
+        "result": "figma-1-754-result.json"
+      }
+    },
+    {
+      "label": "figma-match",
+      "nodeId": "1:528",
+      "scenarioId": "1-528",
+      "viewport": {
+        "width": 280,
+        "height": 321
+      },
+      "reference": {
+        "width": 312,
+        "height": 353
+      },
+      "referenceCompared": {
+        "dimensions": {
+          "width": 280,
+          "height": 321
+        },
+        "crop": {
+          "x": 16,
+          "y": 8
+        }
+      },
+      "browser": {
+        "width": 280,
+        "height": 321
+      },
+      "differentPixels": 10361,
+      "totalPixels": 89880,
+      "diffRatio": 0.11527592345349355,
+      "threshold": 0.01,
+      "pixelChannelTolerance": 16,
+      "verdict": "fail",
+      "artifacts": {
+        "reference": "figma-1-528-reference.png",
+        "browser": "figma-1-528-browser.png",
+        "diff": "figma-1-528-diff.png",
+        "result": "figma-1-528-result.json"
+      }
+    },
+    {
+      "label": "figma-match",
+      "nodeId": "18:3",
+      "scenarioId": "18-3",
+      "viewport": {
+        "width": 320,
+        "height": 688
+      },
+      "reference": {
+        "width": 344,
+        "height": 712
+      },
+      "referenceCompared": {
+        "dimensions": {
+          "width": 320,
+          "height": 688
+        },
+        "crop": {
+          "x": 12,
+          "y": 8
+        }
+      },
+      "browser": {
+        "width": 320,
+        "height": 688
+      },
+      "differentPixels": 6465,
+      "totalPixels": 220160,
+      "diffRatio": 0.02936500726744186,
+      "threshold": 0.01,
+      "pixelChannelTolerance": 16,
+      "verdict": "fail",
+      "artifacts": {
+        "reference": "figma-18-3-reference.png",
+        "browser": "figma-18-3-browser.png",
+        "diff": "figma-18-3-diff.png",
+        "result": "figma-18-3-result.json"
+      }
+    },
+    {
+      "label": "figma-match",
+      "nodeId": "76:2",
+      "scenarioId": "76-2",
+      "viewport": {
+        "width": 1785,
+        "height": 1746
+      },
+      "reference": {
+        "width": 1785,
+        "height": 1746
+      },
+      "referenceCompared": {
+        "dimensions": {
+          "width": 1785,
+          "height": 1746
+        },
+        "crop": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "browser": {
+        "width": 1785,
+        "height": 1746
+      },
+      "differentPixels": 9942,
+      "totalPixels": 3116610,
+      "diffRatio": 0.0031900045241464283,
+      "threshold": 0.01,
+      "pixelChannelTolerance": 16,
+      "verdict": "pass",
+      "artifacts": {
+        "reference": "figma-76-2-reference.png",
+        "browser": "figma-76-2-browser.png",
+        "diff": "figma-76-2-diff.png",
+        "result": "figma-76-2-result.json"
+      }
+    },
+    {
+      "label": "figma-match",
+      "nodeId": "123:2",
+      "scenarioId": "123-2",
+      "viewport": {
+        "width": 320,
+        "height": 688
+      },
+      "reference": {
+        "width": 344,
+        "height": 712
+      },
+      "referenceCompared": {
+        "dimensions": {
+          "width": 320,
+          "height": 688
+        },
+        "crop": {
+          "x": 12,
+          "y": 8
+        }
+      },
+      "browser": {
+        "width": 320,
+        "height": 688
+      },
+      "differentPixels": 6370,
+      "totalPixels": 220160,
+      "diffRatio": 0.028933502906976744,
+      "threshold": 0.01,
+      "pixelChannelTolerance": 16,
+      "verdict": "fail",
+      "artifacts": {
+        "reference": "figma-123-2-reference.png",
+        "browser": "figma-123-2-browser.png",
+        "diff": "figma-123-2-diff.png",
+        "result": "figma-123-2-result.json"
+      }
+    },
+    {
+      "label": "figma-match",
+      "nodeId": "123:79",
+      "scenarioId": "123-79",
+      "viewport": {
+        "width": 680,
+        "height": 688
+      },
+      "reference": {
+        "width": 704,
+        "height": 712
+      },
+      "referenceCompared": {
+        "dimensions": {
+          "width": 680,
+          "height": 688
+        },
+        "crop": {
+          "x": 12,
+          "y": 8
+        }
+      },
+      "browser": {
+        "width": 680,
+        "height": 688
+      },
+      "differentPixels": 8821,
+      "totalPixels": 467840,
+      "diffRatio": 0.018854736662106703,
+      "threshold": 0.01,
+      "pixelChannelTolerance": 16,
+      "verdict": "fail",
+      "artifacts": {
+        "reference": "figma-123-79-reference.png",
+        "browser": "figma-123-79-browser.png",
+        "diff": "figma-123-79-diff.png",
+        "result": "figma-123-79-result.json"
+      }
+    },
+    {
+      "label": "figma-match",
+      "nodeId": "123:167",
+      "scenarioId": "123-167",
+      "viewport": {
+        "width": 1008,
+        "height": 444
+      },
+      "reference": {
+        "width": 1032,
+        "height": 468
+      },
+      "referenceCompared": {
+        "dimensions": {
+          "width": 1008,
+          "height": 444
+        },
+        "crop": {
+          "x": 12,
+          "y": 8
+        }
+      },
+      "browser": {
+        "width": 1008,
+        "height": 444
+      },
+      "differentPixels": 139782,
+      "totalPixels": 447552,
+      "diffRatio": 0.31232571857571856,
+      "threshold": 0.01,
+      "pixelChannelTolerance": 16,
+      "verdict": "fail",
+      "artifacts": {
+        "reference": "figma-123-167-reference.png",
+        "browser": "figma-123-167-browser.png",
+        "diff": "figma-123-167-diff.png",
+        "result": "figma-123-167-result.json"
+      }
+    },
+    {
+      "label": "figma-match",
+      "nodeId": "126:2",
+      "scenarioId": "126-2",
+      "viewport": {
+        "width": 320,
+        "height": 688
+      },
+      "reference": {
+        "width": 344,
+        "height": 712
+      },
+      "referenceCompared": {
+        "dimensions": {
+          "width": 320,
+          "height": 688
+        },
+        "crop": {
+          "x": 12,
+          "y": 8
+        }
+      },
+      "browser": {
+        "width": 320,
+        "height": 688
+      },
+      "differentPixels": 5053,
+      "totalPixels": 220160,
+      "diffRatio": 0.022951489825581397,
+      "threshold": 0.01,
+      "pixelChannelTolerance": 16,
+      "verdict": "fail",
+      "artifacts": {
+        "reference": "figma-126-2-reference.png",
+        "browser": "figma-126-2-browser.png",
+        "diff": "figma-126-2-diff.png",
+        "result": "figma-126-2-result.json"
+      }
+    },
+    {
+      "label": "user-extension",
+      "nodeId": null,
+      "scenarioId": "graphic-motion",
+      "viewport": {
+        "width": 320,
+        "height": 688
+      },
+      "reference": null,
+      "referenceCompared": null,
+      "browser": {
+        "width": 320,
+        "height": 688
+      },
+      "differentPixels": null,
+      "totalPixels": null,
+      "diffRatio": null,
+      "threshold": null,
+      "pixelChannelTolerance": null,
+      "verdict": "baseline",
+      "artifacts": {
+        "reference": null,
+        "browser": "user-extension-graphic-motion-browser.png",
+        "diff": null,
+        "result": "user-extension-graphic-motion-result.json"
+      }
+    }
+  ]
+}

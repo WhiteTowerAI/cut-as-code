@@ -96,3 +96,31 @@ test('the populated preview renders real nonblank local pixels', async ({ page }
   expect(sample.nonTransparent).toBe(64)
   expect(sample.colorCount).toBeGreaterThan(4)
 })
+
+test('the standalone Viewer frame uses its canonical five-second project clock', async ({ page }) => {
+  await page.setViewportSize({ width: 680, height: 688 })
+  await page.goto('/?scenario=1-282')
+
+  await expect(page.getByLabel('Playhead time')).toHaveText('00:00:00:00 / 00:00:05:00')
+})
+
+test('the caption Viewer frame uses its canonical twenty-second project clock', async ({ page }) => {
+  await page.setViewportSize({ width: 680, height: 688 })
+  await page.goto('/?scenario=123-79')
+
+  await expect(page.getByLabel('Playhead time')).toHaveText('00:00:06:26 / 00:00:20:09')
+})
+
+test('the caption selection and toolbar occupy their transcript-safe stage positions', async ({ page }) => {
+  await page.setViewportSize({ width: 680, height: 688 })
+  await page.goto('/?scenario=123-79')
+
+  const [selectionBox, toolbarBox] = await Promise.all([
+    page.locator('.viewer-selection-bounds--caption').boundingBox(),
+    page.locator('.viewer-selection-toolbar').boundingBox(),
+  ])
+  expect(selectionBox).not.toBeNull()
+  expect(toolbarBox).not.toBeNull()
+  expect(selectionBox!.y).toBe(378)
+  expect(toolbarBox!.y).toBe(324)
+})

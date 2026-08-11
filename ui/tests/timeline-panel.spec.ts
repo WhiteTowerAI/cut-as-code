@@ -111,3 +111,42 @@ test('caption timeline renders its lane before video without reordering project 
   expect(videoBox).not.toBeNull()
   expect(captionBox!.y).toBeLessThan(videoBox!.y)
 })
+
+test('an unselected caption track keeps its reserved lane before video', async ({ page }) => {
+  await page.setViewportSize({ width: 1008, height: 444 })
+  await page.goto('/?scenario=1-324')
+
+  await expect(page.getByText('C1', { exact: true })).toHaveCount(0)
+  const videoBox = await page.getByText('V1', { exact: true }).boundingBox()
+  expect(videoBox).not.toBeNull()
+  expect(videoBox!.y).toBeGreaterThanOrEqual(160)
+})
+
+test('an empty timeline omits the ruler and uses its narrow media gutter', async ({ page }) => {
+  await page.setViewportSize({ width: 1008, height: 444 })
+  await page.goto('/?scenario=1-1115')
+
+  const timeline = page.getByRole('region', { name: 'Timeline' })
+  await expect(timeline.locator('.timeline-ruler')).toHaveCount(0)
+  const [gutterBox, surfaceBox, emptyBox] = await Promise.all([
+    timeline.locator('.timeline-gutter').boundingBox(),
+    timeline.locator('[data-timeline-surface]').boundingBox(),
+    timeline.getByText('Drag media here to start creating').locator('..').boundingBox(),
+  ])
+  expect(gutterBox).not.toBeNull()
+  expect(surfaceBox).not.toBeNull()
+  expect(emptyBox).not.toBeNull()
+  expect(gutterBox!.width).toBe(48)
+  expect(surfaceBox!.x).toBe(48)
+  expect(surfaceBox!.width).toBe(960)
+  expect(emptyBox!.x).toBe(48)
+  expect(emptyBox!.width).toBe(912)
+})
+
+test('the caption Timeline frame uses the same canonical twenty-second project clock', async ({ page }) => {
+  await page.setViewportSize({ width: 1008, height: 444 })
+  await page.goto('/?scenario=123-167')
+
+  await expect(page.getByLabel('Playhead time')).toHaveText('00:06')
+  await expect(page.locator('.timeline-ruler span').last()).toHaveText('00:20')
+})

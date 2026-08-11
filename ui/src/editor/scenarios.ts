@@ -53,6 +53,9 @@ const emptyProject: EditorProjectView = {
   tracks: [],
 }
 
+const fiveSecondProject: EditorProjectView = { ...populatedProject, durationS: 5 }
+const twentySecondProject: EditorProjectView = { ...populatedProject, durationS: 20.3 }
+
 function state(overrides: Partial<EditorInitialState> = {}): EditorInitialState {
   return {
     project: populatedProject,
@@ -73,7 +76,7 @@ const scenarios: readonly EditorScenario[] = [
   { id: '1-84', initialState: state() },
   {
     id: '1-282',
-    initialState: state({ selection: { kind: 'video', id: 'track-video' }, currentTimeS: 32 }),
+    initialState: state({ project: fiveSecondProject, selection: { kind: 'video', id: 'track-video' } }),
   },
   { id: '57-152', initialState: state({ openMenu: 'viewer-more' }) },
   { id: '1-1026', initialState: state({ project: emptyProject }) },
@@ -87,14 +90,20 @@ const scenarios: readonly EditorScenario[] = [
   {
     id: '123-79',
     initialState: state({
+      project: twentySecondProject,
       activeTab: 'captions',
       selection: { kind: 'caption', id: 'caption-1' },
-      currentTimeS: 32,
+      currentTimeS: 6.87,
     }),
   },
   {
     id: '123-167',
-    initialState: state({ activeTab: 'captions', selection: { kind: 'caption', id: 'caption-1' } }),
+    initialState: state({
+      project: twentySecondProject,
+      activeTab: 'captions',
+      selection: { kind: 'caption', id: 'caption-1' },
+      currentTimeS: 6.87,
+    }),
   },
   { id: '126-2', initialState: state({ activeTab: 'cards' }) },
   { id: 'graphic-motion', initialState: state({ activeTab: 'graphic-motion' }) },

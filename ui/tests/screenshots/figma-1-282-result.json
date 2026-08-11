@@ -1,0 +1,39 @@
+{
+  "label": "figma-match",
+  "nodeId": "1:282",
+  "scenarioId": "1-282",
+  "viewport": {
+    "width": 680,
+    "height": 688
+  },
+  "reference": {
+    "width": 704,
+    "height": 712
+  },
+  "referenceCompared": {
+    "dimensions": {
+      "width": 680,
+      "height": 688
+    },
+    "crop": {
+      "x": 12,
+      "y": 8
+    }
+  },
+  "browser": {
+    "width": 680,
+    "height": 688
+  },
+  "differentPixels": 5707,
+  "totalPixels": 467840,
+  "diffRatio": 0.01219861491108071,
+  "threshold": 0.01,
+  "pixelChannelTolerance": 16,
+  "verdict": "fail",
+  "artifacts": {
+    "reference": "figma-1-282-reference.png",
+    "browser": "figma-1-282-browser.png",
+    "diff": "figma-1-282-diff.png",
+    "result": "figma-1-282-result.json"
+  }
+}
