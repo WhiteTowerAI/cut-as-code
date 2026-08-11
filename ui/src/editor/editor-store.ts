@@ -17,6 +17,7 @@ export type EditorState = {
   openMenu: MenuId
   setProject: (project: EditorProjectView | null) => void
   seek: (timeS: number) => void
+  setPlaying: (isPlaying: boolean) => void
   select: (selection: EditorSelection) => void
   setActiveTab: (tab: LibraryTab) => void
   setOpenMenu: (menu: MenuId) => void
@@ -24,7 +25,7 @@ export type EditorState = {
 
 export type EditorInitialState = Omit<
   EditorState,
-  'setProject' | 'seek' | 'select' | 'setActiveTab' | 'setOpenMenu'
+  'setProject' | 'seek' | 'setPlaying' | 'select' | 'setActiveTab' | 'setOpenMenu'
 >
 
 export function createEditorStore(initialState: EditorInitialState) {
@@ -36,6 +37,7 @@ export function createEditorStore(initialState: EditorInitialState) {
       const currentTimeS = Number.isFinite(timeS) ? Math.min(Math.max(timeS, 0), durationS) : 0
       set({ currentTimeS })
     },
+    setPlaying: (isPlaying) => set({ isPlaying }),
     select: (selection) => set({ selection }),
     setActiveTab: (activeTab) => set({ activeTab }),
     setOpenMenu: (openMenu) => set({ openMenu }),
