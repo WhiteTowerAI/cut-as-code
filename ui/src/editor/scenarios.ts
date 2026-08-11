@@ -68,7 +68,7 @@ function state(overrides: Partial<EditorInitialState> = {}): EditorInitialState 
 }
 
 const scenarios: readonly EditorScenario[] = [
-  { id: '1-60', initialState: state() },
+  { id: '1-60', initialState: state({ selection: { kind: 'video', id: 'track-video' } }) },
   { id: '1-1373', initialState: state({ project: emptyProject }) },
   { id: '1-84', initialState: state() },
   {

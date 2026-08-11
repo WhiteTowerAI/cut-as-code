@@ -1,9 +1,133 @@
-import { useState } from 'react'
+import { useState, type ComponentType } from 'react'
+import {
+  ArrowDownToLine,
+  ArrowUpToLine,
+  AudioWaveform,
+  Copy,
+  Crop,
+  Filter,
+  Focus,
+  Gauge,
+  Magnet,
+  Maximize2,
+  MoreHorizontal,
+  MousePointer2,
+  Play,
+  Plus,
+  Ratio,
+  Redo2,
+  RotateCcw,
+  RotateCw,
+  Ruler,
+  ScanLine,
+  Scissors,
+  Search,
+  Trash2,
+  Undo2,
+  Upload,
+  Volume2,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react'
 import { LibraryPanel } from './LibraryPanel'
 import { TimelinePanel } from './TimelinePanel'
 import { ViewerPanel } from './ViewerPanel'
 import { createEditorStore } from './editor-store'
 import { getScenario } from './scenarios'
+
+type IconItem = Readonly<{
+  label: string
+  icon: ComponentType<{ 'aria-hidden'?: boolean; size?: number; strokeWidth?: number }>
+}>
+
+const iconGroups: ReadonlyArray<Readonly<{ label: string; icons: readonly IconItem[] }>> = [
+  {
+    label: 'My Assets',
+    icons: [
+      { label: 'Search', icon: Search },
+      { label: 'Import', icon: Upload },
+      { label: 'Filter', icon: Filter },
+    ],
+  },
+  {
+    label: 'Viewer',
+    icons: [
+      { label: 'Crop', icon: Crop },
+      { label: 'Audio', icon: AudioWaveform },
+      { label: 'Rotate', icon: RotateCw },
+      { label: 'Duplicate', icon: Copy },
+      { label: 'Delete', icon: Trash2 },
+      { label: 'Bring forward', icon: ArrowUpToLine },
+      { label: 'Send backward', icon: ArrowDownToLine },
+      { label: 'More', icon: MoreHorizontal },
+      { label: 'Volume', icon: Volume2 },
+      { label: 'Play', icon: Play },
+      { label: 'Capture frame', icon: ScanLine },
+      { label: 'Fit to window', icon: Focus },
+      { label: 'Aspect ratio', icon: Ratio },
+      { label: 'Fullscreen', icon: Maximize2 },
+    ],
+  },
+  {
+    label: 'Timeline',
+    icons: [
+      { label: 'Add', icon: Plus },
+      { label: 'Select', icon: MousePointer2 },
+      { label: 'Snap', icon: Magnet },
+      { label: 'Undo', icon: Undo2 },
+      { label: 'Redo', icon: Redo2 },
+      { label: 'Split', icon: Scissors },
+      { label: 'Speed', icon: Gauge },
+      { label: 'Reverse', icon: RotateCcw },
+      { label: 'Copy', icon: Copy },
+      { label: 'Delete', icon: Trash2 },
+      { label: 'Track fit', icon: Ruler },
+      { label: 'Zoom out', icon: ZoomOut },
+      { label: 'Zoom in', icon: ZoomIn },
+    ],
+  },
+]
+
+function Workspace({ store }: { store: ReturnType<typeof createEditorStore> }) {
+  return (
+    <>
+      <header className="workspace-operation-bar">
+        <strong>Cut as code</strong>
+        <button type="button" disabled title="Export is not connected in this verification surface">Export</button>
+      </header>
+      <div className="workspace-primary">
+        <LibraryPanel store={store} />
+        <ViewerPanel store={store} />
+      </div>
+      <div className="workspace-timeline">
+        <TimelinePanel store={store} />
+      </div>
+    </>
+  )
+}
+
+function IconLibrary() {
+  return (
+    <section className="icon-library" data-icon-library aria-label="Icon library verification">
+      <header className="icon-library-header">
+        <h1>Icon Library</h1>
+        <p>My Assets&nbsp; / &nbsp;Viewer&nbsp; / &nbsp;Timeline</p>
+      </header>
+      {iconGroups.map((group) => (
+        <section className="icon-library-section" key={group.label} aria-labelledby={`icon-group-${group.label.replace(' ', '-').toLowerCase()}`}>
+          <h2 id={`icon-group-${group.label.replace(' ', '-').toLowerCase()}`}>{group.label}</h2>
+          <div className="icon-library-grid">
+            {group.icons.map(({ label, icon: Icon }) => (
+              <div className="icon-library-tile" role="img" aria-label={label} title={label} key={label}>
+                <Icon aria-hidden size={24} strokeWidth={2} />
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+    </section>
+  )
+}
 
 export function EditorShell() {
   const scenarioId = new URLSearchParams(window.location.search).get('scenario') ?? '1-84'
@@ -14,14 +138,31 @@ export function EditorShell() {
   const isViewerScenario = viewerScenarios.has(scenarioId)
   const isTimelineScenario = timelineScenarios.has(scenarioId)
   const isMenuFrame = scenarioId === '57-152' || scenarioId === '1-528'
+  const isWorkspaceScenario = scenarioId === '1-60' || scenarioId === '1-1373'
+  const isIconLibraryScenario = scenarioId === '76-2'
+
+  if (isIconLibraryScenario) {
+    return (
+      <main className="editor-shell editor-shell--icon-library" data-editor-shell data-scenario-id={scenarioId}>
+        <IconLibrary />
+      </main>
+    )
+  }
 
   return (
     <main
-      className={isMenuFrame ? 'editor-shell editor-shell--menu-frame' : 'editor-shell'}
+      className={isWorkspaceScenario
+        ? 'editor-shell editor-shell--workspace'
+        : isMenuFrame
+          ? 'editor-shell editor-shell--menu-frame'
+          : 'editor-shell'}
       data-editor-shell
+      data-scenario-id={scenarioId}
       aria-label="Video editor"
     >
-      {isTimelineScenario ? (
+      {isWorkspaceScenario ? (
+        <Workspace store={store} />
+      ) : isTimelineScenario ? (
         <TimelinePanel store={store} />
       ) : isViewerScenario ? (
         <ViewerPanel store={store} />
