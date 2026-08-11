@@ -96,6 +96,12 @@ class _BrollFixture:
             plan, decision, project_root=self.root,
         )
 
+    def publish_review_page(self, review_id="123e4567-e89b-12d3-a456-426614174000"):
+        page = self.root / "review/03-b-roll" / f"b-roll-review-{review_id}.html"
+        page.parent.mkdir(parents=True, exist_ok=True)
+        page.write_bytes(b"immutable candidate review")
+        return page
+
     def pexels_candidate(self):
         candidate = copy.deepcopy(self.plan["shots"][0]["candidates"][0])
         candidate.update({
@@ -303,7 +309,11 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         self.assertEqual("speaker-inset", updated["presentation"]["mode"])
         self.assertEqual(BrollPlanTests._speaker_style(), updated["speaker_inset_style"])
 
-    def test_prepare_composite_requires_chat_speaker_presentation_decision(self):
+    def test_approve_selection_requires_chat_speaker_presentation_decision(self):
+        self.assertTrue(hasattr(broll_plan, "approve_selection"))
+        selection_rationale = (
+            "Explicit user action approved the exact B-roll selection shown in this review."
+        )
         candidates = self._canonical_candidates(1)
         segment = {
             "candidate_id": candidates[0]["id"],
@@ -312,17 +322,17 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             "playback_rate": 1.0,
         }
         self.plan["speaker_inset_style"] = self._speaker_style()
-        selection = self._canonical_review([segment], intent="prepare_composite")
+        selection = self._canonical_review([segment], intent="approve_selection")
         selection.update({
-            "rationale": broll_plan.HUMAN_PREPARE_COMPOSITE_RATIONALE,
+            "rationale": selection_rationale,
             "rationale_source": "review_ui_explicit_action",
         })
 
         with self.assertRaisesRegex(ValueError, "agent-chat presentation decision is required"):
-            broll_plan.prepare_composite(
+            broll_plan.approve_selection(
                 self.plan, selection,
                 mode="human", actor="Actual user",
-                rationale=broll_plan.HUMAN_PREPARE_COMPOSITE_RATIONALE,
+                rationale=selection_rationale,
                 project_root=self.root, timeline=self.timeline,
             )
 
@@ -335,13 +345,23 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         style = example["speaker_inset_style"]
         self.assertEqual(self._speaker_style(), style)
         for text in (skill, rules):
+            normalized = " ".join(text.split())
             for value in (
                     "focused-panel", "full-bleed-wash", "corner-pip",
                     "project_layout_strategy", "layout_recommendation",
                     "top-left", "top-right", "width_ratio", "0.39",
                     "agent_chat_explicit_action", "presentation-decision.json",
-                    "ordinary", "speaker-inset"):
+                    "ordinary", "speaker-inset", "approve_selection",
+                    "b-roll-selection", "Copy", "Download JSON",
+                    "read-only", "collapsed", "final visual"):
                 self.assertIn(value, text)
+            self.assertIn("consumed as immutable evidence", normalized)
+            self.assertIn("must not present it again", normalized)
+            self.assertIn("ROI", text)
+            self.assertIn("layout", text)
+            self.assertIn("composite", text)
+            self.assertNotIn("prepare_composite", text)
+            self.assertNotIn("only to freeze exact B-roll selections", normalized)
             self.assertNotIn("size_candidates", text)
             self.assertNotIn("bottom-left", text)
             self.assertNotIn("bottom-right", text)
@@ -354,6 +374,10 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         self.assertEqual("chosen", example["presentation"]["status"])
         self.assertEqual("speaker-inset", example["presentation"]["mode"])
         self.assertEqual("b-roll/presentation-decision.json", example["presentation"]["path"])
+        self.assertEqual("approved", example["selection"]["status"])
+        self.assertEqual("approve_selection", example["selection"]["submission_intent"])
+        self.assertEqual("b-roll-selection", example["selection"]["approval_scope"])
+        self.assertTrue(example["selection"]["consumed"])
 
     def test_dynamic_social_docs_and_example_define_search_context_and_semantic_ranking_contract(self):
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
@@ -395,7 +419,70 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             for shot in example["shots"]
         ))
 
-    def test_prepare_composite_writes_non_approval_selection_snapshot(self):
+    def test_approve_selection_writes_consumed_authoritative_selection(self):
+        self.assertTrue(hasattr(broll_plan, "approve_selection"))
+        selection_rationale = (
+            "Explicit user action approved the exact B-roll selection shown in this review."
+        )
+        candidates = self._canonical_candidates(1)
+        segment = {
+            "candidate_id": candidates[0]["id"],
+            "source_range": {"start_s": 0.0, "end_s": 1.0},
+            "program_range": copy.deepcopy(self.plan["shots"][0]["program_range"]),
+            "playback_rate": 1.0,
+        }
+        self.plan["speaker_inset_style"] = self._speaker_style()
+        self.plan = self.record_presentation(self.plan, "speaker-inset")
+        selection = self._canonical_review([segment], intent="approve_selection")
+        selection.update({
+            "rationale": selection_rationale,
+            "rationale_source": "review_ui_explicit_action",
+        })
+        review_page = self.publish_review_page(selection["review_id"])
+
+        prepared = broll_plan.approve_selection(
+            self.plan, selection,
+            mode="human", actor="Actual user",
+            rationale=selection_rationale,
+            project_root=self.root, timeline=self.timeline,
+        )
+
+        self.assertEqual("composite_pending", prepared["shots"][0]["status"])
+        self.assertEqual({"segments": [segment]}, prepared["shots"][0]["selected"])
+        self.assertNotIn("review_status", prepared)
+        self.assertIsNone(prepared["decision"])
+        self.assertIsNone(prepared["review"])
+        binding = prepared["selection"]
+        self.assertEqual("approved", binding["status"])
+        self.assertEqual("approve_selection", binding["submission_intent"])
+        self.assertEqual("b-roll-selection", binding["approval_scope"])
+        self.assertTrue(binding["consumed"])
+        self.assertEqual(broll_plan.sha256_file(review_page), binding["review_page_sha256"])
+        self.assertEqual("b-roll/broll-selection.json", binding["path"])
+        selection_path = self.root / "work" / binding["path"]
+        self.assertTrue(selection_path.is_file())
+        self.assertEqual(binding["sha256"], broll_plan.sha256_file(selection_path))
+        receipt = projectlib.load_json(selection_path)
+        self.assertEqual("approved", receipt["status"])
+        self.assertEqual("b-roll-selection", receipt["approval_scope"])
+        self.assertEqual([segment], prepared["shots"][0]["selected"]["segments"])
+        self.assertEqual(
+            [prepared["shots"][0]["candidates"][0]["sha256"]],
+            receipt["selected_asset_sha256"],
+        )
+        self.assertEqual(selection["review_id"], receipt["source_review"]["review_id"])
+        self.assertEqual(
+            review_page.relative_to(self.root).as_posix(),
+            receipt["source_review"]["path"],
+        )
+        self.assertEqual(broll_plan.sha256_file(review_page), receipt["source_review"]["sha256"])
+        self.assertTrue(receipt["source_review"]["consumed"])
+        self.assertEqual([], broll_plan.validate_plan(
+            prepared, self.timeline, self.transcript,
+            project_root=self.root, verify_files=True,
+        ))
+
+    def test_prepare_composite_legacy_export_is_canonicalized(self):
         candidates = self._canonical_candidates(1)
         segment = {
             "candidate_id": candidates[0]["id"],
@@ -418,24 +505,67 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             project_root=self.root, timeline=self.timeline,
         )
 
-        self.assertEqual("composite_pending", prepared["shots"][0]["status"])
-        self.assertEqual({"segments": [segment]}, prepared["shots"][0]["selected"])
-        self.assertNotIn("review_status", prepared)
-        self.assertIsNone(prepared["decision"])
-        self.assertIsNone(prepared["review"])
-        receipt = prepared["selection"]
-        self.assertEqual("prepared", receipt["status"])
-        self.assertEqual("prepare_composite", receipt["submission_intent"])
-        self.assertEqual("b-roll/broll-selection.json", receipt["path"])
-        selection_path = self.root / "work" / receipt["path"]
-        self.assertTrue(selection_path.is_file())
-        self.assertEqual(receipt["sha256"], broll_plan.sha256_file(selection_path))
+        self.assertEqual("approved", prepared["selection"]["status"])
+        self.assertEqual("approve_selection", prepared["selection"]["submission_intent"])
+        self.assertEqual("b-roll-selection", prepared["selection"]["approval_scope"])
+        receipt = projectlib.load_json(
+            self.root / "work" / prepared["selection"]["path"]
+        )
+        self.assertEqual("approve_selection", receipt["submission_intent"])
+        self.assertEqual("approved", receipt["status"])
+
+    def test_approve_selection_all_skipped_is_an_approved_no_op(self):
+        selection_rationale = (
+            "Explicit user action approved the exact B-roll selection shown in this review."
+        )
+        self.plan["speaker_inset_style"] = self._speaker_style()
+        self.plan = self.record_presentation(self.plan, "speaker-inset")
+        selection = self.review_for(
+            self.plan, [{"id": "shot", "decision": "skip"}],
+            rationale=selection_rationale,
+            submission_intent="approve_selection",
+            approval_scope="b-roll-selection",
+            explicit_user_action=True,
+            revision_notes="",
+            rationale_source="review_ui_explicit_action",
+            timeline_fps=copy.deepcopy(self.timeline["fps"]),
+        )
+        self.publish_review_page(selection["review_id"])
+
+        approved = broll_plan.approve_selection(
+            self.plan, selection,
+            mode="human", actor="Actual user", rationale=selection_rationale,
+            project_root=self.root, timeline=self.timeline,
+        )
+
+        self.assertEqual("skipped", approved["shots"][0]["status"])
+        self.assertIn("review_status", approved)
+        self.assertEqual("approved", approved["review_status"])
+        self.assertEqual("b-roll-selection", approved["review"]["approval_scope"])
+        self.assertEqual("approve_selection", approved["review"]["submission_intent"])
         self.assertEqual([], broll_plan.validate_plan(
-            prepared, self.timeline, self.transcript,
+            approved, self.timeline, self.transcript,
             project_root=self.root, verify_files=True,
+        ))
+        registered = broll_plan.register_operation(self.project, approved)
+        self.assertNotIn("b-roll", registered["sequences"]["main"]["operations"])
+        self.assertFalse(any(
+            item.get("id") == "b-roll" for item in registered["operations"]
+        ))
+        self.publish_review_page(selection["review_id"]).write_bytes(b"tampered")
+        self.assertTrue(any(
+            "review page is missing or stale" in error
+            for error in broll_plan.validate_plan(
+                approved, self.timeline, self.transcript,
+                project_root=self.root, verify_files=True,
+            )
         ))
 
     def test_composite_review_binds_all_speaker_artifacts_and_cannot_change_selection(self):
+        self.assertTrue(hasattr(broll_plan, "approve_selection"))
+        selection_rationale = (
+            "Explicit user action approved the exact B-roll selection shown in this review."
+        )
         candidates = self._canonical_candidates(1)
         segment = {
             "candidate_id": candidates[0]["id"],
@@ -445,15 +575,16 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         }
         self.plan["speaker_inset_style"] = self._speaker_style()
         self.plan = self.record_presentation(self.plan, "speaker-inset")
-        selection = self._canonical_review([segment], intent="prepare_composite")
+        selection = self._canonical_review([segment], intent="approve_selection")
         selection.update({
-            "rationale": broll_plan.HUMAN_PREPARE_COMPOSITE_RATIONALE,
+            "rationale": selection_rationale,
             "rationale_source": "review_ui_explicit_action",
         })
-        prepared = broll_plan.prepare_composite(
+        self.publish_review_page(selection["review_id"])
+        prepared = broll_plan.approve_selection(
             self.plan, selection,
             mode="human", actor="Actual user",
-            rationale=broll_plan.HUMAN_PREPARE_COMPOSITE_RATIONALE,
+            rationale=selection_rationale,
             project_root=self.root, timeline=self.timeline,
         )
         prepared["speaker_inset"] = {
@@ -470,11 +601,11 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
                 "path": "b-roll/speaker-inset-clearance.json", "sha256": "d" * 64,
             },
         }
-        decisions = broll_plan._decision_manifest(prepared["shots"])
         review = self.review_for(
-            prepared, decisions,
+            prepared, [],
             rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
             submission_intent="approve",
+            approval_scope="speaker-inset-composite",
             review_stage="composite",
             explicit_user_action=True,
             revision_notes="",
@@ -487,6 +618,7 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             clearance_sha256=prepared["speaker_inset"]["clearance"]["sha256"],
             style_sha256=broll_plan.canonical_sha256(prepared["speaker_inset_style"]),
         )
+        review.pop("shots")
         approved = broll_plan.apply_review(
             prepared, review,
             mode="human", actor="Actual user",
@@ -513,14 +645,18 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
                 timeline=self.timeline,
             )
         changed = copy.deepcopy(review)
+        changed["shots"] = broll_plan._decision_manifest(prepared["shots"])
         changed["shots"][0]["segments"][0]["source_range"]["start_s"] = 0.25
-        with self.assertRaisesRegex(ValueError, "locked selection"):
+        interaction_path = self.root / "work/b-roll/broll-interaction.json"
+        with self.assertRaisesRegex(ValueError, "must not include candidate shots"):
             broll_plan.apply_review(
                 prepared, changed,
                 mode="human", actor="Actual user",
                 rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
+                interaction_path=interaction_path,
                 timeline=self.timeline,
             )
+        self.assertFalse(interaction_path.exists())
 
     def _canonical_candidates(self, count=3):
         shot = self.plan["shots"][0]
@@ -554,7 +690,7 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         return candidates
 
     def _canonical_review(self, segments, *, intent="approve"):
-        return self.review_for(
+        review = self.review_for(
             self.plan,
             [{
                 "id": "shot", "decision": "select",
@@ -568,6 +704,9 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             rationale_source="review_ui_explicit_action",
             timeline_fps=copy.deepcopy(self.timeline["fps"]),
         )
+        if intent == "approve_selection":
+            review["approval_scope"] = "b-roll-selection"
+        return review
 
     def test_canonical_segments_allow_fixed_rates_and_one_to_three_unique_candidates(self):
         candidates = self._canonical_candidates()
@@ -2475,6 +2614,9 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
             ).group(1)
         ))
         self.assertEqual("selection", selection_payload["review_mode"])
+        self.assertIn("approval_intent", selection_payload)
+        self.assertEqual("approve_selection", selection_payload["approval_intent"])
+        self.assertEqual("b-roll-selection", selection_payload["approval_scope"])
 
         plan = copy.deepcopy(selection_plan)
         segment = {
@@ -2488,7 +2630,8 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
             "status": "composite_pending",
         })
         plan["selection"] = {
-            "status": "prepared", "submission_intent": "prepare_composite",
+            "status": "approved", "submission_intent": "approve_selection",
+            "approval_scope": "b-roll-selection", "consumed": True,
             "path": "b-roll/broll-selection.json", "sha256": "9" * 64,
             "style_sha256": broll_plan.canonical_sha256(plan["speaker_inset_style"]),
         }
@@ -2602,6 +2745,8 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
             build_review_page.PAYLOAD_RE.search(html).group(1)
         ))
         self.assertEqual("composite", payload["review_mode"])
+        self.assertIn("approval_scope", payload)
+        self.assertEqual("speaker-inset-composite", payload["approval_scope"])
         self.assertEqual({"segments": [segment]}, payload["shots"][0]["locked_selection"])
         self.assertEqual("pass", payload["shots"][0]["subshots"][0]["clearance_status"])
         self.assertEqual("pass", payload["shots"][0]["subshots"][0]["subject_legibility"])
@@ -2627,10 +2772,18 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
             / payload["shots"][0]["subshots"][0]["evidence_frames"][0]["path"]
         ).is_file())
         for text in (
-                "prepare_composite", "value.review_stage='composite'", "speaker_bindings",
+                "approve_selection", "Approve B-roll selection",
+                "value.review_stage='composite'", "speaker_bindings",
                 "Project layout strategy", "Preset assessments", "subject_legibility",
-                "continuity"):
+                "continuity", "Copy", "Download JSON",
+                "<details class=\"technical\"><summary>Locked B-roll</summary>"):
             self.assertIn(text, html)
+        self.assertNotIn("function lockedEntry", html)
+        self.assertNotIn("shots:shotEntries", html)
+        self.assertNotIn("<h3>Pure B-roll source</h3>", html)
+        self.assertNotIn(
+            "<details open class=\"technical\"><summary>Locked B-roll</summary>", html,
+        )
         self.assertNotIn("Project speaker size", html)
         self.assertNotIn("size-candidates", html)
 
@@ -4460,10 +4613,10 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
             previewed, analysis, agent_input, preview, clearance,
             self.root, self.timeline,
         )
-        decisions = broll_plan._decision_manifest(cleared["shots"])
         review = self.review_for(
-            cleared, decisions, rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
-            submission_intent="approve", review_stage="composite",
+            cleared, [], rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
+            submission_intent="approve",
+            approval_scope="speaker-inset-composite", review_stage="composite",
             explicit_user_action=True, revision_notes="",
             rationale_source="review_ui_explicit_action",
             timeline_fps=copy.deepcopy(self.timeline["fps"]),
@@ -4474,6 +4627,7 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
             clearance_sha256=cleared["speaker_inset"]["clearance"]["sha256"],
             style_sha256=broll_plan.canonical_sha256(cleared["speaker_inset_style"]),
         )
+        review.pop("shots")
         approved = broll_plan.apply_review(
             cleared, review, mode="human", actor="Actual user",
             rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,

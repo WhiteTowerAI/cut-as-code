@@ -422,6 +422,15 @@ def build_review_page(plan, timeline, transcript, video, output_dir, *, project_
                     shot["source_frame"]["sha256"] = _hash(frame)
             subject_hash = broll_plan.canonical_sha256(broll_plan.review_subject(plan))
             payload = {"review_id": identifier, "review_mode": review_mode, "plan_sha256": subject_hash, "plan_subject_sha256": subject_hash, "candidate_manifest_sha256": broll_plan.canonical_sha256(broll_plan.candidate_manifest(plan)), "review_video_sha256": expected_video_hash, "timeline": {"fps": copy.deepcopy(canonical_timeline["fps"]), "program_duration_s": canonical_timeline["program_duration_s"], "clips": copy.deepcopy(canonical_timeline["clips"])}, "decision_modes": ["human", "agent"], "pre_skipped_ids": pre_skipped_ids, "shots": shots}
+            payload.update({
+                "approval_intent": (
+                    "approve_selection" if review_mode == "selection" else "approve"
+                ),
+                "approval_scope": (
+                    "speaker-inset-composite"
+                    if review_mode == "composite" else "b-roll-selection"
+                ),
+            })
             if review_mode == "composite":
                 speaker = plan["speaker_inset"]
                 payload.update({

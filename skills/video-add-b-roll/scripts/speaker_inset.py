@@ -362,12 +362,15 @@ def prepare_evidence(plan, timeline, transcript, review_video, project_root, *,
     if not video.is_file():
         raise FileNotFoundError(f"review video is missing: {video}")
     selection = plan.get("selection")
-    if not isinstance(selection, dict) or selection.get("status") != "prepared":
-        raise ValueError("prepared selection is required")
+    if (not isinstance(selection, dict)
+            or selection.get("status") != "approved"
+            or selection.get("submission_intent") != "approve_selection"
+            or selection.get("approval_scope") != "b-roll-selection"):
+        raise ValueError("approved B-roll selection is required")
     selection_path = root / "work" / str(selection.get("path", ""))
     if (not selection_path.is_file() or not _is_sha256(selection.get("sha256"))
             or _sha256_file(selection_path) != selection["sha256"]):
-        raise ValueError("prepared selection file is missing or stale")
+        raise ValueError("approved selection file is missing or stale")
     style = plan.get("speaker_inset_style")
     validation = style_errors(style) if style is not None else ["speaker_inset_style is required"]
     if validation or not style_enabled(style):

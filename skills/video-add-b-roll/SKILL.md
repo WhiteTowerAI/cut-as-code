@@ -87,7 +87,7 @@ contract; do not hand-build the operation.
 work/b-roll/broll-plan.json                         # durable domain plan
 work/b-roll/presentation-decision.json               # durable Agent-chat route decision
 work/b-roll/broll-interaction.json                  # durable applied receipt
-work/b-roll/broll-selection.json                    # durable non-approval exact selection
+work/b-roll/broll-selection.json                    # durable approved exact selection and consumed-page binding
 work/b-roll/speaker-inset-analysis.json             # durable scene/evidence packet
 work/b-roll/speaker-inset-agent-input.json          # durable Agent ROI decisions
 work/b-roll/speaker-inset-preview.json              # durable exact preview bindings
@@ -343,10 +343,12 @@ binds the review-video, candidate manifest, and pre-review plan hashes. A change
 or review video requires a new chat choice before a review page can be published.
 
 Choosing `ordinary` removes any speaker style and continues to the existing one-page exact
-candidate review. Choosing `speaker-inset` installs the default rounded-rectangle style and still
-uses that first page only to freeze exact B-roll selections. It must then run `prepare_composite`,
-produce the existing second composite page, and stop for its separate approval. The chat response
-selects a route; it never substitutes for either webpage's explicit review action.
+candidate review. Choosing `speaker-inset` installs the default rounded-rectangle style while
+keeping the first page authoritative for exact B-roll candidate, timing, segment-order, speed, and
+skip decisions. That page emits `submission_intent: "approve_selection"` with
+`approval_scope: "b-roll-selection"`; applying it keeps selected shots `composite_pending` only
+because the new speaker presentation still needs review. The chat response selects a route; it
+never substitutes for either webpage's explicit review action.
 
 ### 4. Publish And Complete Exact-Candidate Review
 
@@ -380,10 +382,13 @@ when no legal fit exists, and their JSON records every ordered segment, range, a
 
 `Modification notes` is optional. A non-empty value, changed program timing, or a changed prefilled
 segment forces `submission_intent: request_revision`; an explicit Request changes action may use
-empty notes. `submission_intent: approve` means the exact current immutable page configuration.
+empty notes. `submission_intent: approve` means an ordinary-route approval, while
+`submission_intent: approve_selection` means the authoritative B-roll content decision for the
+speaker-inset route.
 `Copy` is the primary handoff and places the complete JSON in both a readonly textarea and the
 clipboard when available. `Download JSON` downloads those same bytes for durable local transfer.
-Neither action applies or approves the review.
+Both preserve the same explicit approval receipt bytes; neither mutates the plan until the Agent
+validates and applies the transferred JSON.
 
 After `Download JSON`, bind the actual operator-chosen download location rather than assuming it is
 in the review directory:
@@ -403,6 +408,12 @@ Present the candidate-analysis summary and this exact full-candidate page togeth
 Do not apply review, normalize, build a render plan, or render delivery until the user explicitly
 copies, downloads, or approves exact candidate selections in a later turn. Agent ranking is not
 user approval.
+
+After a valid candidate export is applied, treat that UUID page as consumed as immutable evidence.
+Keep it on disk, but must not present it again, reopen its convenience alias, or ask the user to
+confirm the same B-roll choices. Reopen or republish candidate review only for an invalid or stale
+export, an explicit candidate `request_revision`, changed hash-bound inputs, or an explicit user
+request. A clipboard/download retry transfers the same receipt; it is not editorial reapproval.
 
 Inspect `submission_intent` before applying anything. For `request_revision`, preserve the exact
 export bytes under `work/b-roll`, validate them against the old immutable page, rebuild an
@@ -444,13 +455,28 @@ Use `human` and the actual human actor only after explicit user export. A new hu
 the page's factual `review_ui_explicit_action` rationale; it does not claim to quote a user-authored
 reason. Agent mode still requires the real Agent actor and a specific exported Agent rationale.
 
-For a `speaker-inset` chat decision, apply first-page `prepare_composite`, then use
+For a `speaker-inset` chat decision, apply the first-page authoritative selection:
+
+```powershell
+python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]); sys.path.insert(0,sys.argv[2]); import broll_plan,projectlib; path=root/'work/b-roll/broll-plan.json'; plan=projectlib.load_json(path); selection=projectlib.load_json(sys.argv[3]); timeline=projectlib.load_json(root/'work/timeline.json'); updated=broll_plan.approve_selection(plan,selection,mode=sys.argv[4],actor=sys.argv[5],rationale=selection['rationale'],project_root=root,timeline=timeline); projectlib.write_json(path,updated)" $ProjectRoot $BrollScripts $ReviewExport human "Actual user name"
+```
+
+Then use
 `speaker_inset.py` for evidence, Agent ROI, layout recommendation, exact anchor previews, and clearance; follow
 `reference/broll-rules.md`. The Agent must assess `focused-panel`, `full-bleed-wash`, and
 `corner-pip`, choose a project primary preset, and keep one preset and anchor for each complete
-shot. `corner-pip` supports only the shot-level `top-left` and `top-right` anchors. Only the
-republished page's hash-bound `review_stage: composite` approval may select shots.
-Agent recommendation is advisory; present the exact composite page and stop for user approval.
+shot. `corner-pip` supports only the shot-level `top-left` and `top-right` anchors. Publish only the
+new hash-bound `review_stage: composite` page. Show the approved B-roll there as read-only,
+default-collapsed context; do not render candidate checkboxes, skip/timing/speed controls, or emit
+candidate `shots` in its receipt. The user's composite decision covers only ROI, layout,
+clearance, continuity, style, and exact composite pixels. Agent recommendation is advisory;
+present the exact composite page and stop for user approval.
+
+A candidate revision creates a new candidate UUID page and selection receipt before rebuilding
+speaker artifacts. A composite-only revision creates a new composite UUID page while preserving
+the approved `selection_sha256`; it cannot silently change B-roll. After composite approval,
+derive candidate decisions from the approved selection and transition `composite_pending` shots
+without asking for the same content decision again.
 
 Before accepting `ambiguous`, request dense supplemental evidence inside that subshot and rebuild
 the analysis hash. Require `subject_legibility: pass` for every displayed subshot and a shot-level
@@ -549,7 +575,7 @@ After actual inspection, create an Agent- or human-authored JSON export containi
 `explicit_user_action: true` only after an explicit user action; otherwise use delegated
 `mode: "agent"`. Never infer or fabricate a human pass.
 
-Complete the visual review before final registration. This writes the durable receipt and
+Complete the final visual review before final registration. This writes the durable receipt and
 completed report, binding the plan UUID/hash, verifier stills, contact sheet, boundary reel,
 pending machine summary, and final video by SHA-256:
 

@@ -129,16 +129,19 @@
   values to frame boundaries without replacing untouched canonical values with display rounding.
 - Treat `Modification notes` as optional `revision_notes`. Preserve the user's text exactly. A
   non-empty value requests a revision and is never an approval rationale.
-- Set `submission_intent` to `approve` only for the exact configuration displayed by the current
-  page. Set it to `request_revision` for changed program timing, a changed prefilled segment,
-  non-empty notes, or an explicit Request changes action.
+- Set `submission_intent` to `approve` for an ordinary-route exact configuration and
+  `approve_selection` with `approval_scope: "b-roll-selection"` for the speaker-inset route's
+  authoritative B-roll candidate, timing, segment-order, speed, and skip decision. Set it to
+  `request_revision` for changed program timing, a changed prefilled segment, non-empty notes, or
+  an explicit Request changes action.
 - Reject `request_revision` in `apply_review()` before any plan or receipt write. Validate its
   review UUID, plan/candidate/video hashes, explicit action, timing, and selected candidate; then
   rebuild the proposal, source mapping, transcript evidence, hashes, and a new immutable page.
   Stop for approval again. Never convert revision notes into human authority.
 - Human mode requires an explicit user `Copy` or `Download JSON` action. Both controls must use one
   receipt builder, the same validation, and the same JSON bytes while the form is unchanged. Copy
-  keeps a readonly textarea fallback when clipboard access fails. Neither control applies review.
+  keeps a readonly textarea fallback when clipboard access fails. The controls record explicit
+  approval but do not mutate the plan until the transferred receipt is validated and applied.
 - Delegated Agent mode requires actual delegated
   authority, the real actor name, exact decisions, and a non-empty rationale. Never fabricate
   human approval.
@@ -150,6 +153,11 @@
 - Show the analysis summary and exact full-candidate page together, then stop. Do not apply review,
   normalize, compile, or render until the user explicitly copies, downloads, or approves exact
   selections.
+- After successful validation and application, the candidate UUID page is consumed as immutable
+  evidence. Keep it on disk but must not present it again, reopen its convenience alias, or ask for
+  confirmation of the same B-roll decision. Reopen or republish only for an invalid or stale
+  export, an explicit candidate `request_revision`, changed hash-bound inputs, or an explicit user
+  request. Retrying Copy/Download is receipt transfer, not editorial reapproval.
 
 ## Speaker Inset Review
 
@@ -165,9 +173,11 @@
   `shape: "rounded-rectangle"`, `width_ratio: 0.39`, `aspect_ratio: 0.80`, a 3px `#9E9E9E` border,
   `corner_radius_ratio: 0.10`, `margin_ratio: 0.04`, and `reserved_bottom_ratio: 0.20`. Keep only
   common appearance in this project-level style; preset and anchor belong to the Agent input.
-- The first-page `prepare_composite` action freezes exact B-roll segments in
-  `broll-selection.json` and moves selected shots to `composite_pending`. It is not approval,
-  creates no `review_status`, and never authorizes normalization or registration.
+- The first-page `approve_selection` action writes the approved `broll-selection.json`, binds the
+  consumed candidate page by UUID and SHA-256, and moves selected shots to `composite_pending` only
+  while new speaker presentation evidence is pending. The selected B-roll content is already
+  authoritative and is not approved again on the composite page. An all-skipped selection is an
+  approved no-op and does not create a composite page.
 - Split every selected program range at canonical clip discontinuities and conservative FFmpeg
   scene candidates. Align boundaries and keyframes to rational timeline frames. Never interpolate
   a ROI across a cut or infer identity across cuts.
@@ -230,11 +240,19 @@
 - `pass` binds the recommended enabled anchor actually checked. `no_safe_position` must list every
   anchor and resolve the subshot to `pure_broll`; never shrink the project style, cover focal B-roll
   content, replace the selected B-roll, or invent a fallback speaker image.
-- The second immutable page must show the locked selection, temporal evidence, ROI keyframes,
-  project strategy, recommendation rationale, three assessments, exact recommended composite,
-  supported anchor previews, optional alternate, common style, and clearance reasoning. Approval requires
-  `review_stage: composite` and current selection, analysis, Agent input, preview, clearance, and
-  style hashes. Any modification requests a new immutable page.
+- The second immutable page must show temporal evidence, ROI keyframes, project strategy,
+  recommendation rationale, three assessments, exact recommended composite, supported anchor
+  previews, optional alternate, common style, and clearance reasoning. Keep the locked B-roll as
+  read-only, default-collapsed context. Do not expose candidate selection, skip, timing, segment,
+  or speed controls, and do not emit candidate `shots` in the composite receipt. Approval requires
+  `approval_scope: "speaker-inset-composite"`, `review_stage: composite`, and current selection,
+  analysis, Agent input, preview, clearance, and style hashes. It approves only ROI, layout,
+  clearance, continuity, style, and exact composite pixels.
+- A candidate revision creates a new candidate UUID page and approved selection receipt before
+  speaker artifacts are rebuilt. A composite-only revision creates a new composite UUID page while
+  preserving `selection_sha256`; it cannot change candidate IDs, order, timing, source ranges, or
+  speed. Derive the durable candidate decision manifest from the approved selection after composite
+  approval.
 - After composite approval, normalize a reusable pure B-roll base and precompose the preset
   treatment plus clearance-effective speaker pixels into the one existing per-shot overlay. Bind
   selection, analysis, Agent input, preview, clearance, style, review video, and composite review
@@ -242,8 +260,8 @@
   composite, never the base.
 - Pre-register the verified final composite as the existing approved/pending overlay, render final
   delivery once, then inspect the actual normalized and final pixels. In addition to the ordinary
-  checks, require `speaker_layout_fidelity`, `speaker_legibility`, and `broll_focal_clearance` before
-  final registration becomes verified.
+  checks, keep the final visual review mandatory and require `speaker_layout_fidelity`,
+  `speaker_legibility`, and `broll_focal_clearance` before final registration becomes verified.
 
 ## Segment Timing And Playback
 
