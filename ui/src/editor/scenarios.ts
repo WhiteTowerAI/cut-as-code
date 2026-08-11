@@ -33,8 +33,10 @@ const populatedProject: EditorProjectView = {
   durationS: 127,
   fps: { numerator: 30, denominator: 1 },
   assets: [
-    { id: 'asset-interview', name: 'Interview', kind: 'video' },
-    { id: 'asset-music', name: 'Background music', kind: 'audio' },
+    { id: 'asset-product', name: 'Product teaser.mov', kind: 'video' },
+    { id: 'asset-interview', name: 'Founder interview.mp4', kind: 'video' },
+    { id: 'asset-brand', name: 'Brand loop 04.mp4', kind: 'video' },
+    { id: 'asset-city', name: 'City b-roll.mp4', kind: 'video' },
   ],
   tracks: [
     { id: 'track-video', name: 'Video', kind: 'video' },

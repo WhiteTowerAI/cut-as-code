@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 
 import { Filter, Plus, Search, Upload } from 'lucide-react'
 import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand/vanilla'
-import type { EditorSelection, LibraryTab } from './editor-model'
+import type { AssetView, EditorSelection, LibraryTab } from './editor-model'
 import type { EditorState } from './editor-store'
 
 type LibraryPanelProps = {
@@ -26,12 +26,20 @@ const tabs: ReadonlyArray<{ id: LibraryTab; label: string }> = [
   { id: 'graphic-motion', label: 'Graphic Motion' },
 ]
 
-const assets: readonly TileItem[] = [
-  { id: 'asset-product', label: 'Product teaser.mov', preview: 'product', duration: '00:18', status: 'Added' },
-  { id: 'asset-interview', label: 'Founder interview.mp4', preview: 'founder', duration: '18:42' },
-  { id: 'asset-brand', label: 'Brand loop 04.mp4', preview: 'brand', duration: '00:08' },
-  { id: 'asset-city', label: 'City b-roll.mp4', preview: 'city', duration: '00:05' },
-]
+const assetPreviewMetadata: Readonly<Record<string, Pick<TileItem, 'preview' | 'duration' | 'status'>>> = {
+  'asset-product': { preview: 'product', duration: '00:18', status: 'Added' },
+  'asset-interview': { preview: 'founder', duration: '18:42' },
+  'asset-brand': { preview: 'brand', duration: '00:08' },
+  'asset-city': { preview: 'city', duration: '00:05' },
+}
+
+const fallbackPreviews: readonly TileItem['preview'][] = ['product', 'founder', 'brand', 'city']
+
+function tileForAsset(asset: AssetView): TileItem {
+  const fallbackIndex = [...asset.id].reduce((sum, character) => sum + character.charCodeAt(0), 0) % fallbackPreviews.length
+  const previewMetadata = assetPreviewMetadata[asset.id] ?? { preview: fallbackPreviews[fallbackIndex] }
+  return { id: asset.id, label: asset.name, ...previewMetadata }
+}
 
 const captionStyles: readonly TileItem[] = [
   { id: 'caption-clean', label: 'Clean', preview: 'product', previewText: 'Caption', status: 'Added' },
@@ -113,6 +121,7 @@ function TileGrid({
           className={assetSize ? 'library-tile library-tile--asset' : 'library-tile'}
           type="button"
           key={item.id}
+          data-asset-id={assetSize ? item.id : undefined}
           aria-pressed={selectedId === item.id}
           onClick={() => onSelect({ kind, id: item.id })}
         >
@@ -141,12 +150,13 @@ function AssetsPanel({ store }: LibraryPanelProps) {
   const project = useStore(store, (state) => state.project)
   const selection = useStore(store, (state) => state.selection)
   const select = useStore(store, (state) => state.select)
+  const assetTiles = project?.assets.map(tileForAsset) ?? []
 
   return (
     <>
       <AssetControls />
-      {project?.assets.length ? (
-        <TileGrid items={assets} kind="asset" selectedId={selection?.id} onSelect={select} assetSize />
+      {assetTiles.length ? (
+        <TileGrid items={assetTiles} kind="asset" selectedId={selection?.id} onSelect={select} assetSize />
       ) : (
         <EmptyAssets />
       )}
@@ -277,10 +287,11 @@ export function LibraryPanel({ store }: LibraryPanelProps) {
                 ref={(element) => { tabRefs.current[index] = element }}
                 className="library-tab"
                 data-tab={tab.id}
+                id={`library-tab-${tab.id}`}
                 type="button"
                 role="tab"
                 aria-selected={selected}
-                aria-controls={`library-${tab.id}`}
+                aria-controls="library-panel-content"
                 tabIndex={selected ? 0 : -1}
                 onClick={() => setActiveTab(tab.id)}
                 onKeyDown={(event) => handleTabKeyDown(event, index)}
@@ -291,7 +302,12 @@ export function LibraryPanel({ store }: LibraryPanelProps) {
           })}
         </div>
       </header>
-      <div className="library-content" id={`library-${activeTab}`} role="tabpanel">
+      <div
+        className="library-content"
+        id="library-panel-content"
+        role="tabpanel"
+        aria-labelledby={`library-tab-${activeTab}`}
+      >
         <PanelContent activeTab={activeTab} store={store} />
       </div>
     </section>

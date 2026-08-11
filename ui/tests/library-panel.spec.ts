@@ -21,6 +21,18 @@ test('renders the populated asset library at the approved panel size', async ({ 
   await expect(page.getByRole('tab', { name: 'Transcript' })).toHaveCount(0)
 })
 
+test('selects a project-backed asset by its canonical ID', async ({ page }) => {
+  await page.goto('/?scenario=1-84')
+
+  const asset = page.locator('[data-asset-id="asset-product"]')
+  await expect(asset).toContainText('Product teaser.mov')
+  await expect(asset).toHaveAttribute('aria-pressed', 'false')
+
+  await asset.click()
+
+  await expect(asset).toHaveAttribute('aria-pressed', 'true')
+})
+
 test('switches the single library panel across all four tabs', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 688 })
   await page.goto('/?scenario=1-84')
@@ -59,12 +71,25 @@ test('moves tab focus and selection with the keyboard', async ({ page }) => {
 
   const assets = page.getByRole('tab', { name: 'My Assets' })
   const captions = page.getByRole('tab', { name: 'Captions' })
+  const cards = page.getByRole('tab', { name: 'Cards' })
   const motion = page.getByRole('tab', { name: 'Graphic Motion' })
+
+  for (const tab of [assets, captions, cards, motion]) {
+    const panelId = await tab.getAttribute('aria-controls')
+    expect(panelId).toBeTruthy()
+    await expect(page.locator(`#${panelId}`)).toHaveCount(1)
+  }
+
+  const tabPanel = page.getByRole('tabpanel')
+  await expect(assets).toHaveAttribute('id', 'library-tab-assets')
+  await expect(tabPanel).toHaveAttribute('aria-labelledby', 'library-tab-assets')
 
   await assets.focus()
   await page.keyboard.press('ArrowRight')
   await expect(captions).toBeFocused()
   await expect(captions).toHaveAttribute('aria-selected', 'true')
+  expect(await captions.evaluate((element) => getComputedStyle(element).boxShadow)).not.toBe('none')
+  await expect(tabPanel).toHaveAttribute('aria-labelledby', 'library-tab-captions')
 
   await page.keyboard.press('End')
   await expect(motion).toBeFocused()
