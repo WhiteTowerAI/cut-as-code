@@ -597,5 +597,26 @@
         }
       }
     }
+  },
+  "expressiveTreatments": {
+    "semanticScaleByRole": {
+      "normal": 1.0,
+      "keyword": 1.22,
+      "number": 1.22,
+      "contrast": 1.22
+    },
+    "heroLine": {
+      "color": "#F4C542",
+      "lineHeight": 1.05,
+      "canonicalLevel": "hero",
+      "levels": {
+        "strong": {
+          "scale": 1.5
+        },
+        "hero": {
+          "scale": 1.5
+        }
+      }
+    }
   }
 }

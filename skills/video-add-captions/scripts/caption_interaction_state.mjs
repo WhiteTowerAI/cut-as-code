@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isDeepStrictEqual } from "node:util";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const skillRoot = resolve(scriptDirectory, "..");
@@ -26,6 +27,17 @@ export const hashFile = (path) => createHash("sha256")
 export const hashJson = (value) => createHash("sha256")
   .update(JSON.stringify(value))
   .digest("hex");
+
+export const assertExpressiveTreatmentsBinding = (projectMeta) => {
+  const binding = projectMeta?.expressiveTreatments;
+  const currentValue = readJson(styleConfigPath).expressiveTreatments;
+  if (!binding || resolve(binding.configPath ?? "") !== resolve(styleConfigPath)
+    || binding.configSha256 !== hashFile(styleConfigPath)
+    || !isDeepStrictEqual(binding.value, currentValue)) {
+    throw new Error("Expressive treatment project metadata binding is stale.");
+  }
+  return currentValue;
+};
 
 export const resolveGallerySelection = (response) => {
   const rawResponse = String(response ?? "").trim();
@@ -131,13 +143,32 @@ const assertPreviewReview = (fields, expectedReviewId, decision) => {
   }
 };
 
-export const parseCaptionPreviewApproval = (response, expectedReviewId, expectedEvidence = "standard-four") => {
-  const expressive = expectedEvidence === "expressive-layout-beats";
+export const parseCaptionPreviewApproval = (
+  response, expectedReviewId, expectedEvidence = "standard-four", presentationMode = "standard",
+) => {
+  const expressive = presentationMode === "expressive" || expectedEvidence === "expressive-layout-beats";
   const fields = parseSummaryFields(
     response, "Caption preview review",
     expressive ? ["review", "decision", "evidence", "karaoke"] : ["review", "decision", "evidence"],
   );
   assertPreviewReview(fields, expectedReviewId, "approve");
+  if (expectedEvidence === "composite-aware") {
+    if (fields.get("evidence").trim().toLowerCase() !== "composite-aware") {
+      throw new Error('Composite-aware caption approval Evidence must be exactly "composite-aware".');
+    }
+    let karaoke;
+    if (expressive) {
+      karaoke = fields.get("karaoke").trim();
+      if (!new Set(["on", "off"]).has(karaoke)) {
+        throw new Error('Expressive caption preview approval Karaoke must be exactly "on" or "off".');
+      }
+    }
+    return {
+      reviewId: fields.get("review"), decision: "approve",
+      evidence: ["composite-aware"],
+      ...(expressive ? { karaoke: karaoke === "on" } : {}),
+    };
+  }
   if (expressive) {
     if (fields.get("evidence").trim().toLowerCase() !== "expressive-layout-beats") {
       throw new Error('Expressive caption preview approval Evidence must be exactly "expressive-layout-beats".');
@@ -201,6 +232,137 @@ const assertBoundFile = (binding, actualPath, label) => {
   }
 };
 
+const findWorkRoot = (contextPath) => {
+  let current = dirname(resolve(contextPath));
+  while (true) {
+    if (basename(current).toLowerCase() === "work" && existsSync(join(current, "project.json"))) {
+      return current;
+    }
+    if (existsSync(join(current, "work", "project.json"))) {
+      return join(current, "work");
+    }
+    const parent = dirname(current);
+    if (parent === current) return null;
+    current = parent;
+  }
+};
+
+const operationById = (project, id) => {
+  const operations = Array.isArray(project.operations)
+    ? project.operations
+    : Object.values(project.operations ?? {});
+  return operations.find((operation) => operation?.id === id) ?? null;
+};
+
+export const assertSpatialContextBinding = (state, actualPath = state.spatialContext?.path) => {
+  const captionsPlan = readJson(state.captions.path);
+  const planBinding = captionsPlan.spatial_context;
+  if (!state.spatialContext) {
+    if (planBinding) throw new Error("Captions JSON gained a spatial_context after the interaction started.");
+    if (actualPath) throw new Error("A spatial context was supplied to an interaction that did not bind one.");
+    return null;
+  }
+  if (!planBinding) {
+    throw new Error("Captions JSON lost its spatial_context binding. Start a new interaction.");
+  }
+  if (!actualPath) {
+    throw new Error("The interaction requires the bound spatial context path.");
+  }
+  assertBoundFile(state.spatialContext, actualPath, "Caption spatial context");
+  if (planBinding.policy !== "composite-aware"
+    || planBinding.sha256 !== state.spatialContext.sha256
+    || planBinding.source_operation !== state.spatialContext.sourceOperation
+    || planBinding.source_revision !== state.spatialContext.sourceRevision) {
+    throw new Error("Caption spatial context differs from the captions plan binding. Start a new interaction.");
+  }
+  const context = readJson(state.spatialContext.path);
+  if (context.policy !== "composite-aware"
+    || context.source?.operation_id !== state.spatialContext.sourceOperation
+    || context.source?.operation_revision !== state.spatialContext.sourceRevision) {
+    throw new Error("Caption spatial context source binding is stale. Start a new interaction.");
+  }
+
+  const workRoot = findWorkRoot(state.spatialContext.path);
+  if (!workRoot) {
+    throw new Error("Caption spatial context is not inside a project with work/project.json.");
+  }
+  const project = readJson(join(workRoot, "project.json"));
+  const operation = operationById(project, "b-roll");
+  if (!operation || !(project.sequences?.main?.operations ?? []).includes("b-roll")
+    || !new Set(["approved", "verified"]).has(operation.status)
+    || operation.revision !== state.spatialContext.sourceRevision) {
+    throw new Error("Caption spatial context B-roll operation is inactive, unapproved, or stale.");
+  }
+  const activeOperations = project.sequences?.main?.operations ?? [];
+  if (activeOperations.includes("captions")) {
+    const captionsOperation = operationById(project, "captions");
+    if (!captionsOperation || !(captionsOperation.depends_on ?? []).includes("b-roll")) {
+      throw new Error("Active captions operation depends_on must include b-roll for spatial context.");
+    }
+    if (captionsOperation.based_on?.["b-roll"] !== state.spatialContext.sourceRevision) {
+      throw new Error("Active captions operation based_on b-roll revision is stale.");
+    }
+  }
+  const brollPlanPath = resolve(workRoot, context.source.plan_path);
+  if (!existsSync(brollPlanPath) || hashFile(brollPlanPath) !== context.source.plan_sha256) {
+    throw new Error("Caption spatial context B-roll plan binding is stale.");
+  }
+  const brollPlan = readJson(brollPlanPath);
+  const artifacts = brollPlan.speaker_inset ?? brollPlan.speaker_inset_bindings;
+  for (const [field, sourceField] of [
+    ["analysis", "analysis_sha256"],
+    ["agent_input", "agent_input_sha256"],
+    ["preview", "preview_sha256"],
+    ["clearance", "clearance_sha256"],
+  ]) {
+    const binding = artifacts?.[field] ?? (field === "agent_input" ? artifacts?.["agent-input"] : null);
+    const artifactPath = binding?.path ? resolve(workRoot, binding.path) : null;
+    if (!artifactPath || !existsSync(artifactPath) || binding.sha256 !== context.source[sourceField]
+      || hashFile(artifactPath) !== binding.sha256) {
+      throw new Error(`Caption spatial context ${field} binding is stale.`);
+    }
+  }
+  for (const collection of [context.visual_intervals ?? [], context.placement_beats ?? []]) {
+    for (const item of collection) {
+      if (!item.background) continue;
+      const backgroundPath = resolve(workRoot, item.background.path);
+      if (!existsSync(backgroundPath) || hashFile(backgroundPath) !== item.background.sha256) {
+        throw new Error(`Caption spatial context background for ${item.id} is stale.`);
+      }
+    }
+  }
+  return context;
+};
+
+export const createSpatialContextBinding = (captionsPath, spatialContextPath) => {
+  const plan = readJson(resolve(captionsPath));
+  const planBinding = Array.isArray(plan) ? null : plan.spatial_context;
+  if (!planBinding) {
+    if (spatialContextPath) {
+      throw new Error("--spatial-context is not allowed when captions have no spatial_context binding.");
+    }
+    return null;
+  }
+  if (!spatialContextPath) {
+    throw new Error("Captions have a spatial_context binding; --spatial-context is required.");
+  }
+  const path = resolve(spatialContextPath);
+  if (!existsSync(path) || hashFile(path) !== planBinding.sha256) {
+    throw new Error("Caption spatial context is missing or differs from the captions plan binding.");
+  }
+  const context = readJson(path);
+  if (context.policy !== "composite-aware" || context.source?.operation_id !== "b-roll"
+    || context.source?.operation_revision !== planBinding.source_revision) {
+    throw new Error("Caption spatial context source differs from the captions plan binding.");
+  }
+  return {
+    path,
+    sha256: planBinding.sha256,
+    sourceOperation: "b-roll",
+    sourceRevision: planBinding.source_revision,
+  };
+};
+
 export const assertReviewPageBinding = (state) => {
   if (!state.reviewId || !state.reviewPage?.path || !state.reviewPage?.sha256) {
     throw new Error("Caption style review page binding is missing. Start a new interaction.");
@@ -234,11 +396,88 @@ export const assertStyleDefinitionBindings = (state) => {
   });
 };
 
+export const assertCompositeEvidenceCoverage = (context, evidence) => {
+  const samples = Array.isArray(evidence) ? evidence : [];
+  const sampleBeatId = (sample) => sample.spatialBeatId ?? sample.spatial_beat_id ?? null;
+  const requiredDensePurposes = ["spatial-1", "spatial-2", "spatial-3", "spatial-4", "spatial-5"];
+  for (const beat of context?.placement_beats ?? []) {
+    if (!beat.background) continue;
+    const purposes = new Set(samples
+      .filter((sample) => sampleBeatId(sample) === beat.id)
+      .flatMap((sample) => sample.purposes ?? []));
+    for (const purpose of requiredDensePurposes) {
+      if (!purposes.has(purpose)) {
+        throw new Error(`Composite-aware caption evidence for ${beat.id} is missing required purpose ${purpose}.`);
+      }
+    }
+  }
+
+  const boundaries = [...new Set((context?.visual_intervals ?? []).flatMap((interval) => {
+    const start = Number(interval?.program_range?.start_s);
+    const end = Number(interval?.program_range?.end_s);
+    return Number.isFinite(start) && Number.isFinite(end) && end > start ? [start, end] : [];
+  }))].sort((a, b) => a - b);
+  const purposes = new Set(samples.flatMap((sample) => sample.purposes ?? []));
+  boundaries.forEach((_, index) => {
+    for (const side of ["before", "after"]) {
+      const purpose = `spatial-boundary-${String(index + 1).padStart(3, "0")}-${side}`;
+      if (!purposes.has(purpose)) {
+        throw new Error(`Composite-aware caption evidence is missing required purpose ${purpose}.`);
+      }
+    }
+  });
+};
+
+const reviewCategories = (sample) => {
+  const categories = [];
+  const requested = sample.requested_variant ?? sample.requestedVariant ?? sample.variant ?? null;
+  if (["bottom-standard", "center-emphasis"].includes(requested)) categories.push(requested);
+  let placement = sample.resolved_placement ?? sample.resolvedPlacement ?? null;
+  if (!placement && requested) {
+    placement = requested === "center-emphasis" ? "frame-center" : "preset-bottom";
+  }
+  if (["preset-bottom", "frame-center", "panel-center"].includes(placement)) categories.push(placement);
+  if (sample.hero_line ?? sample.heroLine) categories.push("hero-1.5x");
+  return categories;
+};
+
+export const assertRepresentativeEvidence = (machineSamples, reviewSamples) => {
+  if (!Array.isArray(machineSamples) || !Array.isArray(reviewSamples) || reviewSamples.length > 6) {
+    throw new Error("Caption representative evidence is invalid.");
+  }
+  const byLabel = new Map(machineSamples.map((sample) => [sample.label, sample]));
+  const expectedCategories = new Set(machineSamples.flatMap(reviewCategories));
+  const seenCategories = new Set();
+  const seenPixels = new Set();
+  for (const sample of reviewSamples) {
+    const source = byLabel.get(sample.sample_label);
+    const categories = sample.categories;
+    const pixelKey = `${sample.preview}\0${sample.sha256}`;
+    if (!source || source.preview !== sample.preview || source.sha256 !== sample.sha256
+      || !Array.isArray(categories) || categories.length === 0 || seenPixels.has(pixelKey)) {
+      throw new Error("Caption representative evidence does not match machine evidence.");
+    }
+    seenPixels.add(pixelKey);
+    for (const category of categories) {
+      if (!expectedCategories.has(category) || seenCategories.has(category)) {
+        throw new Error("Caption representative evidence categories are invalid or duplicated.");
+      }
+      seenCategories.add(category);
+    }
+  }
+  if (expectedCategories.size !== seenCategories.size
+    || [...expectedCategories].some((category) => !seenCategories.has(category))) {
+    throw new Error("Caption representative evidence does not cover every maintained category.");
+  }
+};
+
 export const assertPreviewBindings = (preview, state = null) => {
   if (!preview || !preview.projectMetaPath || !preview.projectMetaSha256) {
     throw new Error("Preview project metadata binding is missing. Generate a new preview.");
   }
-  const minimumEvidence = preview.approvalEvidence === "expressive-layout-beats" ? 2 : 4;
+  const minimumEvidence = preview.approvalEvidence === "composite-aware"
+    ? 1
+    : preview.approvalEvidence === "expressive-layout-beats" ? 2 : 4;
   if (!Array.isArray(preview.evidence) || preview.evidence.length < minimumEvidence) {
     throw new Error("Preview evidence bindings are incomplete. Generate a new preview.");
   }
@@ -246,6 +485,10 @@ export const assertPreviewBindings = (preview, state = null) => {
   if (state) {
     assertBoundFile(state.sourceVideo, state.sourceVideo.path, "Source video");
     assertBoundFile(state.captions, state.captions.path, "Captions JSON");
+    assertSpatialContextBinding(state);
+    if ((preview.spatialContextSha256 ?? null) !== (state.spatialContext?.sha256 ?? null)) {
+      throw new Error("Preview spatial context differs from the interaction state. Generate a new preview.");
+    }
     if (state.reviewId || state.reviewPage || state.styleDefinitions) assertStyleDefinitionBindings(state);
     if (state.reviewPage) assertReviewPageBinding(state);
   }
@@ -255,6 +498,18 @@ export const assertPreviewBindings = (preview, state = null) => {
     preview.projectMetaPath,
     "Preview project metadata",
   );
+  let machineDocument = null;
+  if (preview.machineEvidence) {
+    assertBoundFile(preview.machineEvidence, preview.machineEvidence.path, "Caption machine evidence document");
+    machineDocument = readJson(preview.machineEvidence.path);
+    if (!Array.isArray(machineDocument.samples)
+      || preview.machineEvidence.sampleCount !== machineDocument.samples.length) {
+      throw new Error("Caption machine evidence count is stale.");
+    }
+    if (Array.isArray(machineDocument.review_samples)) {
+      assertRepresentativeEvidence(machineDocument.samples, machineDocument.review_samples);
+    }
+  }
   if (preview.reviewPagePath || preview.reviewPageSha256) {
     if (!preview.reviewPagePath || !preview.reviewPageSha256) {
       throw new Error("Caption preview review page binding is incomplete. Generate a new preview.");
@@ -273,10 +528,53 @@ export const assertPreviewBindings = (preview, state = null) => {
       throw new Error("Caption preview timeline identity changed. Generate a new preview.");
     }
     const labels = preview.evidence.map((binding) => binding.label);
-    if (preview.approvalEvidence === "expressive-layout-beats") {
-      if (labels.length < 2 || labels.at(-1) !== "no-caption" || new Set(labels).size !== labels.length
-        || preview.evidence.slice(0, -1).some((binding) => !binding.beatId || !binding.variant)) {
-        throw new Error("Expressive caption preview evidence must bind unique layout beats followed by no-caption.");
+    const machineSamples = machineDocument?.samples ?? preview.evidence;
+    if (preview.approvalEvidence === "composite-aware") {
+      const context = assertSpatialContextBinding(state);
+      assertCompositeEvidenceCoverage(context, machineSamples);
+      const invalidClearance = machineSamples.some((binding) => {
+        const clearance = binding.clearance_status ?? binding.clearanceStatus;
+        const cueIndex = binding.cue_index ?? binding.cueIndex ?? null;
+        const spatialBeatId = binding.spatial_beat_id ?? binding.spatialBeatId ?? null;
+        if (clearance === "pass") return false;
+        const legacyUncaptionedSample = clearance === undefined
+          && cueIndex === null && !spatialBeatId
+          && ((binding.kind === "no-caption" && binding.purposes?.includes("no-caption"))
+            || (binding.kind === "spatial-boundary"
+              && binding.purposes?.some((purpose) => purpose.startsWith("spatial-boundary-"))));
+        return !legacyUncaptionedSample;
+      });
+      const machineLabels = machineSamples.map((sample) => sample.label);
+      if (labels.length !== new Set(labels).size || !machineLabels.includes("no-caption")
+        || invalidClearance) {
+        throw new Error("Composite-aware caption preview evidence coverage or clearance is invalid.");
+      }
+      const plan = readJson(state.captions.path);
+      const heroCueIndexes = (plan.cues ?? []).filter((cue) => cue.hero_line).map((cue) => cue.index);
+      if (heroCueIndexes.some((cueIndex) => !machineSamples.some(
+        (binding) => (binding.cue_index ?? binding.cueIndex) === cueIndex
+          && (binding.hero_line ?? binding.heroLine),
+      ))) {
+        throw new Error("Composite-aware caption preview evidence does not cover every hero-line cue.");
+      }
+      if (preview.presentationMode === "expressive"
+        && (!Array.isArray(preview.comparisonEvidence) || preview.comparisonEvidence.length !== 2)) {
+        throw new Error("Expressive coexistence comparison evidence bindings are incomplete.");
+      }
+    } else if (preview.approvalEvidence === "expressive-layout-beats") {
+      const plan = readJson(state.captions.path);
+      const beatIds = plan.presentation?.layout_beats?.map((beat) => beat.id) ?? [];
+      const boundBeatIds = new Set(machineSamples
+        .map((binding) => binding.beat_id ?? binding.beatId).filter(Boolean));
+      const heroCueIndexes = (plan.cues ?? []).filter((cue) => cue.hero_line).map((cue) => cue.index);
+      const machineLabels = machineSamples.map((sample) => sample.label);
+      if (labels.length < 1 || !machineLabels.includes("no-caption") || new Set(labels).size !== labels.length
+        || beatIds.some((beatId) => !boundBeatIds.has(beatId))
+        || heroCueIndexes.some((cueIndex) => !machineSamples.some(
+          (binding) => (binding.cue_index ?? binding.cueIndex) === cueIndex
+            && (binding.hero_line ?? binding.heroLine),
+        ))) {
+        throw new Error("Expressive caption preview evidence must bind every layout beat, hero-line, and no-caption.");
       }
       if (!Array.isArray(preview.comparisonEvidence) || preview.comparisonEvidence.length !== 2) {
         throw new Error("Expressive coexistence comparison evidence bindings are incomplete.");
@@ -305,6 +603,53 @@ export const assertPreviewBindings = (preview, state = null) => {
   }
 };
 
+export const resolveCanonicalReviewEvidence = (state, canonicalPlan) => {
+  assertPreviewBindings(state?.preview, state);
+  const representative = state.preview.evidence;
+  const binding = state.preview.machineEvidence;
+  const machineDocument = binding?.path && binding.sha256 ? {
+    path: resolve(binding.path),
+    sha256: binding.sha256,
+    sampleCount: binding.sampleCount,
+  } : null;
+  if (canonicalPlan?.presentation?.mode !== "expressive") {
+    return { representative, delivery: representative, machineDocument };
+  }
+
+  if (!machineDocument) {
+    return { representative, delivery: representative, machineDocument: null };
+  }
+  const documentPath = machineDocument.path;
+  const document = readJson(documentPath);
+  const samples = Array.isArray(document.samples) ? document.samples : [];
+  const beatIds = canonicalPlan.presentation.layout_beats?.map((beat) => beat.id) ?? [];
+  const selected = beatIds.map((beatId) => {
+    const matches = samples.filter((sample) => sample.kind === "layout-beat"
+      && (sample.beat_id ?? sample.beatId) === beatId);
+    if (matches.length !== 1) {
+      throw new Error(`Expressive canonical review requires exactly one machine sample for ${beatId}.`);
+    }
+    return matches[0];
+  });
+  const noCaption = samples.filter((sample) => sample.kind === "no-caption");
+  if (noCaption.length !== 1) {
+    throw new Error("Expressive canonical review requires exactly one no-caption machine sample.");
+  }
+
+  const delivery = [...selected, noCaption[0]].map((sample) => {
+    const path = resolve(dirname(documentPath), sample.preview ?? "");
+    if (!sample.preview || sample.sha256 !== hashFile(path)) {
+      throw new Error(`Expressive canonical review evidence is stale: ${sample.label ?? sample.preview}.`);
+    }
+    return { ...sample, path };
+  });
+  return {
+    representative,
+    delivery,
+    machineDocument,
+  };
+};
+
 const normalizeNullable = (value) => value ?? null;
 
 export const selectionOptionsFromState = (selection) => ({
@@ -324,6 +669,7 @@ export const validateGenerationInteraction = ({
   mode,
   sourceVideo,
   captionsPath,
+  spatialContextPath,
   requestedSelection,
   overridesPath,
 }) => {
@@ -348,6 +694,7 @@ export const validateGenerationInteraction = ({
 
   assertBoundFile(state.sourceVideo, sourceVideo, "Source video");
   assertBoundFile(state.captions, captionsPath, "Captions JSON");
+  assertSpatialContextBinding(state, spatialContextPath);
   if (state.reviewId || state.reviewPage || state.styleDefinitions) {
     assertStyleDefinitionBindings(state);
   }
@@ -388,7 +735,9 @@ export const validateGenerationInteraction = ({
       throw new Error("Overrides changed after preview confirmation. Generate and confirm a new preview.");
     }
     if (state.approval.selectionId !== state.selection.choiceId
-      || state.approval.previewEvidenceSignature !== state.preview.evidenceSignature) {
+      || state.approval.previewEvidenceSignature !== state.preview.evidenceSignature
+      || (state.approval.machineEvidenceSha256 ?? null)
+        !== (state.preview.machineEvidence?.sha256 ?? null)) {
       throw new Error("Approval no longer matches the selected style and preview evidence.");
     }
   }

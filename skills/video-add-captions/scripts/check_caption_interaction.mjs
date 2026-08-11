@@ -201,6 +201,17 @@ check("preview response parsers are strict", () => {
     reviewId,
     "expressive-layout-beats",
   ), { reviewId, decision: "approve", evidence: ["expressive-layout-beats"], karaoke: true });
+  assert.deepEqual(parseApprove(
+    previewSummary(reviewId, "approve", "composite-aware"), reviewId, "composite-aware", "standard",
+  ), { reviewId, decision: "approve", evidence: ["composite-aware"] });
+  assert.deepEqual(parseApprove(
+    previewSummary(reviewId, "approve", "composite-aware", "off"),
+    reviewId, "composite-aware", "expressive",
+  ), { reviewId, decision: "approve", evidence: ["composite-aware"], karaoke: false });
+  assert.throws(() => parseApprove(
+    previewSummary(reviewId, "approve", "composite-aware"),
+    reviewId, "composite-aware", "expressive",
+  ), /karaoke/i);
   assert.throws(() => parseApprove(
     previewSummary(reviewId, "approve", undefined, "off"), reviewId, "expressive-layout-beats",
   ), /expressive-layout-beats/i);
@@ -497,6 +508,202 @@ try {
     };
   };
 
+  const prepareCompositeAwarePreview = (name, { previewReady = true, omitPurpose = null } = {}) => {
+    const projectRoot = join(tempRoot, `${name}-project`);
+    const workRoot = join(projectRoot, "work");
+    const brollDir = join(workRoot, "b-roll");
+    const captionsDir = join(workRoot, "captions");
+    mkdirSync(brollDir, { recursive: true });
+    mkdirSync(captionsDir, { recursive: true });
+
+    const artifactBindings = {};
+    for (const field of ["analysis", "agent_input", "preview", "clearance"]) {
+      const path = join(brollDir, `${field}.json`);
+      writeFileSync(path, JSON.stringify({ field }), "utf8");
+      artifactBindings[field] = {
+        path: `b-roll/${field}.json`,
+        sha256: interactionState.hashFile(path),
+      };
+    }
+    const brollPlanPath = join(brollDir, "broll-plan.json");
+    writeFileSync(brollPlanPath, JSON.stringify({ speaker_inset: artifactBindings }), "utf8");
+    const compositePath = join(brollDir, "composite.mp4");
+    writeFileSync(compositePath, "composite", "utf8");
+    const gapCompositePath = join(brollDir, "gap-composite.mp4");
+    writeFileSync(gapCompositePath, "gap-composite", "utf8");
+
+    const contextPath = join(captionsDir, "caption-spatial-context.json");
+    const context = {
+      policy: "composite-aware",
+      source: {
+        operation_id: "b-roll",
+        operation_revision: 1,
+        plan_path: "b-roll/broll-plan.json",
+        plan_sha256: interactionState.hashFile(brollPlanPath),
+        analysis_sha256: artifactBindings.analysis.sha256,
+        agent_input_sha256: artifactBindings.agent_input.sha256,
+        preview_sha256: artifactBindings.preview.sha256,
+        clearance_sha256: artifactBindings.clearance.sha256,
+      },
+      visual_intervals: [
+        {
+          id: "visual-001",
+          program_range: { start_s: 1, end_s: 2 },
+          background: {
+            path: "b-roll/composite.mp4",
+            sha256: interactionState.hashFile(compositePath),
+          },
+        },
+        {
+          id: "visual-002",
+          program_range: { start_s: 2, end_s: 3 },
+          background: {
+            path: "b-roll/gap-composite.mp4",
+            sha256: interactionState.hashFile(gapCompositePath),
+          },
+        },
+      ],
+      placement_beats: [
+        {
+          id: "spatial-001",
+          background: {
+            path: "b-roll/composite.mp4",
+            sha256: interactionState.hashFile(compositePath),
+          },
+        },
+        { id: "spatial-002" },
+      ],
+    };
+    writeFileSync(contextPath, JSON.stringify(context), "utf8");
+
+    const captionsPlanPath = join(captionsDir, "captions-plan.json");
+    writeFileSync(captionsPlanPath, JSON.stringify({
+      timeline_id: "main",
+      cues: [],
+      spatial_context: {
+        policy: "composite-aware",
+        path: "captions/caption-spatial-context.json",
+        sha256: interactionState.hashFile(contextPath),
+        source_operation: "b-roll",
+        source_revision: 1,
+      },
+    }), "utf8");
+    const projectPath = join(workRoot, "project.json");
+    writeFileSync(projectPath, JSON.stringify({
+      operations: [{ id: "b-roll", revision: 1, status: "approved" }],
+      sequences: { main: { operations: ["b-roll"] } },
+    }), "utf8");
+
+    const statePath = join(captionsDir, "caption-interaction.json");
+    const reviewDir = join(projectRoot, "review");
+    runInteraction([
+      "start", "--state", statePath, "--source", sourcePath, "--captions", captionsPlanPath,
+      "--spatial-context", contextPath, "--review-dir", reviewDir, "--no-open", "true",
+    ]);
+    let state = readState(statePath);
+    runInteraction(["select", "--state", statePath, "--response", summary(state.reviewId, "clean")]);
+    state = readState(statePath);
+
+    const evidenceDir = join(projectRoot, "evidence");
+    mkdirSync(evidenceDir);
+    const boundarySpecs = [1, 2, 3].flatMap((_, index) => ["before", "after"].map((side) => ({
+      label: `boundary-${String(index + 1).padStart(3, "0")}-${side}`,
+      purpose: `spatial-boundary-${String(index + 1).padStart(3, "0")}-${side}`,
+      side,
+    })));
+    const evidenceLabels = ["spatial-001", ...boundarySpecs.map((item) => item.label), "no-caption"];
+    const evidence = evidenceLabels.map((label) => {
+      const path = join(evidenceDir, `preview-${label}.png`);
+      writeFileSync(path, tinyPng());
+      return path;
+    });
+    const projectMetaPath = join(evidenceDir, "project-meta.json");
+    writeFileSync(projectMetaPath, JSON.stringify({
+      interaction: { statePath: resolve(statePath), selectionId: state.selection.choiceId },
+      spatialContext: { sha256: interactionState.hashFile(contextPath) },
+    }), "utf8");
+    const samples = [{
+        label: "spatial-001",
+        kind: "spatial-beat",
+        purposes: ["spatial-1", "spatial-2", "spatial-3", "spatial-4", "spatial-5"],
+        spatial_beat_id: "spatial-001",
+        visual_context: "focused-panel",
+        requested_variant: "bottom-standard",
+        resolved_placement: "panel-center",
+        caption_bbox: [0, 0, 1, 1],
+        clearance_status: "pass",
+        preview: basename(evidence[0]),
+        sha256: interactionState.hashFile(evidence[0]),
+      },
+      ...boundarySpecs.map((boundary, index) => ({
+        label: boundary.label,
+        kind: "spatial-boundary",
+        cue_index: null,
+        purposes: [`spatial-boundary-${boundary.side}`, boundary.purpose],
+        clearance_status: "pass",
+        preview: basename(evidence[index + 1]),
+        sha256: interactionState.hashFile(evidence[index + 1]),
+      })),
+      {
+        label: "no-caption",
+        kind: "no-caption",
+        cue_index: null,
+        purposes: ["no-caption"],
+        clearance_status: "pass",
+        preview: basename(evidence.at(-1)),
+        sha256: interactionState.hashFile(evidence.at(-1)),
+      },
+    ];
+    if (omitPurpose) {
+      for (const sample of samples) {
+        sample.purposes = sample.purposes.filter((purpose) => purpose !== omitPurpose);
+      }
+    }
+    const reviewSamples = [{
+      sample_label: "spatial-001",
+      preview: samples[0].preview,
+      sha256: samples[0].sha256,
+      categories: ["bottom-standard", "panel-center"],
+    }];
+    const evidenceDocument = {
+      schema_version: 1,
+      review_id: state.reviewId,
+      selection_id: state.selection.choiceId,
+      timeline_id: "main",
+      timeline_sha256: interactionState.hashFile(timelinePath),
+      plan_sha256: interactionState.hashFile(captionsPlanPath),
+      presentation_mode: "standard",
+      machine_evidence_count: samples.length,
+      primary_evidence_count: reviewSamples.length,
+      approval_evidence: "composite-aware",
+      spatial_context: {
+        sha256: interactionState.hashFile(contextPath),
+        source: { operation_revision: 1 },
+      },
+      samples,
+      review_samples: reviewSamples,
+    };
+    const evidenceDocumentPath = join(evidenceDir, "captions-evidence.json");
+    writeFileSync(evidenceDocumentPath, JSON.stringify(evidenceDocument), "utf8");
+    const payload = Buffer.from(JSON.stringify(evidenceDocument), "utf8").toString("base64");
+    const reviewPage = join(evidenceDir, "captions-review.html");
+    writeFileSync(reviewPage, `<script>const REVIEW_DATA_B64 = "${payload}";</script>`, "utf8");
+    const representativeEvidence = [evidence[0]];
+    if (previewReady) {
+      runInteraction([
+        "preview-ready", "--state", statePath, "--project-meta", projectMetaPath,
+        "--evidence", representativeEvidence.join(","),
+        "--evidence-document", evidenceDocumentPath,
+        "--review-page", reviewPage, "--timeline", timelinePath,
+      ]);
+    }
+    return {
+      statePath, reviewId: state.reviewId, projectPath, gapCompositePath,
+      evidence: representativeEvidence, machineEvidence: evidence,
+      evidenceDocumentPath, reviewPage, projectMetaPath, timelinePath,
+    };
+  };
+
   const prepareExpressivePreview = (name, decisionMode = "human") => {
     const expressivePlanPath = join(tempRoot, `${name}-captions.json`);
     const beats = [
@@ -535,9 +742,17 @@ try {
       return path;
     });
     const projectMetaPath = join(evidenceDir, "project-meta.json");
-    writeFileSync(projectMetaPath, JSON.stringify({ interaction: {
-      statePath: resolve(statePath), selectionId: state.selection.choiceId, overridesSha256: null,
-    } }), "utf8");
+    const styleConfig = JSON.parse(readFileSync(styleConfigPath, "utf8"));
+    writeFileSync(projectMetaPath, JSON.stringify({
+      interaction: {
+        statePath: resolve(statePath), selectionId: state.selection.choiceId, overridesSha256: null,
+      },
+      expressiveTreatments: {
+        configPath: styleConfigPath,
+        configSha256: interactionState.hashFile(styleConfigPath),
+        value: styleConfig.expressiveTreatments,
+      },
+    }), "utf8");
     const comparisonProjectMetaPath = join(evidenceDir, "comparison-project-meta.json");
     writeFileSync(comparisonProjectMetaPath, JSON.stringify({ coexistenceMode: "semantic-plus-karaoke" }), "utf8");
     const samples = beats.map((beat, index) => ({
@@ -555,7 +770,21 @@ try {
       preview: basename(evidence.at(-1)),
       sha256: interactionState.hashFile(evidence.at(-1)),
     });
-    const payload = Buffer.from(JSON.stringify({
+    const reviewSamples = [
+      {
+        sample_label: "beat-001",
+        preview: samples[0].preview,
+        sha256: samples[0].sha256,
+        categories: ["bottom-standard", "preset-bottom"],
+      },
+      {
+        sample_label: "beat-002",
+        preview: samples[1].preview,
+        sha256: samples[1].sha256,
+        categories: ["center-emphasis", "frame-center"],
+      },
+    ];
+    const evidenceDocument = {
       schema_version: 1,
       review_id: state.reviewId,
       selection_id: state.selection.choiceId,
@@ -563,9 +792,11 @@ try {
       timeline_sha256: interactionState.hashFile(timelinePath),
       plan_sha256: interactionState.hashFile(expressivePlanPath),
       presentation_mode: "expressive",
-      primary_evidence_count: samples.length,
+      machine_evidence_count: samples.length,
+      primary_evidence_count: reviewSamples.length,
       approval_evidence: "expressive-layout-beats",
       samples,
+      review_samples: reviewSamples,
       experimental_comparison: {
         experimental: true,
         beat_id: "beat-002",
@@ -584,7 +815,10 @@ try {
           sha256: interactionState.hashFile(path),
         })),
       },
-    }), "utf8").toString("base64");
+    };
+    const evidenceDocumentPath = join(evidenceDir, "captions-evidence.json");
+    writeFileSync(evidenceDocumentPath, JSON.stringify(evidenceDocument), "utf8");
+    const payload = Buffer.from(JSON.stringify(evidenceDocument), "utf8").toString("base64");
     const reviewPage = join(evidenceDir, "captions-review.html");
     writeFileSync(reviewPage, `<script>const REVIEW_DATA_B64 = "${payload}";</script>`, "utf8");
     return {
@@ -592,7 +826,9 @@ try {
       reviewPage,
       projectMetaPath,
       comparisonProjectMetaPath,
-      evidence,
+      evidence: evidence.slice(0, 2),
+      machineEvidence: evidence,
+      evidenceDocumentPath,
       comparisonEvidence,
       reviewId: state.reviewId,
       timelinePath,
@@ -620,20 +856,142 @@ try {
     });
   });
 
+  check("composite-aware approval validates machine clearance and accepts legacy uncaptioned omission", () => {
+    const fixture = prepareCompositeAwarePreview("composite-no-caption-clearance");
+    const state = readState(fixture.statePath);
+    const evidenceDocument = JSON.parse(readFileSync(fixture.evidenceDocumentPath, "utf8"));
+    const noCaption = evidenceDocument.samples.find((binding) => binding.label === "no-caption");
+    const boundary = evidenceDocument.samples.find((binding) => binding.kind === "spatial-boundary");
+    assert.equal(noCaption.clearance_status, "pass");
+    assert.equal(boundary.clearance_status, "pass");
+
+    delete noCaption.clearance_status;
+    delete boundary.clearance_status;
+    writeFileSync(fixture.evidenceDocumentPath, JSON.stringify(evidenceDocument), "utf8");
+    state.preview.machineEvidence.sha256 = interactionState.hashFile(fixture.evidenceDocumentPath);
+    writeFileSync(fixture.statePath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+    runInteraction([
+      "confirm", "--state", fixture.statePath,
+      "--response", previewSummary(fixture.reviewId, "approve", "composite-aware"),
+    ]);
+    assert.equal(readState(fixture.statePath).phase, "render_approved");
+
+    const invalid = prepareCompositeAwarePreview("composite-spatial-clearance-missing");
+    const invalidState = readState(invalid.statePath);
+    const invalidDocument = JSON.parse(readFileSync(invalid.evidenceDocumentPath, "utf8"));
+    delete invalidDocument.samples.find((binding) => binding.spatial_beat_id).clearance_status;
+    writeFileSync(invalid.evidenceDocumentPath, JSON.stringify(invalidDocument), "utf8");
+    invalidState.preview.machineEvidence.sha256 = interactionState.hashFile(invalid.evidenceDocumentPath);
+    writeFileSync(invalid.statePath, `${JSON.stringify(invalidState, null, 2)}\n`, "utf8");
+    runInteraction([
+      "confirm", "--state", invalid.statePath,
+      "--response", previewSummary(invalid.reviewId, "approve", "composite-aware"),
+    ], 1);
+    assert.equal(readState(invalid.statePath).phase, "awaiting_preview_confirmation");
+  });
+
+  check("active captions operation must bind the spatial B-roll revision", () => {
+    const fixture = prepareCompositeAwarePreview("composite-caption-operation-binding");
+    const state = readState(fixture.statePath);
+    const project = JSON.parse(readFileSync(fixture.projectPath, "utf8"));
+    project.operations.push({
+      id: "captions", revision: 1,
+      depends_on: ["understanding"], based_on: { understanding: 1 },
+    });
+    project.sequences.main.operations.push("captions");
+    writeFileSync(fixture.projectPath, JSON.stringify(project), "utf8");
+    assert.throws(
+      () => interactionState.assertSpatialContextBinding(state),
+      /captions.*depends_on.*b-roll/i,
+    );
+
+    project.operations.at(-1).depends_on.push("b-roll");
+    project.operations.at(-1).based_on["b-roll"] = 0;
+    writeFileSync(fixture.projectPath, JSON.stringify(project), "utf8");
+    assert.throws(
+      () => interactionState.assertSpatialContextBinding(state),
+      /captions.*based_on.*b-roll/i,
+    );
+
+    project.operations.at(-1).based_on["b-roll"] = 1;
+    writeFileSync(fixture.projectPath, JSON.stringify(project), "utf8");
+    assert.doesNotThrow(() => interactionState.assertSpatialContextBinding(state));
+  });
+
+  check("composites used only during caption gaps remain hash-bound", () => {
+    const fixture = prepareCompositeAwarePreview("composite-gap-background-binding");
+    writeFileSync(fixture.gapCompositePath, "changed", "utf8");
+    assert.throws(
+      () => interactionState.assertSpatialContextBinding(readState(fixture.statePath)),
+      /background.*visual-002.*stale/i,
+    );
+  });
+
+  check("composite review pages require every dense and visual-boundary purpose", () => {
+    const acceptedMissingPurposes = [];
+    for (const purpose of ["spatial-3", "spatial-boundary-002-after"]) {
+      const fixture = prepareCompositeAwarePreview(
+        `composite-page-missing-${purpose}`, { previewReady: false, omitPurpose: purpose },
+      );
+      const result = spawnSync(process.execPath, [interactionPath,
+        "preview-ready", "--state", fixture.statePath, "--project-meta", fixture.projectMetaPath,
+        "--evidence", fixture.evidence.join(","),
+        "--evidence-document", fixture.evidenceDocumentPath,
+        "--review-page", fixture.reviewPage,
+        "--timeline", fixture.timelinePath,
+      ], { encoding: "utf8" });
+      const output = `${result.stdout}\n${result.stderr}`;
+      if (result.status === 0 || !output.includes(purpose)) acceptedMissingPurposes.push(purpose);
+    }
+    assert.deepEqual(acceptedMissingPurposes, [],
+      `preview-ready accepted or did not identify missing purposes: ${acceptedMissingPurposes.join(", ")}`);
+  });
+
+  check("stored composite previews retain complete purpose-union coverage", () => {
+    for (const purpose of ["spatial-3", "spatial-boundary-002-after"]) {
+      const fixture = prepareCompositeAwarePreview(`composite-state-missing-${purpose}`);
+      const state = readState(fixture.statePath);
+      const document = JSON.parse(readFileSync(fixture.evidenceDocumentPath, "utf8"));
+      const binding = document.samples.find((item) => item.purposes.includes(purpose));
+      binding.purposes = binding.purposes.filter((item) => item !== purpose);
+      writeFileSync(fixture.evidenceDocumentPath, JSON.stringify(document), "utf8");
+      state.preview.machineEvidence.sha256 = interactionState.hashFile(fixture.evidenceDocumentPath);
+      assert.throws(
+        () => interactionState.assertPreviewBindings(state.preview, state),
+        new RegExp(purpose),
+      );
+    }
+  });
+
+  check("machine evidence document binding is stale-sensitive", () => {
+    const fixture = prepareCompositeAwarePreview("composite-machine-document-binding");
+    const state = readState(fixture.statePath);
+    interactionState.assertPreviewBindings(state.preview, state);
+    const document = JSON.parse(readFileSync(fixture.evidenceDocumentPath, "utf8"));
+    document.samples.find((sample) => sample.kind === "spatial-boundary").clearance_status = "fail";
+    writeFileSync(fixture.evidenceDocumentPath, JSON.stringify(document), "utf8");
+    assert.throws(() => interactionState.assertPreviewBindings(state.preview, state), /machine evidence/i);
+  });
+
   check("Expressive preview binds dynamic primary evidence and separate comparison evidence", () => {
     const fixture = prepareExpressivePreview("expressive-bound");
     const baseArgs = ["preview-ready", "--state", fixture.statePath, "--project-meta", fixture.projectMetaPath,
-      "--evidence", fixture.evidence.join(","), "--review-page", fixture.reviewPage,
+      "--evidence", fixture.evidence.join(","),
+      "--evidence-document", fixture.evidenceDocumentPath,
+      "--review-page", fixture.reviewPage,
       "--timeline", fixture.timelinePath];
     runInteraction(baseArgs, 1);
     runInteraction([...baseArgs, "--comparison-evidence", fixture.comparisonEvidence.join(",")]);
     const state = readState(fixture.statePath);
     assert.equal(state.phase, "awaiting_preview_confirmation");
     assert.equal(state.preview.approvalEvidence, "expressive-layout-beats");
-    assert.equal(state.preview.evidence.length, 5);
+    assert.equal(state.preview.evidence.length, 2);
+    assert.equal(state.preview.machineEvidence.sampleCount, 5);
     assert.equal(state.preview.comparisonEvidence.length, 2);
-    assert.deepEqual(state.preview.evidence.slice(0, -1).map((item) => item.beatId), [
-      "beat-001", "beat-002", "beat-003", "beat-004",
+    assert.deepEqual(state.preview.evidence.map((item) => item.label), ["beat-001", "beat-002"]);
+    assert.deepEqual(state.preview.evidence.map((item) => item.categories), [
+      ["bottom-standard", "preset-bottom"],
+      ["center-emphasis", "frame-center"],
     ]);
     runInteraction(["confirm", "--state", fixture.statePath,
       "--response", previewSummary(fixture.reviewId, "approve")], 1);
@@ -644,6 +1002,7 @@ try {
     const approved = readState(fixture.statePath);
     assert.equal(approved.phase, "render_approved");
     assert.equal(approved.approval.karaoke, true);
+    assert.equal(approved.approval.machineEvidenceSha256, approved.preview.machineEvidence.sha256);
     assert.equal(approved.approval.comparisonEvidenceSignature, approved.preview.comparisonEvidenceSignature);
     const requestedSelection = {
       preset: "clean", highlightTheme: null, backgroundTheme: null, strokeTheme: null, karaoke: "true",
@@ -673,11 +1032,68 @@ try {
     }), /comparison evidence/i);
   });
 
+  check("Expressive canonical review keeps representative and delivery evidence distinct", () => {
+    const fixture = prepareExpressivePreview("expressive-canonical-review");
+    runInteraction(["preview-ready", "--state", fixture.statePath,
+      "--project-meta", fixture.projectMetaPath,
+      "--evidence", fixture.evidence.join(","),
+      "--evidence-document", fixture.evidenceDocumentPath,
+      "--comparison-evidence", fixture.comparisonEvidence.join(","),
+      "--review-page", fixture.reviewPage, "--timeline", fixture.timelinePath]);
+    runInteraction(["confirm", "--state", fixture.statePath,
+      "--response", previewSummary(fixture.reviewId, "approve", "expressive-layout-beats", "on")]);
+
+    const state = readState(fixture.statePath);
+    const plan = JSON.parse(readFileSync(fixture.expressivePlanPath, "utf8"));
+    const evidence = interactionState.resolveCanonicalReviewEvidence(state, plan);
+    assert.deepEqual(evidence.representative.map((item) => item.label), ["beat-001", "beat-002"]);
+    assert.deepEqual(evidence.delivery.map((item) => item.label), [
+      "beat-001", "beat-002", "beat-003", "beat-004", "no-caption",
+    ]);
+    assert.equal(evidence.machineDocument.path, resolve(fixture.evidenceDocumentPath));
+    assert.equal(evidence.machineDocument.sha256, interactionState.hashFile(fixture.evidenceDocumentPath));
+  });
+
+  check("Standard spatial canonical review retains the machine evidence document", () => {
+    const fixture = prepareCompositeAwarePreview("standard-spatial-canonical-review");
+    const state = readState(fixture.statePath);
+    const plan = JSON.parse(readFileSync(state.captions.path, "utf8"));
+    const evidence = interactionState.resolveCanonicalReviewEvidence(state, plan);
+
+    assert.deepEqual(evidence.delivery, evidence.representative);
+    assert.equal(evidence.machineDocument.path, resolve(fixture.evidenceDocumentPath));
+    assert.equal(evidence.machineDocument.sha256, interactionState.hashFile(fixture.evidenceDocumentPath));
+    assert.equal(evidence.machineDocument.sampleCount, fixture.machineEvidence.length);
+  });
+
+  check("preview-ready rejects stale Expressive treatment metadata before binding project meta", () => {
+    for (const mutation of ["path", "hash", "value"]) {
+      const fixture = prepareExpressivePreview(`expressive-treatment-${mutation}`);
+      const projectMeta = JSON.parse(readFileSync(fixture.projectMetaPath, "utf8"));
+      if (mutation === "path") projectMeta.expressiveTreatments.configPath = join(tempRoot, "other-styles.json");
+      if (mutation === "hash") projectMeta.expressiveTreatments.configSha256 = "0".repeat(64);
+      if (mutation === "value") projectMeta.expressiveTreatments.value.heroLine.color = "#123456";
+      writeFileSync(fixture.projectMetaPath, JSON.stringify(projectMeta), "utf8");
+      const result = runInteraction([
+        "preview-ready", "--state", fixture.statePath, "--project-meta", fixture.projectMetaPath,
+        "--evidence", fixture.evidence.join(","),
+        "--evidence-document", fixture.evidenceDocumentPath,
+        "--comparison-evidence", fixture.comparisonEvidence.join(","),
+        "--review-page", fixture.reviewPage, "--timeline", fixture.timelinePath,
+      ], 1);
+      assert.match(`${result.stdout}\n${result.stderr}`, /Expressive treatment project metadata binding is stale/i);
+      const state = readState(fixture.statePath);
+      assert.equal(state.phase, "style_selected");
+      assert.equal(state.preview, null);
+    }
+  });
+
   check("Expressive delegated approval requires and stores Karaoke choice", () => {
     const fixture = prepareExpressivePreview("expressive-agent-approval", "agent");
     runInteraction(["preview-ready", "--state", fixture.statePath,
       "--project-meta", fixture.projectMetaPath,
       "--evidence", fixture.evidence.join(","),
+      "--evidence-document", fixture.evidenceDocumentPath,
       "--comparison-evidence", fixture.comparisonEvidence.join(","),
       "--review-page", fixture.reviewPage, "--timeline", fixture.timelinePath]);
     const baseArgs = ["agent-confirm", "--state", fixture.statePath,
@@ -697,6 +1113,7 @@ try {
     runInteraction(["preview-ready", "--state", substituted.statePath,
       "--project-meta", substituted.projectMetaPath,
       "--evidence", substituted.evidence.join(","),
+      "--evidence-document", substituted.evidenceDocumentPath,
       "--comparison-evidence", substituted.comparisonEvidence.join(","),
       "--review-page", substituted.reviewPage, "--timeline", substituted.timelinePath], 1);
     assert.equal(readState(substituted.statePath).phase, "style_selected");
@@ -705,6 +1122,7 @@ try {
     runInteraction(["preview-ready", "--state", changedPlan.statePath,
       "--project-meta", changedPlan.projectMetaPath,
       "--evidence", changedPlan.evidence.join(","),
+      "--evidence-document", changedPlan.evidenceDocumentPath,
       "--comparison-evidence", changedPlan.comparisonEvidence.join(","),
       "--review-page", changedPlan.reviewPage, "--timeline", changedPlan.timelinePath]);
     writeFileSync(changedPlan.expressivePlanPath,
@@ -766,6 +1184,7 @@ try {
     runInteraction(["preview-ready", "--state", expressive.statePath,
       "--project-meta", expressive.projectMetaPath,
       "--evidence", expressive.evidence.join(","),
+      "--evidence-document", expressive.evidenceDocumentPath,
       "--comparison-evidence", expressive.comparisonEvidence.join(","),
       "--review-page", expressive.reviewPage, "--timeline", expressive.timelinePath]);
     runInteraction(["adjust", "--state", expressive.statePath,
