@@ -28,6 +28,11 @@ const TIMELINE_PRESENTATION_INSET_PX = 16
 const MIN_ZOOM = 0.5
 const MAX_ZOOM = 2
 const ZOOM_STEP = 0.25
+const THUMBNAIL_COLORS = [
+  '#5d6875', '#6b5e63', '#4e6a67', '#766b56', '#596678', '#6c596b',
+  '#53695f', '#6e6656', '#566774', '#675a66', '#526762', '#716756',
+] as const
+const WAVEFORM_HEIGHTS = [10, 18, 7, 24, 14, 32, 20, 12, 28, 16, 36, 22, 8, 26, 18, 30, 12, 38, 24, 16, 28, 10, 34, 22, 14, 30, 18, 36, 12, 26, 20, 32, 16, 38] as const
 
 type RationalFps = Readonly<{ numerator: number; denominator: number }>
 type MappingOptions = Readonly<{
@@ -129,8 +134,8 @@ function TrackHeader({ track }: { track: TrackView }) {
 function Waveform() {
   return (
     <span className="timeline-waveform" aria-hidden="true">
-      {Array.from({ length: 76 }, (_, index) => (
-        <i key={index} style={{ height: `${8 + ((index * 11) % 28)}px` }} />
+      {Array.from({ length: 77 }, (_, index) => (
+        <i key={index} style={{ height: `${WAVEFORM_HEIGHTS[index % WAVEFORM_HEIGHTS.length]}px` }} />
       ))}
     </span>
   )
@@ -176,10 +181,19 @@ function Clip({
       style={{ left: `${left}px`, width: `${width}px` }}
       onPointerDown={() => select({ kind, id })}
     >
-      {kind === 'video' && <span className="timeline-thumbnails" aria-hidden="true">{Array.from({ length: 10 }, (_, index) => <i key={index} />)}</span>}
+      {kind === 'video' && (
+        <span className="timeline-thumbnails" aria-hidden="true">
+          {Array.from({ length: 16 }, (_, index) => <i key={index} style={{ backgroundColor: THUMBNAIL_COLORS[index % THUMBNAIL_COLORS.length] }} />)}
+        </span>
+      )}
       {kind === 'audio' && <Waveform />}
       {kind === 'caption' && <span className="timeline-caption-cue">{['Opening hook', "technology shouldn't", 'take you away', 'from the world', 'keep you curious'][Number(id.at(-1)) - 1]}</span>}
-      {kind !== 'caption' && <span className="timeline-clip-label">{kind === 'audio' ? 'City Walk - Audio' : 'City Walk.mp4'}</span>}
+      {kind !== 'caption' && (
+        <span className="timeline-clip-label">
+          {kind === 'audio' ? 'City Walk - Audio' : 'City Walk.mp4'}
+          {kind === 'video' && id === 'video-2' && <span className="timeline-clip-speed">1.0x</span>}
+        </span>
+      )}
     </button>
   )
 }
@@ -233,9 +247,10 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) seekFromPointer(event)
   }
 
-  const rulerTicks = Array.from({ length: 11 }, (_, index) => ({
-    left: `${(TIMELINE_WIDTH_PX * timelineZoom * index) / 10}px`,
-    label: formatRulerTime((durationS * index) / 10),
+  const rulerTicks = Array.from({ length: Math.floor(durationS) + 1 }, (_, second) => ({
+    second,
+    left: `${timeToPx(second, durationS, TIMELINE_WIDTH_PX, timelineZoom)}px`,
+    label: second % 2 === 0 ? formatRulerTime(second) : null,
   }))
 
   return (
@@ -266,7 +281,16 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
             <div className="timeline-ruler-gutter" />
             <div className="timeline-ruler-scroll" ref={rulerScrollRef}>
               <div className="timeline-ruler" style={{ width: `${contentWidth}px` }}>
-                {rulerTicks.map((tick) => <span key={tick.left} style={{ left: tick.left }}>{tick.label}</span>)}
+                {rulerTicks.map((tick) => (
+                  <i
+                    key={tick.second}
+                    className={tick.second % 2 === 0 ? 'timeline-ruler-tick timeline-ruler-tick--major' : 'timeline-ruler-tick'}
+                    data-timeline-ruler-tick={tick.second}
+                    style={{ left: tick.left }}
+                  >
+                    {tick.label && <span>{tick.label}</span>}
+                  </i>
+                ))}
               </div>
             </div>
           </>

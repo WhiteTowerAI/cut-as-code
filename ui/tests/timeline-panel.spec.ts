@@ -56,6 +56,17 @@ test('Timeline renders scenario program ranges with a zoomed presentation inset'
   }
 })
 
+test('Timeline ruler draws every second across the canonical twenty-second domain', async ({ page }) => {
+  await page.setViewportSize({ width: 1008, height: 444 })
+  await page.goto('/?scenario=1-324')
+
+  const ticks = page.locator('[data-timeline-ruler-tick]')
+  await expect(ticks).toHaveCount(21)
+  await expect(ticks.nth(0)).toHaveAttribute('data-timeline-ruler-tick', '0')
+  await expect(ticks.nth(20)).toHaveAttribute('data-timeline-ruler-tick', '20')
+  await expect(ticks.nth(0).locator('span')).toHaveCSS('font-style', 'normal')
+})
+
 test('time and pixel mapping clamps the half-open timeline range', () => {
   expect(timeToPx(-2, 20, 876)).toBe(0)
   expect(timeToPx(10, 20, 876)).toBe(438)

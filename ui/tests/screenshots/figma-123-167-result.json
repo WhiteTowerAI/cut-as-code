@@ -24,9 +24,9 @@
     "width": 1008,
     "height": 444
   },
-  "differentPixels": 52013,
+  "differentPixels": 44675,
   "totalPixels": 447552,
-  "diffRatio": 0.11621666309166309,
+  "diffRatio": 0.09982080294580295,
   "threshold": 0.01,
   "pixelChannelTolerance": 16,
   "verdict": "fail",
