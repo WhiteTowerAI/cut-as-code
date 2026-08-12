@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-11T18:59:38.726Z",
+  "generatedAt": "2026-08-12T09:44:58.214Z",
   "strictDiffRatioThreshold": 0.01,
   "pixelChannelTolerance": 16,
   "results": [
@@ -29,9 +29,9 @@
         "width": 1440,
         "height": 1200
       },
-      "differentPixels": 174149,
+      "differentPixels": 168646,
       "totalPixels": 1728000,
-      "diffRatio": 0.1007806712962963,
+      "diffRatio": 0.09759606481481481,
       "threshold": 0.01,
       "pixelChannelTolerance": 16,
       "verdict": "fail",
@@ -263,9 +263,9 @@
         "width": 1008,
         "height": 444
       },
-      "differentPixels": 78743,
+      "differentPixels": 70835,
       "totalPixels": 447552,
-      "diffRatio": 0.17594156656656657,
+      "diffRatio": 0.1582721113971114,
       "threshold": 0.01,
       "pixelChannelTolerance": 16,
       "verdict": "fail",
@@ -341,9 +341,9 @@
         "width": 1008,
         "height": 444
       },
-      "differentPixels": 80424,
+      "differentPixels": 66298,
       "totalPixels": 447552,
-      "diffRatio": 0.1796975546975547,
+      "diffRatio": 0.14813474188474188,
       "threshold": 0.01,
       "pixelChannelTolerance": 16,
       "verdict": "fail",
@@ -575,9 +575,9 @@
         "width": 1008,
         "height": 444
       },
-      "differentPixels": 139782,
+      "differentPixels": 138573,
       "totalPixels": 447552,
-      "diffRatio": 0.31232571857571856,
+      "diffRatio": 0.3096243564993565,
       "threshold": 0.01,
       "pixelChannelTolerance": 16,
       "verdict": "fail",

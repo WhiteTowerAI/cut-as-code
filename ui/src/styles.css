@@ -1158,7 +1158,7 @@ button {
 }
 
 .timeline-track-reserved {
-  height: 96px;
+  height: 88px;
   border-bottom: 1px solid #35363c;
   background: #292a2e;
 }
@@ -1219,14 +1219,14 @@ button {
   background: #242529;
 }
 
-.timeline-lane--audio { height: 76px; padding-top: 8px; }
+.timeline-lane--audio { height: 76px; margin-top: 12px; padding-top: 8px; }
 .timeline-lane--caption { height: 76px; padding-top: 8px; }
-.timeline-lane--reserved { height: 96px; padding: 0; background: #242529; }
+.timeline-lane--reserved { height: 88px; padding: 0; background: #242529; }
+.timeline-content--with-captions .timeline-lane--video { margin-top: 12px; }
 
 .timeline-clip {
-  position: relative;
+  position: absolute;
   display: block;
-  width: 88%;
   height: 80px;
   padding: 5px;
   overflow: hidden;
@@ -1240,7 +1240,7 @@ button {
 
 .timeline-clip[aria-pressed='true'] { border-color: #fff; box-shadow: 0 0 0 1px #fff; background: #51466c; }
 .timeline-clip--audio { height: 60px; border-color: #4e776d; background: #284a43; }
-.timeline-clip--caption { display: flex; gap: 6px; width: 88%; height: 48px; padding: 0; border-color: #676273; background: transparent; }
+.timeline-clip--caption { display: flex; height: 48px; padding: 0 8px; border-color: #676273; background: #4a465a; }
 
 .timeline-thumbnails { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; width: 100%; height: 48px; }
 .timeline-thumbnails i { display: block; border-radius: 3px; background: #5d6875; }
@@ -1267,9 +1267,7 @@ button {
 .timeline-waveform { display: flex; align-items: center; justify-content: space-between; width: 100%; height: 100%; padding: 18px 8px 2px; }
 .timeline-waveform i { display: block; width: 2px; border-radius: 1px; background: #79b7a7; }
 
-.timeline-caption-cues { display: flex; gap: 6px; width: 100%; height: 48px; }
-.timeline-caption-cues i { display: flex; align-items: center; width: 20%; padding: 0 8px; overflow: hidden; border: 1px solid #676273; border-radius: 5px; color: #eeeaf8; background: #4a465a; font-size: 10px; font-style: normal; white-space: nowrap; }
-.timeline-caption-cues i:nth-child(3) { border-color: #fff; }
+.timeline-caption-cue { display: flex; align-items: center; width: 100%; overflow: hidden; color: #eeeaf8; font-size: 10px; font-style: normal; white-space: nowrap; }
 
 .timeline-empty-state {
   position: absolute;

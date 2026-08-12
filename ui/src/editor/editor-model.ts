@@ -19,6 +19,13 @@ export type TrackView = Readonly<{
   id: string
   name: string
   kind: 'video' | 'audio' | 'caption'
+  clips?: readonly ClipView[]
+}>
+
+export type ClipView = Readonly<{
+  id: string
+  sourceRange: Readonly<{ startS: number; endS: number }>
+  programRange: Readonly<{ startS: number; endS: number }>
 }>
 
 export type EditorProjectView = Readonly<{

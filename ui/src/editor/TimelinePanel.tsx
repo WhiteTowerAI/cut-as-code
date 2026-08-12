@@ -20,10 +20,11 @@ import {
 } from 'lucide-react'
 import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand/vanilla'
-import type { EditorSelection, TrackView } from './editor-model'
+import type { ClipView, EditorSelection, TrackView } from './editor-model'
 import type { EditorState } from './editor-store'
 
 const TIMELINE_WIDTH_PX = 876
+const CLIP_CONTENT_WIDTH_PX = 780
 const MIN_ZOOM = 0.5
 const MAX_ZOOM = 2
 const ZOOM_STEP = 0.25
@@ -137,16 +138,26 @@ function Waveform() {
 
 function Clip({
   track,
+  clip,
+  durationS,
   selection,
   select,
 }: {
   track: TrackView
+  clip: ClipView
+  durationS: number
   selection: EditorSelection
   select: (selection: EditorSelection) => void
 }) {
   const kind = track.kind
-  const id = kind === 'caption' ? 'caption-1' : track.id
+  const id = clip.id
   const selected = selection?.kind === kind && selection.id === id
+  const left = 16 + timeToPx(clip.programRange.startS, durationS, CLIP_CONTENT_WIDTH_PX)
+  const width = timeToPx(
+    clip.programRange.endS - clip.programRange.startS,
+    durationS,
+    CLIP_CONTENT_WIDTH_PX,
+  )
   return (
     <button
       type="button"
@@ -154,11 +165,12 @@ function Clip({
       data-timeline-clip={id}
       aria-label={`${track.name} clip`}
       aria-pressed={selected}
+      style={{ left: `${left}px`, width: `${width}px` }}
       onPointerDown={() => select({ kind, id })}
     >
       {kind === 'video' && <span className="timeline-thumbnails" aria-hidden="true">{Array.from({ length: 10 }, (_, index) => <i key={index} />)}</span>}
       {kind === 'audio' && <Waveform />}
-      {kind === 'caption' && <span className="timeline-caption-cues"><i>Opening hook</i><i>technology shouldn't</i><i>take you away</i><i>from the world</i><i>keep you curious</i></span>}
+      {kind === 'caption' && <span className="timeline-caption-cue">{['Opening hook', "technology shouldn't", 'take you away', 'from the world', 'keep you curious'][Number(id.at(-1)) - 1]}</span>}
       {kind !== 'caption' && <span className="timeline-clip-label">{kind === 'audio' ? 'City Walk - Audio' : 'City Walk.mp4'}</span>}
     </button>
   )
@@ -267,11 +279,20 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
             if (rulerScrollRef.current) rulerScrollRef.current.scrollLeft = event.currentTarget.scrollLeft
           }}
         >
-          <div className="timeline-content" style={{ width: hasMedia ? `${contentWidth}px` : 'calc(100% - 48px)' }}>
+          <div
+            className={`timeline-content${showCaptionTrack ? ' timeline-content--with-captions' : ''}`}
+            style={{ width: hasMedia ? `${contentWidth}px` : 'calc(100% - 48px)' }}
+          >
             {hasMedia && reserveCaptionTrack && <div className="timeline-lane timeline-lane--reserved" aria-hidden="true" />}
             {hasMedia ? visibleTracks.map((track) => (
               <div className={`timeline-lane timeline-lane--${track.kind}`} key={track.id}>
-                <Clip track={track} selection={selection} select={select} />
+                {(track.clips ?? [{
+                  id: track.kind === 'caption' ? 'caption-1' : track.id,
+                  sourceRange: { startS: 0, endS: durationS },
+                  programRange: { startS: 0, endS: durationS },
+                }]).map((clip) => (
+                  <Clip key={clip.id} track={track} clip={clip} durationS={durationS} selection={selection} select={select} />
+                ))}
               </div>
             )) : (
               <div className="timeline-empty-state"><span aria-hidden>▣</span><p>Drag media here to start creating</p></div>

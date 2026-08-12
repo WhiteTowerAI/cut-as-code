@@ -31,9 +31,9 @@ test('timeline selection and click seek update one store playhead', async ({ pag
   const timeline = page.getByRole('region', { name: 'Timeline' })
   await expect(timeline).toBeVisible()
   await timeline.locator('[data-timeline-surface]').click({ position: { x: 438, y: 40 } })
-  await expect(page.getByLabel('Playhead time')).toContainText('01:03')
+  await expect(page.getByLabel('Playhead time')).toContainText('00:10')
 
-  const clip = page.locator('[data-timeline-clip="track-video"]')
+  const clip = page.locator('[data-timeline-clip="video-2"]')
   await clip.click()
   await expect(clip).toHaveAttribute('aria-pressed', 'true')
 })
@@ -47,7 +47,7 @@ test('timeline drag clamps at duration and zoom controls stay in bounds', async 
   await page.mouse.down()
   await page.mouse.move(1200, 100)
   await page.mouse.up()
-  await expect(page.getByLabel('Playhead time')).toContainText('02:07')
+  await expect(page.getByLabel('Playhead time')).toContainText('00:20')
 
   const zoomIn = page.getByRole('button', { name: 'Zoom in timeline' })
   const zoomOut = page.getByRole('button', { name: 'Zoom out timeline' })
@@ -149,4 +149,42 @@ test('the caption Timeline frame uses the same canonical twenty-second project c
 
   await expect(page.getByLabel('Playhead time')).toHaveText('00:06')
   await expect(page.locator('.timeline-ruler span').last()).toHaveText('00:20')
+})
+
+test('the populated Timeline fixture renders its two source spans on the twenty-second ruler', async ({ page }) => {
+  await page.setViewportSize({ width: 1008, height: 444 })
+  await page.goto('/?scenario=1-324')
+
+  await expect(page.locator('.timeline-ruler span').last()).toHaveText('00:20')
+  const clips = page.locator('.timeline-clip--video')
+  await expect(clips).toHaveCount(2)
+
+  const [firstVideo, secondVideo, audio] = await Promise.all([
+    clips.nth(0).boundingBox(),
+    clips.nth(1).boundingBox(),
+    page.locator('[data-timeline-clip="audio-1"]').boundingBox(),
+  ])
+  expect(firstVideo).toMatchObject({ x: 148, y: 164, height: 80 })
+  expect(firstVideo?.width).toBeCloseTo(264, 0)
+  expect(secondVideo).toMatchObject({ y: 164, height: 80 })
+  expect(secondVideo?.x).toBeCloseTo(412, 0)
+  expect(secondVideo?.width).toBeCloseTo(516, 0)
+  expect(audio).toMatchObject({ x: 148, y: 272, height: 60 })
+  expect(audio?.width).toBeCloseTo(780, 0)
+})
+
+test('the caption Timeline fixture preserves its measured lane hierarchy', async ({ page }) => {
+  await page.setViewportSize({ width: 1008, height: 444 })
+  await page.goto('/?scenario=123-167')
+
+  const [caption, video, audio] = await Promise.all([
+    page.locator('.timeline-lane--caption').boundingBox(),
+    page.locator('.timeline-lane--video').boundingBox(),
+    page.locator('.timeline-lane--audio').boundingBox(),
+  ])
+  expect(caption?.height).toBe(76)
+  expect(video?.height).toBe(96)
+  expect(audio?.height).toBe(76)
+  expect(video?.y).toBe(caption!.y + caption!.height + 12)
+  expect(audio?.y).toBe(video!.y + video!.height + 12)
 })

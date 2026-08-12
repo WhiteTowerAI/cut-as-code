@@ -28,6 +28,19 @@ export type EditorScenario = Readonly<{
   initialState: EditorInitialState
 }>
 
+const timelineClips = [
+  {
+    id: 'video-1',
+    sourceRange: { startS: 0, endS: 6.87 },
+    programRange: { startS: 0, endS: 6.87 },
+  },
+  {
+    id: 'video-2',
+    sourceRange: { startS: 6.87, endS: 20.3 },
+    programRange: { startS: 6.87, endS: 20.3 },
+  },
+] as const
+
 const populatedProject: EditorProjectView = {
   revision: 3,
   durationS: 127,
@@ -40,8 +53,16 @@ const populatedProject: EditorProjectView = {
   ],
   tracks: [
     { id: 'track-video', name: 'Video', kind: 'video' },
-    { id: 'track-audio', name: 'Audio', kind: 'audio' },
-    { id: 'track-captions', name: 'Captions', kind: 'caption' },
+    {
+      id: 'track-audio',
+      name: 'Audio',
+      kind: 'audio',
+    },
+    {
+      id: 'track-captions',
+      name: 'Captions',
+      kind: 'caption',
+    },
   ],
 }
 
@@ -54,7 +75,27 @@ const emptyProject: EditorProjectView = {
 }
 
 const fiveSecondProject: EditorProjectView = { ...populatedProject, durationS: 5 }
-const twentySecondProject: EditorProjectView = { ...populatedProject, durationS: 20.3 }
+const twentySecondProject: EditorProjectView = {
+  ...populatedProject,
+  durationS: 20.3,
+  tracks: [
+    { ...populatedProject.tracks[0], clips: timelineClips },
+    {
+      ...populatedProject.tracks[1],
+      clips: [{ id: 'audio-1', sourceRange: { startS: 0, endS: 20.3 }, programRange: { startS: 0, endS: 20.3 } }],
+    },
+    {
+      ...populatedProject.tracks[2],
+      clips: [
+        { id: 'caption-1', sourceRange: { startS: 0, endS: 3.3 }, programRange: { startS: 0, endS: 3.3 } },
+        { id: 'caption-2', sourceRange: { startS: 3.5, endS: 7.3 }, programRange: { startS: 3.5, endS: 7.3 } },
+        { id: 'caption-3', sourceRange: { startS: 7.6, endS: 11.8 }, programRange: { startS: 7.6, endS: 11.8 } },
+        { id: 'caption-4', sourceRange: { startS: 12.2, endS: 15.7 }, programRange: { startS: 12.2, endS: 15.7 } },
+        { id: 'caption-5', sourceRange: { startS: 16, endS: 20.3 }, programRange: { startS: 16, endS: 20.3 } },
+      ],
+    },
+  ],
+}
 
 function state(overrides: Partial<EditorInitialState> = {}): EditorInitialState {
   return {
@@ -71,7 +112,14 @@ function state(overrides: Partial<EditorInitialState> = {}): EditorInitialState 
 }
 
 const scenarios: readonly EditorScenario[] = [
-  { id: '1-60', initialState: state({ selection: { kind: 'video', id: 'track-video' } }) },
+  {
+    id: '1-60',
+    initialState: state({
+      project: twentySecondProject,
+      selection: { kind: 'video', id: 'video-2' },
+      currentTimeS: 6.87,
+    }),
+  },
   { id: '1-1373', initialState: state({ project: emptyProject }) },
   { id: '1-84', initialState: state() },
   {
@@ -80,9 +128,9 @@ const scenarios: readonly EditorScenario[] = [
   },
   { id: '57-152', initialState: state({ openMenu: 'viewer-more' }) },
   { id: '1-1026', initialState: state({ project: emptyProject }) },
-  { id: '1-324', initialState: state() },
+  { id: '1-324', initialState: state({ project: twentySecondProject, currentTimeS: 6.87 }) },
   { id: '1-1115', initialState: state({ project: emptyProject }) },
-  { id: '1-754', initialState: state({ selection: { kind: 'video', id: 'track-video' } }) },
+  { id: '1-754', initialState: state({ project: twentySecondProject, selection: { kind: 'video', id: 'video-2' }, currentTimeS: 6.87 }) },
   { id: '1-528', initialState: state({ openMenu: 'aspect-ratio' }) },
   { id: '18-3', initialState: state({ project: emptyProject }) },
   { id: '76-2', initialState: state() },
