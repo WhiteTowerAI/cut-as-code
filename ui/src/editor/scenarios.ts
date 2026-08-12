@@ -34,13 +34,13 @@ const timeAtFigmaPx = (pixelX: number) => pixelX / FIGMA_TIMELINE_PX_PER_SECOND
 const timelineClips = [
   {
     id: 'video-1',
-    sourceRange: { startS: timeAtFigmaPx(16), endS: timeAtFigmaPx(279) },
-    programRange: { startS: timeAtFigmaPx(16), endS: timeAtFigmaPx(279) },
+    sourceRange: { startS: 0, endS: timeAtFigmaPx(279 - 16) },
+    programRange: { startS: 0, endS: timeAtFigmaPx(279 - 16) },
   },
   {
     id: 'video-2',
-    sourceRange: { startS: timeAtFigmaPx(283), endS: timeAtFigmaPx(796) },
-    programRange: { startS: timeAtFigmaPx(283), endS: timeAtFigmaPx(796) },
+    sourceRange: { startS: timeAtFigmaPx(283 - 16), endS: timeAtFigmaPx(796 - 16) },
+    programRange: { startS: timeAtFigmaPx(283 - 16), endS: timeAtFigmaPx(796 - 16) },
   },
 ] as const
 
@@ -85,16 +85,16 @@ const twentySecondProject: EditorProjectView = {
     { ...populatedProject.tracks[0], clips: timelineClips },
     {
       ...populatedProject.tracks[1],
-      clips: [{ id: 'audio-1', sourceRange: { startS: timeAtFigmaPx(16), endS: timeAtFigmaPx(796) }, programRange: { startS: timeAtFigmaPx(16), endS: timeAtFigmaPx(796) } }],
+      clips: [{ id: 'audio-1', sourceRange: { startS: 0, endS: timeAtFigmaPx(796 - 16) }, programRange: { startS: 0, endS: timeAtFigmaPx(796 - 16) } }],
     },
     {
       ...populatedProject.tracks[2],
       clips: [
-        { id: 'caption-1', sourceRange: { startS: timeAtFigmaPx(16), endS: timeAtFigmaPx(142) }, programRange: { startS: timeAtFigmaPx(16), endS: timeAtFigmaPx(142) } },
-        { id: 'caption-2', sourceRange: { startS: timeAtFigmaPx(148), endS: timeAtFigmaPx(290) }, programRange: { startS: timeAtFigmaPx(148), endS: timeAtFigmaPx(290) } },
-        { id: 'caption-3', sourceRange: { startS: timeAtFigmaPx(302), endS: timeAtFigmaPx(460) }, programRange: { startS: timeAtFigmaPx(302), endS: timeAtFigmaPx(460) } },
-        { id: 'caption-4', sourceRange: { startS: timeAtFigmaPx(472), endS: timeAtFigmaPx(600) }, programRange: { startS: timeAtFigmaPx(472), endS: timeAtFigmaPx(600) } },
-        { id: 'caption-5', sourceRange: { startS: timeAtFigmaPx(612), endS: timeAtFigmaPx(792) }, programRange: { startS: timeAtFigmaPx(612), endS: timeAtFigmaPx(792) } },
+        { id: 'caption-1', sourceRange: { startS: 0, endS: timeAtFigmaPx(126) }, programRange: { startS: 0, endS: timeAtFigmaPx(126) } },
+        { id: 'caption-2', sourceRange: { startS: timeAtFigmaPx(132), endS: timeAtFigmaPx(274) }, programRange: { startS: timeAtFigmaPx(132), endS: timeAtFigmaPx(274) } },
+        { id: 'caption-3', sourceRange: { startS: timeAtFigmaPx(286), endS: timeAtFigmaPx(444) }, programRange: { startS: timeAtFigmaPx(286), endS: timeAtFigmaPx(444) } },
+        { id: 'caption-4', sourceRange: { startS: timeAtFigmaPx(456), endS: timeAtFigmaPx(584) }, programRange: { startS: timeAtFigmaPx(456), endS: timeAtFigmaPx(584) } },
+        { id: 'caption-5', sourceRange: { startS: timeAtFigmaPx(596), endS: timeAtFigmaPx(776) }, programRange: { startS: timeAtFigmaPx(596), endS: timeAtFigmaPx(776) } },
       ],
     },
   ],

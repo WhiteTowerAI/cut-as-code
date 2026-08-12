@@ -24,6 +24,7 @@ import type { ClipView, EditorSelection, TrackView } from './editor-model'
 import type { EditorState } from './editor-store'
 
 const TIMELINE_WIDTH_PX = 876
+const TIMELINE_PRESENTATION_INSET_PX = 16
 const MIN_ZOOM = 0.5
 const MAX_ZOOM = 2
 const ZOOM_STEP = 0.25
@@ -153,7 +154,7 @@ function Clip({
   const kind = track.kind
   const id = clip.id
   const selected = selection?.kind === kind && selection.id === id
-  const left = timeToPx(
+  const left = TIMELINE_PRESENTATION_INSET_PX * timelineZoom + timeToPx(
     clip.programRange.startS,
     durationS,
     TIMELINE_WIDTH_PX,

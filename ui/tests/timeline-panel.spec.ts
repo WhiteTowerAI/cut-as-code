@@ -1,10 +1,59 @@
 import { expect, test } from '@playwright/test'
 import { isTimeInHalfOpenRange, pxToTime, timeToPx } from '../src/editor/TimelinePanel'
+import { getScenario } from '../src/editor/scenarios'
 
 test('clip ranges include their start and exclude their exact end', () => {
   expect(isTimeInHalfOpenRange(4, 4, 8)).toBe(true)
   expect(isTimeInHalfOpenRange(7.999, 4, 8)).toBe(true)
   expect(isTimeInHalfOpenRange(8, 4, 8)).toBe(false)
+})
+
+test('Timeline fixture keeps visual inset out of protocol clip ranges', () => {
+  const project = getScenario('1-324')?.initialState.project
+  const video = project?.tracks.find((track) => track.kind === 'video')
+  const audio = project?.tracks.find((track) => track.kind === 'audio')
+
+  expect(video?.clips?.[0].programRange.startS).toBe(0)
+  expect(video?.clips?.[0].sourceRange.startS).toBe(0)
+  expect(audio?.clips?.[0].programRange.startS).toBe(0)
+  expect(audio?.clips?.[0].sourceRange.startS).toBe(0)
+})
+
+test('Timeline renders scenario program ranges with a zoomed presentation inset', async ({ page }) => {
+  const project = getScenario('1-324')?.initialState.project
+  expect(project).toBeDefined()
+  const expectedClips = project!.tracks
+    .flatMap((track) => track.clips ?? [])
+    .filter((clip) => ['video-1', 'video-2', 'audio-1'].includes(clip.id))
+
+  await page.setViewportSize({ width: 1008, height: 444 })
+  await page.goto('/?scenario=1-324')
+
+  const content = page.locator('.timeline-content')
+  const zoomIn = page.getByRole('button', { name: 'Zoom in timeline' })
+
+  for (const zoom of [1, 1.5]) {
+    const contentBox = await content.boundingBox()
+    expect(contentBox).not.toBeNull()
+
+    for (const clip of expectedClips) {
+      const box = await page.locator(`[data-timeline-clip="${clip.id}"]`).boundingBox()
+      expect(box).not.toBeNull()
+      expect(box!.x).toBeCloseTo(
+        contentBox!.x + 16 * zoom + timeToPx(clip.programRange.startS, project!.durationS, 876, zoom),
+        1,
+      )
+      expect(box!.width).toBeCloseTo(
+        timeToPx(clip.programRange.endS - clip.programRange.startS, project!.durationS, 876, zoom),
+        1,
+      )
+    }
+
+    if (zoom === 1) {
+      await zoomIn.click()
+      await zoomIn.click()
+    }
+  }
 })
 
 test('time and pixel mapping clamps the half-open timeline range', () => {
