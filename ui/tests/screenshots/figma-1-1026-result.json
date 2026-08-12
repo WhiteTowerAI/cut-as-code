@@ -31,7 +31,8 @@
   "pixelChannelTolerance": 16,
   "verdict": "pass",
   "artifacts": {
-    "reference": "figma-1-1026-reference.png",
+    "referenceRaw": "figma-1-1026-reference.png",
+    "referenceCompared": "figma-1-1026-reference-compared.png",
     "browser": "figma-1-1026-browser.png",
     "diff": "figma-1-1026-diff.png",
     "result": "figma-1-1026-result.json"

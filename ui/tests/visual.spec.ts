@@ -33,7 +33,8 @@ type ComparisonResult = Readonly<{
   pixelChannelTolerance: number | null
   verdict: 'pass' | 'fail' | 'baseline'
   artifacts: Readonly<{
-    reference: string | null
+    referenceRaw: string | null
+    referenceCompared: string | null
     browser: string
     diff: string | null
     result: string
@@ -59,11 +60,26 @@ const figmaScenarios: readonly FigmaScenario[] = [
   { nodeId: '126:2', scenarioId: '126-2', viewport: { width: 320, height: 688 }, referenceCrop: { x: 12, y: 8 } },
 ] as const
 
+const geometryScenarios: readonly Readonly<{ scenarioId: string; viewport: Dimensions }>[] = [
+  ...figmaScenarios.map(({ scenarioId, viewport }) => ({ scenarioId, viewport })),
+  { scenarioId: 'graphic-motion', viewport: { width: 320, height: 688 } },
+]
+
 mkdirSync(SCREENSHOT_DIR, { recursive: true })
 
 function artifactName(label: string, scenarioId: string, kind: string, extension: 'png' | 'json') {
   return `${label}-${scenarioId}-${kind}.${extension}`
 }
+
+test('visual comparison artifacts retain the raw reference and the exact compared reference', () => {
+  const result = JSON.parse(
+    readFileSync(resolve(SCREENSHOT_DIR, artifactName('figma', '1-84', 'result', 'json')), 'utf8'),
+  ) as ComparisonResult
+
+  expect(result.artifacts.referenceRaw).toBe('figma-1-84-reference.png')
+  expect(result.artifacts.referenceCompared).toBe('figma-1-84-reference-compared.png')
+  expect(existsSync(resolve(SCREENSHOT_DIR, result.artifacts.referenceCompared))).toBe(true)
+})
 
 function writeResult(result: ComparisonResult) {
   writeFileSync(
@@ -102,9 +118,87 @@ async function settleVisuals(page: Page) {
   })
 }
 
+async function geometryFailures(page: Page, scenarioId: string) {
+  return page.evaluate((currentScenarioId) => {
+    const failures: string[] = []
+    const leafSelector = [
+      'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'label', 'output', 'button',
+      '[role="tab"]', '[role="menuitem"]', '.timeline-clip-label',
+      '.timeline-caption-cue', '[class*="library-"]',
+    ].join(', ')
+    const overlapGroups = [
+      '.library-tabs [role="tab"]',
+      '.viewer-menu [role="menuitem"]',
+      '.viewer-aspect-option',
+      '.timeline-caption-cue',
+      '.timeline-clip-label, .timeline-clip-speed',
+    ]
+    const isVisible = (element: HTMLElement) => {
+      const style = getComputedStyle(element)
+      const rect = element.getBoundingClientRect()
+      return style.display !== 'none'
+        && style.visibility !== 'hidden'
+        && Number(style.opacity) !== 0
+        && !element.closest('.sr-only, [aria-hidden="true"]')
+        && rect.width > 0
+        && rect.height > 0
+        && rect.right > 0
+        && rect.bottom > 0
+        && rect.left < window.innerWidth
+        && rect.top < window.innerHeight
+    }
+    const description = (element: HTMLElement) => {
+      const className = typeof element.className === 'string' && element.className
+        ? `.${element.className.trim().split(/\s+/).join('.')}`
+        : ''
+      return `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}${className} (${JSON.stringify(element.innerText.trim())})`
+    }
+    const leaves = [...document.querySelectorAll<HTMLElement>(leafSelector)].filter((element) => {
+      if (!isVisible(element) || !element.innerText.trim()) return false
+      return ![...element.querySelectorAll<HTMLElement>(leafSelector)].some((child) => child !== element && isVisible(child) && child.innerText.trim())
+    })
+
+    for (const element of leaves) {
+      const rect = element.getBoundingClientRect()
+      if (!element.closest('.library-tabs')
+        && (rect.left < -1 || rect.top < -1 || rect.right > window.innerWidth + 1 || rect.bottom > window.innerHeight + 1)) {
+        failures.push(`${currentScenarioId}: text outside viewport: ${description(element)} at ${rect.left},${rect.top},${rect.width}x${rect.height}`)
+      }
+      const style = getComputedStyle(element)
+      const clipsText = style.overflowX === 'hidden' || style.overflowX === 'clip'
+        || style.overflowY === 'hidden' || style.overflowY === 'clip'
+      if (clipsText && !element.matches('.library-tabs')
+        && (element.scrollWidth > element.clientWidth + 1 || element.scrollHeight > element.clientHeight + 1)) {
+        failures.push(`${currentScenarioId}: clipped text leaf: ${description(element)} (${element.scrollWidth}x${element.scrollHeight} > ${element.clientWidth}x${element.clientHeight})`)
+      }
+    }
+
+    for (const selector of overlapGroups) {
+      const elements = [...document.querySelectorAll<HTMLElement>(selector)].filter(isVisible)
+      for (let index = 0; index < elements.length; index += 1) {
+        for (let otherIndex = index + 1; otherIndex < elements.length; otherIndex += 1) {
+          const first = elements[index]
+          const second = elements[otherIndex]
+          if (first.parentElement !== second.parentElement || first.contains(second) || second.contains(first)) continue
+          if (first.closest('.viewer-selection-bounds, .viewer-opacity-track') || second.closest('.viewer-selection-bounds, .viewer-opacity-track')) continue
+          const left = first.getBoundingClientRect()
+          const right = second.getBoundingClientRect()
+          const intersection = Math.max(0, Math.min(left.right, right.right) - Math.max(left.left, right.left))
+            * Math.max(0, Math.min(left.bottom, right.bottom) - Math.max(left.top, right.top))
+          if (intersection > 1) {
+            failures.push(`${currentScenarioId}: overlapping ${selector}: ${description(first)} / ${description(second)} (${intersection.toFixed(2)}px2)`)
+          }
+        }
+      }
+    }
+    return failures
+  }, scenarioId)
+}
+
 async function comparePngs(
   page: Page,
   referencePath: string,
+  referenceComparedPath: string,
   browserPath: string,
   diffPath: string,
   viewport: Dimensions,
@@ -113,7 +207,7 @@ async function comparePngs(
   const referenceBase64 = readFileSync(referencePath).toString('base64')
   const browserBase64 = readFileSync(browserPath).toString('base64')
 
-  const comparison = await page.evaluate(
+  const dimensions = await page.evaluate(
     async ({ referenceBase64, browserBase64, tolerance, viewport, crop }) => {
       const loadImage = async (base64: string) => {
         const image = new Image()
@@ -137,12 +231,8 @@ async function comparePngs(
       const width = viewport.width
       const height = viewport.height
       const referenceCanvas = document.createElement('canvas')
-      const browserCanvas = document.createElement('canvas')
-      const diffCanvas = document.createElement('canvas')
-      for (const canvas of [referenceCanvas, browserCanvas, diffCanvas]) {
-        canvas.width = width
-        canvas.height = height
-      }
+      referenceCanvas.width = width
+      referenceCanvas.height = height
 
       referenceCanvas.getContext('2d', { willReadFrequently: true })!.drawImage(
         referenceImage,
@@ -155,6 +245,40 @@ async function comparePngs(
         width,
         height,
       )
+      referenceCanvas.id = 'visual-reference-compared-canvas'
+      referenceCanvas.style.cssText = `display:block;width:${width}px;height:${height}px`
+      document.body.append(referenceCanvas)
+
+      return {
+        reference: { width: referenceImage.naturalWidth, height: referenceImage.naturalHeight },
+        referenceCompared: { dimensions: { width, height }, crop },
+        browser: { width: browserImage.naturalWidth, height: browserImage.naturalHeight },
+      }
+    },
+    { referenceBase64, browserBase64, tolerance: PIXEL_CHANNEL_TOLERANCE, viewport, crop },
+  )
+
+  await page.locator('#visual-reference-compared-canvas').screenshot({ path: referenceComparedPath })
+
+  const comparison = await page.evaluate(
+    async ({ browserBase64, tolerance, viewport }) => {
+      const loadImage = async (base64: string) => {
+        const image = new Image()
+        image.src = `data:image/png;base64,${base64}`
+        await image.decode()
+        return image
+      }
+
+      const browserImage = await loadImage(browserBase64)
+      const width = viewport.width
+      const height = viewport.height
+      const referenceCanvas = document.querySelector<HTMLCanvasElement>('#visual-reference-compared-canvas')!
+      const browserCanvas = document.createElement('canvas')
+      const diffCanvas = document.createElement('canvas')
+      for (const canvas of [browserCanvas, diffCanvas]) {
+        canvas.width = width
+        canvas.height = height
+      }
       browserCanvas.getContext('2d', { willReadFrequently: true })!.drawImage(browserImage, 0, 0)
       const referencePixels = referenceCanvas.getContext('2d', { willReadFrequently: true })!
         .getImageData(0, 0, width, height)
@@ -197,29 +321,28 @@ async function comparePngs(
       document.body.append(diffCanvas)
 
       return {
-        reference: { width: referenceImage.naturalWidth, height: referenceImage.naturalHeight },
-        referenceCompared: { dimensions: { width, height }, crop },
-        browser: { width: browserImage.naturalWidth, height: browserImage.naturalHeight },
         differentPixels,
         totalPixels: width * height,
         diffRatio: differentPixels / (width * height),
       }
     },
-    { referenceBase64, browserBase64, tolerance: PIXEL_CHANNEL_TOLERANCE, viewport, crop },
+    { browserBase64, tolerance: PIXEL_CHANNEL_TOLERANCE, viewport },
   )
 
   await page.locator('#visual-diff-canvas').screenshot({ path: diffPath })
-  await page.locator('#visual-diff-canvas').evaluate((element) => element.remove())
-  return comparison
+  await page.locator('#visual-reference-compared-canvas, #visual-diff-canvas').evaluateAll((elements) => elements.forEach((element) => element.remove()))
+  return { ...dimensions, ...comparison }
 }
 
 for (const scenario of figmaScenarios) {
   test(`figma-match ${scenario.nodeId} matches ${scenario.viewport.width}x${scenario.viewport.height}`, async ({ page }) => {
     const referenceFile = artifactName('figma', scenario.scenarioId, 'reference', 'png')
+    const referenceComparedFile = artifactName('figma', scenario.scenarioId, 'reference-compared', 'png')
     const browserFile = artifactName('figma', scenario.scenarioId, 'browser', 'png')
     const diffFile = artifactName('figma', scenario.scenarioId, 'diff', 'png')
     const resultFile = artifactName('figma', scenario.scenarioId, 'result', 'json')
     const referencePath = resolve(SCREENSHOT_DIR, referenceFile)
+    const referenceComparedPath = resolve(SCREENSHOT_DIR, referenceComparedFile)
     const browserPath = resolve(SCREENSHOT_DIR, browserFile)
     const diffPath = resolve(SCREENSHOT_DIR, diffFile)
 
@@ -237,6 +360,7 @@ for (const scenario of figmaScenarios) {
     const comparison = await comparePngs(
       page,
       referencePath,
+      referenceComparedPath,
       browserPath,
       diffPath,
       scenario.viewport,
@@ -263,7 +387,8 @@ for (const scenario of figmaScenarios) {
       pixelChannelTolerance: PIXEL_CHANNEL_TOLERANCE,
       verdict,
       artifacts: {
-        reference: referenceFile,
+        referenceRaw: referenceFile,
+        referenceCompared: referenceComparedFile,
         browser: browserFile,
         diff: diffFile,
         result: resultFile,
@@ -304,12 +429,25 @@ test('user-extension Graphic Motion captures a 320x688 browser baseline', async 
     pixelChannelTolerance: null,
     verdict: 'baseline',
     artifacts: {
-      reference: null,
+      referenceRaw: null,
+      referenceCompared: null,
       browser: browserFile,
       diff: null,
       result: resultFile,
     },
   })
+})
+
+test('all scenarios have unclipped, non-overlapping visible text leaves', async ({ page }) => {
+  const failures: string[] = []
+  for (const scenario of geometryScenarios) {
+    await page.setViewportSize(scenario.viewport)
+    await page.goto(`/?scenario=${scenario.scenarioId}`)
+    await expect(page.locator('[data-scenario-id]')).toHaveAttribute('data-scenario-id', scenario.scenarioId)
+    await settleVisuals(page)
+    failures.push(...await geometryFailures(page, scenario.scenarioId))
+  }
+  expect(failures, failures.join('\n')).toEqual([])
 })
 
 test.afterAll(() => {

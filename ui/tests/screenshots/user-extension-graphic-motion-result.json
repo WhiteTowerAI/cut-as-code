@@ -19,7 +19,8 @@
   "pixelChannelTolerance": null,
   "verdict": "baseline",
   "artifacts": {
-    "reference": null,
+    "referenceRaw": null,
+    "referenceCompared": null,
     "browser": "user-extension-graphic-motion-browser.png",
     "diff": null,
     "result": "user-extension-graphic-motion-result.json"

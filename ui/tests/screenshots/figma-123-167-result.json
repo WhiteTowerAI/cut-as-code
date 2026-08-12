@@ -31,7 +31,8 @@
   "pixelChannelTolerance": 16,
   "verdict": "fail",
   "artifacts": {
-    "reference": "figma-123-167-reference.png",
+    "referenceRaw": "figma-123-167-reference.png",
+    "referenceCompared": "figma-123-167-reference-compared.png",
     "browser": "figma-123-167-browser.png",
     "diff": "figma-123-167-diff.png",
     "result": "figma-123-167-result.json"
