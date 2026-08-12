@@ -1131,6 +1131,7 @@ button {
 }
 
 .timeline-ruler-tick--major { height: 18px; }
+.timeline-ruler-tick--terminal { left: calc(100% - 1px) !important; }
 
 .timeline-ruler-tick span {
   position: absolute;
@@ -1142,6 +1143,8 @@ button {
   transform: translate(8px, 0);
   white-space: nowrap;
 }
+
+.timeline-ruler-tick--terminal span { right: 8px; transform: none; }
 
 .timeline-gutter {
   grid-column: 1;

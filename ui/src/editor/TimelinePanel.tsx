@@ -284,7 +284,7 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
                 {rulerTicks.map((tick) => (
                   <i
                     key={tick.second}
-                    className={tick.second % 2 === 0 ? 'timeline-ruler-tick timeline-ruler-tick--major' : 'timeline-ruler-tick'}
+                    className={`timeline-ruler-tick${tick.second % 2 === 0 ? ' timeline-ruler-tick--major' : ''}${tick.second === durationS ? ' timeline-ruler-tick--terminal' : ''}`}
                     data-timeline-ruler-tick={tick.second}
                     style={{ left: tick.left }}
                   >

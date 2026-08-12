@@ -67,6 +67,68 @@ test('Timeline ruler draws every second across the canonical twenty-second domai
   await expect(ticks.nth(0).locator('span')).toHaveCSS('font-style', 'normal')
 })
 
+test('Timeline keeps terminal ruler drawing and representative media drawing visible', async ({ page }) => {
+  await page.setViewportSize({ width: 1008, height: 444 })
+  await page.goto('/?scenario=1-324')
+
+  const ruler = page.locator('.timeline-ruler')
+  const rulerScroll = page.locator('.timeline-ruler-scroll')
+  const terminalTick = page.locator('[data-timeline-ruler-tick="20"]')
+  const terminalLabel = terminalTick.locator('span')
+  const [rulerBox, rulerScrollBox, terminalTickBox, terminalLabelBox] = await Promise.all([
+    ruler.boundingBox(),
+    rulerScroll.boundingBox(),
+    terminalTick.boundingBox(),
+    terminalLabel.boundingBox(),
+  ])
+  expect(rulerBox).not.toBeNull()
+  expect(rulerScrollBox).not.toBeNull()
+  expect(terminalTickBox).not.toBeNull()
+  expect(terminalLabelBox).not.toBeNull()
+  expect(terminalTickBox!.width).toBeGreaterThan(0)
+  expect(terminalTickBox!.height).toBeGreaterThan(0)
+  expect(terminalLabelBox!.width).toBeGreaterThan(0)
+  expect(terminalLabelBox!.height).toBeGreaterThan(0)
+  for (const box of [terminalTickBox!, terminalLabelBox!]) {
+    expect(box.x).toBeGreaterThanOrEqual(rulerBox!.x - 1)
+    expect(box.x + box.width).toBeLessThanOrEqual(rulerBox!.x + rulerBox!.width + 1)
+    expect(box.x).toBeGreaterThanOrEqual(rulerScrollBox!.x - 1)
+    expect(box.x + box.width).toBeLessThanOrEqual(rulerScrollBox!.x + rulerScrollBox!.width + 1)
+  }
+  await expect(terminalLabel).toHaveText('00:20')
+  await expect(terminalLabel).toHaveCSS('font-style', 'normal')
+
+  const thumbnails = page.locator('[data-timeline-clip="video-1"] .timeline-thumbnails i')
+  const [firstThumbnail, secondThumbnail] = await Promise.all([thumbnails.nth(0).boundingBox(), thumbnails.nth(1).boundingBox()])
+  expect(firstThumbnail).toMatchObject({ width: 52, height: 48 })
+  expect(secondThumbnail).toMatchObject({ width: 52, height: 48 })
+  expect(secondThumbnail!.x - (firstThumbnail!.x + firstThumbnail!.width)).toBeCloseTo(4, 1)
+  await expect(thumbnails.nth(0)).toHaveCSS('background-color', 'rgb(93, 104, 117)')
+  await expect(thumbnails.nth(1)).toHaveCSS('background-color', 'rgb(107, 94, 99)')
+  const thumbnailStrip = page.locator('[data-timeline-clip="video-1"] .timeline-thumbnails')
+  await expect(thumbnailStrip).toHaveCSS('height', '48px')
+  const highlight = await thumbnailStrip.evaluate((element) => {
+    const style = getComputedStyle(element, '::after')
+    return { height: style.height, backgroundColor: style.backgroundColor }
+  })
+  expect(highlight).toEqual({ height: '12px', backgroundColor: 'rgba(255, 255, 255, 0.06)' })
+
+  const waveformBars = page.locator('.timeline-waveform i')
+  const [firstBar, secondBar, thirdBar] = await Promise.all([waveformBars.nth(0).boundingBox(), waveformBars.nth(1).boundingBox(), waveformBars.nth(2).boundingBox()])
+  expect(firstBar).toMatchObject({ width: 2, height: 10 })
+  expect(secondBar).toMatchObject({ width: 2, height: 18 })
+  expect(thirdBar).toMatchObject({ width: 2, height: 7 })
+  expect(secondBar!.x - (firstBar!.x + firstBar!.width)).toBeCloseTo(8, 1)
+
+  const selectedVideo = page.locator('[data-timeline-clip="video-2"]')
+  await expect(selectedVideo.locator('.timeline-clip-label')).toHaveCSS('height', '17px')
+  await expect(selectedVideo.locator('.timeline-clip-speed')).toHaveText('1.0x')
+  await expect(page.getByRole('button', { name: 'Speed' }).first()).toBeDisabled()
+
+  await page.goto('/?scenario=123-167')
+  await expect(page.locator('[data-timeline-clip="caption-3"]')).toHaveCSS('box-shadow', 'rgb(255, 255, 255) 0px 0px 0px 1px inset')
+})
+
 test('time and pixel mapping clamps the half-open timeline range', () => {
   expect(timeToPx(-2, 20, 876)).toBe(0)
   expect(timeToPx(10, 20, 876)).toBe(438)
@@ -153,7 +215,10 @@ test('zoomed horizontal scroll keeps ruler content and playhead on one scale', a
 
   await zoomIn.click()
   await zoomIn.click()
-  await surface.evaluate((element) => { element.scrollLeft = 240 })
+  await surface.evaluate((element) => {
+    element.scrollLeft = 240
+    element.dispatchEvent(new Event('scroll'))
+  })
 
   const [rulerBox, contentBox, playheadBox] = await Promise.all([
     ruler.boundingBox(),
