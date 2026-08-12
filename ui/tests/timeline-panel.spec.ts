@@ -120,7 +120,12 @@ test('Timeline keeps terminal ruler drawing and representative media drawing vis
   expect(thirdBar).toMatchObject({ width: 2, height: 7 })
   expect(secondBar!.x - (firstBar!.x + firstBar!.width)).toBeCloseTo(8, 1)
 
+  await page.goto('/?scenario=1-754')
   const selectedVideo = page.locator('[data-timeline-clip="video-2"]')
+  await expect(selectedVideo).toHaveAttribute('aria-pressed', 'true')
+  await expect(selectedVideo).toHaveCSS('background-color', 'rgb(81, 70, 108)')
+  await expect(selectedVideo).toHaveCSS('border-color', 'rgb(167, 139, 250)')
+  await expect(selectedVideo.locator('.timeline-clip-label')).toHaveCSS('background-color', 'rgb(43, 39, 56)')
   await expect(selectedVideo.locator('.timeline-clip-label')).toHaveCSS('height', '17px')
   await expect(selectedVideo.locator('.timeline-clip-speed')).toHaveText('1.0x')
   await expect(page.getByRole('button', { name: 'Speed' }).first()).toBeDisabled()
