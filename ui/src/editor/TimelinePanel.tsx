@@ -140,23 +140,31 @@ function Clip({
   track,
   clip,
   durationS,
+  timelineZoom,
   selection,
   select,
 }: {
   track: TrackView
   clip: ClipView
   durationS: number
+  timelineZoom: number
   selection: EditorSelection
   select: (selection: EditorSelection) => void
 }) {
   const kind = track.kind
   const id = clip.id
   const selected = selection?.kind === kind && selection.id === id
-  const left = 16 + timeToPx(clip.programRange.startS, durationS, CLIP_CONTENT_WIDTH_PX)
+  const left = 16 + timeToPx(
+    clip.programRange.startS,
+    durationS,
+    CLIP_CONTENT_WIDTH_PX,
+    timelineZoom,
+  )
   const width = timeToPx(
     clip.programRange.endS - clip.programRange.startS,
     durationS,
     CLIP_CONTENT_WIDTH_PX,
+    timelineZoom,
   )
   return (
     <button
@@ -291,7 +299,15 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
                   sourceRange: { startS: 0, endS: durationS },
                   programRange: { startS: 0, endS: durationS },
                 }]).map((clip) => (
-                  <Clip key={clip.id} track={track} clip={clip} durationS={durationS} selection={selection} select={select} />
+                  <Clip
+                    key={clip.id}
+                    track={track}
+                    clip={clip}
+                    durationS={durationS}
+                    timelineZoom={timelineZoom}
+                    selection={selection}
+                    select={select}
+                  />
                 ))}
               </div>
             )) : (

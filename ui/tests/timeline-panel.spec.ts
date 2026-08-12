@@ -90,6 +90,45 @@ test('zoomed horizontal scroll keeps ruler content and playhead on one scale', a
   await expect(ruler).toHaveCSS('width', await content.evaluate((element) => getComputedStyle(element).width))
 })
 
+test('zoom scales adjacent clip ranges in the ruler and playhead coordinate system', async ({ page }) => {
+  await page.setViewportSize({ width: 1008, height: 444 })
+  await page.goto('/?scenario=1-324')
+
+  const content = page.locator('.timeline-content')
+  const ruler = page.locator('.timeline-ruler')
+  const playhead = page.locator('.timeline-playhead')
+  const clips = page.locator('.timeline-clip--video')
+  const zoomIn = page.getByRole('button', { name: 'Zoom in timeline' })
+
+  await zoomIn.click()
+  await zoomIn.click()
+
+  const [contentBox, rulerBox, playheadBox, firstClip, secondClip] = await Promise.all([
+    content.boundingBox(),
+    ruler.boundingBox(),
+    playhead.boundingBox(),
+    clips.nth(0).boundingBox(),
+    clips.nth(1).boundingBox(),
+  ])
+  expect(contentBox).not.toBeNull()
+  expect(rulerBox).not.toBeNull()
+  expect(playheadBox).not.toBeNull()
+  expect(firstClip).not.toBeNull()
+  expect(secondClip).not.toBeNull()
+  expect(rulerBox!.x).toBeCloseTo(contentBox!.x, 0)
+  expect(playheadBox!.x - contentBox!.x).toBeCloseTo(timeToPx(6.87, 20.3, 876, 1.5), 2)
+  expect(firstClip!.x - contentBox!.x).toBeCloseTo(16, 0)
+  expect(firstClip!.width).toBeCloseTo(timeToPx(6.87, 20.3, 780, 1.5), 2)
+  expect(secondClip!.x).toBeCloseTo(firstClip!.x + firstClip!.width, 0)
+})
+
+test('selected Timeline scenario initializes its second video span as selected', async ({ page }) => {
+  await page.setViewportSize({ width: 1008, height: 444 })
+  await page.goto('/?scenario=1-754')
+
+  await expect(page.locator('[data-timeline-clip="video-2"]')).toHaveAttribute('aria-pressed', 'true')
+})
+
 test('unsupported timeline commands remain disabled with explanations', async ({ page }) => {
   await page.goto('/?scenario=1-324')
   for (const name of ['Reverse', 'Duplicate', 'Copy', 'Reorder tracks', 'Speed']) {
