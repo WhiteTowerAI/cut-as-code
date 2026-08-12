@@ -65,21 +65,14 @@ const geometryScenarios: readonly Readonly<{ scenarioId: string; viewport: Dimen
   { scenarioId: 'graphic-motion', viewport: { width: 320, height: 688 } },
 ]
 
+const expectedCurrentRunScenarioIds: string[] = []
+const currentRunResults = new Map<string, ComparisonResult>()
+
 mkdirSync(SCREENSHOT_DIR, { recursive: true })
 
 function artifactName(label: string, scenarioId: string, kind: string, extension: 'png' | 'json') {
   return `${label}-${scenarioId}-${kind}.${extension}`
 }
-
-test('visual comparison artifacts retain the raw reference and the exact compared reference', () => {
-  const result = JSON.parse(
-    readFileSync(resolve(SCREENSHOT_DIR, artifactName('figma', '1-84', 'result', 'json')), 'utf8'),
-  ) as ComparisonResult
-
-  expect(result.artifacts.referenceRaw).toBe('figma-1-84-reference.png')
-  expect(result.artifacts.referenceCompared).toBe('figma-1-84-reference-compared.png')
-  expect(existsSync(resolve(SCREENSHOT_DIR, result.artifacts.referenceCompared))).toBe(true)
-})
 
 function writeResult(result: ComparisonResult) {
   writeFileSync(
@@ -87,25 +80,18 @@ function writeResult(result: ComparisonResult) {
     `${JSON.stringify(result, null, 2)}\n`,
     'utf8',
   )
+  currentRunResults.set(result.scenarioId, result)
   writeAggregateResults()
 }
 
 function writeAggregateResults() {
-  const resultFiles = [
-    ...figmaScenarios.map((scenario) => artifactName('figma', scenario.scenarioId, 'result', 'json')),
-    artifactName('user-extension', 'graphic-motion', 'result', 'json'),
-  ]
-  const aggregateResults = resultFiles
-    .filter((file) => existsSync(resolve(SCREENSHOT_DIR, file)))
-    .map((file) => JSON.parse(readFileSync(resolve(SCREENSHOT_DIR, file), 'utf8')) as ComparisonResult)
-
   writeFileSync(
     resolve(SCREENSHOT_DIR, 'visual-comparison-results.json'),
     `${JSON.stringify({
       generatedAt: new Date().toISOString(),
       strictDiffRatioThreshold: STRICT_DIFF_RATIO_THRESHOLD,
       pixelChannelTolerance: PIXEL_CHANNEL_TOLERANCE,
-      results: aggregateResults,
+      results: [...currentRunResults.values()],
     }, null, 2)}\n`,
     'utf8',
   )
@@ -160,16 +146,58 @@ async function geometryFailures(page: Page, scenarioId: string) {
 
     for (const element of leaves) {
       const rect = element.getBoundingClientRect()
-      if (!element.closest('.library-tabs')
-        && (rect.left < -1 || rect.top < -1 || rect.right > window.innerWidth + 1 || rect.bottom > window.innerHeight + 1)) {
+      const textRange = document.createRange()
+      textRange.selectNodeContents(element)
+      const textRect = textRange.getBoundingClientRect()
+      const outsideViewportX = rect.left < -1 || rect.right > window.innerWidth + 1
+      const outsideViewportY = rect.top < -1 || rect.bottom > window.innerHeight + 1
+      if (outsideViewportY || (outsideViewportX && !element.closest('.library-tabs'))) {
         failures.push(`${currentScenarioId}: text outside viewport: ${description(element)} at ${rect.left},${rect.top},${rect.width}x${rect.height}`)
       }
       const style = getComputedStyle(element)
-      const clipsText = style.overflowX === 'hidden' || style.overflowX === 'clip'
-        || style.overflowY === 'hidden' || style.overflowY === 'clip'
-      if (clipsText && !element.matches('.library-tabs')
-        && (element.scrollWidth > element.clientWidth + 1 || element.scrollHeight > element.clientHeight + 1)) {
+      const clipsTextX = style.overflowX === 'hidden' || style.overflowX === 'clip'
+      const clipsTextY = style.overflowY === 'hidden' || style.overflowY === 'clip'
+      if ((clipsTextX && !element.matches('.library-tabs') && element.scrollWidth > element.clientWidth + 1)
+        || (clipsTextY && element.scrollHeight > element.clientHeight + 1)) {
         failures.push(`${currentScenarioId}: clipped text leaf: ${description(element)} (${element.scrollWidth}x${element.scrollHeight} > ${element.clientWidth}x${element.clientHeight})`)
+      }
+
+      let effectiveLeft = Number.NEGATIVE_INFINITY
+      let effectiveRight = Number.POSITIVE_INFINITY
+      let effectiveTop = Number.NEGATIVE_INFINITY
+      let effectiveBottom = Number.POSITIVE_INFINITY
+      for (let ancestor = element.parentElement; ancestor; ancestor = ancestor.parentElement) {
+        const ancestorStyle = getComputedStyle(ancestor)
+        const clipsX = ancestorStyle.overflowX === 'hidden' || ancestorStyle.overflowX === 'clip'
+        const clipsY = ancestorStyle.overflowY === 'hidden' || ancestorStyle.overflowY === 'clip'
+        const isLibraryTabs = ancestor.matches('.library-tabs')
+        const establishesXClip = clipsX || isLibraryTabs
+        if (!establishesXClip && !clipsY) continue
+        const ancestorRect = ancestor.getBoundingClientRect()
+        if (ancestorRect.width <= 0 || ancestorRect.height <= 0) continue
+        const clipLeft = ancestorRect.left + ancestor.clientLeft
+        const clipRight = clipLeft + ancestor.clientWidth
+        const clipTop = ancestorRect.top + ancestor.clientTop
+        const clipBottom = clipTop + ancestor.clientHeight
+        const reducesEffectiveClipX = establishesXClip && (clipLeft > effectiveLeft + 1 || clipRight < effectiveRight - 1)
+        const reducesEffectiveClipY = clipsY && (clipTop > effectiveTop + 1 || clipBottom < effectiveBottom - 1)
+        const clippedX = reducesEffectiveClipX
+          && clipsX
+          && !isLibraryTabs
+          && (textRect.left < clipLeft - 1 || textRect.right > clipRight + 1)
+        const clippedY = reducesEffectiveClipY
+          && (textRect.top < clipTop - 1 || textRect.bottom > clipBottom + 1)
+        if (establishesXClip) {
+          effectiveLeft = Math.max(effectiveLeft, clipLeft)
+          effectiveRight = Math.min(effectiveRight, clipRight)
+        }
+        if (clipsY) {
+          effectiveTop = Math.max(effectiveTop, clipTop)
+          effectiveBottom = Math.min(effectiveBottom, clipBottom)
+        }
+        if (clippedX || clippedY) {
+          failures.push(`${currentScenarioId}: text clipped by ancestor ${description(ancestor)}: ${description(element)} text at ${textRect.left},${textRect.top},${textRect.width}x${textRect.height} outside ${clipLeft},${clipTop},${ancestor.clientWidth}x${ancestor.clientHeight}`)
+        }
       }
     }
 
@@ -394,11 +422,23 @@ for (const scenario of figmaScenarios) {
         result: resultFile,
       },
     }
+    expectedCurrentRunScenarioIds.push(scenario.scenarioId)
     writeResult(result)
 
+    const writtenResult = JSON.parse(readFileSync(resolve(SCREENSHOT_DIR, resultFile), 'utf8')) as ComparisonResult
+    expect(writtenResult).toEqual(result)
+    expect(writtenResult.artifacts.referenceRaw).toBe(referenceFile)
+    expect(writtenResult.artifacts.referenceCompared).toBe(referenceComparedFile)
+    expect(existsSync(referencePath)).toBe(true)
+    expect(existsSync(referenceComparedPath)).toBe(true)
+    expect(writtenResult.referenceCompared?.dimensions).toEqual(scenario.viewport)
+    expect(writtenResult.browser).toEqual(scenario.viewport)
+    const aggregate = JSON.parse(
+      readFileSync(resolve(SCREENSHOT_DIR, 'visual-comparison-results.json'), 'utf8'),
+    ) as { results: ComparisonResult[] }
+    expect(aggregate.results.map(({ scenarioId }) => scenarioId)).toEqual(expectedCurrentRunScenarioIds)
     expect(comparison.referenceCompared.dimensions).toEqual(scenario.viewport)
     expect(comparison.browser).toEqual(scenario.viewport)
-    expect(comparison.diffRatio).toBeLessThanOrEqual(STRICT_DIFF_RATIO_THRESHOLD)
   })
 }
 
@@ -414,7 +454,7 @@ test('user-extension Graphic Motion captures a 320x688 browser baseline', async 
   await settleVisuals(page)
   await page.screenshot({ path: browserPath, animations: 'disabled', caret: 'hide' })
 
-  writeResult({
+  const result: ComparisonResult = {
     label: 'user-extension',
     nodeId: null,
     scenarioId: 'graphic-motion',
@@ -435,7 +475,41 @@ test('user-extension Graphic Motion captures a 320x688 browser baseline', async 
       diff: null,
       result: resultFile,
     },
+  }
+  expectedCurrentRunScenarioIds.push('graphic-motion')
+  writeResult(result)
+
+  const aggregate = JSON.parse(
+    readFileSync(resolve(SCREENSHOT_DIR, 'visual-comparison-results.json'), 'utf8'),
+  ) as { results: ComparisonResult[] }
+  expect(aggregate.results.map(({ scenarioId }) => scenarioId)).toEqual(expectedCurrentRunScenarioIds)
+})
+
+test('geometry gate reports text clipped by hidden and clip ancestors', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 240 })
+  await page.goto('/?scenario=graphic-motion')
+  await settleVisuals(page)
+  await page.evaluate(() => {
+    const outer = document.createElement('div')
+    outer.id = 'synthetic-outer-clip'
+    outer.style.cssText = 'position:fixed;left:20px;top:20px;width:120px;height:12px;overflow:clip;z-index:9999'
+    const inner = document.createElement('div')
+    inner.id = 'synthetic-inner-clip'
+    inner.style.cssText = 'width:64px;height:24px;overflow-x:hidden;overflow-y:visible;transform:translateX(-20px)'
+    const leaf = document.createElement('p')
+    leaf.id = 'synthetic-clipped-leaf'
+    leaf.textContent = 'Synthetic ancestor clipping text'
+    leaf.style.cssText = 'width:180px;height:20px;margin:0;overflow:visible;white-space:nowrap'
+    inner.append(leaf)
+    outer.append(inner)
+    document.body.append(outer)
   })
+
+  const failures = await geometryFailures(page, 'synthetic-ancestor-clipping')
+  expect(failures.filter((failure) => failure.includes('#synthetic-clipped-leaf'))).toEqual([
+    expect.stringContaining('#synthetic-inner-clip'),
+    expect.stringContaining('#synthetic-outer-clip'),
+  ])
 })
 
 test('all scenarios have unclipped, non-overlapping visible text leaves', async ({ page }) => {
@@ -448,6 +522,27 @@ test('all scenarios have unclipped, non-overlapping visible text leaves', async 
     failures.push(...await geometryFailures(page, scenario.scenarioId))
   }
   expect(failures, failures.join('\n')).toEqual([])
+})
+
+test('current-run Figma comparisons satisfy the strict fidelity gate', () => {
+  const results = [...currentRunResults.values()]
+  test.skip(results.length !== figmaScenarios.length + 1, 'Final fidelity gate requires all 17 current-run producers')
+  expect(results.map(({ scenarioId }) => scenarioId)).toEqual([
+    ...figmaScenarios.map(({ scenarioId }) => scenarioId),
+    'graphic-motion',
+  ])
+  const fidelityFailures = results.filter(
+    (result) => result.label === 'figma-match'
+      && result.diffRatio !== null
+      && result.diffRatio > STRICT_DIFF_RATIO_THRESHOLD,
+  )
+  const failureMessages = fidelityFailures.map(
+    (result) => `${result.nodeId} (${result.scenarioId}): ${result.diffRatio} > ${STRICT_DIFF_RATIO_THRESHOLD}; verdict=${result.verdict}`,
+  )
+  expect(
+    failureMessages,
+    failureMessages.join('\n'),
+  ).toEqual([])
 })
 
 test.afterAll(() => {
