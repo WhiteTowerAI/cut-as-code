@@ -1165,6 +1165,9 @@ button {
 
 .timeline-track-header--audio { height: 76px; padding-top: 13px; }
 .timeline-track-header--caption { height: 76px; padding-top: 13px; }
+.timeline-gutter--with-captions .timeline-track-header--caption { height: 64px; margin-top: 12px; }
+.timeline-gutter--with-captions .timeline-track-header--video { margin-top: 12px; }
+.timeline-gutter--with-captions .timeline-track-header--audio { margin-top: 12px; }
 
 .timeline-track-badge {
   display: grid;
@@ -1222,6 +1225,7 @@ button {
 .timeline-lane--audio { height: 76px; margin-top: 12px; padding-top: 8px; }
 .timeline-lane--caption { height: 76px; padding-top: 8px; }
 .timeline-lane--reserved { height: 88px; padding: 0; background: #242529; }
+.timeline-content--with-captions .timeline-lane--caption { height: 64px; margin-top: 12px; }
 .timeline-content--with-captions .timeline-lane--video { margin-top: 12px; }
 
 .timeline-clip {

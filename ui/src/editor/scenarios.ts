@@ -28,16 +28,19 @@ export type EditorScenario = Readonly<{
   initialState: EditorInitialState
 }>
 
+const FIGMA_TIMELINE_PX_PER_SECOND = 876 / 20
+const timeAtFigmaPx = (pixelX: number) => pixelX / FIGMA_TIMELINE_PX_PER_SECOND
+
 const timelineClips = [
   {
     id: 'video-1',
-    sourceRange: { startS: 0, endS: 6.87 },
-    programRange: { startS: 0, endS: 6.87 },
+    sourceRange: { startS: timeAtFigmaPx(16), endS: timeAtFigmaPx(279) },
+    programRange: { startS: timeAtFigmaPx(16), endS: timeAtFigmaPx(279) },
   },
   {
     id: 'video-2',
-    sourceRange: { startS: 6.87, endS: 20.3 },
-    programRange: { startS: 6.87, endS: 20.3 },
+    sourceRange: { startS: timeAtFigmaPx(283), endS: timeAtFigmaPx(796) },
+    programRange: { startS: timeAtFigmaPx(283), endS: timeAtFigmaPx(796) },
   },
 ] as const
 
@@ -77,21 +80,21 @@ const emptyProject: EditorProjectView = {
 const fiveSecondProject: EditorProjectView = { ...populatedProject, durationS: 5 }
 const twentySecondProject: EditorProjectView = {
   ...populatedProject,
-  durationS: 20.3,
+  durationS: 20,
   tracks: [
     { ...populatedProject.tracks[0], clips: timelineClips },
     {
       ...populatedProject.tracks[1],
-      clips: [{ id: 'audio-1', sourceRange: { startS: 0, endS: 20.3 }, programRange: { startS: 0, endS: 20.3 } }],
+      clips: [{ id: 'audio-1', sourceRange: { startS: timeAtFigmaPx(16), endS: timeAtFigmaPx(796) }, programRange: { startS: timeAtFigmaPx(16), endS: timeAtFigmaPx(796) } }],
     },
     {
       ...populatedProject.tracks[2],
       clips: [
-        { id: 'caption-1', sourceRange: { startS: 0, endS: 3.3 }, programRange: { startS: 0, endS: 3.3 } },
-        { id: 'caption-2', sourceRange: { startS: 3.5, endS: 7.3 }, programRange: { startS: 3.5, endS: 7.3 } },
-        { id: 'caption-3', sourceRange: { startS: 7.6, endS: 11.8 }, programRange: { startS: 7.6, endS: 11.8 } },
-        { id: 'caption-4', sourceRange: { startS: 12.2, endS: 15.7 }, programRange: { startS: 12.2, endS: 15.7 } },
-        { id: 'caption-5', sourceRange: { startS: 16, endS: 20.3 }, programRange: { startS: 16, endS: 20.3 } },
+        { id: 'caption-1', sourceRange: { startS: timeAtFigmaPx(16), endS: timeAtFigmaPx(142) }, programRange: { startS: timeAtFigmaPx(16), endS: timeAtFigmaPx(142) } },
+        { id: 'caption-2', sourceRange: { startS: timeAtFigmaPx(148), endS: timeAtFigmaPx(290) }, programRange: { startS: timeAtFigmaPx(148), endS: timeAtFigmaPx(290) } },
+        { id: 'caption-3', sourceRange: { startS: timeAtFigmaPx(302), endS: timeAtFigmaPx(460) }, programRange: { startS: timeAtFigmaPx(302), endS: timeAtFigmaPx(460) } },
+        { id: 'caption-4', sourceRange: { startS: timeAtFigmaPx(472), endS: timeAtFigmaPx(600) }, programRange: { startS: timeAtFigmaPx(472), endS: timeAtFigmaPx(600) } },
+        { id: 'caption-5', sourceRange: { startS: timeAtFigmaPx(612), endS: timeAtFigmaPx(792) }, programRange: { startS: timeAtFigmaPx(612), endS: timeAtFigmaPx(792) } },
       ],
     },
   ],
@@ -117,7 +120,7 @@ const scenarios: readonly EditorScenario[] = [
     initialState: state({
       project: twentySecondProject,
       selection: { kind: 'video', id: 'video-2' },
-      currentTimeS: 6.87,
+      currentTimeS: timeAtFigmaPx(280),
     }),
   },
   { id: '1-1373', initialState: state({ project: emptyProject }) },
@@ -128,9 +131,9 @@ const scenarios: readonly EditorScenario[] = [
   },
   { id: '57-152', initialState: state({ openMenu: 'viewer-more' }) },
   { id: '1-1026', initialState: state({ project: emptyProject }) },
-  { id: '1-324', initialState: state({ project: twentySecondProject, currentTimeS: 6.87 }) },
+  { id: '1-324', initialState: state({ project: twentySecondProject, currentTimeS: timeAtFigmaPx(280) }) },
   { id: '1-1115', initialState: state({ project: emptyProject }) },
-  { id: '1-754', initialState: state({ project: twentySecondProject, selection: { kind: 'video', id: 'video-2' }, currentTimeS: 6.87 }) },
+  { id: '1-754', initialState: state({ project: twentySecondProject, selection: { kind: 'video', id: 'video-2' }, currentTimeS: timeAtFigmaPx(280) }) },
   { id: '1-528', initialState: state({ openMenu: 'aspect-ratio' }) },
   { id: '18-3', initialState: state({ project: emptyProject }) },
   { id: '76-2', initialState: state() },
@@ -149,8 +152,8 @@ const scenarios: readonly EditorScenario[] = [
     initialState: state({
       project: twentySecondProject,
       activeTab: 'captions',
-      selection: { kind: 'caption', id: 'caption-1' },
-      currentTimeS: 6.87,
+      selection: { kind: 'caption', id: 'caption-3' },
+      currentTimeS: timeAtFigmaPx(280),
     }),
   },
   { id: '126-2', initialState: state({ activeTab: 'cards' }) },

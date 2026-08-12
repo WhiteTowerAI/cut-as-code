@@ -24,7 +24,6 @@ import type { ClipView, EditorSelection, TrackView } from './editor-model'
 import type { EditorState } from './editor-store'
 
 const TIMELINE_WIDTH_PX = 876
-const CLIP_CONTENT_WIDTH_PX = 780
 const MIN_ZOOM = 0.5
 const MAX_ZOOM = 2
 const ZOOM_STEP = 0.25
@@ -154,16 +153,16 @@ function Clip({
   const kind = track.kind
   const id = clip.id
   const selected = selection?.kind === kind && selection.id === id
-  const left = 16 + timeToPx(
+  const left = timeToPx(
     clip.programRange.startS,
     durationS,
-    CLIP_CONTENT_WIDTH_PX,
+    TIMELINE_WIDTH_PX,
     timelineZoom,
   )
   const width = timeToPx(
     clip.programRange.endS - clip.programRange.startS,
     durationS,
-    CLIP_CONTENT_WIDTH_PX,
+    TIMELINE_WIDTH_PX,
     timelineZoom,
   )
   return (
@@ -234,7 +233,7 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
   }
 
   const rulerTicks = Array.from({ length: 11 }, (_, index) => ({
-    left: `${index * 10}%`,
+    left: `${(TIMELINE_WIDTH_PX * timelineZoom * index) / 10}px`,
     label: formatRulerTime((durationS * index) / 10),
   }))
 
@@ -271,7 +270,7 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
             </div>
           </>
         )}
-        <div className="timeline-gutter">
+        <div className={`timeline-gutter${showCaptionTrack ? ' timeline-gutter--with-captions' : ''}`}>
           {reserveCaptionTrack && <div className="timeline-track-reserved" aria-hidden="true" />}
           {visibleTracks.map((track) => <TrackHeader key={track.id} track={track} />)}
         </div>

@@ -30,12 +30,35 @@ test('timeline selection and click seek update one store playhead', async ({ pag
 
   const timeline = page.getByRole('region', { name: 'Timeline' })
   await expect(timeline).toBeVisible()
-  await timeline.locator('[data-timeline-surface]').click({ position: { x: 438, y: 40 } })
+  await timeline.locator('[data-timeline-surface]').click({ position: { x: timeToPx(10, 20, 876), y: 40 } })
   await expect(page.getByLabel('Playhead time')).toContainText('00:10')
 
   const clip = page.locator('[data-timeline-clip="video-2"]')
   await clip.click()
   await expect(clip).toHaveAttribute('aria-pressed', 'true')
+})
+
+test('timeline seek roundtrips the playhead between the two video spans', async ({ page }) => {
+  await page.setViewportSize({ width: 1008, height: 444 })
+  await page.goto('/?scenario=1-324')
+
+  const surface = page.locator('[data-timeline-surface]')
+  const firstVideo = await page.locator('[data-timeline-clip="video-1"]').boundingBox()
+  const secondVideo = await page.locator('[data-timeline-clip="video-2"]').boundingBox()
+  const surfaceBox = await surface.boundingBox()
+  expect(firstVideo).not.toBeNull()
+  expect(secondVideo).not.toBeNull()
+  expect(surfaceBox).not.toBeNull()
+
+  const playheadX = firstVideo!.x + firstVideo!.width + 1
+  await surface.click({ position: { x: playheadX - surfaceBox!.x, y: 40 } })
+  await expect(page.getByLabel('Playhead time')).toHaveText('00:06')
+  const playhead = await page.locator('.timeline-playhead').boundingBox()
+  expect(playhead).not.toBeNull()
+  const snappedTimeS = Math.round((280 / 876 * 20) * 30) / 30
+  expect(playhead!.x).toBeCloseTo(surfaceBox!.x + timeToPx(snappedTimeS, 20, 876), 1)
+  expect(playhead!.x).toBeGreaterThan(firstVideo!.x + firstVideo!.width)
+  expect(playhead!.x).toBeLessThan(secondVideo!.x)
 })
 
 test('timeline drag clamps at duration and zoom controls stay in bounds', async ({ page }) => {
@@ -116,10 +139,13 @@ test('zoom scales adjacent clip ranges in the ruler and playhead coordinate syst
   expect(firstClip).not.toBeNull()
   expect(secondClip).not.toBeNull()
   expect(rulerBox!.x).toBeCloseTo(contentBox!.x, 0)
-  expect(playheadBox!.x - contentBox!.x).toBeCloseTo(timeToPx(6.87, 20.3, 876, 1.5), 2)
-  expect(firstClip!.x - contentBox!.x).toBeCloseTo(16, 0)
-  expect(firstClip!.width).toBeCloseTo(timeToPx(6.87, 20.3, 780, 1.5), 2)
-  expect(secondClip!.x).toBeCloseTo(firstClip!.x + firstClip!.width, 0)
+  expect(rulerBox!.width).toBeCloseTo(876 * 1.5, 0)
+  expect(playheadBox!.x - contentBox!.x).toBeCloseTo(280 * 1.5, 2)
+  expect(firstClip!.x - contentBox!.x).toBeCloseTo(16 * 1.5, 2)
+  expect(firstClip!.width).toBeCloseTo(263 * 1.5, 2)
+  expect(secondClip!.x - contentBox!.x).toBeCloseTo(283 * 1.5, 2)
+  expect(secondClip!.x).toBeGreaterThan(playheadBox!.x)
+  expect(secondClip!.x + secondClip!.width - contentBox!.x).toBeCloseTo(796 * 1.5, 2)
 })
 
 test('selected Timeline scenario initializes its second video span as selected', async ({ page }) => {
@@ -204,12 +230,14 @@ test('the populated Timeline fixture renders its two source spans on the twenty-
     page.locator('[data-timeline-clip="audio-1"]').boundingBox(),
   ])
   expect(firstVideo).toMatchObject({ x: 148, y: 164, height: 80 })
-  expect(firstVideo?.width).toBeCloseTo(264, 0)
+  expect(firstVideo?.width).toBeCloseTo(263, 1)
   expect(secondVideo).toMatchObject({ y: 164, height: 80 })
-  expect(secondVideo?.x).toBeCloseTo(412, 0)
-  expect(secondVideo?.width).toBeCloseTo(516, 0)
+  expect(secondVideo?.x).toBeCloseTo(415, 1)
+  expect(secondVideo?.width).toBeCloseTo(513, 1)
+  expect(secondVideo!.x - (firstVideo!.x + firstVideo!.width)).toBeCloseTo(4, 1)
   expect(audio).toMatchObject({ x: 148, y: 272, height: 60 })
-  expect(audio?.width).toBeCloseTo(780, 0)
+  expect(audio?.width).toBeCloseTo(780, 1)
+  expect(1008 - (audio!.x + audio!.width)).toBeCloseTo(80, 1)
 })
 
 test('the caption Timeline fixture preserves its measured lane hierarchy', async ({ page }) => {
@@ -221,9 +249,10 @@ test('the caption Timeline fixture preserves its measured lane hierarchy', async
     page.locator('.timeline-lane--video').boundingBox(),
     page.locator('.timeline-lane--audio').boundingBox(),
   ])
-  expect(caption?.height).toBe(76)
+  expect(caption?.height).toBe(64)
   expect(video?.height).toBe(96)
   expect(audio?.height).toBe(76)
   expect(video?.y).toBe(caption!.y + caption!.height + 12)
   expect(audio?.y).toBe(video!.y + video!.height + 12)
+  await expect(page.locator('[data-timeline-clip="caption-3"]')).toHaveAttribute('aria-pressed', 'true')
 })
