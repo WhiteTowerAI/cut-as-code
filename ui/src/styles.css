@@ -896,7 +896,7 @@ button {
   display: flex;
   width: 184px;
   height: 36px;
-  margin: 0 8px 8px;
+  margin: 0 8px;
 }
 
 .viewer-alignment-row button {

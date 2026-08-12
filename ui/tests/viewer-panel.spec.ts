@@ -47,6 +47,24 @@ test('opening one Viewer menu closes the other and Escape closes the open menu',
   await expect(page.getByRole('menu', { name: 'Aspect ratio' })).toHaveCount(0)
 })
 
+test('the More menu and Reset Transform stay within the compact Viewer viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 216, height: 462 })
+  await page.goto('/?scenario=57-152')
+
+  const [menuBox, resetTransformBox] = await Promise.all([
+    page.getByRole('menu', { name: 'More viewer actions' }).boundingBox(),
+    page.getByRole('menuitem', { name: 'Reset Transform' }).boundingBox(),
+  ])
+  expect(menuBox).not.toBeNull()
+  expect(resetTransformBox).not.toBeNull()
+  for (const box of [menuBox!, resetTransformBox!]) {
+    expect(box.x).toBeGreaterThanOrEqual(-1)
+    expect(box.y).toBeGreaterThanOrEqual(-1)
+    expect(box.x + box.width).toBeLessThanOrEqual(217)
+    expect(box.y + box.height).toBeLessThanOrEqual(463)
+  }
+})
+
 test('protocol-incompatible Viewer commands stay disabled with accessible explanations', async ({ page }) => {
   await page.goto('/?scenario=1-282')
 
@@ -108,7 +126,7 @@ test('the caption Viewer frame uses its canonical twenty-second project clock', 
   await page.setViewportSize({ width: 680, height: 688 })
   await page.goto('/?scenario=123-79')
 
-  await expect(page.getByLabel('Playhead time')).toHaveText('00:00:06:26 / 00:00:20:09')
+  await expect(page.getByLabel('Playhead time')).toHaveText('00:00:06:26 / 00:00:20:00')
 })
 
 test('the caption selection and toolbar occupy their transcript-safe stage positions', async ({ page }) => {
