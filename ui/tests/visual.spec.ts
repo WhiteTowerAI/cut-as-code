@@ -526,7 +526,6 @@ test('all scenarios have unclipped, non-overlapping visible text leaves', async 
 
 test('current-run Figma comparisons satisfy the strict fidelity gate', () => {
   const results = [...currentRunResults.values()]
-  test.skip(results.length !== figmaScenarios.length + 1, 'Final fidelity gate requires all 17 current-run producers')
   expect(results.map(({ scenarioId }) => scenarioId)).toEqual([
     ...figmaScenarios.map(({ scenarioId }) => scenarioId),
     'graphic-motion',
