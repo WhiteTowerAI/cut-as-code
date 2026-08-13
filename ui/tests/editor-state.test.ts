@@ -589,7 +589,10 @@ test('runtime snapshot displays a terminal decision without losing the unique cu
     read_only: false,
     errors: [],
     resources: [],
-    artifacts: [],
+    artifacts: [{
+      id: 'artifact_current', name: 'current.png', size: 1, media_type: 'image/png',
+      sha256: 'current-preview', url: '/v1/projects/p/artifacts/artifact_current',
+    }],
     media: [],
     view: {
       operations: [{ id: 'content-cards', revision: 3, status: 'approved', etag: 'operation-r3' }],
@@ -627,7 +630,10 @@ test('runtime snapshot displays a terminal decision without losing the unique cu
 test('runtime snapshot maps terminal status only when it binds the exact preview', () => {
   const snapshot: RuntimeSnapshot = {
     snapshot_etag: 'snapshot-r3',
-    read_only: false, errors: [], resources: [], artifacts: [], media: [],
+    read_only: false, errors: [], resources: [], artifacts: [{
+      id: 'artifact_current', name: 'current.png', size: 1, media_type: 'image/png',
+      sha256: 'current-preview', url: '/v1/projects/p/artifacts/artifact_current',
+    }], media: [],
     view: {
       operations: [{ id: 'content-cards', revision: 3, status: 'approved', etag: 'operation-r3' }],
       reviews: [{
@@ -644,7 +650,10 @@ test('runtime snapshot maps terminal status only when it binds the exact preview
   })
   expect(operation?.preview).toEqual({
     status: 'current', revision: 3, reviewId: 'review-content-cards-current',
-    snapshotEtag: 'snapshot-r3', evidenceHashes: ['sha256:current-preview'], artifacts: [],
+    snapshotEtag: 'snapshot-r3', evidenceHashes: ['sha256:current-preview'], artifacts: [{
+      id: 'artifact_current', name: 'current.png', size: 1, sha256: 'current-preview',
+      mediaType: 'image/png', url: '/v1/projects/p/artifacts/artifact_current',
+    }],
   })
   expect(reviewStatusText(operation!, false)).toBe('Preview approved')
   const rejected = {
@@ -758,6 +767,36 @@ test('content-cards runtime projection retains peer operations and binds exact c
   expect(mapped.operations?.find((operation) => operation.id === 'content-cards')?.preview?.artifacts).toEqual([
     expect.objectContaining({ id: 'artifact_still', url: '/v1/projects/p/artifacts/artifact_still' }),
   ])
+})
+
+test('runtime projection invalidates a terminal receipt when any bound artifact is absent', () => {
+  const currentHash = 'a'.repeat(64)
+  const missingHash = 'b'.repeat(64)
+  const snapshot: RuntimeSnapshot = {
+    read_only: false, errors: [], snapshot_etag: 'snapshot-current',
+    resources: [{ id: 'res_project', kind: 'project', etag: 'p', size: 1 }],
+    media: [],
+    artifacts: [{
+      id: 'artifact_current', name: 'current.png', size: 12, media_type: 'image/png',
+      sha256: currentHash, url: '/v1/projects/p/artifacts/artifact_current',
+    }],
+    view: {
+      project_revision: 3, active_sequence: 'main',
+      timeline: { duration_s: 2, fps: { num: 30, den: 1 }, clips: [] },
+      operations: [{ id: 'content-cards', revision: 3, status: 'approved', etag: 'cards-op' }],
+      reviews: [{
+        id: 'cards-decision', revision: 1, status: 'approved', based_on: { 'content-cards': 3 },
+        snapshot_etag: 'snapshot-current', evidence_hashes: [`sha256:${currentHash}`, `sha256:${missingHash}`],
+      }],
+      content_cards_edit: { fields: { copy: 'Actual copy' }, review_template: { schema_version: 1, cards: [] } },
+    },
+  }
+
+  const operation = projectFromSnapshot(null, snapshot)!.operations![0]
+
+  expect(operation.preview).toMatchObject({ status: 'stale', reviewId: 'cards-decision' })
+  expect(operation.approval).toMatchObject({ status: 'invalidated', reviewId: 'cards-decision' })
+  expect(operation.approval?.evidenceHashes).toEqual([`sha256:${currentHash}`, `sha256:${missingHash}`])
 })
 
 test('getScenario resolves every dash-form Figma node and graphic motion', () => {

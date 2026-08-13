@@ -175,6 +175,50 @@ test('browser runtime is ready from the armed credential-free URL and refreshes 
   }
 })
 
+test('browser inspects every registered protocol resource by its server-issued ID', async ({ page }) => {
+  const isolated = await startSidecar(projectRoot)
+  try {
+    const launch = await armLaunch(isolated)
+    await page.goto(launch)
+    await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+    const inspector = page.getByRole('region', { name: 'Protocol resources' })
+    const picker = inspector.getByLabel('Protocol resource')
+    await expect(picker).toHaveCount(1)
+    const snapshot = await page.evaluate(async (projectId) => {
+      const response = await fetch(`/v1/projects/${projectId}/snapshot`)
+      return response.json()
+    }, isolated.ready.projectId)
+    const plan = snapshot.snapshot.resources.find((resource: { kind: string }) => resource.kind === 'plan')
+    const resourceIds = await picker.locator('option').evaluateAll((options) => options.map((option) => option.getAttribute('value')))
+    expect(resourceIds).toHaveLength(3)
+    expect(resourceIds).toEqual(resourceIds.map((id) => expect.stringMatching(/^res_[a-f0-9]+$/)))
+
+    for (const resourceId of resourceIds) {
+      await picker.selectOption(resourceId!)
+      await expect(inspector).toHaveAttribute('data-resource-id', resourceId!)
+      await expect(inspector.locator('[data-resource-etag]')).toBeVisible()
+      await expect(inspector.locator('pre')).not.toBeEmpty()
+    }
+
+    await picker.selectOption(plan.id)
+    await expect(inspector).toHaveAttribute('data-resource-kind', plan.kind)
+    await expect(inspector).toHaveAttribute('data-resource-size', String(plan.size))
+    await expect(inspector).toHaveAttribute('data-resource-operation', plan.operation_id)
+    const etagBefore = plan.etag
+    await writeFile(path.join(projectRoot, 'work', 'captions', 'captions-plan.json'), '{"cues":[{"id":"changed"}]}\n')
+    await expect(inspector.locator('pre')).toContainText('changed')
+    await expect(inspector).not.toHaveAttribute('data-resource-etag', etagBefore)
+
+    await rm(path.join(projectRoot, 'work', 'captions', 'captions-plan.json'))
+    await expect(picker.locator(`option[value="${plan.id}"]`)).toHaveCount(0)
+    await expect(inspector).toHaveAttribute('data-resource-id', resourceIds[0]!)
+    await expect(inspector.locator('pre')).not.toContainText('changed')
+  } finally {
+    await page.close()
+    await stopSidecar(isolated.process)
+  }
+})
+
 test('browser displays current Agent review image, video, and sandboxed HTML from opaque artifact URLs', async ({ page }) => {
   test.setTimeout(30_000)
   const root = await createContentCardsArtifactProjectFixture()

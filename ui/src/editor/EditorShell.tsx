@@ -33,7 +33,7 @@ import {
 import { LibraryPanel } from './LibraryPanel'
 import { TimelinePanel } from './TimelinePanel'
 import { ViewerPanel } from './ViewerPanel'
-import { ProjectReviewPanel } from './ProjectReviewPanel'
+import { ProjectReviewPanel, ProtocolResourceInspector } from './ProjectReviewPanel'
 import { createEditorStore } from './editor-store'
 import { getScenario } from './scenarios'
 import type { ContentCardsReview, RuntimeReadSet, RuntimeSnapshot } from '../runtime/types'
@@ -94,7 +94,7 @@ const iconGroups: ReadonlyArray<Readonly<{ label: string; icons: readonly IconIt
   },
 ]
 
-function Workspace({ store }: { store: ReturnType<typeof createEditorStore> }) {
+function Workspace({ store, runtime }: { store: ReturnType<typeof createEditorStore>; runtime?: RuntimeProjectStatus }) {
   const contentCardsOperation = useStore(store, (state) => state.project?.operations?.find((operation) => operation.kind === 'content-cards'))
   return (
     <>
@@ -103,6 +103,7 @@ function Workspace({ store }: { store: ReturnType<typeof createEditorStore> }) {
         <button type="button" disabled title="Export is not connected in this verification surface">Export</button>
       </header>
       {contentCardsOperation ? <ProjectReviewPanel operation={contentCardsOperation} store={store} /> : null}
+      {runtime && runtime.snapshot.resources.length ? <ProtocolResourceInspector resources={runtime.snapshot.resources} client={runtime.client} /> : null}
       <div className="workspace-primary">
         <LibraryPanel store={store} />
         <ViewerPanel store={store} />
@@ -200,7 +201,7 @@ export function EditorShell({ runtime }: { runtime?: RuntimeProjectStatus }) {
     >
       {runtime ? <RuntimeStatus status={runtime} /> : null}
       {isWorkspaceScenario ? (
-        <Workspace store={store} />
+        <Workspace store={store} runtime={runtime} />
       ) : isTimelineScenario ? (
         <TimelinePanel store={store} />
       ) : isViewerScenario ? (
@@ -330,6 +331,9 @@ function operationFromSnapshot(
   snapshot: RuntimeSnapshot,
   fields?: Readonly<Record<string, unknown>>,
 ) {
+  const currentArtifactHashes = new Set(snapshot.artifacts.flatMap((artifact) => artifact.sha256 ? [`sha256:${artifact.sha256}`] : []))
+  const hasCurrentEvidence = (receipt: NonNullable<RuntimeSnapshot['view']['reviews']>[number]) =>
+    Boolean(receipt.evidence_hashes?.length && receipt.evidence_hashes.every((hash) => currentArtifactHashes.has(hash)))
   const currentReviews = snapshot.view.reviews?.filter((item) =>
     item.status === 'draft' && item.based_on?.[operationId] === revision &&
     item.snapshot_etag === snapshot.snapshot_etag && item.evidence_hashes?.length,
@@ -358,12 +362,12 @@ function operationFromSnapshot(
       id: operationId, kind: operationId, revision,
       editable: operationId === 'content-cards' && !snapshot.read_only && Boolean(fields), fields: fields ?? {},
       ...(previewReceipt ? { preview: {
-        status: 'current', revision,
+        status: hasCurrentEvidence(previewReceipt) ? 'current' : 'stale', revision,
         reviewId: previewReceipt.id, snapshotEtag: previewReceipt.snapshot_etag ?? '',
         evidenceHashes: previewReceipt.evidence_hashes ?? [], artifacts,
       } as const } : {}),
       approval: terminal
-        ? { status: terminal.status as 'approved' | 'rejected', revision,
+        ? { status: (hasCurrentEvidence(terminal) ? terminal.status : 'invalidated') as 'approved' | 'rejected' | 'invalidated', revision,
             rationale: terminal.rationale, reviewId: terminal.id, snapshotEtag: terminal.snapshot_etag,
             evidenceHashes: terminal.evidence_hashes }
         : { status: 'none' as const },

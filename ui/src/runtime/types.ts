@@ -6,6 +6,20 @@ export type RuntimeResource = Readonly<{
   operation_id?: string
 }>
 
+export type RuntimeResourceContent = Readonly<{
+  id: string
+  kind: string
+  etag: string
+  size?: number
+  operation_id?: string
+  content: unknown
+}>
+
+export type ResourceResponse = Readonly<{
+  ok: boolean
+  resource: RuntimeResourceContent
+}>
+
 export type RuntimeFile = Readonly<{
   id: string
   name: string

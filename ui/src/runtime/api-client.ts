@@ -1,4 +1,4 @@
-import type { ContentCardsReview, RuntimeMutationResponse, RuntimeReadSet, RuntimeSnapshot, SnapshotResponse } from './types'
+import type { ContentCardsReview, ResourceResponse, RuntimeMutationResponse, RuntimeReadSet, RuntimeResourceContent, RuntimeSnapshot, SnapshotResponse } from './types'
 
 export class RuntimeConflictError extends Error {
   constructor(readonly snapshot?: RuntimeSnapshot) {
@@ -17,6 +17,17 @@ export class RuntimeApiClient {
     const value = await response.json() as SnapshotResponse
     if (!value.ok) throw new Error('Could not load the project snapshot')
     return value.snapshot
+  }
+
+  async getResource(resourceId: string): Promise<RuntimeResourceContent> {
+    if (!/^res_[a-f0-9]+$/.test(resourceId)) throw new Error('Invalid protocol resource ID')
+    const response = await fetch(`/v1/projects/${encodeURIComponent(this.projectId)}/resources/${encodeURIComponent(resourceId)}`, {
+      credentials: 'same-origin',
+    })
+    if (!response.ok) throw new Error('Could not load the protocol resource')
+    const value = await response.json() as ResourceResponse
+    if (!value.ok) throw new Error('Could not load the protocol resource')
+    return value.resource
   }
 
   subscribe(onChange: () => void): () => void {
