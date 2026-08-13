@@ -11,7 +11,7 @@ type ProjectReviewPanelProps = {
 }
 
 export function ProjectReviewPanel({ operation, store }: ProjectReviewPanelProps) {
-  const [rejecting, setRejecting] = useState(false)
+  const [decision, setDecision] = useState<'approved' | 'rejected' | null>(null)
   const [rationale, setRationale] = useState('')
   const recordDecision = useStore(store, (state) => state.recordReviewDecision)
   const canApprove = useStore(store, (state) => state.canApproveOperation(operation.id))
@@ -20,26 +20,26 @@ export function ProjectReviewPanel({ operation, store }: ProjectReviewPanelProps
     <>
       <ReviewStatusBar operation={operation} store={store} />
       <div style={{ display: 'flex', gap: 8, padding: '8px 12px', borderBottom: '1px solid #30333b', background: '#17191e' }}>
-        <button type="button" disabled={!canApprove} onClick={() => recordDecision(operation.id, 'approved')}>Approve preview</button>
-        <button type="button" disabled={!canApprove} onClick={() => setRejecting(true)}>Reject preview</button>
+        <button type="button" disabled={!canApprove} onClick={() => setDecision('approved')}>Approve preview</button>
+        <button type="button" disabled={!canApprove} onClick={() => setDecision('rejected')}>Reject preview</button>
       </div>
-      {rejecting ? (
+      {decision ? (
         <form
-          aria-label="Reject preview form"
+          aria-label={`${decision === 'approved' ? 'Approve' : 'Reject'} preview form`}
           style={{ display: 'flex', gap: 8, padding: 12, borderBottom: '1px solid #30333b', background: '#17191e' }}
-          onSubmit={(event) => {
+          onSubmit={async (event) => {
             event.preventDefault()
             if (!rationale.trim()) return
-            recordDecision(operation.id, 'rejected', rationale)
-            setRejecting(false)
+            await recordDecision(operation.id, decision, rationale)
+            setDecision(null)
             setRationale('')
           }}
         >
           <label style={{ display: 'contents' }}>
-            <span className="sr-only">Rejection rationale</span>
-            <input aria-label="Rejection rationale" value={rationale} onChange={(event) => setRationale(event.target.value)} />
+            <span className="sr-only">Decision rationale</span>
+            <input aria-label="Decision rationale" value={rationale} onChange={(event) => setRationale(event.target.value)} />
           </label>
-          <button type="submit" disabled={!canApprove || !rationale.trim()}>Confirm rejection</button>
+          <button type="submit" disabled={!canApprove || !rationale.trim()}>Confirm {decision === 'approved' ? 'approval' : 'rejection'}</button>
         </form>
       ) : null}
     </>

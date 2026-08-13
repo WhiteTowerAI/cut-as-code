@@ -101,6 +101,26 @@ async function handleRequest(state, request, response) {
       }
       return json(response, result.ok ? 200 : 400, result)
     }
+    const transactionMatch = url.pathname.match(/^\/v1\/projects\/([^/]+)\/transactions$/)
+    if (request.method === 'POST' && transactionMatch && transactionMatch[1] === state.projectId) {
+      if (request.headers.origin !== state.origin) return json(response, 403, { ok: false, error: 'invalid origin' })
+      const body = await readJson(request)
+      const result = await state.protocol.call({
+        verb: 'plan.update', project_id: state.projectId, operation: body.operation,
+        read_set: body.readSet, review: body.review,
+      })
+      return json(response, result.status || (result.ok ? 200 : 400), result)
+    }
+    const reviewMatch = url.pathname.match(/^\/v1\/projects\/([^/]+)\/reviews\/decision$/)
+    if (request.method === 'POST' && reviewMatch && reviewMatch[1] === state.projectId) {
+      if (request.headers.origin !== state.origin) return json(response, 403, { ok: false, error: 'invalid origin' })
+      const body = await readJson(request)
+      const result = await state.protocol.call({
+        verb: 'review.record', project_id: state.projectId, operation: body.operation,
+        read_set: body.readSet, decision: body.decision,
+      })
+      return json(response, result.status || (result.ok ? 200 : 400), result)
+    }
     const resourceMatch = url.pathname.match(/^\/v1\/projects\/([^/]+)\/resources\/(res_[a-f0-9]+)$/)
     if (request.method === 'GET' && resourceMatch && resourceMatch[1] === state.projectId) {
       const result = await state.protocol.call({

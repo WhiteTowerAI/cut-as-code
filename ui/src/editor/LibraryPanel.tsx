@@ -228,6 +228,9 @@ function ReviewCardFields({ operation, store }: { operation: EditorOperationView
           <option value="lower-third">Lower third</option>
           <option value="quote">Quote</option>
           <option value="statistic">Statistic</option>
+          <option value="default">Default</option>
+          <option value="metric-spotlight">Metric spotlight</option>
+          <option value="side-by-side">Side by side</option>
         </select>
       </label>
       <label>
@@ -237,6 +240,11 @@ function ReviewCardFields({ operation, store }: { operation: EditorOperationView
           <option value="top-right">Top right</option>
           <option value="bottom-left">Bottom left</option>
           <option value="bottom-right">Bottom right</option>
+          <option value="top">Top</option>
+          <option value="bottom">Bottom</option>
+          <option value="left">Left</option>
+          <option value="right">Right</option>
+          <option value="center">Center</option>
         </select>
       </label>
       <label>

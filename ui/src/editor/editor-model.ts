@@ -30,9 +30,9 @@ export type ClipView = Readonly<{
 
 export type ContentCardEditableField = 'copy' | 'layout' | 'placement' | 'enabled'
 
-export type ContentCardLayout = 'lower-third' | 'quote' | 'statistic'
+export type ContentCardLayout = 'lower-third' | 'quote' | 'statistic' | 'default' | 'metric-spotlight' | 'bar-chart' | 'pie-chart' | 'line-chart' | 'side-by-side' | 'parallel-columns'
 
-export type ContentCardPlacement = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+export type ContentCardPlacement = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right' | 'center'
 
 export type OperationPreview = Readonly<{
   status: 'current' | 'stale'

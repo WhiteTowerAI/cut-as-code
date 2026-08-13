@@ -25,7 +25,7 @@ function RuntimeEditor() {
     const refresh = async () => {
       const snapshot = await client.getSnapshot()
       if (!active) return
-      setRuntime({ projectId, snapshot })
+      setRuntime({ projectId, snapshot, client })
       const count = Number(document.documentElement.dataset.runtimeRefreshCount ?? '0')
       document.documentElement.dataset.runtimeRefreshCount = String(count + 1)
     }
@@ -53,5 +53,5 @@ function RuntimeEditor() {
     }
   }, [bootstrapToken, fixtureMode, projectId])
 
-  return <EditorShell runtime={runtime} />
+  return <EditorShell key={runtime?.projectId ?? 'fixture'} runtime={runtime} />
 }

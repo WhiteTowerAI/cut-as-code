@@ -1,3 +1,4 @@
+import copy
 import hashlib
 import json
 import os
@@ -5,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import uuid
 from pathlib import Path
 from unittest import mock
 
@@ -79,17 +81,18 @@ class ProtocolServiceTests(unittest.TestCase):
         self.assertEqual("main", view["active_sequence"])
         self.assertEqual(1, view["operation_count"])
         self.assertEqual(0, view["review_count"])
+        operation = view["operations"][0]
+        self.assertEqual(64, len(operation.pop("etag")))
         self.assertEqual(
-            [
-                {
-                    "id": "captions",
-                    "revision": 1,
-                    "status": "draft",
-                    "target": {"sequence": "main", "scope": "full"},
-                    "plan_resource_id": plan_resource_id("captions"),
-                }
-            ],
-            view["operations"],
+            {
+                "id": "captions",
+                "revision": 1,
+                "status": "draft",
+                "target": {"sequence": "main", "scope": "full"},
+                "plan_resource_id": plan_resource_id("captions"),
+                "based_on": {},
+            },
+            operation,
         )
         self.assertEqual([], view["reviews"])
         for resource in response["snapshot"]["resources"]:
@@ -394,6 +397,675 @@ class ProtocolServiceTests(unittest.TestCase):
             [json.loads(line) for line in result.stdout.splitlines()],
         )
         self.assertEqual("", result.stderr)
+
+    def test_content_cards_plan_update_uses_complete_etag_read_set_and_leaf_review_semantics(self):
+        self._configure_content_cards_project()
+        opened = self.service.handle_request(
+            {"verb": "open_project", "project_root": str(self.root)}
+        )
+        read_set = self._read_set(opened["snapshot"], "content-cards")
+
+        response = self.service.handle_request(
+            {
+                "verb": "plan.update",
+                "project_id": opened["project_id"],
+                "operation": "content-cards",
+                "read_set": read_set,
+                "review": self._cards_review(copy="A stronger opening", placement="top"),
+            }
+        )
+
+        self.assertTrue(response["ok"])
+        self.assertEqual("committed", response["result"])
+        saved = json.loads(self.plan.read_text(encoding="utf-8"))
+        self.assertEqual("A stronger opening", saved["cards"][0]["copy"]["text"])
+        self.assertEqual("approved", saved["cards"][0]["copy"]["status"])
+        self.assertEqual("top", saved["cards"][0]["placement"]["region"])
+        project = json.loads(self.project_path.read_text(encoding="utf-8"))
+        operation = next(item for item in project["operations"] if item["id"] == "content-cards")
+        dependent = next(item for item in project["operations"] if item["id"] == "graphic-motion")
+        review = project["reviews"][0]
+        self.assertEqual((2, "stale"), (operation["revision"], operation["status"]))
+        self.assertEqual(("stale", {"content-cards": 1}), (dependent["status"], dependent["based_on"]))
+        self.assertEqual(("stale", {"content-cards": 1}), (review["status"], review["based_on"]))
+        self.assertEqual("draft", project["render"]["status"])
+
+    def test_content_cards_semantic_no_op_does_not_rewrite_or_increment_revision(self):
+        self._configure_content_cards_project(approved_plan=True)
+        opened = self.service.handle_request(
+            {"verb": "open_project", "project_root": str(self.root)}
+        )
+        before_project = self.project_path.read_bytes()
+        before_plan = self.plan.read_bytes()
+
+        response = self.service.handle_request(
+            {
+                "verb": "plan.update",
+                "project_id": opened["project_id"],
+                "operation": "content-cards",
+                "read_set": self._read_set(opened["snapshot"], "content-cards"),
+                "review": self._cards_review(copy="Original copy", placement="bottom"),
+            }
+        )
+
+        self.assertEqual({"ok": True, "result": "no_change", "snapshot": opened["snapshot"]}, response)
+        self.assertEqual(before_project, self.project_path.read_bytes())
+        self.assertEqual(before_plan, self.plan.read_bytes())
+
+    def test_same_operation_external_change_returns_conflict_without_overwrite(self):
+        self._configure_content_cards_project()
+        opened = self.service.handle_request(
+            {"verb": "open_project", "project_root": str(self.root)}
+        )
+        read_set = self._read_set(opened["snapshot"], "content-cards")
+        plan = json.loads(self.plan.read_text(encoding="utf-8"))
+        plan["cards"][0]["copy"]["suggested_text"] = "Agent update"
+        self.plan.write_text(json.dumps(plan), encoding="utf-8")
+
+        response = self.service.handle_request(
+            {
+                "verb": "plan.update",
+                "project_id": opened["project_id"],
+                "operation": "content-cards",
+                "read_set": read_set,
+                "review": self._cards_review(copy="Local update", placement="top"),
+            }
+        )
+
+        self.assertFalse(response["ok"])
+        self.assertEqual(409, response["status"])
+        self.assertEqual("conflict", response["error"])
+        self.assertEqual("Agent update", json.loads(self.plan.read_text(encoding="utf-8"))["cards"][0]["copy"]["suggested_text"])
+
+    def test_different_operation_external_change_refreshes_without_conflicting(self):
+        self._configure_content_cards_project()
+        opened = self.service.handle_request(
+            {"verb": "open_project", "project_root": str(self.root)}
+        )
+        read_set = self._read_set(opened["snapshot"], "content-cards")
+        project = json.loads(self.project_path.read_text(encoding="utf-8"))
+        project["operations"][1]["revision"] = 3
+        project["operations"][1]["status"] = "stale"
+        self.project_path.write_text(json.dumps(project), encoding="utf-8")
+
+        response = self.service.handle_request({
+            "verb": "plan.update", "project_id": opened["project_id"],
+            "operation": "content-cards", "read_set": read_set,
+            "review": self._cards_review(copy="Local update", placement="top"),
+        })
+
+        self.assertTrue(response["ok"])
+        saved = json.loads(self.project_path.read_text(encoding="utf-8"))
+        graphic_motion = next(item for item in saved["operations"] if item["id"] == "graphic-motion")
+        self.assertEqual(3, graphic_motion["revision"])
+
+    def test_plan_update_rejects_generic_patch_and_managed_fields(self):
+        self._configure_content_cards_project()
+        opened = self.service.handle_request(
+            {"verb": "open_project", "project_root": str(self.root)}
+        )
+        base = {
+            "verb": "plan.update",
+            "project_id": opened["project_id"],
+            "operation": "content-cards",
+            "read_set": self._read_set(opened["snapshot"], "content-cards"),
+        }
+        for extra in ({"patch": {"revision": 99}}, {"review": self._cards_review(), "revision": 99}):
+            with self.subTest(extra=extra):
+                response = self.service.handle_request({**base, **extra})
+                self.assertFalse(response["ok"])
+
+    def test_review_record_requires_current_same_revision_full_evidence_binding(self):
+        self._configure_content_cards_project()
+        opened = self.service.handle_request(
+            {"verb": "open_project", "project_root": str(self.root)}
+        )
+        read_set = self._read_set(opened["snapshot"], "content-cards")
+        decision = {
+            "review_id": "content-cards-preview-r1",
+            "decision": "approved",
+            "snapshot_etag": "snapshot-r1",
+            "evidence_hashes": ["sha256:preview-r1"],
+            "actor": "local-user",
+            "rationale": "Reviewed the bound composited evidence",
+        }
+
+        response = self.service.handle_request(
+            {
+                "verb": "review.record",
+                "project_id": opened["project_id"],
+                "operation": "content-cards",
+                "read_set": read_set,
+                "decision": decision,
+            }
+        )
+
+        self.assertTrue(response["ok"])
+        receipt = json.loads(self.project_path.read_text(encoding="utf-8"))["reviews"][0]
+        self.assertEqual("approved", receipt["status"])
+        self.assertEqual("human", receipt["decision_mode"])
+        self.assertEqual(decision["evidence_hashes"], receipt["evidence_hashes"])
+
+        for field, value in (("evidence_hashes", []), ("snapshot_etag", "wrong"), ("review_id", "wrong")):
+            self._configure_content_cards_project()
+            reopened = self.service.handle_request(
+                {"verb": "open_project", "project_root": str(self.root)}
+            )
+            invalid = {**decision, field: value}
+            rejected = self.service.handle_request(
+                {
+                    "verb": "review.record",
+                    "project_id": reopened["project_id"],
+                    "operation": "content-cards",
+                    "read_set": self._read_set(reopened["snapshot"], "content-cards"),
+                    "decision": invalid,
+                }
+            )
+            self.assertFalse(rejected["ok"], field)
+
+    def test_open_project_recovers_prepared_transaction_after_plan_replacement(self):
+        self._configure_content_cards_project()
+        original_project = self.project_path.read_bytes()
+        original_plan = self.plan.read_bytes()
+        updated_project = json.loads(original_project)
+        updated_project["operations"][0]["revision"] = 2
+        updated_project["operations"][0]["status"] = "stale"
+        updated_project["operations"][1]["status"] = "stale"
+        updated_project["reviews"][0]["status"] = "stale"
+        updated_project["render"]["status"] = "draft"
+        updated_project_bytes = (json.dumps(updated_project, indent=2) + "\n").encode()
+        updated_plan = json.loads(original_plan)
+        updated_plan["cards"][0]["copy"]["suggested_text"] = "Recovered edit"
+        updated_plan_bytes = (json.dumps(updated_plan, indent=2) + "\n").encode()
+        self.plan.write_bytes(updated_plan_bytes)
+        journal = self.root / "work" / ".editor" / "transaction.json"
+        journal.parent.mkdir()
+        journal.write_text(json.dumps({
+            "schema_version": 1,
+            "transaction_id": str(uuid.uuid4()),
+            "operation": "content-cards",
+            "verb": "plan.update",
+            "state": "prepared",
+            "files": [
+                {"path": "work/content-cards/cards-plan.json", "old_hash": hashlib.sha256(original_plan).hexdigest(),
+                 "new_hash": hashlib.sha256(updated_plan_bytes).hexdigest(), "new_content": updated_plan_bytes.decode()},
+                {"path": "work/project.json", "old_hash": hashlib.sha256(original_project).hexdigest(),
+                 "new_hash": hashlib.sha256(updated_project_bytes).hexdigest(), "new_content": updated_project_bytes.decode()},
+            ],
+        }), encoding="utf-8")
+
+        response = ProtocolService().handle_request(
+            {"verb": "open_project", "project_root": str(self.root)}
+        )
+
+        self.assertTrue(response["ok"])
+        self.assertEqual(2, json.loads(self.project_path.read_text(encoding="utf-8"))["operations"][0]["revision"])
+        self.assertFalse(journal.exists())
+
+    def test_open_project_enters_read_only_when_transaction_recovery_is_ambiguous(self):
+        self._configure_content_cards_project()
+        journal = self.root / "work" / ".editor" / "transaction.json"
+        journal.parent.mkdir()
+        journal.write_text(json.dumps({
+            "schema_version": 1, "transaction_id": str(uuid.uuid4()), "operation": "content-cards",
+            "verb": "review.record", "state": "prepared", "files": [{
+                "path": "work/project.json", "old_hash": "0" * 64,
+                "new_hash": "1" * 64, "new_content": "{}\n",
+            }],
+        }), encoding="utf-8")
+
+        response = ProtocolService().handle_request(
+            {"verb": "open_project", "project_root": str(self.root)}
+        )
+
+        self.assertTrue(response["ok"])
+        self.assertTrue(response["snapshot"]["read_only"])
+        self.assertIn("ambiguous transaction recovery", response["snapshot"]["errors"])
+
+        project_id = response["project_id"]
+        service = ProtocolService()
+        response = service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+        project_id = response["project_id"]
+        refreshed = service.handle_request({"verb": "get_snapshot", "project_id": project_id})
+        self.assertTrue(refreshed["snapshot"]["read_only"])
+        for verb, payload in (
+            ("plan.update", {"review": self._cards_review()}),
+            ("review.record", {"decision": {}}),
+        ):
+            rejected = service.handle_request({
+                "verb": verb, "project_id": project_id, "operation": "content-cards",
+                "read_set": self._read_set(response["snapshot"], "content-cards"), **payload,
+            })
+            self.assertFalse(rejected["ok"])
+            self.assertEqual("project is in recovery quarantine", rejected["error"])
+
+    def test_project_mutation_lease_blocks_a_second_writer(self):
+        self._configure_content_cards_project()
+        opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+        lease = self.service._acquire_lease(self.root)
+        try:
+            response = ProtocolService()._acquire_lease(self.root)
+            self.assertIsNone(response)
+            response = self.service.handle_request({
+                "verb": "plan.update", "project_id": opened["project_id"],
+                "operation": "content-cards", "read_set": self._read_set(opened["snapshot"], "content-cards"),
+                "review": self._cards_review(copy="Blocked"),
+            })
+        finally:
+            self.service._release_lease(lease)
+
+        self.assertEqual((False, 409, "project mutation is busy"),
+                         (response["ok"], response["status"], response["error"]))
+
+    def test_project_mutation_lease_recovers_a_dead_owner_without_stealing_a_live_lock(self):
+        self._configure_content_cards_project()
+        opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+        lock = self.root / "work" / ".editor" / "mutation.lock"
+        lock.parent.mkdir(exist_ok=True)
+        lock.write_text("999999999\n", encoding="utf-8")
+
+        response = self.service.handle_request({
+            "verb": "plan.update", "project_id": opened["project_id"],
+            "operation": "content-cards", "read_set": self._read_set(opened["snapshot"], "content-cards"),
+            "review": self._cards_review(copy="Recovered owner"),
+        })
+
+        self.assertTrue(response["ok"])
+        lease = self.service._acquire_lease(self.root)
+        try:
+            blocked = self.service.handle_request({
+                "verb": "plan.update", "project_id": opened["project_id"],
+                "operation": "content-cards", "read_set": self._read_set(response["snapshot"], "content-cards"),
+                "review": self._cards_review(copy="Must not steal"),
+            })
+        finally:
+            self.service._release_lease(lease)
+        self.assertEqual((False, 409), (blocked["ok"], blocked["status"]))
+
+    def test_final_cas_rejects_same_operation_change_during_transaction(self):
+        self._configure_content_cards_project()
+        opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+        changed = False
+
+        def external_write():
+            nonlocal changed
+            if changed:
+                return
+            changed = True
+            plan = json.loads(self.plan.read_text(encoding="utf-8"))
+            plan["cards"][0]["copy"]["suggested_text"] = "External boundary update"
+            self.plan.write_text(json.dumps(plan), encoding="utf-8")
+
+        self.service._before_final_cas = external_write
+        response = self.service.handle_request({
+            "verb": "plan.update", "project_id": opened["project_id"],
+            "operation": "content-cards", "read_set": self._read_set(opened["snapshot"], "content-cards"),
+            "review": self._cards_review(copy="Local overwrite"),
+        })
+
+        self.assertEqual((False, 409, "conflict"), (response["ok"], response["status"], response["error"]))
+        self.assertEqual("External boundary update", json.loads(self.plan.read_text(encoding="utf-8"))["cards"][0]["copy"]["suggested_text"])
+
+    def test_final_cas_reconciles_a_different_operation_change(self):
+        self._configure_content_cards_project()
+        opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+
+        def external_write():
+            project = json.loads(self.project_path.read_text(encoding="utf-8"))
+            project["operations"][1]["revision"] = 9
+            self.project_path.write_text(json.dumps(project), encoding="utf-8")
+
+        self.service._before_final_cas = external_write
+        response = self.service.handle_request({
+            "verb": "plan.update", "project_id": opened["project_id"],
+            "operation": "content-cards", "read_set": self._read_set(opened["snapshot"], "content-cards"),
+            "review": self._cards_review(copy="Local update"),
+        })
+
+        self.assertTrue(response["ok"])
+        project = json.loads(self.project_path.read_text(encoding="utf-8"))
+        self.assertEqual(9, next(item for item in project["operations"] if item["id"] == "graphic-motion")["revision"])
+        self.assertEqual(2, next(item for item in project["operations"] if item["id"] == "content-cards")["revision"])
+
+    def test_review_final_cas_reconciles_other_operation_and_updates_exact_receipt(self):
+        self._configure_content_cards_project()
+        project = json.loads(self.project_path.read_text(encoding="utf-8"))
+        project["reviews"].insert(0, {
+            "id": "older-preview", "revision": 1, "status": "approved", "depends_on": ["content-cards"],
+            "based_on": {"content-cards": 1}, "snapshot_etag": "older-snapshot",
+            "evidence_hashes": ["sha256:older"], "decision_mode": "human", "actor": "local-user",
+            "rationale": "Older evidence",
+        })
+        self.project_path.write_text(json.dumps(project, indent=2) + "\n", encoding="utf-8")
+        opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+
+        def external_write():
+            current = json.loads(self.project_path.read_text(encoding="utf-8"))
+            next(item for item in current["operations"] if item["id"] == "graphic-motion")["revision"] = 9
+            self.project_path.write_text(json.dumps(current), encoding="utf-8")
+
+        self.service._before_final_cas = external_write
+        response = self.service.handle_request({
+            "verb": "review.record", "project_id": opened["project_id"], "operation": "content-cards",
+            "read_set": self._read_set(opened["snapshot"], "content-cards"), "decision": {
+                "review_id": "content-cards-preview-r1", "decision": "approved", "snapshot_etag": "snapshot-r1",
+                "evidence_hashes": ["sha256:preview-r1"], "actor": "local-user", "rationale": "Current evidence",
+            },
+        })
+
+        self.assertTrue(response["ok"])
+        committed = json.loads(self.project_path.read_text(encoding="utf-8"))
+        self.assertEqual(9, next(item for item in committed["operations"] if item["id"] == "graphic-motion")["revision"])
+        receipt = next(item for item in committed["reviews"] if item["id"] == "content-cards-preview-r1")
+        self.assertEqual(("approved", "Current evidence"), (receipt["status"], receipt["rationale"]))
+
+    def test_review_final_cas_rejects_changed_target_receipt_without_overwriting_terminal_decision(self):
+        self._configure_content_cards_project()
+        opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+
+        def external_decision():
+            current = json.loads(self.project_path.read_text(encoding="utf-8"))
+            receipt = next(item for item in current["reviews"] if item["id"] == "content-cards-preview-r1")
+            receipt.update({
+                "status": "approved", "decision_mode": "human", "actor": "external-user",
+                "rationale": "External evidence approved",
+            })
+            self.project_path.write_text(json.dumps(current), encoding="utf-8")
+
+        self.service._before_final_cas = external_decision
+        response = self.service.handle_request({
+            "verb": "review.record", "project_id": opened["project_id"], "operation": "content-cards",
+            "read_set": self._read_set(opened["snapshot"], "content-cards"), "decision": {
+                "review_id": "content-cards-preview-r1", "decision": "approved", "snapshot_etag": "snapshot-r1",
+                "evidence_hashes": ["sha256:preview-r1"], "actor": "local-user", "rationale": "Local approval",
+            },
+        })
+
+        self.assertEqual((False, 409, "conflict"), (response["ok"], response["status"], response["error"]))
+        authoritative = next(item for item in response["snapshot"]["view"]["reviews"]
+                             if item["id"] == "content-cards-preview-r1")
+        self.assertEqual(("approved", "External evidence approved"),
+                         (authoritative["status"], authoritative["rationale"]))
+        persisted = next(item for item in json.loads(self.project_path.read_text(encoding="utf-8"))["reviews"]
+                         if item["id"] == "content-cards-preview-r1")
+        self.assertEqual(("approved", "external-user"), (persisted["status"], persisted["actor"]))
+
+    def test_review_final_cas_preserves_unrelated_receipt_change(self):
+        self._configure_content_cards_project()
+        project = json.loads(self.project_path.read_text(encoding="utf-8"))
+        project["reviews"].append({
+            "id": "graphic-motion-preview", "revision": 1, "status": "approved",
+            "depends_on": ["graphic-motion"], "based_on": {"graphic-motion": 2},
+            "snapshot_etag": "graphic-snapshot", "evidence_hashes": ["sha256:graphic"],
+            "decision_mode": "human", "actor": "first-reviewer", "rationale": "Initial decision",
+        })
+        self.project_path.write_text(json.dumps(project, indent=2) + "\n", encoding="utf-8")
+        opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+
+        def external_receipt_change():
+            current = json.loads(self.project_path.read_text(encoding="utf-8"))
+            receipt = next(item for item in current["reviews"] if item["id"] == "graphic-motion-preview")
+            receipt.update({"actor": "external-reviewer", "rationale": "Updated external decision"})
+            self.project_path.write_text(json.dumps(current), encoding="utf-8")
+
+        self.service._before_final_cas = external_receipt_change
+        response = self.service.handle_request({
+            "verb": "review.record", "project_id": opened["project_id"], "operation": "content-cards",
+            "read_set": self._read_set(opened["snapshot"], "content-cards"), "decision": {
+                "review_id": "content-cards-preview-r1", "decision": "approved", "snapshot_etag": "snapshot-r1",
+                "evidence_hashes": ["sha256:preview-r1"], "actor": "local-user", "rationale": "Current evidence",
+            },
+        })
+
+        self.assertTrue(response["ok"])
+        committed = json.loads(self.project_path.read_text(encoding="utf-8"))
+        unrelated = next(item for item in committed["reviews"] if item["id"] == "graphic-motion-preview")
+        target = next(item for item in committed["reviews"] if item["id"] == "content-cards-preview-r1")
+        self.assertEqual(("external-reviewer", "Updated external decision"),
+                         (unrelated["actor"], unrelated["rationale"]))
+        self.assertEqual(("approved", "Current evidence"), (target["status"], target["rationale"]))
+
+    def test_any_failure_after_prepare_quarantines_live_registration_and_preserves_journal(self):
+        for boundary in ("stage", "replace-plan", "replace-project", "validate", "hash", "mark-committed", "unlink"):
+            with self.subTest(boundary=boundary):
+                self._configure_content_cards_project()
+                service = ProtocolService()
+                opened = service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+                journal = self.root / "work" / ".editor" / "transaction.json"
+                original_atomic = service._atomic_write
+                original_unlink = Path.unlink
+
+                service._after_prepare = lambda: (_ for _ in ()).throw(OSError("injected stage failure")) if boundary == "stage" else None
+                def after_replace(path):
+                    if boundary == "replace-plan" and path == self.plan:
+                        raise OSError("injected plan replacement failure")
+                    if boundary == "replace-project" and path == self.project_path:
+                        raise OSError("injected project replacement failure")
+                service._after_replace = after_replace
+                service._before_post_commit_validation = lambda: (_ for _ in ()).throw(OSError("injected validation failure")) if boundary == "validate" else None
+                service._before_hash_verification = lambda: (_ for _ in ()).throw(OSError("injected hash failure")) if boundary == "hash" else None
+
+                atomic_calls = 0
+                def fail_atomic(path, data):
+                    nonlocal atomic_calls
+                    atomic_calls += 1
+                    if boundary == "mark-committed" and atomic_calls == 2:
+                        raise OSError("injected marker failure")
+                    return original_atomic(path, data)
+
+                def fail_unlink(path, *args, **kwargs):
+                    if boundary == "unlink" and Path(path) == journal:
+                        raise OSError("injected unlink failure")
+                    return original_unlink(path, *args, **kwargs)
+
+                with mock.patch.object(service, "_atomic_write", side_effect=fail_atomic), \
+                        mock.patch.object(Path, "unlink", fail_unlink):
+                    response = service.handle_request({
+                        "verb": "plan.update", "project_id": opened["project_id"],
+                        "operation": "content-cards", "read_set": self._read_set(opened["snapshot"], "content-cards"),
+                        "review": self._cards_review(copy=f"Failure {boundary}"),
+                    })
+
+                self.assertFalse(response["ok"])
+                self.assertTrue(journal.exists(), boundary)
+                retry = service.handle_request({
+                    "verb": "plan.update", "project_id": opened["project_id"],
+                    "operation": "content-cards", "read_set": self._read_set(opened["snapshot"], "content-cards"),
+                    "review": self._cards_review(copy="Retry"),
+                })
+                self.assertEqual("project is in recovery quarantine", retry["error"])
+                journal.unlink(missing_ok=True)
+
+    def test_open_project_does_not_recover_while_a_live_mutation_lease_is_held(self):
+        self._configure_content_cards_project()
+        journal = self.root / "work" / ".editor" / "transaction.json"
+        journal.parent.mkdir(exist_ok=True)
+        project_bytes = self.project_path.read_bytes()
+        journal.write_text(json.dumps({"schema_version": 1, "transaction_id": str(uuid.uuid4()),
+            "operation": "content-cards", "verb": "review.record", "state": "prepared", "files": [{
+                "path": "work/project.json", "old_hash": hashlib.sha256(project_bytes).hexdigest(),
+                "new_hash": hashlib.sha256(project_bytes).hexdigest(), "new_content": project_bytes.decode(),
+            }]}), encoding="utf-8")
+        lease = self.service._acquire_lease(self.root)
+        try:
+            response = ProtocolService().handle_request({"verb": "open_project", "project_root": str(self.root)})
+        finally:
+            self.service._release_lease(lease)
+
+        self.assertTrue(response["snapshot"]["read_only"])
+        self.assertIn("busy during recovery", response["snapshot"]["errors"][0])
+        self.assertTrue(journal.exists())
+
+    def test_review_record_rejects_stale_upstream_dependencies(self):
+        self._configure_content_cards_project()
+        project = json.loads(self.project_path.read_text(encoding="utf-8"))
+        captions = copy.deepcopy(project["operations"][0])
+        captions.update({"id": "captions", "revision": 2, "status": "approved", "depends_on": [], "based_on": {}, "plan": None})
+        cards = project["operations"][0]
+        cards["depends_on"] = ["captions"]
+        cards["based_on"] = {"captions": 1}
+        cards["status"] = "stale"
+        project["operations"].insert(0, captions)
+        project["sequences"]["main"]["operations"] = ["captions", "content-cards", "graphic-motion"]
+        self.project_path.write_text(json.dumps(project), encoding="utf-8")
+        opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+        decision = {"review_id": "content-cards-preview-r1", "decision": "approved", "snapshot_etag": "snapshot-r1",
+                    "evidence_hashes": ["sha256:preview-r1"], "actor": "local-user", "rationale": "Looks correct"}
+
+        response = self.service.handle_request({"verb": "review.record", "project_id": opened["project_id"],
+            "operation": "content-cards", "read_set": self._read_set(opened["snapshot"], "content-cards"), "decision": decision})
+
+        self.assertFalse(response["ok"])
+        self.assertIn("current dependencies", response["error"])
+
+    def test_crafted_recovery_journals_are_quarantined(self):
+        self._configure_content_cards_project()
+        project_bytes = self.project_path.read_bytes()
+        cases = (
+            [{"path": "input/source.mp4", "old_hash": hashlib.sha256(self.source.read_bytes()).hexdigest(), "new_hash": hashlib.sha256(b"owned").hexdigest(), "new_content": "owned"}],
+            [{"path": "work/project.json", "old_hash": hashlib.sha256(project_bytes).hexdigest(), "new_hash": hashlib.sha256(project_bytes).hexdigest(), "new_content": project_bytes.decode()}] * 2,
+        )
+        for files in cases:
+            with self.subTest(files=files):
+                journal = self.root / "work" / ".editor" / "transaction.json"
+                journal.parent.mkdir(exist_ok=True)
+                journal.write_text(json.dumps({"schema_version": 1, "transaction_id": str(uuid.uuid4()),
+                    "operation": "content-cards", "verb": "plan.update", "state": "prepared", "files": files}), encoding="utf-8")
+                response = ProtocolService().handle_request({"verb": "open_project", "project_root": str(self.root)})
+                self.assertTrue(response["snapshot"]["read_only"])
+                journal.unlink(missing_ok=True)
+
+    def test_committed_recovery_requires_every_target_at_new_hash(self):
+        self._configure_content_cards_project()
+        project_bytes = self.project_path.read_bytes()
+        plan_bytes = self.plan.read_bytes()
+        journal = self.root / "work" / ".editor" / "transaction.json"
+        journal.parent.mkdir(exist_ok=True)
+        journal.write_text(json.dumps({"schema_version": 1, "transaction_id": str(uuid.uuid4()),
+            "operation": "content-cards", "verb": "plan.update", "state": "committed", "files": [
+                {"path": "work/content-cards/cards-plan.json", "old_hash": hashlib.sha256(plan_bytes).hexdigest(), "new_hash": "1" * 64, "new_content": "{}"},
+                {"path": "work/project.json", "old_hash": hashlib.sha256(project_bytes).hexdigest(), "new_hash": "2" * 64, "new_content": "{}"},
+            ]}), encoding="utf-8")
+
+        response = ProtocolService().handle_request({"verb": "open_project", "project_root": str(self.root)})
+
+        self.assertTrue(response["snapshot"]["read_only"])
+
+    def test_recovery_rejects_invalid_proposed_content_cards_plan_before_replay_or_removal(self):
+        self._configure_content_cards_project()
+        old_project = self.project_path.read_bytes()
+        old_plan = self.plan.read_bytes()
+        new_project = json.loads(old_project)
+        next(item for item in new_project["operations"] if item["id"] == "content-cards")["revision"] = 2
+        new_project = (json.dumps(new_project, indent=2) + "\n").encode()
+        invalid_plan = b'{"schema_version": 1, "cards": "invalid"}\n'
+        self.plan.write_bytes(invalid_plan)
+        journal = self._write_journal("prepared", old_project, old_plan, new_project, invalid_plan)
+
+        response = ProtocolService().handle_request({"verb": "open_project", "project_root": str(self.root)})
+
+        self.assertTrue(response["snapshot"]["read_only"])
+        self.assertTrue(journal.exists())
+        self.assertEqual(old_project, self.project_path.read_bytes())
+
+    def test_recovery_rejects_an_all_old_invalid_proposal_before_removing_journal(self):
+        self._configure_content_cards_project()
+        old_project = self.project_path.read_bytes()
+        old_plan = self.plan.read_bytes()
+        new_project = json.loads(old_project)
+        next(item for item in new_project["operations"] if item["id"] == "content-cards")["revision"] = 2
+        new_project = (json.dumps(new_project, indent=2) + "\n").encode()
+        invalid_plan = b'{"schema_version": 1, "cards": "invalid"}\n'
+        journal = self._write_journal("prepared", old_project, old_plan, new_project, invalid_plan)
+
+        response = ProtocolService().handle_request({"verb": "open_project", "project_root": str(self.root)})
+
+        self.assertTrue(response["snapshot"]["read_only"])
+        self.assertTrue(journal.exists())
+        self.assertEqual(old_plan, self.plan.read_bytes())
+
+    def test_committed_all_new_recovery_validates_plan_before_removing_journal(self):
+        self._configure_content_cards_project()
+        old_project = self.project_path.read_bytes()
+        old_plan = self.plan.read_bytes()
+        new_project = json.loads(old_project)
+        next(item for item in new_project["operations"] if item["id"] == "content-cards")["revision"] = 2
+        new_project = (json.dumps(new_project, indent=2) + "\n").encode()
+        invalid_plan = b'{"schema_version": 1, "cards": "invalid"}\n'
+        self.project_path.write_bytes(new_project)
+        self.plan.write_bytes(invalid_plan)
+        journal = self._write_journal("committed", old_project, old_plan, new_project, invalid_plan)
+
+        response = ProtocolService().handle_request({"verb": "open_project", "project_root": str(self.root)})
+
+        self.assertTrue(response["snapshot"]["read_only"])
+        self.assertTrue(journal.exists())
+
+    def _write_journal(self, state, old_project, old_plan, new_project, new_plan):
+        journal = self.root / "work" / ".editor" / "transaction.json"
+        journal.parent.mkdir(exist_ok=True)
+        journal.write_text(json.dumps({"schema_version": 1, "transaction_id": str(uuid.uuid4()),
+            "operation": "content-cards", "verb": "plan.update", "state": state, "files": [
+                {"path": "work/content-cards/cards-plan.json", "old_hash": hashlib.sha256(old_plan).hexdigest(),
+                 "new_hash": hashlib.sha256(new_plan).hexdigest(), "new_content": new_plan.decode()},
+                {"path": "work/project.json", "old_hash": hashlib.sha256(old_project).hexdigest(),
+                 "new_hash": hashlib.sha256(new_project).hexdigest(), "new_content": new_project.decode()},
+            ]}), encoding="utf-8")
+        return journal
+
+    def _configure_content_cards_project(self, approved_plan=False):
+        self.plan = self.root / "work" / "content-cards" / "cards-plan.json"
+        self.plan.parent.mkdir(exist_ok=True)
+        plan = {
+            "schema_version": 1,
+            "target": "overlay",
+            "timeline_id": "main",
+            "brief": {"theme": "almanac", "target_card_count": 1},
+            "cards": [
+                {
+                    "id": "card-001",
+                    "card_type": "intro",
+                    "evidence_refs": ["moment-1"],
+                    "copy": {"status": "draft", "suggested_text": "Original copy", "display": {"title": None}},
+                    "placement": {"status": "draft", "region": None},
+                    "visual_treatment": {"status": "draft", "layout": "default"},
+                }
+            ],
+        }
+        if approved_plan:
+            scripts = self.root.parents[0]
+            sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "skills" / "video-add-content-cards" / "scripts"))
+            import apply_cards_review
+            plan = apply_cards_review.apply_review(plan, self._cards_review(copy="Original copy", placement="bottom"))
+        self.plan.write_text(json.dumps(plan, indent=2) + "\n", encoding="utf-8")
+        project = self._project()
+        project["sequences"]["main"]["operations"] = ["content-cards", "graphic-motion"]
+        project["operations"] = [
+            {**project["operations"][0], "id": "content-cards", "status": "approved", "plan": "content-cards/cards-plan.json"},
+            {**project["operations"][0], "id": "graphic-motion", "status": "approved", "revision": 2,
+             "depends_on": ["content-cards"], "based_on": {"content-cards": 1}, "plan": None},
+        ]
+        project["reviews"] = [{
+            "id": "content-cards-preview-r1", "revision": 1, "status": "draft",
+            "depends_on": ["content-cards"], "based_on": {"content-cards": 1},
+            "snapshot_etag": "snapshot-r1", "evidence_hashes": ["sha256:preview-r1"],
+        }]
+        project["render"] = {"status": "verified", "output": "../final/final.mp4"}
+        self.project_path.write_text(json.dumps(project, indent=2) + "\n", encoding="utf-8")
+
+    def _cards_review(self, copy="Original copy", placement="bottom"):
+        return {"schema_version": 1, "cards": [{
+            "id": "card-001", "selected": True, "copy": copy,
+            "placement": placement, "visual_treatment": "default",
+        }]}
+
+    @staticmethod
+    def _read_set(snapshot, operation_id):
+        resources = snapshot["resources"]
+        project = next(item for item in resources if item["kind"] == "project")
+        plan = next(item for item in resources if item.get("operation_id") == operation_id)
+        operation = next(item for item in snapshot["view"]["operations"] if item["id"] == operation_id)
+        return {"project": project["etag"], "operation": operation["etag"], "plan": plan["etag"]}
 
     def _write_project(self):
         self.project_path.write_text(json.dumps(self._project()), encoding="utf-8")

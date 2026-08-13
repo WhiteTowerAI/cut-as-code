@@ -1,4 +1,4 @@
-import { useState, type ComponentType } from 'react'
+import { useEffect, useState, type ComponentType } from 'react'
 import { useStore } from 'zustand'
 import {
   ArrowDownToLine,
@@ -36,7 +36,10 @@ import { ViewerPanel } from './ViewerPanel'
 import { ProjectReviewPanel } from './ProjectReviewPanel'
 import { createEditorStore } from './editor-store'
 import { getScenario } from './scenarios'
-import type { RuntimeSnapshot } from '../runtime/types'
+import type { ContentCardsReview, RuntimeReadSet, RuntimeSnapshot } from '../runtime/types'
+import { RuntimeApiClient, RuntimeConflictError } from '../runtime/api-client'
+import type { ContentCardsDraftChange } from './editor-store'
+import type { EditorProjectView } from './editor-model'
 
 type IconItem = Readonly<{
   label: string
@@ -137,13 +140,19 @@ function IconLibrary() {
 export type RuntimeProjectStatus = Readonly<{
   projectId: string
   snapshot: RuntimeSnapshot
+  client: RuntimeApiClient
 }>
 
 export function EditorShell({ runtime }: { runtime?: RuntimeProjectStatus }) {
   const scenarioId = new URLSearchParams(window.location.search).get('scenario') ?? '1-84'
   const scenario = getScenario(scenarioId) ?? getScenario('1-84')!
+  const [bridge] = useState(() => runtime ? runtimeAdapter(runtime.client, runtime.snapshot, scenario.initialState.project) : undefined)
   const [store] = useState(() => {
-    const next = createEditorStore(scenario.initialState)
+    const runtimeProject = runtime ? projectFromSnapshot(scenario.initialState.project, runtime.snapshot) : null
+    const next = createEditorStore(
+      { ...scenario.initialState, project: runtimeProject ?? scenario.initialState.project },
+      bridge,
+    )
     if (scenarioId === 'review-content-cards-conflict') {
       next.getState().editOperationDraft('content-cards', { copy: 'Local review note' })
       const project = next.getState().project
@@ -157,12 +166,17 @@ export function EditorShell({ runtime }: { runtime?: RuntimeProjectStatus }) {
     }
     return next
   })
+  useEffect(() => {
+    if (!runtime || !bridge) return
+    bridge.sync(runtime.snapshot)
+    store.getState().setProject(projectFromSnapshot(scenario.initialState.project, runtime.snapshot))
+  }, [bridge, runtime, scenario.initialState.project, store])
   const viewerScenarios = new Set(['1-282', '57-152', '1-1026', '1-528', '123-79'])
   const timelineScenarios = new Set(['1-324', '1-1115', '1-754', '123-167'])
   const isViewerScenario = viewerScenarios.has(scenarioId)
   const isTimelineScenario = timelineScenarios.has(scenarioId)
   const isMenuFrame = scenarioId === '57-152' || scenarioId === '1-528'
-  const isWorkspaceScenario = scenarioId === '1-60' || scenarioId === '1-1373' || scenarioId.startsWith('review-content-cards')
+  const isWorkspaceScenario = Boolean(runtime) || scenarioId === '1-60' || scenarioId === '1-1373' || scenarioId.startsWith('review-content-cards')
   const isIconLibraryScenario = scenarioId === '76-2'
 
   if (isIconLibraryScenario) {
@@ -196,6 +210,108 @@ export function EditorShell({ runtime }: { runtime?: RuntimeProjectStatus }) {
       )}
     </main>
   )
+}
+
+function runtimeAdapter(client: RuntimeApiClient, initial: RuntimeSnapshot, base: EditorProjectView | null) {
+  let snapshot = initial
+  const readSet = (): RuntimeReadSet => {
+    const operation = snapshot.view.operations?.find((item) => item.id === 'content-cards')
+    const project = snapshot.resources.find((item) => item.kind === 'project')
+    const plan = snapshot.resources.find((item) => item.operation_id === 'content-cards')
+    if (!operation || !project || !plan) throw new Error('Content Cards read set is incomplete')
+    return { project: project.etag, operation: operation.etag, plan: plan.etag }
+  }
+  const currentProject = (next: RuntimeSnapshot) => {
+    snapshot = next
+    const project = projectFromSnapshot(base, next)
+    if (!project) throw new Error('Content Cards snapshot is unavailable')
+    return project
+  }
+  return {
+    sync: (next: RuntimeSnapshot) => { snapshot = next },
+    save: async (_operationId: string, draft: ContentCardsDraftChange) => {
+      const template = snapshot.view.content_cards_edit?.review_template
+      if (!template) throw new Error('Content Cards review template is unavailable')
+      const review: ContentCardsReview = {
+        schema_version: 1,
+        cards: template.cards.map((card, index) => index === 0 ? {
+          ...card,
+          ...(draft.copy !== undefined ? { copy: draft.copy } : {}),
+          ...(draft.layout !== undefined ? { visual_treatment: draft.layout } : {}),
+          ...(draft.placement !== undefined ? { placement: draft.placement } : {}),
+          ...(draft.enabled !== undefined ? { selected: draft.enabled } : {}),
+        } : card),
+      }
+      try {
+        const response = await client.updateContentCards(readSet(), review)
+        return currentProject(response.snapshot ?? await client.getSnapshot())
+      } catch (error) {
+        if (error instanceof RuntimeConflictError) {
+          const project = error.snapshot ? projectFromSnapshot(base, error.snapshot) : null
+          throw Object.assign(error, { conflict: true, ...(project ? { project } : {}) })
+        }
+        throw error
+      }
+    },
+    review: async (_operationId: string, decision: 'approved' | 'rejected', rationale?: string) => {
+      const operation = snapshot.view.operations?.find((item) => item.id === 'content-cards')
+      const reviews = snapshot.view.reviews?.filter((item) =>
+        item.status === 'draft' && item.based_on?.['content-cards'] === operation?.revision &&
+        item.snapshot_etag && item.evidence_hashes?.length,
+      ) ?? []
+      if (reviews.length !== 1) throw new Error('A unique current review is required')
+      const review = reviews[0]
+      try {
+        const response = await client.recordContentCardsReview(readSet(), {
+          review_id: review.id, decision, snapshot_etag: review.snapshot_etag,
+          evidence_hashes: review.evidence_hashes, actor: 'local-user',
+          rationale: rationale?.trim(),
+        })
+        return currentProject(response.snapshot ?? await client.getSnapshot())
+      } catch (error) {
+        if (error instanceof RuntimeConflictError) {
+          const project = error.snapshot ? projectFromSnapshot(base, error.snapshot) : null
+          throw Object.assign(error, { conflict: true, ...(project ? { project } : {}) })
+        }
+        throw error
+      }
+    },
+  }
+}
+
+export function projectFromSnapshot(base: EditorProjectView | null, snapshot: RuntimeSnapshot): EditorProjectView | null {
+  const operation = snapshot.view.operations?.find((item) => item.id === 'content-cards')
+  const edit = snapshot.view.content_cards_edit
+  if (!base || !operation) return base
+  const currentReviews = snapshot.view.reviews?.filter((item) =>
+    item.status === 'draft' && item.based_on?.['content-cards'] === operation.revision &&
+    item.snapshot_etag && item.evidence_hashes?.length,
+  ) ?? []
+  const review = currentReviews.length === 1 ? currentReviews[0] : undefined
+  const terminalReviews = snapshot.view.reviews?.filter((item) =>
+    (item.status === 'approved' || item.status === 'rejected') &&
+    item.based_on?.['content-cards'] === operation.revision &&
+    (!review || (item.id === review.id && item.snapshot_etag === review.snapshot_etag)),
+  ) ?? []
+  const terminal = terminalReviews.length === 1 ? terminalReviews[0] : undefined
+  const previewReceipt = review ?? terminal
+  return {
+    ...base,
+    operations: [{
+      id: 'content-cards', kind: 'content-cards', revision: operation.revision,
+      editable: !snapshot.read_only && Boolean(edit), fields: edit?.fields ?? {},
+      ...(previewReceipt ? { preview: {
+        status: 'current', revision: operation.revision,
+        reviewId: previewReceipt.id, snapshotEtag: previewReceipt.snapshot_etag ?? '',
+        evidenceHashes: previewReceipt.evidence_hashes ?? [],
+      } as const } : {}),
+      approval: terminal
+        ? { status: terminal.status as 'approved' | 'rejected', revision: operation.revision,
+            rationale: terminal.rationale, reviewId: terminal.id, snapshotEtag: terminal.snapshot_etag,
+            evidenceHashes: terminal.evidence_hashes }
+        : { status: 'none' },
+    }],
+  }
 }
 
 function RuntimeStatus({ status }: { status: RuntimeProjectStatus }) {

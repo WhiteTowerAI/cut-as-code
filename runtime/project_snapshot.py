@@ -133,6 +133,15 @@ def build_snapshot(project_root):
         "operations": [_node_view(node) for node in operations if isinstance(node, dict)],
         "reviews": [_node_view(node) for node in reviews if isinstance(node, dict)],
     }
+    cards = next((node for node in operations if isinstance(node, dict) and node.get("id") == "content-cards"), None)
+    if cards and isinstance(cards.get("plan"), str):
+        try:
+            cards_plan = json.loads(_contained_path(root, cards["plan"]).read_text(encoding="utf-8"))
+            edit_model = _content_cards_edit_model(cards_plan)
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
+            edit_model = None
+        if edit_model:
+            view["content_cards_edit"] = edit_model
     return _snapshot(resources, _unique(errors), view)
 
 
@@ -204,9 +213,43 @@ def _node_view(node):
         "id": node.get("id"),
         "revision": node.get("revision"),
         "status": node.get("status"),
+        "etag": hashlib.sha256(
+            json.dumps(node, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest(),
     }
     if "target" in node:
         item["target"] = node.get("target")
     if isinstance(node.get("plan"), str) and node["plan"].strip():
         item["plan_resource_id"] = resource_id("plan", str(node.get("id", "")))
+    for field in ("based_on", "snapshot_etag", "evidence_hashes", "decision_mode", "rationale"):
+        if field in node:
+            item[field] = node[field]
     return item
+
+
+def _content_cards_edit_model(plan):
+    cards = plan.get("cards")
+    if not isinstance(cards, list) or not cards:
+        return None
+    entries = []
+    for card in cards:
+        if not isinstance(card, dict) or not isinstance(card.get("id"), str):
+            return None
+        copy = card.get("copy") if isinstance(card.get("copy"), dict) else {}
+        placement = card.get("placement") if isinstance(card.get("placement"), dict) else {}
+        treatment = card.get("visual_treatment") if isinstance(card.get("visual_treatment"), dict) else {}
+        entry = {
+            "id": card["id"], "selected": True,
+            "copy": copy.get("text") or copy.get("suggested_text") or "",
+            "placement": placement.get("region") or "bottom",
+            "visual_treatment": treatment.get("layout") or "default",
+        }
+        if "data" in card:
+            entry["data"] = card["data"]
+        entries.append(entry)
+    first = entries[0]
+    return {
+        "fields": {"copy": first["copy"], "layout": first["visual_treatment"],
+                   "placement": first["placement"], "enabled": first["selected"]},
+        "review_template": {"schema_version": 1, "cards": entries},
+    }

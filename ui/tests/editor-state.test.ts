@@ -1,10 +1,14 @@
 import { expect, test } from '@playwright/test'
 import type { EditorProjectView } from '../src/editor/editor-model'
+import { projectFromSnapshot } from '../src/editor/EditorShell'
 import {
   createEditorStore,
   type ContentCardsDraftChange,
 } from '../src/editor/editor-store'
 import { getScenario } from '../src/editor/scenarios'
+import type { RuntimeSnapshot } from '../src/runtime/types'
+import { RuntimeApiClient, RuntimeConflictError } from '../src/runtime/api-client'
+import { reviewStatusText } from '../src/editor/ReviewStatusBar'
 
 const project: EditorProjectView = {
   revision: 7,
@@ -31,7 +35,7 @@ const project: EditorProjectView = {
         snapshotEtag: 'snapshot-r3',
         evidenceHashes: ['sha256:content-cards-preview-r3'],
       },
-      approval: { status: 'approved', revision: 3 },
+      approval: { status: 'none' },
     },
     {
       id: 'captions',
@@ -128,6 +132,12 @@ test('setProject replaces the project snapshot with the next revision', () => {
 
 test('content-card draft changes stay local until an explicit semantic save', () => {
   const store = createStateStore()
+  store.getState().setProject({
+    ...project,
+    operations: project.operations?.map((operation) => operation.id === 'content-cards'
+      ? { ...operation, approval: { status: 'approved', revision: 3 } }
+      : operation),
+  })
 
   store.getState().editOperationDraft('content-cards', { copy: 'Revised copy' })
 
@@ -252,6 +262,12 @@ test('a decision cannot be recorded without complete immutable preview evidence'
 
 test('an approved preview cannot be replaced by a rejection without a new review', () => {
   const store = createStateStore()
+  store.getState().setProject({
+    ...project,
+    operations: project.operations?.map((operation) => operation.id === 'content-cards'
+      ? { ...operation, approval: { status: 'approved', revision: 3 } }
+      : operation),
+  })
 
   store.getState().recordReviewDecision('content-cards', 'approved')
   store.getState().recordReviewDecision('content-cards', 'rejected', 'Too late to reject this review')
@@ -363,6 +379,277 @@ test('unsupported operations and fields cannot create editable drafts', () => {
 
   expect(store.getState().getOperationDraft('captions')).toBeNull()
   expect(store.getState().getOperationDraft('content-cards')).toBeNull()
+})
+
+test('runtime save delegates the draft and applies only the authoritative project', async () => {
+  const authoritative: EditorProjectView = {
+    ...project,
+    revision: 8,
+    operations: project.operations?.map((operation) => operation.id === 'content-cards'
+      ? { ...operation, revision: 4, fields: { ...operation.fields, copy: 'Server copy' } }
+      : operation),
+  }
+  const calls: unknown[] = []
+  const store = createEditorStore({
+    project, activeTab: 'assets', selection: null, currentTimeS: 0,
+    isPlaying: false, timelineZoom: 1, snapEnabled: true, openMenu: null,
+  }, {
+    save: async (operationId, draft) => { calls.push({ operationId, draft }); return authoritative },
+    review: async () => authoritative,
+  })
+  store.getState().editOperationDraft('content-cards', { copy: 'Client copy' })
+
+  await store.getState().saveOperationDraft('content-cards')
+
+  expect(calls).toEqual([{ operationId: 'content-cards', draft: { copy: 'Client copy' } }])
+  expect(store.getState().project).toBe(authoritative)
+  expect(store.getState().getOperationDraft('content-cards')).toBeNull()
+})
+
+test('a conflict-shaped failure without an authoritative project remains retryable', async () => {
+  const store = createEditorStore({
+    project, activeTab: 'assets', selection: null, currentTimeS: 0,
+    isPlaying: false, timelineZoom: 1, snapEnabled: true, openMenu: null,
+  }, {
+    save: async () => { throw Object.assign(new Error('conflict'), { conflict: true }) },
+    review: async () => project,
+  })
+  store.getState().editOperationDraft('content-cards', { copy: 'Client copy' })
+
+  await store.getState().saveOperationDraft('content-cards')
+
+  expect(store.getState().getOperationDraft('content-cards')).toMatchObject({
+    dirty: true, conflict: false, pending: false, fields: { copy: 'Client copy' },
+  })
+  expect(store.getState().canSaveOperation('content-cards')).toBe(true)
+})
+
+test('an in-flight save preserves newer edits and blocks overlapping save requests', async () => {
+  let resolveSave!: (project: EditorProjectView) => void
+  let calls = 0
+  const store = createEditorStore({
+    project, activeTab: 'assets', selection: null, currentTimeS: 0,
+    isPlaying: false, timelineZoom: 1, snapEnabled: true, openMenu: null,
+  }, {
+    save: async () => { calls += 1; return new Promise((resolve) => { resolveSave = resolve }) },
+    review: async () => project,
+  })
+  store.getState().editOperationDraft('content-cards', { copy: 'Submitted copy' })
+  const first = store.getState().saveOperationDraft('content-cards')
+  store.getState().editOperationDraft('content-cards', { copy: 'Newer copy' })
+  const second = store.getState().saveOperationDraft('content-cards')
+  await Promise.resolve()
+  expect(calls).toBe(1)
+  resolveSave({ ...project, operations: project.operations?.map((operation) => operation.id === 'content-cards'
+    ? { ...operation, revision: 4, fields: { ...operation.fields, copy: 'Submitted copy' } } : operation) })
+  await first
+  await second
+
+  expect(store.getState().getOperationDraft('content-cards')).toMatchObject({
+    dirty: true, pending: false, fields: { copy: 'Newer copy' },
+  })
+})
+
+test('runtime conflict applies authoritative project and preserves the local draft', async () => {
+  const authoritative = { ...project, revision: 8, operations: project.operations?.map((operation) => operation.id === 'content-cards'
+    ? { ...operation, revision: 4, fields: { ...operation.fields, copy: 'Agent copy' } } : operation) }
+  const store = createEditorStore({
+    project, activeTab: 'assets', selection: null, currentTimeS: 0,
+    isPlaying: false, timelineZoom: 1, snapEnabled: true, openMenu: null,
+  }, {
+    save: async () => { throw Object.assign(new Error('conflict'), { conflict: true, project: authoritative }) },
+    review: async () => project,
+  })
+  store.getState().editOperationDraft('content-cards', { copy: 'Local copy' })
+
+  await store.getState().saveOperationDraft('content-cards')
+
+  expect(store.getState().project).toBe(authoritative)
+  expect(store.getState().getOperationDraft('content-cards')).toMatchObject({ conflict: true, fields: { copy: 'Local copy' } })
+})
+
+test('runtime non-conflict failure remains visible and retryable', async () => {
+  const store = createEditorStore({
+    project, activeTab: 'assets', selection: null, currentTimeS: 0,
+    isPlaying: false, timelineZoom: 1, snapEnabled: true, openMenu: null,
+  }, {
+    save: async () => { throw new Error('Protocol unavailable') }, review: async () => project,
+  })
+  store.getState().editOperationDraft('content-cards', { copy: 'Local copy' })
+
+  await store.getState().saveOperationDraft('content-cards')
+
+  expect(store.getState().getOperationDraft('content-cards')).toMatchObject({
+    dirty: true, pending: false, error: 'Protocol unavailable',
+  })
+  expect(store.getState().canSaveOperation('content-cards')).toBe(true)
+})
+
+test('project mutation busy remains retryable and is not classified as semantic conflict', async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    ok: false, error: 'project mutation is busy',
+  }), { status: 409, headers: { 'Content-Type': 'application/json' } })
+  try {
+    const client = new RuntimeApiClient('project-1')
+    const error = await client.updateContentCards(
+      { project: 'project-etag', operation: 'operation-etag', plan: 'plan-etag' },
+      { schema_version: 1, cards: [] },
+    ).then(() => null, (caught: unknown) => caught)
+
+    expect(error).toBeInstanceOf(Error)
+    expect(error).not.toBeInstanceOf(RuntimeConflictError)
+    expect((error as Error).message).toBe('project mutation is busy')
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('runtime review requires explicit rationale and surfaces backend failure', async () => {
+  let calls = 0
+  const store = createEditorStore({
+    project, activeTab: 'assets', selection: null, currentTimeS: 0,
+    isPlaying: false, timelineZoom: 1, snapEnabled: true, openMenu: null,
+  }, {
+    save: async () => project,
+    review: async () => { calls += 1; throw new Error('Review service unavailable') },
+  })
+
+  await store.getState().recordReviewDecision('content-cards', 'approved')
+  expect(calls).toBe(0)
+  await store.getState().recordReviewDecision('content-cards', 'approved', 'Evidence looks correct')
+
+  expect(calls).toBe(1)
+  expect(store.getState().getOperationDraft('content-cards')).toMatchObject({ error: 'Review service unavailable' })
+})
+
+test('review request identity blocks double submit and ignores an obsolete failure', async () => {
+  let resolveReview!: (project: EditorProjectView) => void
+  let calls = 0
+  const store = createEditorStore({
+    project, activeTab: 'assets', selection: null, currentTimeS: 0,
+    isPlaying: false, timelineZoom: 1, snapEnabled: true, openMenu: null,
+  }, {
+    save: async () => project,
+    review: async () => { calls += 1; return new Promise((resolve) => { resolveReview = resolve }) },
+  })
+
+  const first = store.getState().recordReviewDecision('content-cards', 'approved', 'Current evidence')
+  const second = store.getState().recordReviewDecision('content-cards', 'rejected', 'Duplicate request')
+  expect(store.getState().getOperationDraft('content-cards')).toMatchObject({ pending: true, requestId: 1 })
+  expect(store.getState().canApproveOperation('content-cards')).toBe(false)
+  await Promise.resolve()
+  expect(calls).toBe(1)
+  resolveReview({ ...project, revision: 8 })
+  await first
+  await second
+
+  expect(store.getState().project?.revision).toBe(8)
+  expect(store.getState().getOperationDraft('content-cards')).toBeNull()
+})
+
+test('review conflict applies authoritative project and preserves local draft state', async () => {
+  const authoritative = { ...project, revision: 8 }
+  const store = createEditorStore({
+    project, activeTab: 'assets', selection: null, currentTimeS: 0,
+    isPlaying: false, timelineZoom: 1, snapEnabled: true, openMenu: null,
+  }, {
+    save: async () => project,
+    review: async () => { throw Object.assign(new Error('conflict'), { conflict: true, project: authoritative }) },
+  })
+
+  await store.getState().recordReviewDecision('content-cards', 'approved', 'Current evidence')
+
+  expect(store.getState().project).toBe(authoritative)
+  expect(store.getState().getOperationDraft('content-cards')).toMatchObject({
+    dirty: false, conflict: true, pending: false, requestId: 1,
+  })
+})
+
+test('review conflict-shaped failure without an authoritative project remains retryable', async () => {
+  const store = createEditorStore({
+    project, activeTab: 'assets', selection: null, currentTimeS: 0,
+    isPlaying: false, timelineZoom: 1, snapEnabled: true, openMenu: null,
+  }, {
+    save: async () => project,
+    review: async () => { throw Object.assign(new Error('project mutation is busy'), { conflict: true }) },
+  })
+
+  await store.getState().recordReviewDecision('content-cards', 'approved', 'Current evidence')
+
+  expect(store.getState().getOperationDraft('content-cards')).toMatchObject({
+    dirty: false, conflict: false, pending: false, error: 'project mutation is busy',
+  })
+  expect(store.getState().canApproveOperation('content-cards')).toBe(true)
+})
+
+test('runtime snapshot displays a terminal decision without losing the unique current preview', () => {
+  const snapshot: RuntimeSnapshot = {
+    read_only: false,
+    errors: [],
+    resources: [],
+    artifacts: [],
+    media: [],
+    view: {
+      operations: [{ id: 'content-cards', revision: 3, status: 'approved', etag: 'operation-r3' }],
+      reviews: [
+        {
+          id: 'review-content-cards-current', revision: 1, status: 'draft',
+          based_on: { 'content-cards': 3 }, snapshot_etag: 'snapshot-r3',
+          evidence_hashes: ['sha256:current-preview'],
+        },
+        {
+          id: 'review-content-cards-approved', revision: 1, status: 'approved', rationale: 'Evidence is correct',
+          based_on: { 'content-cards': 3 }, snapshot_etag: 'snapshot-r3',
+          evidence_hashes: ['sha256:approved-preview'],
+        },
+      ],
+      content_cards_edit: {
+        fields: project.operations?.[0]?.fields ?? {},
+        review_template: { schema_version: 1, cards: [] },
+      },
+    },
+  }
+
+  const operation = projectFromSnapshot(project, snapshot)?.operations?.[0]
+
+  expect(operation?.preview).toMatchObject({ status: 'current', reviewId: 'review-content-cards-current' })
+  expect(operation?.approval).toEqual({ status: 'none' })
+  const mapped = projectFromSnapshot(project, snapshot)
+  const store = createEditorStore({
+    project: mapped, activeTab: 'assets', selection: null, currentTimeS: 0,
+    isPlaying: false, timelineZoom: 1, snapEnabled: true, openMenu: null,
+  })
+  expect(store.getState().canApproveOperation('content-cards')).toBe(true)
+})
+
+test('runtime snapshot maps terminal status only when it binds the exact preview', () => {
+  const snapshot: RuntimeSnapshot = {
+    read_only: false, errors: [], resources: [], artifacts: [], media: [],
+    view: {
+      operations: [{ id: 'content-cards', revision: 3, status: 'approved', etag: 'operation-r3' }],
+      reviews: [{
+        id: 'review-content-cards-current', revision: 1, status: 'approved', rationale: 'Evidence is correct',
+        based_on: { 'content-cards': 3 }, snapshot_etag: 'snapshot-r3', evidence_hashes: ['sha256:current-preview'],
+      }],
+      content_cards_edit: { fields: project.operations?.[0]?.fields ?? {}, review_template: { schema_version: 1, cards: [] } },
+    },
+  }
+
+  const operation = projectFromSnapshot(project, snapshot)?.operations?.[0]
+  expect(operation?.approval).toMatchObject({
+    status: 'approved', revision: 3,
+  })
+  expect(operation?.preview).toEqual({
+    status: 'current', revision: 3, reviewId: 'review-content-cards-current',
+    snapshotEtag: 'snapshot-r3', evidenceHashes: ['sha256:current-preview'],
+  })
+  expect(reviewStatusText(operation!, false)).toBe('Preview approved')
+  const rejected = {
+    ...operation!,
+    approval: { ...operation!.approval!, status: 'rejected' as const },
+  }
+  expect(reviewStatusText(rejected, false)).toBe('Preview rejected')
 })
 
 test('getScenario resolves every dash-form Figma node and graphic motion', () => {

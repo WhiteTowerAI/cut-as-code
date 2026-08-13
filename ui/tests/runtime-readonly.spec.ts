@@ -1,6 +1,8 @@
 import { expect, request, test, type APIRequestContext } from '@playwright/test'
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -15,6 +17,7 @@ type ReadyMessage = Readonly<{
 const uiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const repositoryRoot = path.resolve(uiRoot, '..')
 const bundledPython = 'C:\\Users\\Charles Kang\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python\\python.exe'
+const execFileAsync = promisify(execFile)
 
 let projectRoot: string
 let sidecar: ChildProcessWithoutNullStreams
@@ -172,6 +175,78 @@ test('browser runtime removes the one-use token and refreshes after an external 
   }
 })
 
+test('mutation routes forward only typed protocol commands and return conflicts', async () => {
+  const isolated = await authenticatedSidecar()
+  try {
+    const response = await isolated.client.post(
+      `/v1/projects/${isolated.ready.projectId}/transactions`,
+      {
+        data: { operation: 'captions', readSet: {}, patch: { revision: 99 } },
+        headers: { Origin: isolatedURL(isolated.ready) },
+      },
+    )
+    expect(response.status()).toBe(400)
+    expect(await response.json()).toEqual({ ok: false, error: 'unsupported operation' })
+
+    const review = await isolated.client.post(
+      `/v1/projects/${isolated.ready.projectId}/reviews/decision`,
+      {
+        data: { operation: 'captions', readSet: {}, decision: { decision: 'approved' } },
+        headers: { Origin: isolatedURL(isolated.ready) },
+      },
+    )
+    expect(review.status()).toBe(400)
+    expect(await review.json()).toEqual({ ok: false, error: 'unsupported operation' })
+  } finally {
+    await isolated.client.dispose()
+    await stopSidecar(isolated.process)
+  }
+})
+
+test('content cards save commits through sidecar and stale read sets return 409', async () => {
+  test.setTimeout(20_000)
+  const root = await createContentCardsProjectFixture()
+  const isolated = await startSidecar(root)
+  const client = await request.newContext({ baseURL: isolatedURL(isolated.ready) })
+  try {
+    await client.post('/v1/session/bootstrap', {
+      data: { projectId: isolated.ready.projectId, bootstrapToken: isolated.ready.bootstrapToken },
+      headers: { Origin: isolatedURL(isolated.ready) },
+    })
+    const loaded = await client.get(`/v1/projects/${isolated.ready.projectId}/snapshot`)
+    const { snapshot } = await loaded.json()
+    expect(snapshot.read_only, `loaded:${JSON.stringify(snapshot.errors)}`).toBe(false)
+    const operation = snapshot.view.operations.find((item: { id: string }) => item.id === 'content-cards')
+    const readSet = {
+      project: snapshot.resources.find((item: { kind: string }) => item.kind === 'project').etag,
+      operation: operation.etag,
+      plan: snapshot.resources.find((item: { operation_id?: string }) => item.operation_id === 'content-cards').etag,
+    }
+    const body = {
+      operation: 'content-cards', readSet,
+      review: { schema_version: 1, cards: [{ id: 'card-001', selected: true, copy: 'Saved locally', placement: 'top', visual_treatment: 'default' }] },
+    }
+    const saved = await client.post(`/v1/projects/${isolated.ready.projectId}/transactions`, {
+      data: body, headers: { Origin: isolatedURL(isolated.ready) },
+    })
+    const savedBody = await saved.json()
+    expect(saved.status(), `saved:${JSON.stringify(savedBody)}`).toBe(200)
+    expect(savedBody).toMatchObject({ ok: true, result: 'committed' })
+    const project = JSON.parse(await readFile(path.join(root, 'work', 'project.json'), 'utf8'))
+    expect(project.operations[0]).toMatchObject({ revision: 2, status: 'stale' })
+    expect(project.render.status).toBe('draft')
+
+    const conflict = await client.post(`/v1/projects/${isolated.ready.projectId}/transactions`, {
+      data: body, headers: { Origin: isolatedURL(isolated.ready) },
+    })
+    expect(conflict.status(), `conflict:${await conflict.text()}`).toBe(409)
+  } finally {
+    await client.dispose()
+    await stopSidecar(isolated.process)
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 async function authenticatedSidecar() {
   const isolated = await startSidecar(projectRoot)
   const isolatedURLValue = isolatedURL(isolated.ready)
@@ -302,5 +377,38 @@ async function createProjectFixture() {
     reviews: [],
     render: { status: 'draft' },
   }))
+  return root
+}
+
+async function createContentCardsProjectFixture() {
+  const root = await mkdtemp(path.join(tmpdir(), 'cut-editor-cards-'))
+  await mkdir(path.join(root, 'work', 'content-cards'), { recursive: true })
+  await mkdir(path.join(root, 'input'), { recursive: true })
+  await writeFile(path.join(root, 'input', 'source.mp4'), 'video')
+  const { stdout: sourceStat } = await execFileAsync(bundledPython, ['-c',
+    'import os,sys; s=os.stat(sys.argv[1]); print(f"{s.st_size} {s.st_mtime_ns}")',
+    path.join(root, 'input', 'source.mp4')])
+  const [sourceSize, sourceModifiedNs] = sourceStat.trim().split(' ')
+  await writeFile(path.join(root, 'work', 'timeline.json'), JSON.stringify({
+    schema_version: 1, source_duration_s: 1, program_duration_s: 1,
+    fps: { num: 30, den: 1 }, clips: [{ id: 'clip-1', source_range: { start_s: 0, end_s: 1 }, program_range: { start_s: 0, end_s: 1 }, speed: 1 }],
+  }))
+  await writeFile(path.join(root, 'work', 'content-cards', 'cards-plan.json'), JSON.stringify({
+    schema_version: 1, target: 'overlay', timeline_id: 'main',
+    brief: { theme: 'almanac', target_card_count: 1 }, cards: [{
+      id: 'card-001', card_type: 'intro', evidence_refs: ['moment-1'],
+      copy: { status: 'draft', suggested_text: 'Original copy', display: { title: null } },
+      placement: { status: 'draft', region: null }, visual_treatment: { status: 'draft', layout: 'default' },
+    }],
+  }))
+  const projectJson = JSON.stringify({
+    schema_version: 1,
+    source: { path: '../input/source.mp4', fingerprint: { size: Number(sourceSize), modified_ns: '__MTIME__', duration_s: 1 } },
+    active_sequence: 'main', sequences: { main: { timeline: 'timeline.json', operations: ['content-cards'] } },
+    operations: [{ id: 'content-cards', revision: 1, status: 'approved', depends_on: [], based_on: {},
+      target: { sequence: 'main', scope: 'full' }, effects: { changes_timeline: false, changes_geometry: false, changes_video_pixels: true, changes_audio: false },
+      plan: 'content-cards/cards-plan.json', outputs: [] }], reviews: [], render: { status: 'verified' },
+  }).replace('"__MTIME__"', sourceModifiedNs)
+  await writeFile(path.join(root, 'work', 'project.json'), projectJson)
   return root
 }

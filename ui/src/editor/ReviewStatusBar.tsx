@@ -8,22 +8,26 @@ type ReviewStatusBarProps = {
   store: StoreApi<EditorState>
 }
 
+export function reviewStatusText(operation: EditorOperationView, conflict: boolean) {
+  return conflict
+    ? 'Conflict'
+    : !operation.preview
+      ? 'No preview artifact'
+      : operation.preview.status === 'stale'
+        ? 'Preview stale'
+        : operation.approval?.status === 'approved'
+          ? 'Preview approved'
+          : operation.approval?.status === 'rejected'
+            ? 'Preview rejected'
+            : 'Preview current'
+}
+
 export function ReviewStatusBar({ operation, store }: ReviewStatusBarProps) {
   const draft = useStore(store, (state) => state.getOperationDraft(operation.id))
   const canSave = useStore(store, (state) => state.canSaveOperation(operation.id))
   const save = useStore(store, (state) => state.saveOperationDraft)
   const discard = useStore(store, (state) => state.discardOperationDraft)
-  const previewStatus = draft?.conflict
-    ? 'Conflict'
-    : !operation.preview
-      ? 'No preview artifact'
-    : operation.preview?.status === 'stale'
-      ? 'Preview stale'
-      : operation.approval?.status === 'approved'
-        ? 'Preview approved'
-        : operation.approval?.status === 'rejected'
-          ? 'Preview rejected'
-          : 'Preview current'
+  const previewStatus = reviewStatusText(operation, Boolean(draft?.conflict))
 
   return (
     <section
@@ -34,10 +38,12 @@ export function ReviewStatusBar({ operation, store }: ReviewStatusBarProps) {
         <strong>{previewStatus}</strong>
         {draft?.dirty ? <span> Unsaved changes</span> : null}
         {draft?.conflict ? <span> External update detected</span> : null}
+        {draft?.pending ? <span> Saving</span> : null}
+        {draft?.error ? <span role="alert"> {draft.error}</span> : null}
       </output>
       <span style={{ marginLeft: 'auto' }}>Revision {operation.revision}</span>
       <button type="button" disabled={!canSave} onClick={() => save(operation.id)}>Save Changes</button>
-      <button type="button" disabled={!draft} onClick={() => discard(operation.id)}>Discard changes</button>
+      <button type="button" disabled={!draft || draft.pending} onClick={() => discard(operation.id)}>Discard changes</button>
     </section>
   )
 }

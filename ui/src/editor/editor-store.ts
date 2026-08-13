@@ -22,6 +22,9 @@ export type OperationDraft = Readonly<{
   fields: ContentCardsDraftChange
   dirty: boolean
   conflict: boolean
+  pending?: boolean
+  requestId?: number
+  error?: string
 }>
 
 const contentCardFields: readonly ContentCardEditableField[] = [
@@ -31,12 +34,17 @@ const contentCardFields: readonly ContentCardEditableField[] = [
   'enabled',
 ]
 
-const contentCardLayouts: readonly ContentCardLayout[] = ['lower-third', 'quote', 'statistic']
+const contentCardLayouts: readonly ContentCardLayout[] = ['lower-third', 'quote', 'statistic', 'default', 'metric-spotlight', 'bar-chart', 'pie-chart', 'line-chart', 'side-by-side', 'parallel-columns']
 const contentCardPlacements: readonly ContentCardPlacement[] = [
   'top-left',
   'top-right',
   'bottom-left',
   'bottom-right',
+  'top',
+  'bottom',
+  'left',
+  'right',
+  'center',
 ]
 
 function getOperation(project: EditorProjectView | null, operationId: string) {
@@ -71,9 +79,9 @@ function hasReviewEvidence(operation: EditorOperationView) {
   const preview = operation.preview
   return Boolean(
     preview &&
-      preview.reviewId.trim() &&
-      preview.snapshotEtag.trim() &&
-      preview.evidenceHashes.length &&
+      typeof preview.reviewId === 'string' && preview.reviewId.trim() &&
+      typeof preview.snapshotEtag === 'string' && preview.snapshotEtag.trim() &&
+      Array.isArray(preview.evidenceHashes) && preview.evidenceHashes.length &&
       preview.evidenceHashes.every((hash) => hash.trim()),
   )
 }
@@ -90,6 +98,7 @@ function canRecordReviewDecision(
       isSupportedOperation(operation) &&
       !draft?.dirty &&
       !draft?.conflict &&
+      !draft?.pending &&
       preview?.status === 'current' &&
       preview.revision === operation.revision &&
       hasReviewEvidence(operation) &&
@@ -117,12 +126,17 @@ export type EditorState = {
   setOpenMenu: (menu: MenuId) => void
   editOperationDraft: (operationId: string, change: ContentCardsDraftChange) => void
   discardOperationDraft: (operationId: string) => void
-  saveOperationDraft: (operationId: string) => void
-  recordReviewDecision: (operationId: string, decision: 'approved' | 'rejected', rationale?: string) => void
+  saveOperationDraft: (operationId: string) => Promise<void>
+  recordReviewDecision: (operationId: string, decision: 'approved' | 'rejected', rationale?: string) => Promise<void>
   getOperationDraft: (operationId: string) => OperationDraft | null
   canSaveOperation: (operationId: string) => boolean
   canApproveOperation: (operationId: string) => boolean
 }
+
+export type EditorRuntimeAdapter = Readonly<{
+  save: (operationId: string, draft: ContentCardsDraftChange) => Promise<EditorProjectView>
+  review: (operationId: string, decision: 'approved' | 'rejected', rationale?: string) => Promise<EditorProjectView>
+}>
 
 export type EditorInitialState = Omit<
   EditorState,
@@ -144,7 +158,7 @@ export type EditorInitialState = Omit<
   | 'operationDrafts'
 >
 
-export function createEditorStore(initialState: EditorInitialState) {
+export function createEditorStore(initialState: EditorInitialState, runtime?: EditorRuntimeAdapter) {
   return createStore<EditorState>()((set, get) => ({
     ...initialState,
     operationDrafts: {},
@@ -188,6 +202,8 @@ export function createEditorStore(initialState: EditorInitialState) {
         fields: nextFields,
         dirty: !fieldsMatch(operation.fields, nextFields),
         conflict: false,
+        pending: current?.pending ?? false,
+        requestId: current?.requestId,
       }
       set({ operationDrafts: { ...get().operationDrafts, [operationId]: draft } })
     },
@@ -195,13 +211,57 @@ export function createEditorStore(initialState: EditorInitialState) {
       const { [operationId]: _discarded, ...operationDrafts } = get().operationDrafts
       set({ operationDrafts })
     },
-    saveOperationDraft: (operationId) => {
+    saveOperationDraft: async (operationId) => {
       const state = get()
       const draft = state.operationDrafts[operationId]
       const operation = getOperation(state.project, operationId)
-      if (!draft || !operation || !isSupportedOperation(operation) || draft.conflict) return
+      if (!draft || !operation || !isSupportedOperation(operation) || draft.conflict || draft.pending) return
       if (!draft.dirty) {
         state.discardOperationDraft(operationId)
+        return
+      }
+      if (runtime) {
+        const requestId = (draft.requestId ?? 0) + 1
+        const submittedFields = { ...draft.fields }
+        set({ operationDrafts: {
+          ...get().operationDrafts,
+          [operationId]: { ...draft, requestId, pending: true, error: undefined },
+        } })
+        try {
+          const project = await runtime.save(operationId, submittedFields)
+          const current = get().operationDrafts[operationId]
+          if (current?.requestId !== requestId) return
+          const newerFields = Object.fromEntries(Object.entries(current.fields).filter(
+            ([field, value]) => submittedFields[field as keyof ContentCardsDraftChange] !== value,
+          )) as ContentCardsDraftChange
+          if (Object.keys(newerFields).length) {
+            set({ project, operationDrafts: {
+              ...get().operationDrafts,
+              [operationId]: {
+                baseRevision: getOperation(project, operationId)?.revision ?? current.baseRevision,
+                fields: newerFields, dirty: true, conflict: false, pending: false,
+                requestId,
+              },
+            } })
+          } else {
+            const { [operationId]: _saved, ...operationDrafts } = get().operationDrafts
+            set({ project, operationDrafts })
+          }
+        } catch (error) {
+          const current = get().operationDrafts[operationId]
+          if (current?.requestId !== requestId) return
+          if (error && typeof error === 'object' && 'conflict' in error && 'project' in error) {
+            set({ operationDrafts: {
+              ...get().operationDrafts,
+              [operationId]: { ...current, conflict: true, pending: false },
+            }, project: error.project as EditorProjectView })
+          } else {
+            set({ operationDrafts: {
+              ...get().operationDrafts,
+              [operationId]: { ...current, pending: false, error: error instanceof Error ? error.message : 'Save failed' },
+            } })
+          }
+        }
         return
       }
       const operations = state.project?.operations?.map((candidate) =>
@@ -223,12 +283,43 @@ export function createEditorStore(initialState: EditorInitialState) {
       const { [operationId]: _saved, ...operationDrafts } = state.operationDrafts
       set({ project: state.project ? { ...state.project, operations } : null, operationDrafts })
     },
-    recordReviewDecision: (operationId, decision, rationale) => {
+    recordReviewDecision: async (operationId, decision, rationale) => {
       const state = get()
       const operation = getOperation(state.project, operationId)
       if (!operation || !canRecordReviewDecision(state.project, operationId, state.operationDrafts[operationId])) return
       const cleanRationale = rationale?.trim()
-      if (decision === 'rejected' && !cleanRationale) return
+      if (!cleanRationale) return
+      if (runtime) {
+        const currentDraft = state.operationDrafts[operationId]
+        if (currentDraft?.pending) return
+        const requestId = (currentDraft?.requestId ?? 0) + 1
+        const pendingDraft: OperationDraft = currentDraft
+          ? { ...currentDraft, requestId, pending: true, error: undefined }
+          : { baseRevision: operation.revision, fields: {}, dirty: false, conflict: false, requestId, pending: true }
+        set({ operationDrafts: { ...get().operationDrafts, [operationId]: pendingDraft } })
+        try {
+          const project = await runtime.review(operationId, decision, cleanRationale)
+          const current = get().operationDrafts[operationId]
+          if (current?.requestId !== requestId) return
+          const { [operationId]: _reviewed, ...operationDrafts } = get().operationDrafts
+          set({ project, operationDrafts })
+        } catch (error) {
+          const current = get().operationDrafts[operationId]
+          if (current?.requestId !== requestId) return
+          if (error && typeof error === 'object' && 'conflict' in error && 'project' in error) {
+            set({ operationDrafts: {
+              ...get().operationDrafts,
+              [operationId]: { ...current, conflict: true, pending: false },
+            }, project: error.project as EditorProjectView })
+          } else {
+            set({ operationDrafts: {
+              ...get().operationDrafts,
+              [operationId]: { ...current, pending: false, error: error instanceof Error ? error.message : 'Review failed' },
+            } })
+          }
+        }
+        return
+      }
       const operations = state.project?.operations?.map((candidate) =>
         candidate.id === operationId
           ? {
@@ -249,7 +340,7 @@ export function createEditorStore(initialState: EditorInitialState) {
     getOperationDraft: (operationId) => get().operationDrafts[operationId] ?? null,
     canSaveOperation: (operationId) => {
       const draft = get().operationDrafts[operationId]
-      return Boolean(draft?.dirty && !draft.conflict)
+      return Boolean(draft?.dirty && !draft.conflict && !draft.pending)
     },
     canApproveOperation: (operationId) => {
       const state = get()

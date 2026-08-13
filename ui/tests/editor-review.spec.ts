@@ -21,9 +21,9 @@ test('review rejection requires an explicit rationale and editor exposes no exec
   await page.goto('/?scenario=review-content-cards')
 
   await page.getByRole('button', { name: 'Reject preview' }).click()
-  await expect(page.getByLabel('Rejection rationale')).toBeVisible()
+  await expect(page.getByLabel('Decision rationale')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Confirm rejection' })).toBeDisabled()
-  await page.getByLabel('Rejection rationale').fill('Title obscures the speaker')
+  await page.getByLabel('Decision rationale').fill('Title obscures the speaker')
   await page.getByRole('button', { name: 'Confirm rejection' }).click()
   await expect(page.getByRole('status', { name: 'Content Cards review status' })).toContainText('Preview rejected')
 
