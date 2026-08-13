@@ -1,28 +1,25 @@
 import { expect, test } from '@playwright/test'
 
 test('loads the local Inter faces used by the Library typography', async ({ page }) => {
-  await page.goto('/?scenario=1-84')
+  await page.goto('/?scenario=18-3')
 
   const typography = await page.evaluate(async () => {
     await document.fonts.ready
-    const requestedWeights = [400, 500, 600]
-    const loadedWeights = await Promise.all(requestedWeights.map(async (weight) => ({
-      weight,
-      faces: (await document.fonts.load(`${weight} 11px Inter`, 'Library')).length,
-    })))
+    const loadedWeights: number[] = []
+    document.fonts.forEach((face) => {
+      if (face.family.replaceAll('"', '') === 'Inter' && face.status === 'loaded') {
+        loadedWeights.push(Number(face.weight))
+      }
+    })
     return {
       family: getComputedStyle(document.querySelector('.library-panel')!).fontFamily,
-      loadedWeights,
+      loadedWeights: loadedWeights.sort((left, right) => left - right),
     }
   })
 
   expect(typography).toEqual({
     family: 'Inter, ui-sans-serif, system-ui, sans-serif',
-    loadedWeights: [
-      { weight: 400, faces: 1 },
-      { weight: 500, faces: 1 },
-      { weight: 600, faces: 1 },
-    ],
+    loadedWeights: [400, 500, 600],
   })
 })
 
@@ -217,6 +214,105 @@ test('caption theme controls match the official panel geometry', async ({ page }
     firstSwatch: { left: 62, top: 427, width: 18, height: 18 },
     toggle: { left: 272, top: 466, width: 36, height: 20 },
   })
+})
+
+test('pages the compact four-tab strip while preserving the official first page', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 688 })
+  await page.goto('/?scenario=1-84')
+
+  const tablist = page.getByRole('tablist', { name: 'Library sections' })
+  const assets = page.getByRole('tab', { name: 'My Assets' })
+  const motion = page.getByRole('tab', { name: 'Graphic Motion' })
+  const tabGeometry = () => tablist.evaluate((node) => {
+    const listBox = node.getBoundingClientRect()
+    const relativeBox = (tab: string) => {
+      const box = node.querySelector<HTMLElement>(`[data-tab="${tab}"]`)!.getBoundingClientRect()
+      return {
+        left: Math.round(box.left - listBox.left + node.scrollLeft),
+        width: Math.round(box.width),
+      }
+    }
+    return {
+      scrollLeft: Math.round(node.scrollLeft),
+      clientWidth: node.clientWidth,
+      assets: relativeBox('assets'),
+      captions: relativeBox('captions'),
+      cards: relativeBox('cards'),
+      motion: relativeBox('graphic-motion'),
+    }
+  })
+  const selectedTabViewport = () => tablist.evaluate((node) => {
+    const listBox = node.getBoundingClientRect()
+    const selectedBox = node.querySelector<HTMLElement>('[aria-selected="true"]')!.getBoundingClientRect()
+    return {
+      scrollLeft: Math.round(node.scrollLeft),
+      left: Math.round(selectedBox.left - listBox.left),
+      right: Math.round(selectedBox.right - listBox.left),
+      clientWidth: node.clientWidth,
+    }
+  })
+
+  expect(await tabGeometry()).toEqual({
+    scrollLeft: 0,
+    clientWidth: 296,
+    assets: { left: 0, width: 76 },
+    captions: { left: 80, width: 76 },
+    cards: { left: 160, width: 60 },
+    motion: { left: 296, width: 112 },
+  })
+
+  await motion.evaluate((element) => element.click())
+  await expect(motion).toHaveAttribute('aria-selected', 'true')
+  await expect.poll(selectedTabViewport).toEqual({ scrollLeft: 112, left: 184, right: 296, clientWidth: 296 })
+
+  await assets.evaluate((element) => element.click())
+  await expect(assets).toHaveAttribute('aria-selected', 'true')
+  await expect.poll(() => tablist.evaluate((node) => Math.round(node.scrollLeft))).toBe(0)
+
+  await assets.focus()
+  await page.keyboard.press('End')
+  await expect(motion).toBeFocused()
+  await expect.poll(selectedTabViewport).toEqual({ scrollLeft: 112, left: 184, right: 296, clientWidth: 296 })
+
+  await page.keyboard.press('Home')
+  await expect(assets).toBeFocused()
+  await expect.poll(() => tablist.evaluate((node) => Math.round(node.scrollLeft))).toBe(0)
+})
+
+test('keeps the workspace Library on the same initial three-tab page', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1200 })
+  await page.goto('/?scenario=1-1373')
+
+  const tablist = page.getByRole('tablist', { name: 'Library sections' })
+  const geometry = await tablist.evaluate((node) => {
+    const listBox = node.getBoundingClientRect()
+    const motionBox = node.querySelector<HTMLElement>('[data-tab="graphic-motion"]')!.getBoundingClientRect()
+    return {
+      scrollLeft: Math.round(node.scrollLeft),
+      clientWidth: node.clientWidth,
+      motionLeft: Math.round(motionBox.left - listBox.left),
+    }
+  })
+
+  expect(geometry).toEqual({ scrollLeft: 0, clientWidth: 296, motionLeft: 296 })
+})
+
+test('expands the empty workspace drop zone to the Library content width', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1200 })
+  await page.goto('/?scenario=1-1373')
+
+  const geometry = await page.locator('.library-content').evaluate((content) => {
+    const contentBox = content.getBoundingClientRect()
+    const dropzoneBox = content.querySelector('.asset-dropzone')!.getBoundingClientRect()
+    return {
+      contentWidth: contentBox.width,
+      dropzoneLeft: Math.round(dropzoneBox.left - contentBox.left),
+      dropzoneWidth: dropzoneBox.width,
+      dropzoneRight: Math.round(contentBox.right - dropzoneBox.right),
+    }
+  })
+
+  expect(geometry).toEqual({ contentWidth: 400, dropzoneLeft: 12, dropzoneWidth: 376, dropzoneRight: 12 })
 })
 
 test('switches the single library panel across all four tabs', async ({ page }) => {

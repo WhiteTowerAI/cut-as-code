@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-13T03:46:38.181Z",
+  "generatedAt": "2026-08-13T04:48:13.621Z",
   "strictDiffRatioThreshold": 0.01,
   "pixelChannelTolerance": 16,
   "results": [
@@ -29,9 +29,9 @@
         "width": 1440,
         "height": 1200
       },
-      "differentPixels": 147979,
+      "differentPixels": 147012,
       "totalPixels": 1728000,
-      "diffRatio": 0.08563599537037037,
+      "diffRatio": 0.08507638888888888,
       "threshold": 0.01,
       "pixelChannelTolerance": 16,
       "verdict": "fail",
@@ -69,12 +69,12 @@
         "width": 1440,
         "height": 1200
       },
-      "differentPixels": 18651,
+      "differentPixels": 16505,
       "totalPixels": 1728000,
-      "diffRatio": 0.010793402777777778,
+      "diffRatio": 0.00955150462962963,
       "threshold": 0.01,
       "pixelChannelTolerance": 16,
-      "verdict": "fail",
+      "verdict": "pass",
       "artifacts": {
         "referenceRaw": "figma-1-1373-reference.png",
         "referenceCompared": "figma-1-1373-reference-compared.png",
@@ -109,9 +109,9 @@
         "width": 320,
         "height": 688
       },
-      "differentPixels": 3496,
+      "differentPixels": 2765,
       "totalPixels": 220160,
-      "diffRatio": 0.015879360465116277,
+      "diffRatio": 0.012559047965116279,
       "threshold": 0.01,
       "pixelChannelTolerance": 16,
       "verdict": "fail",
@@ -429,9 +429,9 @@
         "width": 320,
         "height": 688
       },
-      "differentPixels": 5461,
+      "differentPixels": 3895,
       "totalPixels": 220160,
-      "diffRatio": 0.0248046875,
+      "diffRatio": 0.017691678779069766,
       "threshold": 0.01,
       "pixelChannelTolerance": 16,
       "verdict": "fail",
@@ -509,9 +509,9 @@
         "width": 320,
         "height": 688
       },
-      "differentPixels": 4125,
+      "differentPixels": 3249,
       "totalPixels": 220160,
-      "diffRatio": 0.018736373546511628,
+      "diffRatio": 0.014757449127906977,
       "threshold": 0.01,
       "pixelChannelTolerance": 16,
       "verdict": "fail",
@@ -629,9 +629,9 @@
         "width": 320,
         "height": 688
       },
-      "differentPixels": 4823,
+      "differentPixels": 3806,
       "totalPixels": 220160,
-      "diffRatio": 0.021906795058139535,
+      "diffRatio": 0.017287427325581396,
       "threshold": 0.01,
       "pixelChannelTolerance": 16,
       "verdict": "fail",
