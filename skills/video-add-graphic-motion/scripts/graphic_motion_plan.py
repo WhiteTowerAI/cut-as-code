@@ -31,6 +31,11 @@ RANGE_EPSILON = 1e-6
 SELECTION_FIELDS = {
     "name", "description", "category", "tags", "intent_keywords", "best_for", "avoid_when",
 }
+ROLE_SELECTION_FIELDS = {
+    "structural_roles", "motion_functions", "visual_language", "rhythm_energy",
+    "information_density", "frame_relationship", "color_tendency", "style_rationale",
+}
+STRUCTURAL_ROLES = {"opener", "chapter", "interstitial", "background", "outro"}
 RECIPE_LIBRARY_ROOT = Path(__file__).resolve().parents[1] / "recipes"
 
 
@@ -422,6 +427,15 @@ def _selection_errors(cue_id, cue, recipe_ids):
     shortlist = selection.get("shortlist")
     queries = intent.get("recipe_queries")
     errors = []
+    has_structural_role = "structural_role" in selection
+    structural_role = selection.get("structural_role")
+    if has_structural_role and structural_role not in STRUCTURAL_ROLES:
+        errors.append(f"{cue_id} structural role selection is invalid")
+    allowed_matched_fields = (
+        SELECTION_FIELDS | ROLE_SELECTION_FIELDS
+        if has_structural_role and structural_role in STRUCTURAL_ROLES
+        else SELECTION_FIELDS
+    )
     if (
         not _nonblank(selection.get("query"))
         or not isinstance(queries, list)
@@ -446,7 +460,7 @@ def _selection_errors(cue_id, cue, recipe_ids):
             or score is None
             or score < 0
             or not isinstance(matched, list)
-            or any(field not in SELECTION_FIELDS for field in matched)
+            or any(field not in allowed_matched_fields for field in matched)
             or len(matched) != len(set(matched))
         ):
             errors.append(f"{cue_id} recipe shortlist is invalid")
@@ -469,6 +483,19 @@ def _selection_errors(cue_id, cue, recipe_ids):
         or any(not _nonblank(field_evidence.get(field)) for field in SELECTION_FIELDS)
     ):
         errors.append(f"{cue_id} recipe selection must assess all seven manifest fields")
+    role_field_evidence = selection.get("role_field_evidence")
+    if has_structural_role:
+        if (
+            not isinstance(role_field_evidence, dict)
+            or set(role_field_evidence) != ROLE_SELECTION_FIELDS
+            or any(
+                not _nonblank(role_field_evidence.get(field))
+                for field in ROLE_SELECTION_FIELDS
+            )
+        ):
+            errors.append(f"{cue_id} role-aware selection must assess all eight role fields")
+    elif role_field_evidence is not None:
+        errors.append(f"{cue_id} role-aware selection must assess all eight role fields")
     return list(dict.fromkeys(errors))
 
 

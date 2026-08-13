@@ -17,6 +17,21 @@ export const SELECTION_FIELDS = [
   "avoid_when",
 ];
 
+export const STRUCTURAL_ROLES = [
+  "opener", "chapter", "interstitial", "background", "outro",
+];
+
+export const ROLE_SELECTION_FIELDS = [
+  "structural_roles",
+  "motion_functions",
+  "visual_language",
+  "rhythm_energy",
+  "information_density",
+  "frame_relationship",
+  "color_tendency",
+  "style_rationale",
+];
+
 const POSITIVE_WEIGHTS = {
   name: 8,
   description: 4,
@@ -24,6 +39,17 @@ const POSITIVE_WEIGHTS = {
   tags: 6,
   intent_keywords: 14,
   best_for: 5,
+};
+
+const ROLE_WEIGHTS = {
+  structural_roles: 16,
+  motion_functions: 10,
+  visual_language: 7,
+  rhythm_energy: 2,
+  information_density: 2,
+  frame_relationship: 2,
+  color_tendency: 2,
+  style_rationale: 2,
 };
 
 const STOPWORDS = new Set([
@@ -88,7 +114,7 @@ async function walk(directory, skipDirectories = new Set()) {
 }
 
 function metadataFromManifest(manifest) {
-  return {
+  const metadata = {
     name: manifestScalar(manifest, "name") || "",
     description: manifestScalar(manifest, "description") || "",
     category: manifestScalar(manifest, "category") || "",
@@ -97,6 +123,21 @@ function metadataFromManifest(manifest) {
     best_for: manifestList(manifest, "best_for"),
     avoid_when: manifestList(manifest, "avoid_when"),
   };
+  for (const field of ["structural_roles", "motion_functions", "visual_language", "mechanisms"]) {
+    const values = manifestList(manifest, field);
+    if (values.length) metadata[field] = values;
+  }
+  for (const field of [
+    "rhythm_energy",
+    "information_density",
+    "frame_relationship",
+    "color_tendency",
+    "style_rationale",
+  ]) {
+    const value = manifestScalar(manifest, field);
+    if (value !== null) metadata[field] = value;
+  }
+  return metadata;
 }
 
 export async function discoverRecipes(recipesRoot) {
@@ -149,13 +190,28 @@ function fieldText(value) {
   return Array.isArray(value) ? value.join(" ") : String(value || "");
 }
 
-export function rankRecipes(recipes, { query = "", category = null, limit = 8 } = {}) {
+function normalizeStructuralRole(value) {
+  if (value === null || value === undefined || String(value).trim() === "") return null;
+  const role = String(value).trim().toLocaleLowerCase();
+  if (!STRUCTURAL_ROLES.includes(role)) {
+    throw new Error(`structural role must be one of: ${STRUCTURAL_ROLES.join(", ")}`);
+  }
+  return role;
+}
+
+export function rankRecipes(recipes, {
+  query = "",
+  category = null,
+  structuralRole = null,
+  limit = 8,
+} = {}) {
   const parsedLimit = Number(limit);
   if (!Number.isInteger(parsedLimit) || parsedLimit < 1 || parsedLimit > 50) {
     throw new Error("limit must be an integer from 1 to 50");
   }
   const queryWords = [...new Set(words(query))];
-  if (String(query).trim() && queryWords.length === 0) return [];
+  const normalizedRole = normalizeStructuralRole(structuralRole);
+  if (String(query).trim() && queryWords.length === 0 && !normalizedRole) return [];
   const normalizedCategory = category ? String(category).toLocaleLowerCase() : null;
   const results = [];
   for (const recipe of recipes) {
@@ -168,9 +224,22 @@ export function rankRecipes(recipes, { query = "", category = null, limit = 8 } 
       if (matches.length) matchedFields.push(field);
       score += matches.length * weight;
     }
+    const roleMatches = normalizedRole
+      && Array.isArray(recipe.metadata.structural_roles)
+      && recipe.metadata.structural_roles.includes(normalizedRole);
+    if (roleMatches) {
+      matchedFields.push("structural_roles");
+      score += ROLE_WEIGHTS.structural_roles;
+      for (const field of ROLE_SELECTION_FIELDS.slice(1)) {
+        const tokens = new Set(words(fieldText(recipe.metadata[field])));
+        const matches = queryWords.filter((token) => tokens.has(token));
+        if (matches.length) matchedFields.push(field);
+        score += matches.length * ROLE_WEIGHTS[field];
+      }
+    }
     const avoidTokens = new Set(words(fieldText(recipe.metadata.avoid_when)));
     const avoidWhenMatches = queryWords.filter((token) => avoidTokens.has(token));
-    if (queryWords.length && score === 0) continue;
+    if ((queryWords.length || normalizedRole) && score === 0) continue;
     results.push({
       id: recipe.id,
       surface: recipe.surface,
@@ -192,8 +261,19 @@ export function rankRecipes(recipes, { query = "", category = null, limit = 8 } 
   }).slice(0, parsedLimit);
 }
 
-export async function searchRecipes({ recipesRoot, query = "", category = null, limit = 8 }) {
-  return rankRecipes(await discoverRecipes(recipesRoot), { query, category, limit });
+export async function searchRecipes({
+  recipesRoot,
+  query = "",
+  category = null,
+  structuralRole = null,
+  limit = 8,
+}) {
+  return rankRecipes(await discoverRecipes(recipesRoot), {
+    query,
+    category,
+    structuralRole,
+    limit,
+  });
 }
 
 export async function showRecipe({ recipesRoot, recipeId }) {
@@ -283,6 +363,7 @@ async function main(args) {
       recipesRoot,
       query: option(args, "--query", ""),
       category: option(args, "--category"),
+      structuralRole: option(args, "--structural-role"),
       limit: Number(option(args, "--limit", "8")),
     });
   } else if (command === "show") {
@@ -301,7 +382,7 @@ async function main(args) {
     });
   } else {
     throw new Error(
-      "usage: recipe_library.mjs search --query <text> [--category <id>] [--limit 8] --json\n"
+      "usage: recipe_library.mjs search --query <text> [--category <id>] [--structural-role opener|chapter|interstitial|background|outro] [--limit 8] --json\n"
       + "       recipe_library.mjs show <recipe-id> --json\n"
       + "       recipe_library.mjs materialize <recipe-id> --project <root> --cue <cue-id> --json\n"
       + "       recipe_library.mjs bind-adaptation --project <root> --cue <cue-id> --json",

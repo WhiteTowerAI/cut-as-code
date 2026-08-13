@@ -19,8 +19,8 @@ captions and content cards, and may not overlap either upstream overlay.
 The bundled `recipes/` tree is the only effect library. Do not search the web, query a remote
 catalog, or author a substitute effect. Every bundled manifest recipe is supported through its
 preconverted `hyperframes/` directory.
-The library contains 1,477 recipes: 218 motion-anything recipes, the MIT-licensed Codrops
-`codrops/KineticImages` Three.js recipe, and 1,258 source-backed stickers across
+The library contains 1,513 recipes: 218 motion-anything recipes, 37 MIT-licensed Codrops
+project recipes backed by 112 internal variants, and 1,258 source-backed stickers across
 `canvas-confetti/`, `mojs/`, `line-md/`, `meteocons/`, and `tsparticles/`. Library-level
 provenance lives in `recipes/ATTRIBUTION.md`; each source directory also carries its exact
 license and `SOURCE.json` receipt.
@@ -45,21 +45,35 @@ Read [recipe-selection.md](reference/recipe-selection.md),
    person exemption explicitly; protect uncertain cases.
 3. Define each cue before recipe search: content, purpose, half-open program range, motion
    family, interaction model, compositing mode, timing rationale, and one or more literal
-   `recipe_queries`. Reject filler and visual collisions. Zero cues is valid.
+   `recipe_queries`. When video understanding identifies a genuine structural composition,
+   also choose exactly one `structural_role`: `opener`, `chapter`, `interstitial`,
+   `background`, or `outro`. Do not infer a role merely from a style word. Reject filler and
+   visual collisions. Zero cues is valid.
 4. Build a deterministic local shortlist:
 
    ```powershell
    node skills/video-add-graphic-motion/scripts/recipe_library.mjs search `
      --query "technical text decode signal" --limit 8 --json
+   node skills/video-add-graphic-motion/scripts/recipe_library.mjs search `
+     --query "cinematic image collage" --structural-role opener --limit 8 --json
    node skills/video-add-graphic-motion/scripts/recipe_library.mjs show decrypted-text --json
    ```
 
-5. The Agent must judge the shortlist, not blindly take rank 1. For the chosen recipe, read and
-   assess all seven manifest fields: `name`, `description`, `category`, `tags`,
-   `intent_keywords`, `best_for`, and `avoid_when`. Record brief evidence for every field,
-   an Agent rationale, and an explicit `avoid_when` review in `selection`. `avoid_when` is a
-   contextual warning only; it never makes a recipe unsupported. Prefer two or more candidates
-   when the query returns them. If none fits the cue or footage, skip the cue.
+   Omit `--structural-role` for ordinary semantic overlays. Supplying it explicitly enables
+   role-aware recall only for recipes whose `structural_roles` includes the requested role.
+
+5. The Agent must judge the shortlist, not blindly take rank 1. For every choice, read and assess
+   the seven legacy manifest fields: `name`, `description`, `category`, `tags`,
+   `intent_keywords`, `best_for`, and `avoid_when`; keep their assessments in
+   `selection.field_evidence`. For a role-aware search, also assess `structural_roles`,
+   `motion_functions`, `visual_language`, `rhythm_energy`, `information_density`,
+   `frame_relationship`, `color_tendency`, and `style_rationale`; record the requested role in
+   `selection.structural_role` and all eight assessments in `selection.role_field_evidence`.
+   Inspect `mechanisms` and optional KineticImages `modes` as adaptation guidance, not ranking
+   evidence. Ordinary selections must omit both role receipt properties. Record an Agent
+   rationale and explicit `avoid_when` review in `selection`. `avoid_when` is a contextual
+   warning only; it never makes a recipe unsupported. Prefer two or more candidates when the
+   query returns them. If none fits the cue or footage, skip the cue.
 6. Materialize the chosen preconverted recipe:
 
    ```powershell

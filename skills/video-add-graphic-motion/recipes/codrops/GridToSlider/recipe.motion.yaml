@@ -1,0 +1,74 @@
+spec_version: 1
+id: "codrops-gridtoslider-index"
+name: "Ideas for Grid to Slideshow Switch Animations"
+description: "A graphic image grid resolves into a centered slider composition."
+surfaces: [video]
+category: "fullscreen-transition"
+tech: [html, css, js]
+canvas: [video]
+target: [fullscreen]
+intent: "fullscreen-transition"
+runtime: [css, js]
+export: [skill, html]
+dependencies: []
+tags:
+  - "codrops"
+  - "grid"
+  - "slider"
+  - "images"
+  - "futuristic"
+  - "transition"
+  - "fullscreen"
+intent_keywords:
+  - "grid to slider transition"
+  - "futuristic editorial montage"
+  - "image chapter change"
+  - "网格转幻灯片"
+  - "未来感图片转场"
+best_for:
+  - "A chapter or interstitial in fashion, music, art, and product-launch edits"
+  - "A fullscreen pivot between a gallery grid and one selected image"
+avoid_when:
+  - "The audience needs immediate plain-language explanation"
+  - "The scene cannot tolerate dense graphic panels or image cropping"
+structural_roles:
+  - "chapter"
+  - "interstitial"
+motion_functions:
+  - "transition"
+  - "build"
+  - "settle"
+visual_language:
+  - "editorial"
+  - "futuristic"
+  - "geometric"
+mechanisms:
+  - "grid-to-slider"
+  - "image-panels"
+  - "type"
+rhythm_energy: "medium-high"
+information_density: "dense"
+frame_relationship: "fullscreen"
+color_tendency: "dark"
+style_rationale: "The reviewed black composition combines a large wordmark, portrait cards, and panel changes, giving a dense editorial transition."
+restraint:
+  max_per_view: 1
+  notes: "Use as one frame-dominant designed cutaway; adapt content, palette, typography, framing, and timing instead of running an unchanged source showcase."
+motion:
+  duration_ms: 6000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: "index/index.html"
+implementations:
+  - tech: js
+    files: ["index/index.html", "index/hf-recipe.js", "index/hf-adapter.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/codrops/GridToSlider/tree/1d8b2abb52ba9207459d1b2ee6ac372f429ef8de"
+  attribution_required: true
+author:
+  name: "codrops"
+  url: "https://github.com/codrops"
+version: 0.1.0

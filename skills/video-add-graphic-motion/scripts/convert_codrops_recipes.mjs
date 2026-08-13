@@ -1197,6 +1197,332 @@ export async function rewriteExistingCodropsPaths(importsRoot) {
   return { projects, variants, files };
 }
 
+const CODROPS_STRUCTURAL_ROLES = new Set([
+  "opener", "chapter", "interstitial", "outro", "background",
+]);
+const CODROPS_MOTION_FUNCTIONS = new Set([
+  "reveal", "transition", "loop", "build", "settle",
+]);
+const CODROPS_RHYTHM_ENERGIES = new Set(["calm", "medium", "medium-high", "high"]);
+const CODROPS_INFORMATION_DENSITIES = new Set(["sparse", "balanced", "dense"]);
+const CODROPS_FRAME_RELATIONSHIPS = new Set(["fullscreen", "frame-dominant"]);
+const CODROPS_COLOR_TENDENCIES = new Set([
+  "image-led", "monochrome", "dark", "light", "flexible",
+]);
+const CODROPS_STYLE_SCALARS = [
+  "description",
+  "category",
+  "rhythm_energy",
+  "information_density",
+  "frame_relationship",
+  "color_tendency",
+  "style_rationale",
+];
+const CODROPS_STYLE_LISTS = [
+  "structural_roles",
+  "motion_functions",
+  "visual_language",
+  "mechanisms",
+  "tags",
+  "intent_keywords",
+  "best_for",
+  "avoid_when",
+];
+const GENERIC_RESTRAINT = "Use as one frame-dominant designed cutaway; adapt content, palette, typography, framing, and timing instead of running an unchanged source showcase.";
+const KINETIC_RESTRAINT = "Use as one frame-dominant designed cutaway; adapt content and select one intentional mode instead of running a source showcase.";
+const GENERIC_USAGE = "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot.";
+const KINETIC_USAGE = "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot. Select one KineticImages mode for a production cue.";
+
+function yamlString(value) {
+  return JSON.stringify(String(value));
+}
+
+function appendYamlList(lines, key, values) {
+  lines.push(`${key}:`);
+  for (const value of values) lines.push(`  - ${yamlString(value)}`);
+}
+
+function appendYamlModes(lines, modes) {
+  lines.push("modes:");
+  for (const [name, mode] of Object.entries(modes)) {
+    lines.push(`  ${name}:`);
+    lines.push(`    roles: [${mode.roles.map(yamlString).join(", ")}]`);
+    lines.push(`    energy: ${yamlString(mode.energy)}`);
+  }
+}
+
+function requireNonblankString(projectId, field, value) {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`${projectId}: ${field} must be a non-empty string`);
+  }
+}
+
+function requireStringList(projectId, field, value) {
+  if (
+    !Array.isArray(value)
+    || value.length === 0
+    || value.some((item) => typeof item !== "string" || !item.trim())
+  ) {
+    throw new Error(`${projectId}: ${field} must be a non-empty string array`);
+  }
+  if (new Set(value).size !== value.length) {
+    throw new Error(`${projectId}: ${field} must not contain duplicate values`);
+  }
+}
+
+function requireEnumList(projectId, field, values, allowed) {
+  requireStringList(projectId, field, values);
+  for (const value of values) {
+    if (!allowed.has(value)) throw new Error(`${projectId}: invalid ${field} value ${value}`);
+  }
+}
+
+export function validateCodropsStyleMetadata({ catalog, styleMetadata }) {
+  if (!catalog || !Array.isArray(catalog.projects)) {
+    throw new Error("Codrops catalog projects are required");
+  }
+  if (!styleMetadata || styleMetadata.schema_version !== 1 || !styleMetadata.projects) {
+    throw new Error("Codrops style metadata schema_version 1 is required");
+  }
+  const catalogIds = catalog.projects.map((project) => project.id);
+  if (catalogIds.some((id) => typeof id !== "string" || !id)) {
+    throw new Error("Codrops catalog project IDs must be non-empty strings");
+  }
+  if (new Set(catalogIds).size !== catalogIds.length) {
+    throw new Error("Codrops catalog contains duplicate project IDs");
+  }
+  const styleIds = Object.keys(styleMetadata.projects);
+  const missing = catalogIds.filter((id) => !Object.hasOwn(styleMetadata.projects, id));
+  const extra = styleIds.filter((id) => !catalogIds.includes(id));
+  if (missing.length) throw new Error(`missing style metadata: ${missing.join(", ")}`);
+  if (extra.length) throw new Error(`extra style metadata: ${extra.join(", ")}`);
+
+  for (const projectId of catalogIds) {
+    const style = styleMetadata.projects[projectId];
+    if (!style || typeof style !== "object" || Array.isArray(style)) {
+      throw new Error(`${projectId}: style metadata must be an object`);
+    }
+    const allowedFields = new Set([
+      ...CODROPS_STYLE_SCALARS,
+      ...CODROPS_STYLE_LISTS,
+      ...(projectId === "KineticImages" ? ["modes"] : []),
+    ]);
+    const unexpectedFields = Object.keys(style).filter((field) => !allowedFields.has(field));
+    if (unexpectedFields.length) {
+      throw new Error(`${projectId}: unexpected style metadata field ${unexpectedFields.join(", ")}`);
+    }
+    for (const field of CODROPS_STYLE_SCALARS) {
+      requireNonblankString(projectId, field, style[field]);
+    }
+    for (const field of CODROPS_STYLE_LISTS) {
+      requireStringList(projectId, field, style[field]);
+    }
+    requireEnumList(projectId, "structural_roles", style.structural_roles, CODROPS_STRUCTURAL_ROLES);
+    requireEnumList(projectId, "motion_functions", style.motion_functions, CODROPS_MOTION_FUNCTIONS);
+    if (!CODROPS_RHYTHM_ENERGIES.has(style.rhythm_energy)) {
+      throw new Error(`${projectId}: invalid rhythm_energy value ${style.rhythm_energy}`);
+    }
+    if (!CODROPS_INFORMATION_DENSITIES.has(style.information_density)) {
+      throw new Error(`${projectId}: invalid information_density value ${style.information_density}`);
+    }
+    if (!CODROPS_FRAME_RELATIONSHIPS.has(style.frame_relationship)) {
+      throw new Error(`${projectId}: invalid frame_relationship value ${style.frame_relationship}`);
+    }
+    if (!CODROPS_COLOR_TENDENCIES.has(style.color_tendency)) {
+      throw new Error(`${projectId}: invalid color_tendency value ${style.color_tendency}`);
+    }
+    if (!style.intent_keywords.some((value) => /[A-Za-z]/.test(value))) {
+      throw new Error(`${projectId}: intent_keywords requires an English phrase`);
+    }
+    if (!style.intent_keywords.some((value) => /\p{Script=Han}/u.test(value))) {
+      throw new Error(`${projectId}: intent_keywords requires a Chinese phrase`);
+    }
+    if (projectId === "KineticImages") {
+      if (!style.modes || typeof style.modes !== "object" || Array.isArray(style.modes)) {
+        throw new Error("KineticImages: modes must be an object");
+      }
+      for (const [modeName, mode] of Object.entries(style.modes)) {
+        requireEnumList(projectId, `modes.${modeName}.roles`, mode?.roles, CODROPS_STRUCTURAL_ROLES);
+        requireNonblankString(projectId, `modes.${modeName}.energy`, mode?.energy);
+      }
+    } else if (Object.hasOwn(style, "modes")) {
+      throw new Error(`${projectId}: modes is only supported for KineticImages`);
+    }
+  }
+  return { projects: [...catalogIds].sort(compareNames) };
+}
+
+export function buildCodropsManifest({ catalogProject, conversion, style }) {
+  const projectId = catalogProject?.id || "unknown Codrops project";
+  if (!conversion || conversion.project_id !== catalogProject?.id) {
+    throw new Error(`${projectId}: catalog and conversion project IDs do not match`);
+  }
+  const defaults = Array.isArray(conversion.variants)
+    ? conversion.variants.filter((variant) => variant.name === "index")
+    : [];
+  if (defaults.length !== 1) throw new Error(`${projectId}: expected exactly one index variant`);
+  const index = defaults[0];
+  requireNonblankString(projectId, "composition_id", index.composition_id);
+  requireNonblankString(projectId, "entry", index.output);
+  const durationMs = Number(index.duration_s) * 1000;
+  if (!Number.isInteger(durationMs)) {
+    throw new Error(`${projectId}: duration must resolve to integer milliseconds`);
+  }
+  if (catalogProject.license?.type !== "MIT") {
+    throw new Error(`${projectId}: manifest requires MIT license evidence`);
+  }
+  if (!/^[0-9a-f]{40}$/i.test(catalogProject.source_commit || "")) {
+    throw new Error(`${projectId}: source_commit must be a 40-character commit`);
+  }
+  requireNonblankString(projectId, "title", catalogProject.title);
+  requireNonblankString(projectId, "source_url", catalogProject.source_url);
+  const sourceUrl = catalogProject.source_url.replace(/\/+$/, "");
+  const owner = new URL(sourceUrl).pathname.split("/").filter(Boolean)[0];
+  if (!owner) throw new Error(`${projectId}: source_url must contain a GitHub owner`);
+  const kinetic = projectId === "KineticImages";
+  const lines = [
+    "spec_version: 1",
+    `id: ${yamlString(index.composition_id)}`,
+    `name: ${yamlString(catalogProject.title)}`,
+    `description: ${yamlString(style.description)}`,
+    "surfaces: [video]",
+    `category: ${yamlString(style.category)}`,
+    kinetic ? "tech: [three.js, webgl, js]" : "tech: [html, css, js]",
+    "canvas: [video]",
+    "target: [fullscreen]",
+    `intent: ${yamlString(style.category)}`,
+    kinetic ? "runtime: [three.js, webgl, js]" : "runtime: [css, js]",
+    "export: [skill, html]",
+    "dependencies: []",
+  ];
+  for (const field of ["tags", "intent_keywords", "best_for", "avoid_when"]) {
+    appendYamlList(lines, field, style[field]);
+  }
+  for (const field of ["structural_roles", "motion_functions", "visual_language", "mechanisms"]) {
+    appendYamlList(lines, field, style[field]);
+  }
+  for (const field of [
+    "rhythm_energy", "information_density", "frame_relationship", "color_tendency", "style_rationale",
+  ]) {
+    lines.push(`${field}: ${yamlString(style[field])}`);
+  }
+  if (kinetic) appendYamlModes(lines, style.modes);
+  lines.push(
+    "restraint:",
+    "  max_per_view: 1",
+    `  notes: ${yamlString(kinetic ? KINETIC_RESTRAINT : GENERIC_RESTRAINT)}`,
+    "motion:",
+    `  duration_ms: ${durationMs}`,
+    "  easing: linear",
+    "  reduced_motion: freeze",
+    "  gpu_safe: true",
+    `entry: ${yamlString(index.output)}`,
+    "implementations:",
+    `  - tech: ${kinetic ? "three.js" : "js"}`,
+    "    files: [\"index/index.html\", \"index/hf-recipe.js\", \"index/hf-adapter.js\"]",
+    `    usage: ${yamlString(kinetic ? KINETIC_USAGE : GENERIC_USAGE)}`,
+    "license:",
+    "  spdx: MIT",
+    `  upstream: ${yamlString(`${sourceUrl}/tree/${catalogProject.source_commit}`)}`,
+    "  attribution_required: true",
+    "author:",
+    `  name: ${yamlString(owner)}`,
+    `  url: ${yamlString(`https://github.com/${owner}`)}`,
+    "version: 0.1.0",
+  );
+  return `${lines.join("\n")}\n`;
+}
+
+function matchingReceiptProvenance(project, conversion) {
+  for (const field of ["demo_url", "article_url", "source_url", "source_commit"]) {
+    if (conversion[field] !== undefined && conversion[field] !== project[field]) {
+      throw new Error(`${project.id}: catalog and receipt ${field} do not match`);
+    }
+  }
+  if (
+    conversion.license !== undefined
+    && JSON.stringify(conversion.license) !== JSON.stringify(project.license)
+  ) {
+    throw new Error(`${project.id}: catalog and receipt license do not match`);
+  }
+}
+
+async function validateCodropsLicenseEvidence(root, project) {
+  const license = project.license || {};
+  if (license.type !== "MIT") throw new Error(`${project.id}: MIT license evidence is required`);
+  if (license.file || license.sha256) {
+    if (!license.file || !/^[0-9a-f]{64}$/i.test(license.sha256 || "")) {
+      throw new Error(`${project.id}: license file evidence requires file and SHA-256`);
+    }
+    const licensePath = path.join(root, project.local_directory, license.file);
+    if (!(await fileExists(licensePath))) throw new Error(`${project.id}: missing license file ${license.file}`);
+    const actual = sha256(await readFile(licensePath));
+    if (actual !== license.sha256.toLowerCase()) throw new Error(`${project.id}: license SHA-256 mismatch`);
+    return;
+  }
+  if (
+    license.evidence !== "codrops-site-license"
+    || license.url !== "https://tympanus.net/codrops/licensing/"
+  ) {
+    throw new Error(`${project.id}: unsupported MIT license evidence`);
+  }
+}
+
+export async function writeCodropsManifests(importsRoot) {
+  const root = path.resolve(importsRoot);
+  const [catalog, styleMetadata] = await Promise.all([
+    readFile(path.join(root, "SOURCE_CATALOG.json"), "utf8").then(JSON.parse),
+    readFile(path.join(root, "STYLE_METADATA.json"), "utf8").then(JSON.parse),
+  ]);
+  validateCodropsStyleMetadata({ catalog, styleMetadata });
+  const pending = [];
+  const recipeIds = new Set();
+  for (const project of [...catalog.projects].sort((left, right) => compareNames(left.id, right.id))) {
+    if (project.local_directory !== project.id) {
+      throw new Error(`${project.id}: local_directory must equal the project ID`);
+    }
+    const projectDir = path.join(root, project.local_directory);
+    const receiptPath = path.join(projectDir, "hyperframes", "conversion.json");
+    if (!(await fileExists(receiptPath))) throw new Error(`${project.id}: missing conversion receipt`);
+    const conversion = JSON.parse(await readFile(receiptPath, "utf8"));
+    matchingReceiptProvenance(project, conversion);
+    await validateCodropsLicenseEvidence(root, project);
+    const defaults = Array.isArray(conversion.variants)
+      ? conversion.variants.filter((variant) => variant.name === "index")
+      : [];
+    if (defaults.length !== 1) throw new Error(`${project.id}: expected exactly one index variant`);
+    for (const relative of [defaults[0].output, "index/hf-recipe.js", "index/hf-adapter.js"]) {
+      if (!(await fileExists(path.join(projectDir, "hyperframes", ...relative.split("/"))))) {
+        throw new Error(`${project.id}: missing implementation file ${relative}`);
+      }
+    }
+    const yaml = buildCodropsManifest({
+      catalogProject: project,
+      conversion,
+      style: styleMetadata.projects[project.id],
+    });
+    if (recipeIds.has(defaults[0].composition_id)) {
+      throw new Error(`${project.id}: duplicate recipe ID ${defaults[0].composition_id}`);
+    }
+    recipeIds.add(defaults[0].composition_id);
+    pending.push({
+      project_id: project.id,
+      recipe_id: defaults[0].composition_id,
+      path: path.join(projectDir, "recipe.motion.yaml"),
+      yaml,
+    });
+  }
+  for (const manifest of pending) await writeFile(manifest.path, manifest.yaml, "utf8");
+  return {
+    projects: pending.length,
+    manifests: pending.map(({ project_id, recipe_id, path: manifestPath }) => ({
+      project_id,
+      recipe_id,
+      path: manifestPath,
+    })),
+  };
+}
+
 async function main() {
   const scriptDir = path.dirname(fileURLToPath(import.meta.url));
   const rootArg = process.argv.slice(2).find((arg) => !arg.startsWith("--"));
@@ -1209,8 +1535,14 @@ async function main() {
     process.stdout.write(`rewrote ${result.projects} Codrops projects / ${result.variants} variants / ${result.files} files\n`);
     return;
   }
+  if (process.argv.includes("--write-manifests")) {
+    const result = await writeCodropsManifests(importsRoot);
+    process.stdout.write(`wrote ${result.projects} Codrops recipe manifests\n`);
+    return;
+  }
   const receipts = await convertAllCodrops({ importsRoot });
   const variants = receipts.reduce((count, receipt) => count + receipt.variants.length, 0);
+  await writeCodropsManifests(importsRoot);
   process.stdout.write(`converted ${receipts.length} Codrops projects / ${variants} variants\n`);
 }
 
