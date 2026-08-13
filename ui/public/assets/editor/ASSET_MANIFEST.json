@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "purpose": "Exact static assets required by the production editor UI.",
+  "source": "ui/public/fixtures before plugin packaging",
+  "files": [
+    "viewer-poster.png",
+    "brand.png",
+    "caption-boxed.png",
+    "caption-clean.png",
+    "caption-minimal.png",
+    "caption-pill.png",
+    "caption-shorts.png",
+    "caption-social-bold.png",
+    "caption-stroked.png",
+    "card-cta.png",
+    "card-lower-third.png",
+    "card-product.png",
+    "card-quote.png",
+    "card-split.png",
+    "card-stat.png",
+    "city.png",
+    "founder.png",
+    "icon-filter.svg",
+    "icon-search.svg",
+    "icon-upload.svg",
+    "product.png"
+  ]
+}

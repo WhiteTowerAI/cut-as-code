@@ -9,16 +9,6 @@ export class RuntimeConflictError extends Error {
 export class RuntimeApiClient {
   constructor(private readonly projectId: string) {}
 
-  async bootstrap(token: string): Promise<void> {
-    const response = await fetch('/v1/session/bootstrap', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectId: this.projectId, bootstrapToken: token }),
-    })
-    if (!response.ok) throw new Error('Could not start the local editor session')
-  }
-
   async getSnapshot(): Promise<RuntimeSnapshot> {
     const response = await fetch(`/v1/projects/${encodeURIComponent(this.projectId)}/snapshot`, {
       credentials: 'same-origin',

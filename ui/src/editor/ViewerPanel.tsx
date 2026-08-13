@@ -286,7 +286,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
         {hasMedia && (
           <>
             <div className="viewer-canvas">
-              <img data-preview-media src="/fixtures/viewer-poster.png" alt="Project preview" />
+              <img data-preview-media src="/assets/editor/viewer-poster.png" alt="Project preview" />
             </div>
             {selectionKind && (
               <>

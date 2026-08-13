@@ -173,7 +173,7 @@ test('the populated preview renders real nonblank local pixels', async ({ page }
 
   const preview = page.locator('[data-preview-media]')
   await expect(preview).toBeVisible()
-  await expect(preview).toHaveAttribute('src', /\/fixtures\//)
+  await expect(preview).toHaveAttribute('src', /^\/assets\/editor\/viewer-poster\.png$/)
   const sample = await preview.evaluate((element) => {
     const image = element as HTMLImageElement
     const canvas = document.createElement('canvas')

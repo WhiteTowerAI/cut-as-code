@@ -28,10 +28,10 @@ const tabs: ReadonlyArray<{ id: LibraryTab; label: string }> = [
 ]
 
 const assetPreviewMetadata: Readonly<Record<string, Pick<TileItem, 'preview' | 'image' | 'duration' | 'status'>>> = {
-  'asset-product': { preview: 'product', image: '/fixtures/library/product.png', duration: '00:18', status: 'Added' },
-  'asset-interview': { preview: 'founder', image: '/fixtures/library/founder.png', duration: '18:42' },
-  'asset-brand': { preview: 'brand', image: '/fixtures/library/brand.png', duration: '00:08' },
-  'asset-city': { preview: 'city', image: '/fixtures/library/city.png', duration: '00:05' },
+  'asset-product': { preview: 'product', image: '/assets/editor/product.png', duration: '00:18', status: 'Added' },
+  'asset-interview': { preview: 'founder', image: '/assets/editor/founder.png', duration: '18:42' },
+  'asset-brand': { preview: 'brand', image: '/assets/editor/brand.png', duration: '00:08' },
+  'asset-city': { preview: 'city', image: '/assets/editor/city.png', duration: '00:05' },
 }
 
 const fallbackPreviews: readonly TileItem['preview'][] = ['product', 'founder', 'brand', 'city']
@@ -43,22 +43,22 @@ function tileForAsset(asset: AssetView): TileItem {
 }
 
 const captionStyles: readonly TileItem[] = [
-  { id: 'caption-clean', label: 'Clean', preview: 'product', image: '/fixtures/library/caption-clean.png', previewText: 'Caption', status: 'Added' },
-  { id: 'caption-minimal', label: 'Minimal', preview: 'founder', image: '/fixtures/library/caption-minimal.png', previewText: 'Caption' },
-  { id: 'caption-social', label: 'Social bold', preview: 'brand', image: '/fixtures/library/caption-social-bold.png', previewText: 'STAY CURIOUS' },
-  { id: 'caption-pill', label: 'Pill', preview: 'city', image: '/fixtures/library/caption-pill.png', previewText: 'Caption' },
-  { id: 'caption-boxed', label: 'Boxed', preview: 'product', image: '/fixtures/library/caption-boxed.png', previewText: 'Caption' },
-  { id: 'caption-stroked', label: 'Stroked', preview: 'founder', image: '/fixtures/library/caption-stroked.png', previewText: 'Caption' },
-  { id: 'caption-shorts', label: 'Shorts', preview: 'brand', image: '/fixtures/library/caption-shorts.png', previewText: 'keep creating' },
+  { id: 'caption-clean', label: 'Clean', preview: 'product', image: '/assets/editor/caption-clean.png', previewText: 'Caption', status: 'Added' },
+  { id: 'caption-minimal', label: 'Minimal', preview: 'founder', image: '/assets/editor/caption-minimal.png', previewText: 'Caption' },
+  { id: 'caption-social', label: 'Social bold', preview: 'brand', image: '/assets/editor/caption-social-bold.png', previewText: 'STAY CURIOUS' },
+  { id: 'caption-pill', label: 'Pill', preview: 'city', image: '/assets/editor/caption-pill.png', previewText: 'Caption' },
+  { id: 'caption-boxed', label: 'Boxed', preview: 'product', image: '/assets/editor/caption-boxed.png', previewText: 'Caption' },
+  { id: 'caption-stroked', label: 'Stroked', preview: 'founder', image: '/assets/editor/caption-stroked.png', previewText: 'Caption' },
+  { id: 'caption-shorts', label: 'Shorts', preview: 'brand', image: '/assets/editor/caption-shorts.png', previewText: 'keep creating' },
 ]
 
 const contentCards: readonly TileItem[] = [
-  { id: 'card-lower-third', label: 'Lower third', preview: 'product', image: '/fixtures/library/card-lower-third.png', previewText: 'Presenter', duration: '00:18', status: 'Added', accent: 'purple' },
-  { id: 'card-quote', label: 'Quote', preview: 'founder', image: '/fixtures/library/card-quote.png', previewText: 'Pull quote', duration: '18:42', accent: 'cyan' },
-  { id: 'card-stat', label: 'Stat', preview: 'brand', image: '/fixtures/library/card-stat.png', previewText: '72%', duration: '00:08', accent: 'yellow' },
-  { id: 'card-split', label: 'Split', preview: 'city', image: '/fixtures/library/card-split.png', previewText: 'Before / after', duration: '00:05', accent: 'green' },
-  { id: 'card-cta', label: 'CTA', preview: 'product', image: '/fixtures/library/card-cta.png', previewText: 'Try it now', duration: '00:18', status: 'Added', accent: 'pink' },
-  { id: 'card-product', label: 'Product', preview: 'founder', image: '/fixtures/library/card-product.png', previewText: 'Feature callout', duration: '18:42', accent: 'purple' },
+  { id: 'card-lower-third', label: 'Lower third', preview: 'product', image: '/assets/editor/card-lower-third.png', previewText: 'Presenter', duration: '00:18', status: 'Added', accent: 'purple' },
+  { id: 'card-quote', label: 'Quote', preview: 'founder', image: '/assets/editor/card-quote.png', previewText: 'Pull quote', duration: '18:42', accent: 'cyan' },
+  { id: 'card-stat', label: 'Stat', preview: 'brand', image: '/assets/editor/card-stat.png', previewText: '72%', duration: '00:08', accent: 'yellow' },
+  { id: 'card-split', label: 'Split', preview: 'city', image: '/assets/editor/card-split.png', previewText: 'Before / after', duration: '00:05', accent: 'green' },
+  { id: 'card-cta', label: 'CTA', preview: 'product', image: '/assets/editor/card-cta.png', previewText: 'Try it now', duration: '00:18', status: 'Added', accent: 'pink' },
+  { id: 'card-product', label: 'Product', preview: 'founder', image: '/assets/editor/card-product.png', previewText: 'Feature callout', duration: '18:42', accent: 'purple' },
 ]
 
 const motionRecipes: readonly TileItem[] = [
@@ -71,7 +71,7 @@ const motionRecipes: readonly TileItem[] = [
 function SearchField({ placeholder, compact = false }: { placeholder: string; compact?: boolean }) {
   return (
     <label className={compact ? 'library-search library-search--compact' : 'library-search'}>
-      <img className="library-control-icon" src="/fixtures/library/icon-search.svg" alt="" />
+      <img className="library-control-icon" src="/assets/editor/icon-search.svg" alt="" />
       <input aria-label={placeholder} placeholder={placeholder} />
     </label>
   )
@@ -82,10 +82,10 @@ function AssetControls() {
     <div className="library-controls">
       <SearchField placeholder="Search assets" compact />
       <button className="library-icon-button" type="button" aria-label="Import assets" title="Import assets">
-        <img className="library-control-icon" src="/fixtures/library/icon-upload.svg" alt="" />
+        <img className="library-control-icon" src="/assets/editor/icon-upload.svg" alt="" />
       </button>
       <button className="library-icon-button" type="button" aria-label="Filter assets" title="Filter assets">
-        <img className="library-control-icon" src="/fixtures/library/icon-filter.svg" alt="" />
+        <img className="library-control-icon" src="/assets/editor/icon-filter.svg" alt="" />
       </button>
     </div>
   )
@@ -278,7 +278,7 @@ function MotionPanel({ store }: LibraryPanelProps) {
   return (
     <>
       <label className="library-search">
-        <img className="library-control-icon" src="/fixtures/library/icon-search.svg" alt="" />
+        <img className="library-control-icon" src="/assets/editor/icon-search.svg" alt="" />
         <input
           aria-label="Search motion recipes"
           placeholder="Search motion recipes"

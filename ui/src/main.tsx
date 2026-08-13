@@ -11,7 +11,6 @@ function RuntimeEditor() {
   const [runtime, setRuntime] = useState<RuntimeProjectStatus>()
   const parameters = new URLSearchParams(window.location.search)
   const projectId = parameters.get('project')
-  const bootstrapToken = parameters.get('bootstrap')
   const fixtureMode = parameters.has('scenario')
 
   useEffect(() => {
@@ -32,12 +31,6 @@ function RuntimeEditor() {
 
     void (async () => {
       try {
-        if (bootstrapToken) {
-          await client.bootstrap(bootstrapToken)
-          parameters.delete('bootstrap')
-          const query = parameters.toString()
-          window.history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
-        }
         await refresh()
         if (!active) return
         document.documentElement.dataset.runtimeState = 'ready'
@@ -51,7 +44,7 @@ function RuntimeEditor() {
       active = false
       unsubscribe()
     }
-  }, [bootstrapToken, fixtureMode, projectId])
+  }, [fixtureMode, projectId])
 
   return <EditorShell key={runtime?.projectId ?? 'fixture'} runtime={runtime} />
 }

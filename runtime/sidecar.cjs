@@ -9,6 +9,19 @@ const { spawn } = require('node:child_process')
 const readline = require('node:readline')
 
 const LOOPBACK = '127.0.0.1'
+const LAUNCH_TTL_MS = 10_000
+const HTTP_ROUTE_ALLOWLIST = Object.freeze([
+  Object.freeze({ id: 'launch', methods: Object.freeze(['GET']), pattern: /^\/$/ }),
+  Object.freeze({ id: 'meta', methods: Object.freeze(['GET']), pattern: /^\/v1\/meta$/ }),
+  Object.freeze({ id: 'snapshot', methods: Object.freeze(['GET']), pattern: /^\/v1\/projects\/([^/]+)\/snapshot$/ }),
+  Object.freeze({ id: 'transaction', methods: Object.freeze(['POST']), pattern: /^\/v1\/projects\/([^/]+)\/transactions$/ }),
+  Object.freeze({ id: 'review', methods: Object.freeze(['POST']), pattern: /^\/v1\/projects\/([^/]+)\/reviews\/decision$/ }),
+  Object.freeze({ id: 'resource', methods: Object.freeze(['GET']), pattern: /^\/v1\/projects\/([^/]+)\/resources\/(res_[a-f0-9]+)$/ }),
+  Object.freeze({ id: 'file', methods: Object.freeze(['GET']), pattern: /^\/v1\/projects\/([^/]+)\/(media|artifacts)\/((?:asset|artifact)_[a-f0-9]+)$/ }),
+  Object.freeze({ id: 'events', methods: Object.freeze(['GET']), pattern: /^\/v1\/projects\/([^/]+)\/events$/ }),
+  Object.freeze({ id: 'static', methods: Object.freeze(['GET', 'HEAD']), pattern: /^(?!\/v1(?:\/|$)).+$/ }),
+])
+const PROTOCOL_VERB_ALLOWLIST = Object.freeze(['open_project', 'get_snapshot', 'get_resource', 'plan.update', 'review.record'])
 
 async function main() {
   const options = parseArguments(process.argv.slice(2))
@@ -23,7 +36,7 @@ async function main() {
     uiRoot,
     protocol,
     projectId: opened.project_id,
-    bootstrapToken: crypto.randomBytes(32).toString('base64url'),
+    launches: [],
     sessions: new Set(),
     clients: new Set(),
     media: new Map(),
@@ -45,12 +58,15 @@ async function main() {
   state.server = server
   state.watcher = watchProject(state)
 
-  process.stdout.write(JSON.stringify({
+  const ready = {
     host: LOOPBACK,
     port: address.port,
     projectId: state.projectId,
-    bootstrapToken: state.bootstrapToken,
-  }) + '\n')
+  }
+  process.stdout.write(JSON.stringify(ready) + '\n')
+
+  const control = readline.createInterface({ input: process.stdin, crlfDelay: Infinity })
+  control.on('line', (line) => handleControl(state, line))
 
   let closing = false
   const close = async () => {
@@ -64,35 +80,40 @@ async function main() {
   }
   process.once('SIGINT', close)
   process.once('SIGTERM', close)
-  process.stdin.resume()
   process.stdin.once('end', close)
 }
 
 async function handleRequest(state, request, response) {
   if (request.headers.host !== state.host) return json(response, 400, { ok: false, error: 'invalid host' })
   const url = new URL(request.url, state.origin)
+  const route = routeForRequest(request.method, url.pathname)
+  if (!route) return json(response, 404, { ok: false, error: 'not found' })
 
-  if (request.method === 'POST' && url.pathname === '/v1/session/bootstrap') {
-    if (request.headers.origin !== state.origin) return json(response, 403, { ok: false, error: 'invalid origin' })
-    const body = await readJson(request)
-    if (body.projectId !== state.projectId || !state.bootstrapToken
-      || !constantTimeEqual(body.bootstrapToken, state.bootstrapToken)) {
-      return json(response, 401, { ok: false, error: 'invalid bootstrap token' })
+  if (route.id === 'launch') {
+    if (authorized(state, request)) return serveStatic(state.uiRoot, url.pathname, request.method, response)
+    const directNavigation = request.headers['sec-fetch-mode'] === 'navigate'
+      && request.headers['sec-fetch-dest'] === 'document'
+      && request.headers['sec-fetch-site'] === 'none'
+    const correctProject = url.searchParams.size === 1 && url.searchParams.get('project') === state.projectId
+    state.launches = state.launches.filter((expiresAt) => expiresAt >= Date.now())
+    if (!directNavigation || !correctProject || state.launches.length === 0) {
+      return json(response, 401, { ok: false, error: 'editor launch is not armed' })
     }
-    state.bootstrapToken = null
+    state.launches.shift()
     const session = crypto.randomBytes(32).toString('base64url')
     state.sessions.add(session)
     response.setHeader('Set-Cookie', `cut_session=${session}; HttpOnly; SameSite=Strict; Path=/`)
-    return json(response, 200, { ok: true, projectId: state.projectId })
+    response.writeHead(303, { Location: request.url, 'Cache-Control': 'no-store' })
+    return response.end()
   }
 
-  if (url.pathname.startsWith('/v1/')) {
+  if (route.id !== 'static') {
     if (!authorized(state, request)) return json(response, 401, { ok: false, error: 'unauthorized' })
-    if (request.method === 'GET' && url.pathname === '/v1/meta') {
+    if (route.id === 'meta') {
       return json(response, 200, { ok: true, projectId: state.projectId, readOnly: true })
     }
-    const snapshotMatch = url.pathname.match(/^\/v1\/projects\/([^/]+)\/snapshot$/)
-    if (request.method === 'GET' && snapshotMatch && snapshotMatch[1] === state.projectId) {
+    const match = route.match
+    if (route.id === 'snapshot' && match[1] === state.projectId) {
       await refreshFiles(state)
       const result = await state.protocol.call({ verb: 'get_snapshot', project_id: state.projectId })
       if (result.ok) {
@@ -101,8 +122,7 @@ async function handleRequest(state, request, response) {
       }
       return json(response, result.ok ? 200 : 400, result)
     }
-    const transactionMatch = url.pathname.match(/^\/v1\/projects\/([^/]+)\/transactions$/)
-    if (request.method === 'POST' && transactionMatch && transactionMatch[1] === state.projectId) {
+    if (route.id === 'transaction' && match[1] === state.projectId) {
       if (request.headers.origin !== state.origin) return json(response, 403, { ok: false, error: 'invalid origin' })
       const body = await readJson(request)
       const result = await state.protocol.call({
@@ -111,8 +131,7 @@ async function handleRequest(state, request, response) {
       })
       return json(response, result.status || (result.ok ? 200 : 400), result)
     }
-    const reviewMatch = url.pathname.match(/^\/v1\/projects\/([^/]+)\/reviews\/decision$/)
-    if (request.method === 'POST' && reviewMatch && reviewMatch[1] === state.projectId) {
+    if (route.id === 'review' && match[1] === state.projectId) {
       if (request.headers.origin !== state.origin) return json(response, 403, { ok: false, error: 'invalid origin' })
       const body = await readJson(request)
       const result = await state.protocol.call({
@@ -121,22 +140,19 @@ async function handleRequest(state, request, response) {
       })
       return json(response, result.status || (result.ok ? 200 : 400), result)
     }
-    const resourceMatch = url.pathname.match(/^\/v1\/projects\/([^/]+)\/resources\/(res_[a-f0-9]+)$/)
-    if (request.method === 'GET' && resourceMatch && resourceMatch[1] === state.projectId) {
+    if (route.id === 'resource' && match[1] === state.projectId) {
       const result = await state.protocol.call({
-        verb: 'get_resource', project_id: state.projectId, resource_id: resourceMatch[2],
+        verb: 'get_resource', project_id: state.projectId, resource_id: match[2],
       })
       return json(response, result.ok ? 200 : 404, result)
     }
-    const fileMatch = url.pathname.match(/^\/v1\/projects\/([^/]+)\/(media|artifacts)\/((?:asset|artifact)_[a-f0-9]+)$/)
-    if (request.method === 'GET' && fileMatch && fileMatch[1] === state.projectId) {
-      const registry = fileMatch[2] === 'media' ? state.media : state.artifacts
-      const item = registry.get(fileMatch[3])
+    if (route.id === 'file' && match[1] === state.projectId) {
+      const registry = match[2] === 'media' ? state.media : state.artifacts
+      const item = registry.get(match[3])
       if (!item) return json(response, 404, { ok: false, error: 'unknown resource' })
       return streamFile(request, response, item)
     }
-    const eventMatch = url.pathname.match(/^\/v1\/projects\/([^/]+)\/events$/)
-    if (request.method === 'GET' && eventMatch && eventMatch[1] === state.projectId) {
+    if (route.id === 'events' && match[1] === state.projectId) {
       response.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
@@ -150,8 +166,28 @@ async function handleRequest(state, request, response) {
     return json(response, 404, { ok: false, error: 'not found' })
   }
 
-  if (request.method !== 'GET' && request.method !== 'HEAD') return json(response, 405, { ok: false, error: 'method not allowed' })
+  if (!authorized(state, request)) return json(response, 401, { ok: false, error: 'unauthorized' })
   return serveStatic(state.uiRoot, url.pathname, request.method, response)
+}
+
+function routeForRequest(method, pathname) {
+  for (const route of HTTP_ROUTE_ALLOWLIST) {
+    if (!route.methods.includes(method)) continue
+    const match = route.pattern.exec(pathname)
+    if (match) return { id: route.id, match }
+  }
+  return null
+}
+
+function handleControl(state, line) {
+  let request
+  try { request = JSON.parse(line) } catch { return process.stdout.write(`${JSON.stringify({ id: null, ok: false, error: 'invalid control message' })}\n`) }
+  if (!Number.isInteger(request.id) || request.command !== 'arm_launch') {
+    return process.stdout.write(`${JSON.stringify({ id: request.id ?? null, ok: false, error: 'unsupported control command' })}\n`)
+  }
+  state.launches.push(Date.now() + LAUNCH_TTL_MS)
+  const url = `${state.origin}/?project=${encodeURIComponent(state.projectId)}`
+  process.stdout.write(`${JSON.stringify({ id: request.id, ok: true, url })}\n`)
 }
 
 function watchProject(state) {
@@ -266,13 +302,6 @@ function authorized(state, request) {
   return typeof cookies.cut_session === 'string' && state.sessions.has(cookies.cut_session)
 }
 
-function constantTimeEqual(left, right) {
-  if (typeof left !== 'string' || typeof right !== 'string') return false
-  const a = Buffer.from(left)
-  const b = Buffer.from(right)
-  return a.length === b.length && crypto.timingSafeEqual(a, b)
-}
-
 function readJson(request) {
   return new Promise((resolve, reject) => {
     let body = ''
@@ -354,6 +383,7 @@ async function startProtocolService(runtimeRoot) {
   })
   return {
     call(value) {
+      if (!PROTOCOL_VERB_ALLOWLIST.includes(value.verb)) return Promise.reject(new Error('unsupported protocol verb'))
       return new Promise((resolve, reject) => {
         const request = { resolve, reject, timer: null }
         request.timer = setTimeout(() => {
@@ -378,7 +408,11 @@ async function startProtocolService(runtimeRoot) {
   }
 }
 
-main().catch((error) => {
-  process.stderr.write(`${error.message}\n`)
-  process.exitCode = 1
-})
+module.exports = { HTTP_ROUTE_ALLOWLIST, routeForRequest }
+
+if (require.main === module) {
+  main().catch((error) => {
+    process.stderr.write(`${error.message}\n`)
+    process.exitCode = 1
+  })
+}

@@ -11,7 +11,12 @@ type ReadyMessage = Readonly<{
   host: string
   port: number
   projectId: string
-  bootstrapToken: string
+}>
+
+type StartedSidecar = Readonly<{
+  process: ChildProcessWithoutNullStreams
+  ready: ReadyMessage
+  readLine: () => Promise<string>
 }>
 
 const uiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -21,14 +26,15 @@ const execFileAsync = promisify(execFile)
 
 let projectRoot: string
 let sidecar: ChildProcessWithoutNullStreams
+let startedSidecar: StartedSidecar
 let ready: ReadyMessage
 let baseURL: string
 
 test.beforeAll(async () => {
   projectRoot = await createProjectFixture()
-  const started = await startSidecar(projectRoot)
-  sidecar = started.process
-  ready = started.ready
+  startedSidecar = await startSidecar(projectRoot)
+  sidecar = startedSidecar.process
+  ready = startedSidecar.ready
   baseURL = `http://${ready.host}:${ready.port}`
 })
 
@@ -37,42 +43,40 @@ test.afterAll(async () => {
   if (projectRoot) await rm(projectRoot, { recursive: true, force: true })
 })
 
-test('binds to loopback and exchanges the bootstrap token exactly once', async () => {
+test('binds to loopback and arms one credential-free browser launch at a time', async () => {
   expect(ready.host).toBe('127.0.0.1')
   expect(ready.port).toBeGreaterThan(0)
   expect(ready.projectId).toMatch(/^project_[a-f0-9]+$/)
 
   const first = await request.newContext({ baseURL })
-  const bootstrapped = await bootstrap(first)
-  expect(bootstrapped.status()).toBe(200)
-  expect(await bootstrapped.json()).toMatchObject({ ok: true, projectId: ready.projectId })
+  const launch = await armLaunch(startedSidecar)
+  expect(launch).toBe(`${baseURL}/?project=${encodeURIComponent(ready.projectId)}`)
+  const opened = await browserNavigation(first, launch)
+  expect(opened.status()).toBe(200)
+  expect(await opened.text()).toContain('<div id="root">')
 
   const replay = await request.newContext({ baseURL })
-  const rejected = await bootstrap(replay)
+  const rejected = await browserNavigation(replay, launch)
   expect(rejected.status()).toBe(401)
   await first.dispose()
   await replay.dispose()
 })
 
-test('rejects forged origins and hosts without consuming a fresh token', async () => {
+test('rejects unarmed launches and forged hosts without consuming an armed launch', async () => {
   const isolated = await startSidecar(projectRoot)
   const isolatedURL = `http://${isolated.ready.host}:${isolated.ready.port}`
   const client = await request.newContext({ baseURL: isolatedURL })
   try {
-    const badOrigin = await client.post('/v1/session/bootstrap', {
-      data: { projectId: isolated.ready.projectId, bootstrapToken: isolated.ready.bootstrapToken },
-      headers: { Origin: 'http://attacker.invalid' },
-    })
-    expect(badOrigin.status()).toBe(403)
+    const launch = `${isolatedURL}/?project=${encodeURIComponent(isolated.ready.projectId)}`
+    expect((await browserNavigation(client, launch)).status()).toBe(401)
 
-    const valid = await client.post('/v1/session/bootstrap', {
-      data: { projectId: isolated.ready.projectId, bootstrapToken: isolated.ready.bootstrapToken },
-      headers: { Origin: isolatedURL },
-    })
-    expect(valid.status()).toBe(200)
+    await armLaunch(isolated)
 
-    const badHost = await client.get('/v1/meta', { headers: { Host: 'attacker.invalid' } })
+    const badHost = await client.get(launch, {
+      headers: { Host: 'attacker.invalid', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Dest': 'document' },
+    })
     expect(badHost.status()).toBe(400)
+    expect((await browserNavigation(client, launch)).status()).toBe(200)
   } finally {
     await client.dispose()
     await stopSidecar(isolated.process)
@@ -142,17 +146,13 @@ test('streams confined media by opaque ID with HTTP byte ranges', async () => {
   }
 })
 
-test('browser runtime removes the one-use token and refreshes after an external change', async ({ page }) => {
+test('browser runtime is ready from the armed credential-free URL and refreshes after an external change', async ({ page }) => {
   const isolated = await startSidecar(projectRoot)
   try {
-    await page.goto(
-      `${isolatedURL(isolated.ready)}/?project=${encodeURIComponent(isolated.ready.projectId)}`
-        + `&bootstrap=${encodeURIComponent(isolated.ready.bootstrapToken)}`,
-    )
+    const launch = await armLaunch(isolated)
+    await page.goto(launch)
     await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
-    expect(page.url()).toBe(
-      `${isolatedURL(isolated.ready)}/?project=${encodeURIComponent(isolated.ready.projectId)}`,
-    )
+    expect(page.url()).toBe(launch)
     await expect(page.locator('[data-editor-shell]')).toBeVisible()
     const status = page.locator('[data-runtime-project-status]')
     await expect(status).toBeVisible()
@@ -186,7 +186,7 @@ test('mutation routes forward only typed protocol commands and return conflicts'
       },
     )
     expect(response.status()).toBe(400)
-    expect(await response.json()).toEqual({ ok: false, error: 'unsupported operation' })
+    expect(await response.json()).toEqual({ ok: false, error: 'plan.update accepts only a typed content-cards review' })
 
     const review = await isolated.client.post(
       `/v1/projects/${isolated.ready.projectId}/reviews/decision`,
@@ -209,10 +209,8 @@ test('content cards save commits through sidecar and stale read sets return 409'
   const isolated = await startSidecar(root)
   const client = await request.newContext({ baseURL: isolatedURL(isolated.ready) })
   try {
-    await client.post('/v1/session/bootstrap', {
-      data: { projectId: isolated.ready.projectId, bootstrapToken: isolated.ready.bootstrapToken },
-      headers: { Origin: isolatedURL(isolated.ready) },
-    })
+    await armLaunch(isolated)
+    await browserNavigation(client, `${isolatedURL(isolated.ready)}/?project=${encodeURIComponent(isolated.ready.projectId)}`)
     const loaded = await client.get(`/v1/projects/${isolated.ready.projectId}/snapshot`)
     const { snapshot } = await loaded.json()
     expect(snapshot.read_only, `loaded:${JSON.stringify(snapshot.errors)}`).toBe(false)
@@ -251,21 +249,15 @@ async function authenticatedSidecar() {
   const isolated = await startSidecar(projectRoot)
   const isolatedURLValue = isolatedURL(isolated.ready)
   const client = await request.newContext({ baseURL: isolatedURLValue })
-  const response = await client.post('/v1/session/bootstrap', {
-    data: {
-      projectId: isolated.ready.projectId,
-      bootstrapToken: isolated.ready.bootstrapToken,
-    },
-    headers: { Origin: isolatedURLValue },
-  })
+  const launch = await armLaunch(isolated)
+  const response = await browserNavigation(client, launch)
   expect(response.status()).toBe(200)
   return { ...isolated, client }
 }
 
-function bootstrap(client: APIRequestContext) {
-  return client.post('/v1/session/bootstrap', {
-    data: { projectId: ready.projectId, bootstrapToken: ready.bootstrapToken },
-    headers: { Origin: baseURL },
+function browserNavigation(client: APIRequestContext, url: string) {
+  return client.get(url, {
+    headers: { 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Dest': 'document', 'Sec-Fetch-Site': 'none' },
   })
 }
 
@@ -273,10 +265,7 @@ function isolatedURL(message: ReadyMessage) {
   return `http://${message.host}:${message.port}`
 }
 
-async function startSidecar(root: string): Promise<{
-  process: ChildProcessWithoutNullStreams
-  ready: ReadyMessage
-}> {
+async function startSidecar(root: string): Promise<StartedSidecar> {
   const child = spawn(process.execPath, [
     path.join(repositoryRoot, 'runtime', 'sidecar.cjs'),
     '--project-root', root,
@@ -287,16 +276,31 @@ async function startSidecar(root: string): Promise<{
     stdio: ['pipe', 'pipe', 'pipe'],
   })
 
+  const queuedLines: string[] = []
+  const lineWaiters: Array<(line: string) => void> = []
+  let stdout = ''
+  child.stdout.on('data', (chunk) => {
+    stdout += chunk.toString()
+    while (stdout.includes('\n')) {
+      const newline = stdout.indexOf('\n')
+      const line = stdout.slice(0, newline)
+      stdout = stdout.slice(newline + 1)
+      const waiter = lineWaiters.shift()
+      if (waiter) waiter(line)
+      else queuedLines.push(line)
+    }
+  })
+  const readLine = () => new Promise<string>((resolve) => {
+    const line = queuedLines.shift()
+    if (line !== undefined) resolve(line)
+    else lineWaiters.push(resolve)
+  })
   const message = await new Promise<ReadyMessage>((resolve, reject) => {
-    let stdout = ''
     let stderr = ''
     const timeout = setTimeout(() => reject(new Error(`sidecar startup timed out: ${stderr}`)), 10_000)
-    child.stdout.on('data', (chunk) => {
-      stdout += chunk.toString()
-      const newline = stdout.indexOf('\n')
-      if (newline < 0) return
+    void readLine().then((line) => {
       clearTimeout(timeout)
-      resolve(JSON.parse(stdout.slice(0, newline)))
+      resolve(JSON.parse(line))
     })
     child.stderr.on('data', (chunk) => { stderr += chunk.toString() })
     child.once('exit', (code) => {
@@ -308,7 +312,17 @@ async function startSidecar(root: string): Promise<{
     child.kill()
     return waitForExit(child, 2_000).then(() => { throw error })
   })
-  return { process: child, ready: message }
+  return { process: child, ready: message, readLine }
+}
+
+let controlRequestId = 0
+
+async function armLaunch(sidecar: StartedSidecar) {
+  const id = ++controlRequestId
+  sidecar.process.stdin.write(`${JSON.stringify({ id, command: 'arm_launch' })}\n`)
+  const response = JSON.parse(await sidecar.readLine())
+  expect(response).toMatchObject({ id, ok: true })
+  return response.url as string
 }
 
 async function stopSidecar(child: ChildProcessWithoutNullStreams) {
