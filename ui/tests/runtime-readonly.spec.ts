@@ -1,0 +1,306 @@
+import { expect, request, test, type APIRequestContext } from '@playwright/test'
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+type ReadyMessage = Readonly<{
+  host: string
+  port: number
+  projectId: string
+  bootstrapToken: string
+}>
+
+const uiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const repositoryRoot = path.resolve(uiRoot, '..')
+const bundledPython = 'C:\\Users\\Charles Kang\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python\\python.exe'
+
+let projectRoot: string
+let sidecar: ChildProcessWithoutNullStreams
+let ready: ReadyMessage
+let baseURL: string
+
+test.beforeAll(async () => {
+  projectRoot = await createProjectFixture()
+  const started = await startSidecar(projectRoot)
+  sidecar = started.process
+  ready = started.ready
+  baseURL = `http://${ready.host}:${ready.port}`
+})
+
+test.afterAll(async () => {
+  if (sidecar) await stopSidecar(sidecar)
+  if (projectRoot) await rm(projectRoot, { recursive: true, force: true })
+})
+
+test('binds to loopback and exchanges the bootstrap token exactly once', async () => {
+  expect(ready.host).toBe('127.0.0.1')
+  expect(ready.port).toBeGreaterThan(0)
+  expect(ready.projectId).toMatch(/^project_[a-f0-9]+$/)
+
+  const first = await request.newContext({ baseURL })
+  const bootstrapped = await bootstrap(first)
+  expect(bootstrapped.status()).toBe(200)
+  expect(await bootstrapped.json()).toMatchObject({ ok: true, projectId: ready.projectId })
+
+  const replay = await request.newContext({ baseURL })
+  const rejected = await bootstrap(replay)
+  expect(rejected.status()).toBe(401)
+  await first.dispose()
+  await replay.dispose()
+})
+
+test('rejects forged origins and hosts without consuming a fresh token', async () => {
+  const isolated = await startSidecar(projectRoot)
+  const isolatedURL = `http://${isolated.ready.host}:${isolated.ready.port}`
+  const client = await request.newContext({ baseURL: isolatedURL })
+  try {
+    const badOrigin = await client.post('/v1/session/bootstrap', {
+      data: { projectId: isolated.ready.projectId, bootstrapToken: isolated.ready.bootstrapToken },
+      headers: { Origin: 'http://attacker.invalid' },
+    })
+    expect(badOrigin.status()).toBe(403)
+
+    const valid = await client.post('/v1/session/bootstrap', {
+      data: { projectId: isolated.ready.projectId, bootstrapToken: isolated.ready.bootstrapToken },
+      headers: { Origin: isolatedURL },
+    })
+    expect(valid.status()).toBe(200)
+
+    const badHost = await client.get('/v1/meta', { headers: { Host: 'attacker.invalid' } })
+    expect(badHost.status()).toBe(400)
+  } finally {
+    await client.dispose()
+    await stopSidecar(isolated.process)
+  }
+})
+
+test('loads snapshots and exposes only opaque resource identifiers', async () => {
+  const isolated = await authenticatedSidecar()
+  try {
+    const response = await isolated.client.get(`/v1/projects/${isolated.ready.projectId}/snapshot`)
+    expect(response.status()).toBe(200)
+    const snapshot = await response.json()
+
+    expect(snapshot.ok).toBe(true)
+    expect(snapshot.snapshot.view.active_sequence).toBe('main')
+    expect(snapshot.snapshot.resources).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: expect.stringMatching(/^res_[a-f0-9]+$/), kind: 'project' }),
+      expect.objectContaining({ id: expect.stringMatching(/^res_[a-f0-9]+$/), kind: 'plan' }),
+    ]))
+    expect(JSON.stringify(snapshot)).not.toContain(projectRoot)
+    expect(snapshot.snapshot.media).toEqual([
+      expect.objectContaining({ id: expect.stringMatching(/^asset_[a-f0-9]+$/), name: 'source.mp4', size: 10 }),
+    ])
+    expect(snapshot.snapshot.artifacts).toEqual([
+      expect.objectContaining({ id: expect.stringMatching(/^artifact_[a-f0-9]+$/), name: 'preview.txt' }),
+    ])
+
+    const plan = snapshot.snapshot.resources.find((item: { kind: string }) => item.kind === 'plan')
+    const resource = await isolated.client.get(
+      `/v1/projects/${isolated.ready.projectId}/resources/${plan.id}`,
+    )
+    expect(resource.status()).toBe(200)
+    expect(await resource.json()).toMatchObject({ ok: true, resource: { content: { cues: [] } } })
+
+    const pathEscape = await isolated.client.get(
+      `/v1/projects/${isolated.ready.projectId}/resources/${encodeURIComponent('../../work/project.json')}`,
+    )
+    expect(pathEscape.status()).toBe(404)
+  } finally {
+    await isolated.client.dispose()
+    await stopSidecar(isolated.process)
+  }
+})
+
+test('streams confined media by opaque ID with HTTP byte ranges', async () => {
+  const isolated = await authenticatedSidecar()
+  try {
+    const snapshotResponse = await isolated.client.get(`/v1/projects/${isolated.ready.projectId}/snapshot`)
+    const { snapshot } = await snapshotResponse.json()
+    const mediaId = snapshot.media[0].id
+
+    const ranged = await isolated.client.get(
+      `/v1/projects/${isolated.ready.projectId}/media/${mediaId}`,
+      { headers: { Range: 'bytes=2-5' } },
+    )
+    expect(ranged.status()).toBe(206)
+    expect(ranged.headers()['content-range']).toBe('bytes 2-5/10')
+    expect(Buffer.from(await ranged.body()).toString('ascii')).toBe('2345')
+
+    const unknown = await isolated.client.get(
+      `/v1/projects/${isolated.ready.projectId}/media/${encodeURIComponent('../source.mp4')}`,
+    )
+    expect(unknown.status()).toBe(404)
+  } finally {
+    await isolated.client.dispose()
+    await stopSidecar(isolated.process)
+  }
+})
+
+test('browser runtime removes the one-use token and refreshes after an external change', async ({ page }) => {
+  const isolated = await startSidecar(projectRoot)
+  try {
+    await page.goto(
+      `${isolatedURL(isolated.ready)}/?project=${encodeURIComponent(isolated.ready.projectId)}`
+        + `&bootstrap=${encodeURIComponent(isolated.ready.bootstrapToken)}`,
+    )
+    await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+    expect(page.url()).toBe(
+      `${isolatedURL(isolated.ready)}/?project=${encodeURIComponent(isolated.ready.projectId)}`,
+    )
+    await expect(page.locator('[data-editor-shell]')).toBeVisible()
+    const status = page.locator('[data-runtime-project-status]')
+    await expect(status).toBeVisible()
+    await expect(status.getByText(isolated.ready.projectId, { exact: true })).toBeVisible()
+    await expect(status.getByText('main', { exact: true })).toBeVisible()
+    await expect(status.getByText('Read only', { exact: true })).toBeVisible()
+    await expect(status.getByText('3 resources', { exact: true })).toBeVisible()
+    await expect(status.getByText('2 protocol errors', { exact: true })).toBeVisible()
+
+    const before = Number(await page.locator('html').getAttribute('data-runtime-refresh-count'))
+    const fingerprintBefore = await status.getAttribute('data-resource-fingerprint')
+    await writeFile(path.join(projectRoot, 'work', 'captions', 'captions-plan.json'), '{"cues":[{"id":"external"}]}\n')
+    await expect.poll(async () => Number(
+      await page.locator('html').getAttribute('data-runtime-refresh-count'),
+    )).toBeGreaterThan(before)
+    await expect.poll(() => status.getAttribute('data-resource-fingerprint')).not.toBe(fingerprintBefore)
+  } finally {
+    await page.close()
+    await stopSidecar(isolated.process)
+  }
+})
+
+async function authenticatedSidecar() {
+  const isolated = await startSidecar(projectRoot)
+  const isolatedURLValue = isolatedURL(isolated.ready)
+  const client = await request.newContext({ baseURL: isolatedURLValue })
+  const response = await client.post('/v1/session/bootstrap', {
+    data: {
+      projectId: isolated.ready.projectId,
+      bootstrapToken: isolated.ready.bootstrapToken,
+    },
+    headers: { Origin: isolatedURLValue },
+  })
+  expect(response.status()).toBe(200)
+  return { ...isolated, client }
+}
+
+function bootstrap(client: APIRequestContext) {
+  return client.post('/v1/session/bootstrap', {
+    data: { projectId: ready.projectId, bootstrapToken: ready.bootstrapToken },
+    headers: { Origin: baseURL },
+  })
+}
+
+function isolatedURL(message: ReadyMessage) {
+  return `http://${message.host}:${message.port}`
+}
+
+async function startSidecar(root: string): Promise<{
+  process: ChildProcessWithoutNullStreams
+  ready: ReadyMessage
+}> {
+  const child = spawn(process.execPath, [
+    path.join(repositoryRoot, 'runtime', 'sidecar.cjs'),
+    '--project-root', root,
+    '--ui-root', path.join(uiRoot, 'dist'),
+  ], {
+    cwd: repositoryRoot,
+    env: { ...process.env, CAC_PYTHON: process.env.CAC_PYTHON ?? bundledPython },
+    stdio: ['pipe', 'pipe', 'pipe'],
+  })
+
+  const message = await new Promise<ReadyMessage>((resolve, reject) => {
+    let stdout = ''
+    let stderr = ''
+    const timeout = setTimeout(() => reject(new Error(`sidecar startup timed out: ${stderr}`)), 10_000)
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString()
+      const newline = stdout.indexOf('\n')
+      if (newline < 0) return
+      clearTimeout(timeout)
+      resolve(JSON.parse(stdout.slice(0, newline)))
+    })
+    child.stderr.on('data', (chunk) => { stderr += chunk.toString() })
+    child.once('exit', (code) => {
+      clearTimeout(timeout)
+      reject(new Error(`sidecar exited ${code}: ${stderr}`))
+    })
+    child.once('error', reject)
+  }).catch((error) => {
+    child.kill()
+    return waitForExit(child, 2_000).then(() => { throw error })
+  })
+  return { process: child, ready: message }
+}
+
+async function stopSidecar(child: ChildProcessWithoutNullStreams) {
+  if (child.exitCode !== null) return
+  child.stdin.end()
+  if (!await waitForExit(child, 3_000)) {
+    child.kill()
+    await waitForExit(child, 2_000)
+  }
+  child.stdout.destroy()
+  child.stderr.destroy()
+}
+
+function waitForExit(child: ChildProcessWithoutNullStreams, timeoutMs: number) {
+  if (child.exitCode !== null) return Promise.resolve(true)
+  return new Promise<boolean>((resolve) => {
+    const timeout = setTimeout(() => {
+      child.off('exit', onExit)
+      resolve(false)
+    }, timeoutMs)
+    const onExit = () => {
+      clearTimeout(timeout)
+      resolve(true)
+    }
+    child.once('exit', onExit)
+  })
+}
+
+async function createProjectFixture() {
+  const root = await mkdtemp(path.join(tmpdir(), 'cut-editor-sidecar-'))
+  await mkdir(path.join(root, 'work', 'captions'), { recursive: true })
+  await mkdir(path.join(root, 'input'), { recursive: true })
+  await mkdir(path.join(root, 'review'), { recursive: true })
+  await writeFile(path.join(root, 'input', 'source.mp4'), '0123456789')
+  await writeFile(path.join(root, 'review', 'preview.txt'), 'agent preview')
+  await writeFile(path.join(root, 'work', 'captions', 'captions-plan.json'), '{"cues":[]}\n')
+  await writeFile(path.join(root, 'work', 'timeline.json'), JSON.stringify({
+    schema_version: 1,
+    source_duration_s: 1,
+    program_duration_s: 1,
+    fps: { num: 30, den: 1 },
+    clips: [{
+      id: 'clip-1',
+      source_range: { start_s: 0, end_s: 1 },
+      program_range: { start_s: 0, end_s: 1 },
+      speed: 1,
+    }],
+  }))
+  await writeFile(path.join(root, 'work', 'project.json'), JSON.stringify({
+    schema_version: 1,
+    project_id: 'fixture',
+    revision: 1,
+    source: { path: 'input/source.mp4' },
+    active_sequence: 'main',
+    sequences: { main: { timeline: 'timeline.json', operations: ['captions'] } },
+    operations: [{
+      id: 'captions',
+      revision: 1,
+      status: 'draft',
+      target: { sequence: 'main', scope: 'full' },
+      effects: ['overlay'],
+      plan: 'captions/captions-plan.json',
+      based_on: {},
+      render_contributions: [],
+    }],
+    reviews: [],
+    render: { status: 'draft' },
+  }))
+  return root
+}

@@ -34,6 +34,7 @@ import { TimelinePanel } from './TimelinePanel'
 import { ViewerPanel } from './ViewerPanel'
 import { createEditorStore } from './editor-store'
 import { getScenario } from './scenarios'
+import type { RuntimeSnapshot } from '../runtime/types'
 
 type IconItem = Readonly<{
   label: string
@@ -129,7 +130,12 @@ function IconLibrary() {
   )
 }
 
-export function EditorShell() {
+export type RuntimeProjectStatus = Readonly<{
+  projectId: string
+  snapshot: RuntimeSnapshot
+}>
+
+export function EditorShell({ runtime }: { runtime?: RuntimeProjectStatus }) {
   const scenarioId = new URLSearchParams(window.location.search).get('scenario') ?? '1-84'
   const scenario = getScenario(scenarioId) ?? getScenario('1-84')!
   const [store] = useState(() => createEditorStore(scenario.initialState))
@@ -160,6 +166,7 @@ export function EditorShell() {
       data-scenario-id={scenarioId}
       aria-label="Video editor"
     >
+      {runtime ? <RuntimeStatus status={runtime} /> : null}
       {isWorkspaceScenario ? (
         <Workspace store={store} />
       ) : isTimelineScenario ? (
@@ -170,5 +177,38 @@ export function EditorShell() {
         <LibraryPanel store={store} />
       )}
     </main>
+  )
+}
+
+function RuntimeStatus({ status }: { status: RuntimeProjectStatus }) {
+  const { projectId, snapshot } = status
+  const resourceFingerprint = snapshot.resources.map((resource) => resource.etag).join(':')
+  return (
+    <aside
+      data-runtime-project-status
+      data-resource-fingerprint={resourceFingerprint}
+      aria-label="Runtime project status"
+      style={{
+        position: 'fixed',
+        zIndex: 100,
+        right: 12,
+        top: 12,
+        display: 'flex',
+        gap: 8,
+        alignItems: 'center',
+        padding: '6px 8px',
+        border: '1px solid #393b42',
+        borderRadius: 6,
+        color: '#f0f1f6',
+        background: '#202126',
+        font: '11px Inter, ui-sans-serif, system-ui, sans-serif',
+      }}
+    >
+      <span>{projectId}</span>
+      <span>{snapshot.view.active_sequence ?? 'No active sequence'}</span>
+      <span>{snapshot.read_only ? 'Read only' : 'Writable'}</span>
+      <span>{snapshot.resources.length} resources</span>
+      <span>{snapshot.errors.length ? `${snapshot.errors.length} protocol errors` : 'No protocol errors'}</span>
+    </aside>
   )
 }
