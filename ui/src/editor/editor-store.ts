@@ -67,6 +67,36 @@ function fieldsMatch(
   return Object.entries(draft).every(([field, value]) => authority[field] === value)
 }
 
+function hasReviewEvidence(operation: EditorOperationView) {
+  const preview = operation.preview
+  return Boolean(
+    preview &&
+      preview.reviewId.trim() &&
+      preview.snapshotEtag.trim() &&
+      preview.evidenceHashes.length &&
+      preview.evidenceHashes.every((hash) => hash.trim()),
+  )
+}
+
+function canRecordReviewDecision(
+  project: EditorProjectView | null,
+  operationId: string,
+  draft: OperationDraft | undefined,
+) {
+  const operation = getOperation(project, operationId)
+  const preview = operation?.preview
+  return Boolean(
+    operation &&
+      isSupportedOperation(operation) &&
+      !draft?.dirty &&
+      !draft?.conflict &&
+      preview?.status === 'current' &&
+      preview.revision === operation.revision &&
+      hasReviewEvidence(operation) &&
+      operation.approval?.status === 'none',
+  )
+}
+
 export type EditorState = {
   project: EditorProjectView | null
   activeTab: LibraryTab
@@ -88,6 +118,7 @@ export type EditorState = {
   editOperationDraft: (operationId: string, change: ContentCardsDraftChange) => void
   discardOperationDraft: (operationId: string) => void
   saveOperationDraft: (operationId: string) => void
+  recordReviewDecision: (operationId: string, decision: 'approved' | 'rejected', rationale?: string) => void
   getOperationDraft: (operationId: string) => OperationDraft | null
   canSaveOperation: (operationId: string) => boolean
   canApproveOperation: (operationId: string) => boolean
@@ -106,6 +137,7 @@ export type EditorInitialState = Omit<
   | 'editOperationDraft'
   | 'discardOperationDraft'
   | 'saveOperationDraft'
+  | 'recordReviewDecision'
   | 'getOperationDraft'
   | 'canSaveOperation'
   | 'canApproveOperation'
@@ -191,20 +223,37 @@ export function createEditorStore(initialState: EditorInitialState) {
       const { [operationId]: _saved, ...operationDrafts } = state.operationDrafts
       set({ project: state.project ? { ...state.project, operations } : null, operationDrafts })
     },
+    recordReviewDecision: (operationId, decision, rationale) => {
+      const state = get()
+      const operation = getOperation(state.project, operationId)
+      if (!operation || !canRecordReviewDecision(state.project, operationId, state.operationDrafts[operationId])) return
+      const cleanRationale = rationale?.trim()
+      if (decision === 'rejected' && !cleanRationale) return
+      const operations = state.project?.operations?.map((candidate) =>
+        candidate.id === operationId
+          ? {
+              ...candidate,
+              approval: {
+                status: decision,
+                revision: candidate.revision,
+                ...(decision === 'rejected' ? { rationale: cleanRationale } : {}),
+                reviewId: operation.preview!.reviewId,
+                snapshotEtag: operation.preview!.snapshotEtag,
+                evidenceHashes: operation.preview!.evidenceHashes,
+              },
+            }
+          : candidate,
+      )
+      set({ project: state.project ? { ...state.project, operations } : null })
+    },
     getOperationDraft: (operationId) => get().operationDrafts[operationId] ?? null,
     canSaveOperation: (operationId) => {
       const draft = get().operationDrafts[operationId]
       return Boolean(draft?.dirty && !draft.conflict)
     },
     canApproveOperation: (operationId) => {
-      const operation = getOperation(get().project, operationId)
-      const draft = get().operationDrafts[operationId]
-      return Boolean(
-        operation?.preview?.status === 'current' &&
-          operation.preview.revision === operation.revision &&
-          !draft?.dirty &&
-          !draft?.conflict,
-      )
+      const state = get()
+      return canRecordReviewDecision(state.project, operationId, state.operationDrafts[operationId])
     },
   }))
 }

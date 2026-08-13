@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 
 import { Plus } from 'lucide-react'
 import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand/vanilla'
-import type { AssetView, EditorSelection, LibraryTab } from './editor-model'
+import type { AssetView, EditorOperationView, EditorSelection, LibraryTab } from './editor-model'
 import type { EditorState } from './editor-store'
 
 type LibraryPanelProps = {
@@ -212,7 +212,42 @@ function PlacementControls() {
   )
 }
 
-function CardsPanel({ store }: LibraryPanelProps) {
+function ReviewCardFields({ operation, store }: { operation: EditorOperationView; store: StoreApi<EditorState> }) {
+  const draft = useStore(store, (state) => state.getOperationDraft(operation.id))
+  const edit = useStore(store, (state) => state.editOperationDraft)
+  const fields = { ...operation.fields, ...draft?.fields }
+  return (
+    <fieldset aria-label="Content Card fields" style={{ display: 'grid', gap: 6, marginTop: 12 }}>
+      <label>
+        <span className="sr-only">Content card copy</span>
+        <input aria-label="Content card copy" value={String(fields.copy ?? '')} onChange={(event) => edit(operation.id, { copy: event.target.value })} />
+      </label>
+      <label>
+        Layout
+        <select aria-label="Content card layout" value={String(fields.layout ?? 'lower-third')} onChange={(event) => edit(operation.id, { layout: event.target.value as 'lower-third' | 'quote' | 'statistic' })}>
+          <option value="lower-third">Lower third</option>
+          <option value="quote">Quote</option>
+          <option value="statistic">Statistic</option>
+        </select>
+      </label>
+      <label>
+        Placement
+        <select aria-label="Content card placement" value={String(fields.placement ?? 'bottom-left')} onChange={(event) => edit(operation.id, { placement: event.target.value as 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' })}>
+          <option value="top-left">Top left</option>
+          <option value="top-right">Top right</option>
+          <option value="bottom-left">Bottom left</option>
+          <option value="bottom-right">Bottom right</option>
+        </select>
+      </label>
+      <label>
+        <input aria-label="Content card enabled" type="checkbox" checked={Boolean(fields.enabled)} onChange={(event) => edit(operation.id, { enabled: event.target.checked })} />
+        Enabled
+      </label>
+    </fieldset>
+  )
+}
+
+function CardsPanel({ store, operation }: LibraryPanelProps & { operation?: EditorOperationView }) {
   const selection = useStore(store, (state) => state.selection)
   const select = useStore(store, (state) => state.select)
   return (
@@ -221,6 +256,7 @@ function CardsPanel({ store }: LibraryPanelProps) {
       <TileGrid items={contentCards} kind="card" selectedId={selection?.id} onSelect={select} />
       <PlacementControls />
       <button className="library-primary-action" type="button">Insert content card</button>
+      {operation?.editable ? <ReviewCardFields operation={operation} store={store} /> : null}
     </>
   )
 }
@@ -249,10 +285,10 @@ function MotionPanel({ store }: LibraryPanelProps) {
   )
 }
 
-function PanelContent({ activeTab, store }: { activeTab: LibraryTab; store: StoreApi<EditorState> }): ReactNode {
+function PanelContent({ activeTab, store, operation }: { activeTab: LibraryTab; store: StoreApi<EditorState>; operation?: EditorOperationView }): ReactNode {
   if (activeTab === 'assets') return <AssetsPanel store={store} />
   if (activeTab === 'captions') return <CaptionsPanel store={store} />
-  if (activeTab === 'cards') return <CardsPanel store={store} />
+  if (activeTab === 'cards') return <CardsPanel store={store} operation={operation} />
   return <MotionPanel store={store} />
 }
 
@@ -260,6 +296,7 @@ export function LibraryPanel({ store }: LibraryPanelProps) {
   const activeTab = useStore(store, (state) => state.activeTab)
   const setActiveTab = useStore(store, (state) => state.setActiveTab)
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const contentCardsOperation = useStore(store, (state) => state.project?.operations?.find((operation) => operation.kind === 'content-cards'))
 
   useEffect(() => {
     tabRefs.current[tabs.findIndex((tab) => tab.id === activeTab)]?.scrollIntoView({
@@ -314,7 +351,7 @@ export function LibraryPanel({ store }: LibraryPanelProps) {
         role="tabpanel"
         aria-labelledby={`library-tab-${activeTab}`}
       >
-        <PanelContent activeTab={activeTab} store={store} />
+        <PanelContent activeTab={activeTab} store={store} operation={contentCardsOperation} />
       </div>
     </section>
   )

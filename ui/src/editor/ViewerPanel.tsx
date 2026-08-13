@@ -238,6 +238,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
   const seek = useStore(store, (state) => state.seek)
   const setPlaying = useStore(store, (state) => state.setPlaying)
   const setOpenMenu = useStore(store, (state) => state.setOpenMenu)
+  const contentCardsOperation = useStore(store, (state) => state.project?.operations?.find((operation) => operation.kind === 'content-cards'))
   const hasMedia = Boolean(project && project.durationS > 0)
   const fps = project ? project.fps.numerator / project.fps.denominator : 30
 
@@ -276,6 +277,11 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
   return (
     <section className="viewer-panel" role="region" aria-label="Viewer">
       <header className="viewer-titlebar">Viewer</header>
+      {contentCardsOperation?.preview ? (
+        <output aria-label="Preview artifact metadata" style={{ display: 'block', padding: '4px 12px', color: '#a9adb9', background: '#17191e', fontSize: 11 }}>
+          Existing preview artifact: {contentCardsOperation.preview.status} (revision {contentCardsOperation.preview.revision})
+        </output>
+      ) : null}
       <div className="viewer-stage">
         {hasMedia && (
           <>

@@ -19,6 +19,8 @@ export const scenarioIds = [
   '123-167',
   '126-2',
   'graphic-motion',
+  'review-content-cards',
+  'review-content-cards-conflict',
 ] as const
 
 export type ScenarioId = (typeof scenarioIds)[number]
@@ -75,6 +77,47 @@ const emptyProject: EditorProjectView = {
   fps: { numerator: 30, denominator: 1 },
   assets: [],
   tracks: [],
+}
+
+const reviewProject: EditorProjectView = {
+  ...populatedProject,
+  operations: [
+    {
+      id: 'content-cards',
+      kind: 'content-cards',
+      revision: 3,
+      editable: true,
+      fields: {
+        copy: 'Meet the product team',
+        layout: 'lower-third',
+        placement: 'bottom-left',
+        enabled: true,
+      },
+      preview: {
+        status: 'current',
+        revision: 3,
+        reviewId: 'review-content-cards-r3',
+        snapshotEtag: 'snapshot-r3',
+        evidenceHashes: ['sha256:content-cards-preview-r3'],
+      },
+      approval: { status: 'none' },
+    },
+    {
+      id: 'captions',
+      kind: 'captions',
+      revision: 3,
+      editable: false,
+      fields: {},
+      preview: {
+        status: 'current',
+        revision: 3,
+        reviewId: 'review-captions-r3',
+        snapshotEtag: 'snapshot-captions-r3',
+        evidenceHashes: ['sha256:captions-preview-r3'],
+      },
+      approval: { status: 'none' },
+    },
+  ],
 }
 
 const fiveSecondProject: EditorProjectView = { ...populatedProject, durationS: 5 }
@@ -158,6 +201,14 @@ const scenarios: readonly EditorScenario[] = [
   },
   { id: '126-2', initialState: state({ activeTab: 'cards' }) },
   { id: 'graphic-motion', initialState: state({ activeTab: 'graphic-motion' }) },
+  { id: 'review-content-cards', initialState: state({ project: reviewProject, activeTab: 'cards' }) },
+  {
+    id: 'review-content-cards-conflict',
+    initialState: state({
+      project: reviewProject,
+      activeTab: 'cards',
+    }),
+  },
 ]
 
 export function getScenario(id: string): EditorScenario | undefined {

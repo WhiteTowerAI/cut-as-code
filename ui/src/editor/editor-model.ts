@@ -37,11 +37,18 @@ export type ContentCardPlacement = 'top-left' | 'top-right' | 'bottom-left' | 'b
 export type OperationPreview = Readonly<{
   status: 'current' | 'stale'
   revision: number
+  reviewId: string
+  snapshotEtag: string
+  evidenceHashes: readonly string[]
 }>
 
 export type OperationApproval = Readonly<{
   status: 'none' | 'approved' | 'rejected' | 'invalidated'
   revision?: number
+  rationale?: string
+  reviewId?: string
+  snapshotEtag?: string
+  evidenceHashes?: readonly string[]
 }>
 
 export type EditorOperationView = Readonly<{

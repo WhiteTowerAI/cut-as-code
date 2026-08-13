@@ -24,7 +24,13 @@ const project: EditorProjectView = {
         placement: 'bottom-left',
         enabled: true,
       },
-      preview: { status: 'current', revision: 3 },
+      preview: {
+        status: 'current',
+        revision: 3,
+        reviewId: 'review-content-cards-r3',
+        snapshotEtag: 'snapshot-r3',
+        evidenceHashes: ['sha256:content-cards-preview-r3'],
+      },
       approval: { status: 'approved', revision: 3 },
     },
     {
@@ -33,7 +39,13 @@ const project: EditorProjectView = {
       revision: 2,
       editable: false,
       fields: {},
-      preview: { status: 'current', revision: 2 },
+      preview: {
+        status: 'current',
+        revision: 2,
+        reviewId: 'review-captions-r2',
+        snapshotEtag: 'snapshot-captions-r2',
+        evidenceHashes: ['sha256:captions-preview-r2'],
+      },
       approval: { status: 'none' },
     },
   ],
@@ -210,6 +222,64 @@ test('saving preserves an approval with no revision binding', () => {
   expect(store.getState().project?.operations?.[0]?.approval).toEqual({ status: 'none' })
 })
 
+test('a rejection records its non-empty rationale against the current preview revision', () => {
+  const store = createStateStore()
+
+  store.getState().recordReviewDecision('content-cards', 'rejected', 'Title obscures the speaker')
+
+  expect(store.getState().project?.operations?.[0]?.approval).toEqual({
+    status: 'rejected',
+    revision: 3,
+    rationale: 'Title obscures the speaker',
+    reviewId: 'review-content-cards-r3',
+    snapshotEtag: 'snapshot-r3',
+    evidenceHashes: ['sha256:content-cards-preview-r3'],
+  })
+})
+
+test('a decision cannot be recorded without complete immutable preview evidence', () => {
+  const store = createStateStore()
+  store.getState().setProject({
+    ...project,
+    operations: project.operations?.map((operation) => operation.id === 'content-cards'
+      ? { ...operation, preview: { status: 'current', revision: 3 }, approval: { status: 'none' } }
+      : operation),
+  })
+
+  store.getState().recordReviewDecision('content-cards', 'approved')
+  expect(store.getState().project?.operations?.[0]?.approval).toEqual({ status: 'none' })
+})
+
+test('an approved preview cannot be replaced by a rejection without a new review', () => {
+  const store = createStateStore()
+
+  store.getState().recordReviewDecision('content-cards', 'approved')
+  store.getState().recordReviewDecision('content-cards', 'rejected', 'Too late to reject this review')
+
+  expect(store.getState().project?.operations?.[0]?.approval).toMatchObject({ status: 'approved' })
+  expect(store.getState().canApproveOperation('content-cards')).toBe(false)
+})
+
+test('a rejected preview cannot be replaced by an approval without a new review', () => {
+  const store = createStateStore()
+
+  store.getState().recordReviewDecision('content-cards', 'rejected', 'Title obscures the speaker')
+  store.getState().recordReviewDecision('content-cards', 'approved')
+
+  expect(store.getState().project?.operations?.[0]?.approval).toMatchObject({ status: 'rejected' })
+  expect(store.getState().canApproveOperation('content-cards')).toBe(false)
+})
+
+test('read-only captions cannot record an approval or rejection despite a current preview', () => {
+  const store = createStateStore()
+  const before = store.getState().project?.operations?.[1]?.approval
+
+  store.getState().recordReviewDecision('captions', 'approved')
+  store.getState().recordReviewDecision('captions', 'rejected', 'No rationale should be stored')
+
+  expect(store.getState().project?.operations?.[1]?.approval).toEqual(before)
+})
+
 test('discard restores the authoritative operation values', () => {
   const store = createStateStore()
 
@@ -248,7 +318,17 @@ test('an external update discards a clean same-operation draft without blocking 
     revision: 8,
     operations: project.operations?.map((operation) =>
       operation.id === 'content-cards'
-        ? { ...operation, revision: 4, preview: { status: 'current', revision: 4 } }
+        ? {
+            ...operation,
+            revision: 4,
+            preview: {
+              status: 'current',
+              revision: 4,
+              reviewId: 'review-content-cards-r4',
+              snapshotEtag: 'snapshot-r4',
+              evidenceHashes: ['sha256:content-cards-preview-r4'],
+            },
+          }
         : operation,
     ),
   })
@@ -307,4 +387,9 @@ test('getScenario resolves every dash-form Figma node and graphic motion', () =>
   ] as const
 
   expect(ids.map((id) => getScenario(id)?.id)).toEqual(ids)
+})
+
+test('getScenario resolves the dedicated content cards review fixtures', () => {
+  expect(getScenario('review-content-cards')?.initialState.project?.operations?.[0]?.kind).toBe('content-cards')
+  expect(getScenario('review-content-cards-conflict')?.id).toBe('review-content-cards-conflict')
 })

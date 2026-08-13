@@ -1,4 +1,5 @@
 import { useState, type ComponentType } from 'react'
+import { useStore } from 'zustand'
 import {
   ArrowDownToLine,
   ArrowUpToLine,
@@ -32,6 +33,7 @@ import {
 import { LibraryPanel } from './LibraryPanel'
 import { TimelinePanel } from './TimelinePanel'
 import { ViewerPanel } from './ViewerPanel'
+import { ProjectReviewPanel } from './ProjectReviewPanel'
 import { createEditorStore } from './editor-store'
 import { getScenario } from './scenarios'
 import type { RuntimeSnapshot } from '../runtime/types'
@@ -90,12 +92,14 @@ const iconGroups: ReadonlyArray<Readonly<{ label: string; icons: readonly IconIt
 ]
 
 function Workspace({ store }: { store: ReturnType<typeof createEditorStore> }) {
+  const contentCardsOperation = useStore(store, (state) => state.project?.operations?.find((operation) => operation.kind === 'content-cards'))
   return (
     <>
       <header className="workspace-operation-bar">
         <strong>Cut as code</strong>
         <button type="button" disabled title="Export is not connected in this verification surface">Export</button>
       </header>
+      {contentCardsOperation ? <ProjectReviewPanel operation={contentCardsOperation} store={store} /> : null}
       <div className="workspace-primary">
         <LibraryPanel store={store} />
         <ViewerPanel store={store} />
@@ -138,13 +142,27 @@ export type RuntimeProjectStatus = Readonly<{
 export function EditorShell({ runtime }: { runtime?: RuntimeProjectStatus }) {
   const scenarioId = new URLSearchParams(window.location.search).get('scenario') ?? '1-84'
   const scenario = getScenario(scenarioId) ?? getScenario('1-84')!
-  const [store] = useState(() => createEditorStore(scenario.initialState))
+  const [store] = useState(() => {
+    const next = createEditorStore(scenario.initialState)
+    if (scenarioId === 'review-content-cards-conflict') {
+      next.getState().editOperationDraft('content-cards', { copy: 'Local review note' })
+      const project = next.getState().project
+      next.getState().setProject(project ? {
+        ...project,
+        revision: project.revision + 1,
+        operations: project.operations?.map((operation) => operation.id === 'content-cards'
+          ? { ...operation, revision: operation.revision + 1, fields: { ...operation.fields, copy: 'Agent update' } }
+          : operation),
+      } : null)
+    }
+    return next
+  })
   const viewerScenarios = new Set(['1-282', '57-152', '1-1026', '1-528', '123-79'])
   const timelineScenarios = new Set(['1-324', '1-1115', '1-754', '123-167'])
   const isViewerScenario = viewerScenarios.has(scenarioId)
   const isTimelineScenario = timelineScenarios.has(scenarioId)
   const isMenuFrame = scenarioId === '57-152' || scenarioId === '1-528'
-  const isWorkspaceScenario = scenarioId === '1-60' || scenarioId === '1-1373'
+  const isWorkspaceScenario = scenarioId === '1-60' || scenarioId === '1-1373' || scenarioId.startsWith('review-content-cards')
   const isIconLibraryScenario = scenarioId === '76-2'
 
   if (isIconLibraryScenario) {
