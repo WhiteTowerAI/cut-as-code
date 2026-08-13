@@ -20,6 +20,8 @@ if (!rootPackage || typeof rootPackage.dependencies !== 'object') {
 const components = productionDependencyClosure(lock, Object.keys(rootPackage.dependencies))
 const animxyz = inspectAnimxyz(packageRoot)
 components.push(animxyz.component)
+const assetInventory = inspectPackagedScriptAndFontAssets(packageRoot, components)
+components.push(...assetInventory.components)
 components.sort((left, right) => left.name.localeCompare(right.name, 'en'))
 
 const unresolved = components.filter((component) => !component.license || component.license === 'NOASSERTION')
@@ -33,7 +35,7 @@ writeJson(path.join(packageRoot, 'SBOM.spdx.json'), spdx(components))
 const auditPath = path.join(packageRoot, 'PACKAGE_AUDIT.json')
 const baseAudit = {
   schema_version: 1,
-  scope: 'all packaged files',
+  scope: 'all packaged files for secrets; executable, stylesheet, font, and runtime binary assets for third-party licensing',
   generated_from: {
     dependency_lock: 'ui/package-lock.json',
     package_builder: 'scripts/build_plugin_package.ps1',
@@ -42,8 +44,26 @@ const baseAudit = {
     status: 'pass',
     component_count: components.length,
     first_party_license: 'MIT',
-    components: components.map(({ name, version, license, evidence }) => ({ name, version, license, evidence })),
+    components: components.map(({ name, version, license, checksum, packagedPaths, evidence }) => ({
+      name,
+      version,
+      license,
+      checksum,
+      packaged_paths: packagedPaths ?? [],
+      evidence,
+    })),
     unresolved: [],
+  },
+  third_party_asset_audit: {
+    status: 'pass',
+    scope: 'executable, stylesheet, font, and runtime binary assets',
+    extensions: assetInventory.extensions,
+    files_scanned: assetInventory.filesScanned,
+    third_party: assetInventory.thirdParty,
+    generated_bundles: assetInventory.generatedBundles,
+    generated_stylesheets: assetInventory.generatedStylesheets,
+    first_party_or_generated: assetInventory.firstPartyOrGenerated,
+    unknown: [],
   },
   secret_audit: {
     status: 'pending',
@@ -142,6 +162,228 @@ function inspectAnimxyz(root) {
   }
 }
 
+function inspectPackagedScriptAndFontAssets(root, dependencyComponents) {
+  const extensions = ['.bin', '.cjs', '.css', '.dll', '.dylib', '.js', '.mjs', '.node', '.otf', '.so', '.ttf', '.wasm', '.woff', '.woff2']
+  const files = walk(root)
+    .filter((file) => extensions.includes(path.extname(file).toLowerCase()))
+    .map((file) => ({ file, path: relative(root, file) }))
+  const known = [
+    inspectGsap(root),
+    inspectFont(root, {
+      name: 'Cal Sans',
+      version: '1.000',
+      path: 'skills/video-add-captions/public/fonts/CalSans-Regular.ttf',
+      additionalPaths: ['skills/video-add-captions/examples/fonts/CalSans-Regular.ttf'],
+      sha256: 'c7e50dba671a7b2e606d5bcb9390cbd5e4e1de269afc0bc98eb1eacc517fdb05',
+      sourceRevision: '46b43bfb793e324d84a8c93f127d4addcadcbfd9',
+      sourceRepository: 'https://github.com/calcom/font',
+      licenseUrl: 'https://openfontlicense.org',
+      evidenceStrings: [
+        'Version 1.000',
+        'Copyright 2021 The Cal Sans Project Authors (https://github.com/calcom/font)',
+        'SIL Open Font License, Version 1.1',
+        'https://openfontlicense.org',
+      ],
+    }),
+    inspectFont(root, {
+      name: 'Lexend',
+      version: '1.007',
+      path: 'skills/video-add-content-cards/assets/fonts/Lexend-VariableFont_wght.ttf',
+      sha256: '91342a7f7da58a6bc398057da404b563d8890cc755ab312718a7cea515c09232',
+      sourceRevision: '388ae39e02759a6c5ff40419e1c2c43c2736e533',
+      sourceRepository: 'https://github.com/googlefonts/lexend',
+      licenseUrl: 'https://scripts.sil.org/OFL',
+      evidenceStrings: [
+        'Version 1.007',
+        'Copyright 2019 The Lexend Project Authors (https://github.com/googlefonts/lexend)',
+        'SIL Open Font License, Version 1.1',
+        'https://scripts.sil.org/OFL',
+      ],
+    }),
+  ]
+  const knownPaths = new Set(known.flatMap((item) => item.packagedPaths))
+  const interComponent = dependencyComponents.find((item) => item.name === '@fontsource/inter')
+  if (!interComponent) throw new Error('packaged Inter assets have no @fontsource/inter component')
+  const interHashes = new Set(
+    walk(path.join(repositoryRoot, 'ui', 'node_modules', '@fontsource', 'inter'))
+      .filter((file) => ['.otf', '.ttf', '.woff', '.woff2'].includes(path.extname(file).toLowerCase()))
+      .map((file) => sha256(fs.readFileSync(file))),
+  )
+  const thirdParty = known.flatMap((item) => item.packagedPaths.map((packagedPath) => ({
+    path: packagedPath,
+    component: item.name,
+    sha256: item.checksum.value,
+  })))
+  const generatedBundles = []
+  const generatedStylesheets = []
+  const firstPartyOrGenerated = []
+  const unknown = []
+  for (const item of files) {
+    if (knownPaths.has(item.path)) continue
+    if (/^ui\/dist\/assets\/inter-[A-Za-z0-9-]+\.(?:woff2?|otf|ttf)$/.test(item.path)) {
+      const hash = sha256(fs.readFileSync(item.file))
+      if (!interHashes.has(hash)) {
+        unknown.push(item.path)
+        continue
+      }
+      thirdParty.push({ path: item.path, component: interComponent.name, sha256: hash })
+      continue
+    }
+    if (/^ui\/dist\/assets\/index-[A-Za-z0-9_-]+\.js$/.test(item.path)) {
+      const hash = assertGeneratedDistAsset(item)
+      if (!hash) {
+        unknown.push(item.path)
+        continue
+      }
+      generatedBundles.push({
+        path: item.path,
+        sha256: hash,
+        components: dependencyComponents
+          .filter((component) => component.evidence.kind === 'npm-lockfile-and-installed-license')
+          .map((component) => component.name)
+          .sort(),
+      })
+      continue
+    }
+    if (/^ui\/dist\/assets\/index-[A-Za-z0-9_-]+\.css$/.test(item.path)) {
+      const hash = assertGeneratedDistAsset(item)
+      if (!hash) {
+        unknown.push(item.path)
+        continue
+      }
+      generatedStylesheets.push({
+        path: item.path,
+        sha256: hash,
+        kind: 'generated-vite-stylesheet',
+      })
+      continue
+    }
+    if (/^skills\/video-add-graphic-motion\/recipes\/animxyz\/(?:[^/]+\/hyperframes\/)?_runtime\/animxyz\.css$/.test(item.path)) {
+      const hash = sha256(fs.readFileSync(item.file))
+      if (hash !== '4a133a5e4bf9ff2b3c87d7ef3a20064ccaab3c8838cafbf540c75d658f7c451d') unknown.push(item.path)
+      else thirdParty.push({ path: item.path, component: '@animxyz/core', sha256: hash })
+      continue
+    }
+    if (isFirstPartyOrGeneratedAsset(item.path)) firstPartyOrGenerated.push(item.path)
+    else unknown.push(item.path)
+  }
+  if (generatedBundles.length !== 1) unknown.push(...generatedBundles.map((item) => item.path))
+  if (generatedStylesheets.length !== 1) unknown.push(...generatedStylesheets.map((item) => item.path))
+  if (unknown.length) throw new Error(`unknown third-party runtime assets: ${unknown.join(', ')}`)
+  return {
+    extensions,
+    filesScanned: files.length,
+    components: known,
+    thirdParty,
+    generatedBundles,
+    generatedStylesheets,
+    firstPartyOrGenerated,
+  }
+}
+
+function assertGeneratedDistAsset(item) {
+  const source = path.join(repositoryRoot, ...item.path.split('/'))
+  if (!fs.existsSync(source) || !fs.statSync(source).isFile()) return undefined
+  const hash = sha256(fs.readFileSync(item.file))
+  return hash === sha256(fs.readFileSync(source)) ? hash : undefined
+}
+
+function inspectGsap(root) {
+  const packagedPath = 'skills/video-add-captions/public/gsap.min.js'
+  const file = requiredPackagedFile(root, packagedPath)
+  const bytes = fs.readFileSync(file)
+  const hash = sha256(bytes)
+  const expectedHash = 'c71e401021a12cfa35fe7afcf45240c0dea1ca87016d3921b9ecd35424e49026'
+  if (hash !== expectedHash) throw new Error(`packaged GSAP hash changed: ${hash}`)
+  const source = bytes.toString('utf8')
+  for (const evidence of ['GSAP 3.12.5', 'Copyright 2024, GreenSock', 'https://gsap.com/standard-license']) {
+    if (!source.includes(evidence)) throw new Error(`packaged GSAP license evidence is missing: ${evidence}`)
+  }
+  return {
+    name: 'GSAP',
+    version: '3.12.5',
+    license: 'LicenseRef-GSAP-Standard',
+    downloadLocation: 'https://gsap.com',
+    checksum: { algorithm: 'SHA256', value: hash },
+    packagedPaths: [packagedPath],
+    licenseText: 'Copyright 2024, GreenSock. All rights reserved. Subject to the terms at https://gsap.com/standard-license or, for Club GSAP members, the agreement issued with that membership.',
+    evidence: {
+      kind: 'embedded-javascript-license-header',
+      packaged_path: packagedPath,
+      license_url: 'https://gsap.com/standard-license',
+      source_revision: 'a7646f5b8acf6369f30df1b04aa9a9c85dfae38c',
+      sha256: hash,
+    },
+  }
+}
+
+function inspectFont(root, definition) {
+  const paths = [definition.path, ...(definition.additionalPaths ?? [])]
+  const file = requiredPackagedFile(root, definition.path)
+  const bytes = fs.readFileSync(file)
+  const hash = sha256(bytes)
+  if (hash !== definition.sha256) throw new Error(`packaged ${definition.name} hash changed: ${hash}`)
+  for (const packagedPath of paths.slice(1)) {
+    const additionalHash = sha256(fs.readFileSync(requiredPackagedFile(root, packagedPath)))
+    if (additionalHash !== definition.sha256) throw new Error(`packaged ${definition.name} hash changed at ${packagedPath}: ${additionalHash}`)
+  }
+  const metadata = extractSfntNameText(bytes)
+  for (const evidence of definition.evidenceStrings) {
+    if (!metadata.includes(evidence)) throw new Error(`packaged ${definition.name} license evidence is missing: ${evidence}`)
+  }
+  return {
+    name: definition.name,
+    version: definition.version,
+    license: 'OFL-1.1',
+    downloadLocation: definition.sourceRepository,
+    checksum: { algorithm: 'SHA256', value: hash },
+    packagedPaths: paths,
+    licenseText: `This Font Software is licensed under the SIL Open Font License, Version 1.1. The packaged font name table identifies ${definition.sourceRepository} and ${definition.licenseUrl}.`,
+    evidence: {
+      kind: 'embedded-sfnt-name-table',
+      packaged_path: definition.path,
+      source_repository: definition.sourceRepository,
+      license_url: definition.licenseUrl,
+      source_revision: definition.sourceRevision,
+      sha256: hash,
+    },
+  }
+}
+
+function extractSfntNameText(bytes) {
+  return `${bytes.toString('utf8')}\n${Buffer.from(bytes).swap16().toString('utf16le')}`
+}
+
+function requiredPackagedFile(root, packagedPath) {
+  const file = path.join(root, ...packagedPath.split('/'))
+  if (!fs.existsSync(file) || !fs.statSync(file).isFile()) throw new Error(`required packaged third-party asset is missing: ${packagedPath}`)
+  return file
+}
+
+function isFirstPartyOrGeneratedAsset(packagedPath) {
+  if (/^runtime\/(?:mcp|sidecar)\.cjs$/.test(packagedPath)) return true
+  if (/^skills\/video-add-graphic-motion\/recipes\/animxyz\/[^/]+\/hyperframes\/hf-(?:adapter|recipe)\.js$/.test(packagedPath)) return true
+  return new Set([
+    'skills/video-add-graphic-motion/scripts/audit_sticker_metadata.mjs',
+    'skills/video-add-graphic-motion/scripts/convert_codrops_recipes.mjs',
+    'skills/video-add-graphic-motion/scripts/convert_motion_anything_recipes.mjs',
+    'skills/video-add-graphic-motion/scripts/import_sticker_recipes.mjs',
+    'skills/video-add-graphic-motion/scripts/recipe_library.mjs',
+    'skills/video-add-graphic-motion/scripts/sticker_recipe_catalog.mjs',
+    'skills/video-add-graphic-motion/scripts/sticker_semantics.mjs',
+    'skills/video-add-graphic-motion/scripts/verify_codrops_hyperframes.mjs',
+    'skills/video-add-captions/scripts/build_style_preview_gallery.mjs',
+    'skills/video-add-captions/scripts/caption_interaction.mjs',
+    'skills/video-add-captions/scripts/caption_interaction_state.mjs',
+    'skills/video-add-captions/scripts/caption_style_config.mjs',
+    'skills/video-add-captions/scripts/check_caption_interaction.mjs',
+    'skills/video-add-captions/scripts/check_caption_style_config.mjs',
+    'skills/video-add-captions/scripts/generate_caption_project.mjs',
+    'skills/video-add-content-cards/examples/build-gallery.mjs',
+    'skills/video-add-content-cards/examples/shoot.mjs',
+  ]).has(packagedPath)
+}
+
 function notices(items, animxyzInfo) {
   const rows = items.map((item) => `| ${item.name} | ${item.version} | ${item.license} |`).join('\n')
   const sections = items.map((item) => [
@@ -151,7 +393,9 @@ function notices(items, animxyzInfo) {
     '',
     item.name === '@animxyz/core'
       ? `Vendored through nexu-io/motion-anything revision ${animxyzInfo.audit.license_evidence.source_revision}; upstream ${animxyzInfo.audit.license_evidence.upstream}; frozen CSS SHA-256 ${animxyzInfo.audit.sha256}.`
-      : `Source: ${item.downloadLocation}`,
+      : item.packagedPaths?.length
+        ? `Packaged path: ${item.packagedPaths.join(', ')}; source revision ${item.evidence.source_revision}; license evidence ${item.evidence.license_url}; SHA-256 ${item.checksum.value}.`
+        : `Source: ${item.downloadLocation}`,
     '',
     '```text',
     item.licenseText,
@@ -192,12 +436,21 @@ function spdx(items) {
       licenseDeclared: item.license,
       copyrightText: 'NOASSERTION',
       checksums: [{ algorithm: item.checksum.algorithm, checksumValue: item.checksum.value }],
-      externalRefs: item.name === '@animxyz/core' ? [] : [{
+      ...(item.packagedPaths?.length ? {
+        packageFileName: item.packagedPaths.join(', '),
+        sourceInfo: `Packaged asset evidence: ${item.evidence.kind}; source revision ${item.evidence.source_revision}; license ${item.evidence.license_url}`,
+      } : {}),
+      externalRefs: item.name === '@animxyz/core' || item.packagedPaths?.length ? [] : [{
         referenceCategory: 'PACKAGE-MANAGER',
         referenceType: 'purl',
         referenceLocator: `pkg:npm/${encodeURIComponent(item.name)}@${item.version}`,
       }],
     })),
+    hasExtractedLicensingInfos: [{
+      licenseId: 'LicenseRef-GSAP-Standard',
+      extractedText: items.find((item) => item.name === 'GSAP')?.licenseText ?? 'NOASSERTION',
+      seeAlsos: ['https://gsap.com/standard-license'],
+    }],
   }
 }
 

@@ -17,6 +17,7 @@ from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 BUILD_SCRIPT = REPOSITORY_ROOT / "scripts" / "build_plugin_package.ps1"
+COMPLIANCE_SCRIPT = REPOSITORY_ROOT / "scripts" / "generate_package_compliance.cjs"
 PLUGIN_MANIFEST = REPOSITORY_ROOT / ".codex-plugin" / "plugin.json"
 MCP_MANIFEST = REPOSITORY_ROOT / ".mcp.json"
 BUNDLED_PYTHON = Path(
@@ -80,6 +81,35 @@ THIRD_PARTY_COMPONENTS = {
     ("scheduler", "0.27.0", "MIT"),
     ("zustand", "5.0.14", "MIT"),
     ("@animxyz/core", "vendored", "MIT"),
+    ("Cal Sans", "1.000", "OFL-1.1"),
+    ("GSAP", "3.12.5", "LicenseRef-GSAP-Standard"),
+    ("Lexend", "1.007", "OFL-1.1"),
+}
+THIRD_PARTY_ASSETS = {
+    "skills/video-add-captions/examples/fonts/CalSans-Regular.ttf": {
+        "component": "Cal Sans",
+        "sha256": "c7e50dba671a7b2e606d5bcb9390cbd5e4e1de269afc0bc98eb1eacc517fdb05",
+        "license_url": "https://openfontlicense.org",
+        "source_revision": "46b43bfb793e324d84a8c93f127d4addcadcbfd9",
+    },
+    "skills/video-add-captions/public/fonts/CalSans-Regular.ttf": {
+        "component": "Cal Sans",
+        "sha256": "c7e50dba671a7b2e606d5bcb9390cbd5e4e1de269afc0bc98eb1eacc517fdb05",
+        "license_url": "https://openfontlicense.org",
+        "source_revision": "46b43bfb793e324d84a8c93f127d4addcadcbfd9",
+    },
+    "skills/video-add-captions/public/gsap.min.js": {
+        "component": "GSAP",
+        "sha256": "c71e401021a12cfa35fe7afcf45240c0dea1ca87016d3921b9ecd35424e49026",
+        "license_url": "https://gsap.com/standard-license",
+        "source_revision": "a7646f5b8acf6369f30df1b04aa9a9c85dfae38c",
+    },
+    "skills/video-add-content-cards/assets/fonts/Lexend-VariableFont_wght.ttf": {
+        "component": "Lexend",
+        "sha256": "91342a7f7da58a6bc398057da404b563d8890cc755ab312718a7cea515c09232",
+        "license_url": "https://scripts.sil.org/OFL",
+        "source_revision": "388ae39e02759a6c5ff40419e1c2c43c2736e533",
+    },
 }
 
 
@@ -117,9 +147,93 @@ class PluginPackageTests(unittest.TestCase):
             with zipfile.ZipFile(first) as archive:
                 archive.extractall(installed)
             extracted = installed / package_root
+            self._assert_unknown_third_party_asset_is_rejected(extracted)
             self._audit_route_allowlist(extracted)
             self._audit_graphic_motion_core(extracted, root / "graphic motion core project")
             self._smoke_open_editor(extracted, root / "video project with spaces", root)
+
+    def test_compliance_inventory_covers_packaged_third_party_assets_and_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="cut compliance package ") as temporary:
+            package_root = Path(temporary) / "package with spaces"
+            shutil.copytree(
+                REPOSITORY_ROOT / "skills" / "video-add-graphic-motion" / "recipes" / "animxyz",
+                package_root / "skills" / "video-add-graphic-motion" / "recipes" / "animxyz",
+            )
+            shutil.copytree(REPOSITORY_ROOT / "ui" / "dist", package_root / "ui" / "dist")
+            (package_root / "runtime").mkdir(parents=True)
+            for runtime_file in ("mcp.cjs", "sidecar.cjs"):
+                shutil.copy2(
+                    REPOSITORY_ROOT / "runtime" / runtime_file,
+                    package_root / "runtime" / runtime_file,
+                )
+            for asset_path in THIRD_PARTY_ASSETS:
+                destination = package_root / asset_path
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(REPOSITORY_ROOT / asset_path, destination)
+
+            subprocess.run(
+                ["node", str(COMPLIANCE_SCRIPT), str(REPOSITORY_ROOT), str(package_root)],
+                cwd=REPOSITORY_ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            notices = (package_root / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
+            audit = json.loads((package_root / "PACKAGE_AUDIT.json").read_text(encoding="utf-8"))
+            self.assertEqual(
+                {
+                    (item["name"], item["version"], item["license"])
+                    for item in audit["license_audit"]["components"]
+                },
+                THIRD_PARTY_COMPONENTS,
+            )
+            inter_assets = [
+                item
+                for item in audit["third_party_asset_audit"]["third_party"]
+                if item["component"] == "@fontsource/inter"
+            ]
+            self.assertEqual(len(inter_assets), 6)
+            self.assertTrue(all(item["path"].startswith("ui/dist/assets/inter-") for item in inter_assets))
+            generated_bundles = audit["third_party_asset_audit"]["generated_bundles"]
+            self.assertEqual(len(generated_bundles), 1)
+            self.assertRegex(generated_bundles[0]["path"], r"^ui/dist/assets/index-.+\.js$")
+            self.assertEqual(
+                set(generated_bundles[0]["components"]),
+                {name for name, _, _ in THIRD_PARTY_COMPONENTS if name not in {"@animxyz/core", "Cal Sans", "GSAP", "Lexend"}},
+            )
+            animxyz_styles = [
+                item for item in audit["third_party_asset_audit"]["third_party"]
+                if item["component"] == "@animxyz/core" and item["path"].endswith("animxyz.css")
+            ]
+            self.assertEqual(len(animxyz_styles), 11)
+            self.assertEqual(
+                {item["sha256"] for item in animxyz_styles},
+                {"4a133a5e4bf9ff2b3c87d7ef3a20064ccaab3c8838cafbf540c75d658f7c451d"},
+            )
+            generated_stylesheets = audit["third_party_asset_audit"]["generated_stylesheets"]
+            self.assertEqual(len(generated_stylesheets), 1)
+            self.assertRegex(generated_stylesheets[0]["path"], r"^ui/dist/assets/index-.+\.css$")
+            self._assert_asset_component_evidence(notices, audit)
+            self._assert_sbom_asset_evidence(
+                json.loads((package_root / "SBOM.spdx.json").read_text(encoding="utf-8"))
+            )
+            self._assert_unknown_third_party_asset_is_rejected(package_root, "unknown-vendor.js")
+            self._assert_unknown_third_party_asset_is_rejected(package_root, "unknown-font.ttf")
+            self._assert_unknown_third_party_asset_is_rejected(
+                package_root, "ui/dist/assets/inter-evil.woff2"
+            )
+            self._assert_unknown_third_party_asset_is_rejected(
+                package_root, "ui/dist/assets/index-evil.js"
+            )
+            self._assert_unknown_third_party_asset_is_rejected(package_root, "unknown-style.css")
+            self._assert_unknown_third_party_asset_is_rejected(package_root, "unknown-runtime.wasm")
+            self._assert_unknown_third_party_asset_is_rejected(package_root, "unknown-addon.node")
+            self.assertEqual(
+                audit["scope"],
+                "all packaged files for secrets; executable, stylesheet, font, and runtime binary assets for third-party licensing",
+            )
+            self.assertEqual(audit["third_party_asset_audit"]["scope"], "executable, stylesheet, font, and runtime binary assets")
 
     def _build(self, output: Path) -> None:
         subprocess.run(
@@ -149,6 +263,12 @@ class PluginPackageTests(unittest.TestCase):
             roots = {name.split("/", 1)[0] for name in names}
             self.assertEqual(roots, {"cut-as-code-editor"})
             relative_names = [name.removeprefix("cut-as-code-editor/") for name in names]
+            for asset_path, expected in THIRD_PARTY_ASSETS.items():
+                self.assertIn(asset_path, relative_names)
+                self.assertEqual(
+                    hashlib.sha256(archive.read(f"cut-as-code-editor/{asset_path}")).hexdigest(),
+                    expected["sha256"],
+                )
 
             required = {
                 ".codex-plugin/plugin.json",
@@ -181,13 +301,21 @@ class PluginPackageTests(unittest.TestCase):
                 THIRD_PARTY_COMPONENTS,
             )
             self.assertTrue(all(item["checksums"] for item in sbom["packages"]))
+            self._assert_sbom_asset_evidence(sbom)
 
             audit = json.loads(archive.read("cut-as-code-editor/PACKAGE_AUDIT.json"))
             self.assertEqual(audit["schema_version"], 1)
-            self.assertEqual(audit["scope"], "all packaged files")
+            self.assertEqual(
+                audit["scope"],
+                "all packaged files for secrets; executable, stylesheet, font, and runtime binary assets for third-party licensing",
+            )
             self.assertEqual(audit["license_audit"]["status"], "pass")
             self.assertEqual(audit["license_audit"]["component_count"], len(THIRD_PARTY_COMPONENTS))
             self.assertEqual(audit["license_audit"]["unresolved"], [])
+            asset_audit = audit["third_party_asset_audit"]
+            self.assertEqual(asset_audit["status"], "pass")
+            self.assertEqual(asset_audit["unknown"], [])
+            self._assert_asset_component_evidence(notices, audit)
             self.assertEqual(audit["secret_audit"]["status"], "pass")
             self.assertEqual(audit["secret_audit"]["findings"], [])
             self.assertGreater(audit["secret_audit"]["files_scanned"], 0)
@@ -315,6 +443,74 @@ process.stdout.write(JSON.stringify({
             audit["actual"],
             ["launch", "meta", "snapshot", "transaction", "review", "resource", "file", "file", "events", "static", "static", None, None, None, None],
         )
+
+    def _assert_unknown_third_party_asset_is_rejected(
+        self, plugin_root: Path, filename: str = "unknown-vendor.js"
+    ) -> None:
+        relative_path = (
+            filename
+            if "/" in filename
+            else f"skills/video-add-captions/public/{filename}"
+        )
+        unknown = plugin_root / relative_path
+        unknown.parent.mkdir(parents=True, exist_ok=True)
+        unknown.write_text("/* unclassified third-party fixture */\n", encoding="utf-8")
+        try:
+            result = subprocess.run(
+                [
+                    "node",
+                    str(COMPLIANCE_SCRIPT),
+                    str(REPOSITORY_ROOT),
+                    str(plugin_root),
+                ],
+                cwd=REPOSITORY_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("unknown third-party runtime assets:", result.stderr)
+            self.assertIn(relative_path, result.stderr)
+        finally:
+            unknown.unlink(missing_ok=True)
+
+    def _assert_sbom_asset_evidence(self, sbom: dict) -> None:
+        sbom_components = {item["name"]: item for item in sbom["packages"]}
+        for asset_path, expected in THIRD_PARTY_ASSETS.items():
+            component = sbom_components[expected["component"]]
+            self.assertIn(asset_path, component["packageFileName"])
+            self.assertIn(expected["license_url"], component["sourceInfo"])
+            self.assertIn(expected["source_revision"], component["sourceInfo"])
+        self.assertEqual(
+            sbom["hasExtractedLicensingInfos"][0]["licenseId"],
+            "LicenseRef-GSAP-Standard",
+        )
+        self.assertIn(
+            "https://gsap.com/standard-license",
+            sbom["hasExtractedLicensingInfos"][0]["extractedText"],
+        )
+
+    def _assert_asset_component_evidence(self, notices: str, audit: dict) -> None:
+        audited_components = {
+            item["name"]: item for item in audit["license_audit"]["components"]
+        }
+        audited_assets = {
+            item["path"]: item
+            for item in audit["third_party_asset_audit"]["third_party"]
+        }
+        for asset_path, expected in THIRD_PARTY_ASSETS.items():
+            self.assertIn(asset_path, notices)
+            self.assertIn(expected["sha256"], notices)
+            self.assertIn(expected["license_url"], notices)
+            self.assertIn(expected["source_revision"], notices)
+            component = audited_components[expected["component"]]
+            self.assertIn(asset_path, component["packaged_paths"])
+            self.assertEqual(component["checksum"]["value"], expected["sha256"])
+            self.assertEqual(component["evidence"]["license_url"], expected["license_url"])
+            self.assertEqual(component["evidence"]["source_revision"], expected["source_revision"])
+            self.assertEqual(audited_assets[asset_path]["component"], expected["component"])
+            self.assertEqual(audited_assets[asset_path]["sha256"], expected["sha256"])
 
     def _audit_graphic_motion_core(self, plugin_root: Path, project_root: Path) -> None:
         library = plugin_root / "skills" / "video-add-graphic-motion" / "scripts" / "recipe_library.mjs"
