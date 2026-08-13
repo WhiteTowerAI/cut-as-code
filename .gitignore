@@ -8,6 +8,7 @@ __pycache__/
 work/
 docs/
 /tests/
+/TEST/
 skills/video-add-graphic-motion/tests/
 
 .claude/worktrees/

@@ -10,7 +10,7 @@ import { sceneStateAt, showcaseStateAt } from "./scene-time.js";
 
 const IMAGE_URLS = Array.from(
   { length: 13 },
-  (_, index) => new URL(`./upstream/public/images/img${index + 1}.webp`, import.meta.url).href,
+  (_, index) => new URL(`./public/images/img${index + 1}.webp`, import.meta.url).href,
 );
 
 class MeshImageMaterial extends THREE.MeshBasicMaterial {
@@ -125,7 +125,7 @@ async function makeModel(url, texture, materialFactory, transform) {
   return object;
 }
 
-export async function createRecipe({ canvas }) {
+export async function createKineticImagesRecipe({ canvas }) {
   const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
   renderer.setSize(1920, 1080, false);
   renderer.setPixelRatio(1);
@@ -137,14 +137,14 @@ export async function createRecipe({ canvas }) {
   const [{ texture: billboardTexture, aspect }, { texture: paperTexture }, bannerTexture] = await Promise.all([
     collageTexture(IMAGE_URLS),
     collageTexture(IMAGE_URLS.slice(0, 5), { axis: "y", canvasWidth: 1024 }),
-    new THREE.TextureLoader().loadAsync(new URL("./upstream/public/banner.jpg", import.meta.url).href),
+    new THREE.TextureLoader().loadAsync(new URL("./public/banner.jpg", import.meta.url).href),
   ]);
   bannerTexture.colorSpace = THREE.SRGBColorSpace;
   const cylinders = makeCylinders(billboardTexture, aspect, bannerTexture);
   scene.add(cylinders.group);
 
   const paper = await makeModel(
-    new URL("./upstream/public/paper.glb", import.meta.url).href,
+    new URL("./public/paper.glb", import.meta.url).href,
     paperTexture,
     (texture, material) => {
       material.map = texture;
@@ -161,7 +161,7 @@ export async function createRecipe({ canvas }) {
 
   const { texture: spiralTexture } = await collageTexture(IMAGE_URLS);
   const spiral = await makeModel(
-    new URL("./upstream/public/spiral.glb", import.meta.url).href,
+    new URL("./public/spiral.glb", import.meta.url).href,
     spiralTexture,
     (texture) => new MeshImageMaterial({ map: texture, side: THREE.DoubleSide, toneMapped: false }),
     () => {},

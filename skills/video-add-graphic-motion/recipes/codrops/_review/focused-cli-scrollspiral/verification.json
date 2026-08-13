@@ -1,0 +1,1167 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-07T05:49:03.267Z",
+  "imports_root": "D:\\Users\\Charles Kang\\Desktop\\temp\\cut-as-code\\skills\\video-add-graphic-motion\\recipes\\codrops",
+  "total_variants": 9,
+  "visual": [],
+  "cli": [
+    {
+      "key": "ScrollSpiral/index",
+      "ok": true,
+      "check": {
+        "ok": true,
+        "json": {
+          "ok": true,
+          "strict": false,
+          "lint": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "filesScanned": 1
+          },
+          "runtime": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": []
+          },
+          "layout": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "duration": 8,
+            "samples": [
+              0.444,
+              1.333,
+              2.222,
+              3.111,
+              4,
+              4.889,
+              5.778,
+              6.667,
+              7.556
+            ],
+            "transitionSamples": [],
+            "transitionSamplesDropped": 0,
+            "tolerance": 2,
+            "totalIssueCount": 0,
+            "truncated": false
+          },
+          "motion": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "enabled": false,
+            "samples": 0
+          },
+          "contrast": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "enabled": true,
+            "samples": [
+              0.444,
+              2.222,
+              4,
+              5.778,
+              7.556
+            ],
+            "checked": 0,
+            "passed": 0
+          },
+          "snapshots": {
+            "enabled": false,
+            "files": [],
+            "times": [],
+            "findingFiles": []
+          },
+          "_meta": {
+            "version": "0.7.90",
+            "latestVersion": "0.7.96",
+            "updateAvailable": true
+          }
+        },
+        "stderr": "[hyperframes] browserGpuMode auto → hardware (WebGL renderer vendor=\"Google Inc. (AMD)\" renderer=\"ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)\")"
+      },
+      "keyframes": {
+        "ok": true,
+        "json": {
+          "project": "codrops-hf-cli-MAc3yv",
+          "runtime": "all",
+          "compositions": [
+            {
+              "composition": "index.html",
+              "source": "index.html",
+              "tweens": [],
+              "traces": [],
+              "cssKeyframes": [],
+              "anime": []
+            }
+          ],
+          "_meta": {
+            "version": "0.7.90",
+            "latestVersion": "0.7.96",
+            "updateAvailable": true
+          }
+        },
+        "stderr": ""
+      },
+      "cleanup": {
+        "ok": true
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "check_ok": true,
+          "check_json_ok": true,
+          "check_error": null,
+          "check_stderr": "[hyperframes] browserGpuMode auto → hardware (WebGL renderer vendor=\"Google Inc. (AMD)\" renderer=\"ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)\")",
+          "keyframes_ok": true,
+          "cleanup": {
+            "ok": true
+          }
+        }
+      ]
+    },
+    {
+      "key": "ScrollSpiral/index2",
+      "ok": true,
+      "check": {
+        "ok": true,
+        "json": {
+          "ok": true,
+          "strict": false,
+          "lint": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "filesScanned": 1
+          },
+          "runtime": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": []
+          },
+          "layout": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "duration": 8,
+            "samples": [
+              0.444,
+              1.333,
+              2.222,
+              3.111,
+              4,
+              4.889,
+              5.778,
+              6.667,
+              7.556
+            ],
+            "transitionSamples": [],
+            "transitionSamplesDropped": 0,
+            "tolerance": 2,
+            "totalIssueCount": 0,
+            "truncated": false
+          },
+          "motion": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "enabled": false,
+            "samples": 0
+          },
+          "contrast": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "enabled": true,
+            "samples": [
+              0.444,
+              2.222,
+              4,
+              5.778,
+              7.556
+            ],
+            "checked": 0,
+            "passed": 0
+          },
+          "snapshots": {
+            "enabled": false,
+            "files": [],
+            "times": [],
+            "findingFiles": []
+          },
+          "_meta": {
+            "version": "0.7.90",
+            "latestVersion": "0.7.96",
+            "updateAvailable": true
+          }
+        },
+        "stderr": "[hyperframes] browserGpuMode auto → hardware (WebGL renderer vendor=\"Google Inc. (AMD)\" renderer=\"ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)\")"
+      },
+      "keyframes": {
+        "ok": true,
+        "json": {
+          "project": "codrops-hf-cli-kzE3r7",
+          "runtime": "all",
+          "compositions": [
+            {
+              "composition": "index.html",
+              "source": "index.html",
+              "tweens": [],
+              "traces": [],
+              "cssKeyframes": [],
+              "anime": []
+            }
+          ],
+          "_meta": {
+            "version": "0.7.90",
+            "latestVersion": "0.7.96",
+            "updateAvailable": true
+          }
+        },
+        "stderr": ""
+      },
+      "cleanup": {
+        "ok": true
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "check_ok": true,
+          "check_json_ok": true,
+          "check_error": null,
+          "check_stderr": "[hyperframes] browserGpuMode auto → hardware (WebGL renderer vendor=\"Google Inc. (AMD)\" renderer=\"ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)\")",
+          "keyframes_ok": true,
+          "cleanup": {
+            "ok": true
+          }
+        }
+      ]
+    },
+    {
+      "key": "ScrollSpiral/index3",
+      "ok": true,
+      "check": {
+        "ok": true,
+        "json": {
+          "ok": true,
+          "strict": false,
+          "lint": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "filesScanned": 1
+          },
+          "runtime": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": []
+          },
+          "layout": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "duration": 8,
+            "samples": [
+              0.444,
+              1.333,
+              2.222,
+              3.111,
+              4,
+              4.889,
+              5.778,
+              6.667,
+              7.556
+            ],
+            "transitionSamples": [],
+            "transitionSamplesDropped": 0,
+            "tolerance": 2,
+            "totalIssueCount": 0,
+            "truncated": false
+          },
+          "motion": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "enabled": false,
+            "samples": 0
+          },
+          "contrast": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "enabled": true,
+            "samples": [
+              0.444,
+              2.222,
+              4,
+              5.778,
+              7.556
+            ],
+            "checked": 0,
+            "passed": 0
+          },
+          "snapshots": {
+            "enabled": false,
+            "files": [],
+            "times": [],
+            "findingFiles": []
+          },
+          "_meta": {
+            "version": "0.7.90",
+            "latestVersion": "0.7.96",
+            "updateAvailable": true
+          }
+        },
+        "stderr": "[hyperframes] browserGpuMode auto → hardware (WebGL renderer vendor=\"Google Inc. (AMD)\" renderer=\"ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)\")"
+      },
+      "keyframes": {
+        "ok": true,
+        "json": {
+          "project": "codrops-hf-cli-E1tKCd",
+          "runtime": "all",
+          "compositions": [
+            {
+              "composition": "index.html",
+              "source": "index.html",
+              "tweens": [],
+              "traces": [],
+              "cssKeyframes": [],
+              "anime": []
+            }
+          ],
+          "_meta": {
+            "version": "0.7.90",
+            "latestVersion": "0.7.96",
+            "updateAvailable": true
+          }
+        },
+        "stderr": ""
+      },
+      "cleanup": {
+        "ok": true
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "check_ok": true,
+          "check_json_ok": true,
+          "check_error": null,
+          "check_stderr": "[hyperframes] browserGpuMode auto → hardware (WebGL renderer vendor=\"Google Inc. (AMD)\" renderer=\"ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)\")",
+          "keyframes_ok": true,
+          "cleanup": {
+            "ok": true
+          }
+        }
+      ]
+    },
+    {
+      "key": "ScrollSpiral/index4",
+      "ok": true,
+      "check": {
+        "ok": true,
+        "json": {
+          "ok": true,
+          "strict": false,
+          "lint": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "filesScanned": 1
+          },
+          "runtime": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": []
+          },
+          "layout": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "duration": 8,
+            "samples": [
+              0.444,
+              1.333,
+              2.222,
+              3.111,
+              4,
+              4.889,
+              5.778,
+              6.667,
+              7.556
+            ],
+            "transitionSamples": [],
+            "transitionSamplesDropped": 0,
+            "tolerance": 2,
+            "totalIssueCount": 0,
+            "truncated": false
+          },
+          "motion": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "enabled": false,
+            "samples": 0
+          },
+          "contrast": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "enabled": true,
+            "samples": [
+              0.444,
+              2.222,
+              4,
+              5.778,
+              7.556
+            ],
+            "checked": 0,
+            "passed": 0
+          },
+          "snapshots": {
+            "enabled": false,
+            "files": [],
+            "times": [],
+            "findingFiles": []
+          },
+          "_meta": {
+            "version": "0.7.90",
+            "latestVersion": "0.7.96",
+            "updateAvailable": true
+          }
+        },
+        "stderr": "[hyperframes] browserGpuMode auto → hardware (WebGL renderer vendor=\"Google Inc. (AMD)\" renderer=\"ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)\")"
+      },
+      "keyframes": {
+        "ok": true,
+        "json": {
+          "project": "codrops-hf-cli-2TCw77",
+          "runtime": "all",
+          "compositions": [
+            {
+              "composition": "index.html",
+              "source": "index.html",
+              "tweens": [],
+              "traces": [],
+              "cssKeyframes": [],
+              "anime": []
+            }
+          ],
+          "_meta": {
+            "version": "0.7.90",
+            "latestVersion": "0.7.96",
+            "updateAvailable": true
+          }
+        },
+        "stderr": ""
+      },
+      "cleanup": {
+        "ok": true
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "check_ok": true,
+          "check_json_ok": true,
+          "check_error": null,
+          "check_stderr": "[hyperframes] browserGpuMode auto → hardware (WebGL renderer vendor=\"Google Inc. (AMD)\" renderer=\"ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)\")",
+          "keyframes_ok": true,
+          "cleanup": {
+            "ok": true
+          }
+        }
+      ]
+    },
+    {
+      "key": "ScrollSpiral/index5",
+      "ok": true,
+      "check": {
+        "ok": true,
+        "json": {
+          "ok": true,
+          "strict": false,
+          "lint": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "filesScanned": 1
+          },
+          "runtime": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": []
+          },
+          "layout": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "duration": 8,
+            "samples": [
+              0.444,
+              1.333,
+              2.222,
+              3.111,
+              4,
+              4.889,
+              5.778,
+              6.667,
+              7.556
+            ],
+            "transitionSamples": [],
+            "transitionSamplesDropped": 0,
+            "tolerance": 2,
+            "totalIssueCount": 0,
+            "truncated": false
+          },
+          "motion": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "enabled": false,
+            "samples": 0
+          },
+          "contrast": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "enabled": true,
+            "samples": [
+              0.444,
+              2.222,
+              4,
+              5.778,
+              7.556
+            ],
+            "checked": 0,
+            "passed": 0
+          },
+          "snapshots": {
+            "enabled": false,
+            "files": [],
+            "times": [],
+            "findingFiles": []
+          },
+          "_meta": {
+            "version": "0.7.90",
+            "latestVersion": "0.7.96",
+            "updateAvailable": true
+          }
+        },
+        "stderr": "[hyperframes] browserGpuMode auto → hardware (WebGL renderer vendor=\"Google Inc. (AMD)\" renderer=\"ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)\")"
+      },
+      "keyframes": {
+        "ok": true,
+        "json": {
+          "project": "codrops-hf-cli-Oh25uh",
+          "runtime": "all",
+          "compositions": [
+            {
+              "composition": "index.html",
+              "source": "index.html",
+              "tweens": [],
+              "traces": [],
+              "cssKeyframes": [],
+              "anime": []
+            }
+          ],
+          "_meta": {
+            "version": "0.7.90",
+            "latestVersion": "0.7.96",
+            "updateAvailable": true
+          }
+        },
+        "stderr": ""
+      },
+      "cleanup": {
+        "ok": true
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "check_ok": true,
+          "check_json_ok": true,
+          "check_error": null,
+          "check_stderr": "[hyperframes] browserGpuMode auto → hardware (WebGL renderer vendor=\"Google Inc. (AMD)\" renderer=\"ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)\")",
+          "keyframes_ok": true,
+          "cleanup": {
+            "ok": true
+          }
+        }
+      ]
+    },
+    {
+      "key": "ScrollSpiral/index6",
+      "ok": true,
+      "check": {
+        "ok": true,
+        "json": {
+          "ok": true,
+          "strict": false,
+          "lint": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "filesScanned": 1
+          },
+          "runtime": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": []
+          },
+          "layout": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "duration": 8,
+            "samples": [
+              0.444,
+              1.333,
+              2.222,
+              3.111,
+              4,
+              4.889,
+              5.778,
+              6.667,
+              7.556
+            ],
+            "transitionSamples": [],
+            "transitionSamplesDropped": 0,
+            "tolerance": 2,
+            "totalIssueCount": 0,
+            "truncated": false
+          },
+          "motion": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "enabled": false,
+            "samples": 0
+          },
+          "contrast": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "enabled": true,
+            "samples": [
+              0.444,
+              2.222,
+              4,
+              5.778,
+              7.556
+            ],
+            "checked": 0,
+            "passed": 0
+          },
+          "snapshots": {
+            "enabled": false,
+            "files": [],
+            "times": [],
+            "findingFiles": []
+          },
+          "_meta": {
+            "version": "0.7.90",
+            "latestVersion": "0.7.96",
+            "updateAvailable": true
+          }
+        },
+        "stderr": "[hyperframes] browserGpuMode auto → hardware (WebGL renderer vendor=\"Google Inc. (AMD)\" renderer=\"ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)\")"
+      },
+      "keyframes": {
+        "ok": true,
+        "json": {
+          "project": "codrops-hf-cli-5jxlet",
+          "runtime": "all",
+          "compositions": [
+            {
+              "composition": "index.html",
+              "source": "index.html",
+              "tweens": [],
+              "traces": [],
+              "cssKeyframes": [],
+              "anime": []
+            }
+          ],
+          "_meta": {
+            "version": "0.7.90",
+            "latestVersion": "0.7.96",
+            "updateAvailable": true
+          }
+        },
+        "stderr": ""
+      },
+      "cleanup": {
+        "ok": true
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "check_ok": true,
+          "check_json_ok": true,
+          "check_error": null,
+          "check_stderr": "[hyperframes] browserGpuMode auto → hardware (WebGL renderer vendor=\"Google Inc. (AMD)\" renderer=\"ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)\")",
+          "keyframes_ok": true,
+          "cleanup": {
+            "ok": true
+          }
+        }
+      ]
+    },
+    {
+      "key": "ScrollSpiral/index7",
+      "ok": true,
+      "check": {
+        "ok": true,
+        "json": {
+          "ok": true,
+          "strict": false,
+          "lint": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "filesScanned": 1
+          },
+          "runtime": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": []
+          },
+          "layout": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "duration": 8,
+            "samples": [
+              0.444,
+              1.333,
+              2.222,
+              3.111,
+              4,
+              4.889,
+              5.778,
+              6.667,
+              7.556
+            ],
+            "transitionSamples": [],
+            "transitionSamplesDropped": 0,
+            "tolerance": 2,
+            "totalIssueCount": 0,
+            "truncated": false
+          },
+          "motion": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "enabled": false,
+            "samples": 0
+          },
+          "contrast": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "enabled": true,
+            "samples": [
+              0.444,
+              2.222,
+              4,
+              5.778,
+              7.556
+            ],
+            "checked": 0,
+            "passed": 0
+          },
+          "snapshots": {
+            "enabled": false,
+            "files": [],
+            "times": [],
+            "findingFiles": []
+          },
+          "_meta": {
+            "version": "0.7.90",
+            "latestVersion": "0.7.96",
+            "updateAvailable": true
+          }
+        },
+        "stderr": "[hyperframes] browserGpuMode auto → hardware (WebGL renderer vendor=\"Google Inc. (AMD)\" renderer=\"ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)\")"
+      },
+      "keyframes": {
+        "ok": true,
+        "json": {
+          "project": "codrops-hf-cli-yUfLfF",
+          "runtime": "all",
+          "compositions": [
+            {
+              "composition": "index.html",
+              "source": "index.html",
+              "tweens": [],
+              "traces": [],
+              "cssKeyframes": [],
+              "anime": []
+            }
+          ],
+          "_meta": {
+            "version": "0.7.90",
+            "latestVersion": "0.7.96",
+            "updateAvailable": true
+          }
+        },
+        "stderr": ""
+      },
+      "cleanup": {
+        "ok": true
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "check_ok": true,
+          "check_json_ok": true,
+          "check_error": null,
+          "check_stderr": "[hyperframes] browserGpuMode auto → hardware (WebGL renderer vendor=\"Google Inc. (AMD)\" renderer=\"ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)\")",
+          "keyframes_ok": true,
+          "cleanup": {
+            "ok": true
+          }
+        }
+      ]
+    },
+    {
+      "key": "ScrollSpiral/index8",
+      "ok": true,
+      "check": {
+        "ok": true,
+        "json": {
+          "ok": true,
+          "strict": false,
+          "lint": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "filesScanned": 1
+          },
+          "runtime": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": []
+          },
+          "layout": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "duration": 8,
+            "samples": [
+              0.444,
+              1.333,
+              2.222,
+              3.111,
+              4,
+              4.889,
+              5.778,
+              6.667,
+              7.556
+            ],
+            "transitionSamples": [],
+            "transitionSamplesDropped": 0,
+            "tolerance": 2,
+            "totalIssueCount": 0,
+            "truncated": false
+          },
+          "motion": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "enabled": false,
+            "samples": 0
+          },
+          "contrast": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "enabled": true,
+            "samples": [
+              0.444,
+              2.222,
+              4,
+              5.778,
+              7.556
+            ],
+            "checked": 0,
+            "passed": 0
+          },
+          "snapshots": {
+            "enabled": false,
+            "files": [],
+            "times": [],
+            "findingFiles": []
+          },
+          "_meta": {
+            "version": "0.7.90",
+            "latestVersion": "0.7.96",
+            "updateAvailable": true
+          }
+        },
+        "stderr": "[hyperframes] browserGpuMode auto → hardware (WebGL renderer vendor=\"Google Inc. (AMD)\" renderer=\"ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)\")"
+      },
+      "keyframes": {
+        "ok": true,
+        "json": {
+          "project": "codrops-hf-cli-DppFaH",
+          "runtime": "all",
+          "compositions": [
+            {
+              "composition": "index.html",
+              "source": "index.html",
+              "tweens": [],
+              "traces": [],
+              "cssKeyframes": [],
+              "anime": []
+            }
+          ],
+          "_meta": {
+            "version": "0.7.90",
+            "latestVersion": "0.7.96",
+            "updateAvailable": true
+          }
+        },
+        "stderr": ""
+      },
+      "cleanup": {
+        "ok": true
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "check_ok": true,
+          "check_json_ok": true,
+          "check_error": null,
+          "check_stderr": "[hyperframes] browserGpuMode auto → hardware (WebGL renderer vendor=\"Google Inc. (AMD)\" renderer=\"ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)\")",
+          "keyframes_ok": true,
+          "cleanup": {
+            "ok": true
+          }
+        }
+      ]
+    },
+    {
+      "key": "ScrollSpiral/index9",
+      "ok": true,
+      "check": {
+        "ok": true,
+        "json": {
+          "ok": true,
+          "strict": false,
+          "lint": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "filesScanned": 1
+          },
+          "runtime": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": []
+          },
+          "layout": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "duration": 8,
+            "samples": [
+              0.444,
+              1.333,
+              2.222,
+              3.111,
+              4,
+              4.889,
+              5.778,
+              6.667,
+              7.556
+            ],
+            "transitionSamples": [],
+            "transitionSamplesDropped": 0,
+            "tolerance": 2,
+            "totalIssueCount": 0,
+            "truncated": false
+          },
+          "motion": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "enabled": false,
+            "samples": 0
+          },
+          "contrast": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "enabled": true,
+            "samples": [
+              0.444,
+              2.222,
+              4,
+              5.778,
+              7.556
+            ],
+            "checked": 0,
+            "passed": 0
+          },
+          "snapshots": {
+            "enabled": false,
+            "files": [],
+            "times": [],
+            "findingFiles": []
+          },
+          "_meta": {
+            "version": "0.7.90",
+            "latestVersion": "0.7.96",
+            "updateAvailable": true
+          }
+        },
+        "stderr": "[hyperframes] browserGpuMode auto → hardware (WebGL renderer vendor=\"Google Inc. (AMD)\" renderer=\"ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)\")"
+      },
+      "keyframes": {
+        "ok": true,
+        "json": {
+          "project": "codrops-hf-cli-27DkfL",
+          "runtime": "all",
+          "compositions": [
+            {
+              "composition": "index.html",
+              "source": "index.html",
+              "tweens": [],
+              "traces": [],
+              "cssKeyframes": [],
+              "anime": []
+            }
+          ],
+          "_meta": {
+            "version": "0.7.90",
+            "latestVersion": "0.7.96",
+            "updateAvailable": true
+          }
+        },
+        "stderr": ""
+      },
+      "cleanup": {
+        "ok": true
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "check_ok": true,
+          "check_json_ok": true,
+          "check_error": null,
+          "check_stderr": "[hyperframes] browserGpuMode auto → hardware (WebGL renderer vendor=\"Google Inc. (AMD)\" renderer=\"ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)\")",
+          "keyframes_ok": true,
+          "cleanup": {
+            "ok": true
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "visual_passed": 0,
+    "visual_failed": 0,
+    "cli_passed": 9,
+    "cli_failed": 0
+  }
+}

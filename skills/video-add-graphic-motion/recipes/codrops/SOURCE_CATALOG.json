@@ -1,5 +1,5 @@
 {
-    "generated_at":  "2026-08-04T12:51:38.746Z",
+    "generated_at":  "2026-08-10T08:47:32.120Z",
     "source_entry":  "https://tympanus.net/codrops/demos/",
     "licensing_url":  "https://tympanus.net/codrops/licensing/",
     "licensing_verified_at":  "2026-08-04",
@@ -9,7 +9,7 @@
                              "threshold_explicit_video_utility":  4,
                              "threshold_hyperframes_convertibility":  4,
                              "reviewed_actual_demo_states":  true,
-                             "selected":  36,
+                             "selected":  37,
                              "rejected_after_visual_review":  16,
                              "user_deleted_after_selection":  4
                          },
@@ -1504,6 +1504,48 @@
                                                  "initial_sha256":  "8c217caa207d93e57154dea429efc4f487269d2da0da336b23072f790c00ae8f",
                                                  "interaction_screenshot":  "visuals/frame-103.png",
                                                  "interaction_sha256":  "ab1a8275a8289b3d13e22ae45b2cfd1fad3dad6e62c58d934ced2926bced01e5"
+                                             }
+                     },
+                     {
+                         "id":  "KineticImages",
+                         "title":  "Kinetic Images",
+                         "demo_page":  null,
+                         "demos_hub_url":  "https://tympanus.net/codrops/demos/",
+                         "demo_url":  "https://tympanus.net/Tutorials/KineticImages/",
+                         "article_url":  "https://tympanus.net/Tutorials/KineticImages/",
+                         "source_url":  "https://github.com/DGFX/codrops-kinetic-images",
+                         "source_commit":  "965dda362a8f9e5d522ed675493897200d273e49",
+                         "local_directory":  "KineticImages",
+                         "license":  {
+                                         "type":  "MIT",
+                                         "evidence":  "codrops-site-license",
+                                         "file":  "LICENSE.codrops",
+                                         "sha256":  "967b533a2646d103d5c13f340b9cf921dfcbb3ce0336682bea319868ee80637c"
+                                     },
+                         "screening":  {
+                                           "primary_role":  "background",
+                                           "video_roles":  [
+                                                               "background",
+                                                               "transition"
+                                                           ],
+                                           "scores":  {
+                                                          "standalone_visual_appeal":  5,
+                                                          "temporal_structure":  5,
+                                                          "explicit_video_utility":  5,
+                                                          "content_replaceability":  5,
+                                                          "fullscreen_adaptability":  4,
+                                                          "visual_distinctiveness":  5,
+                                                          "hyperframes_convertibility":  4
+                                                      },
+                                           "total_score":  33,
+                                           "visual_judgement":  "The verified composition turns replaceable imagery into rotating cylinders, a folded paper ribbon, and a spiral surface. These dimensional treatments can carry a full-frame background or bridge two video beats without relying on interface chrome.",
+                                           "hyperframes_judgement":  "The bespoke Three.js port uses local images and GLB assets with absolute-time scene states, fixed 1920x1080 output, and deterministic HyperFrames seeking. The verified frames are nonblank, visually different over time, and repeat exactly at the same timestamp."
+                                       },
+                         "review_evidence":  {
+                                                 "initial_screenshot":  "_review/kinetic-images-alignment-evidence/frame-00-at-0.1s.png",
+                                                 "initial_sha256":  "35eaec0ee712ecad8c183ac5e0be37297c47f86f46c312dd2df5fda500c737b2",
+                                                 "interaction_screenshot":  "_review/kinetic-images-alignment-evidence/frame-01-at-3s.png",
+                                                 "interaction_sha256":  "587be6059dd00a8cedcc4c474626e146b5cd0056e181cfb649c95e728ae46d34"
                                              }
                      }
                  ]

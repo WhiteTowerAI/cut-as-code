@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
-  "project_id": "codrops-kinetic-images",
+  "project_id": "KineticImages",
   "demo_url": "https://tympanus.net/Tutorials/KineticImages/",
   "article_url": "https://tympanus.net/Tutorials/KineticImages/",
   "source_url": "https://github.com/DGFX/codrops-kinetic-images",
   "source_commit": "965dda362a8f9e5d522ed675493897200d273e49",
   "license": {
     "type": "MIT",
-    "evidence": "official-codrops-license",
+    "evidence": "codrops-site-license",
     "file": "LICENSE.codrops",
     "sha256": "967b533a2646d103d5c13f340b9cf921dfcbb3ce0336682bea319868ee80637c"
   },
@@ -15,11 +15,11 @@
   "variants": [
     {
       "name": "index",
-      "composition_id": "kinetic-images",
-      "source_entry": "preview.html",
-      "runtime_entry": "preview.html",
-      "source_sha256": "2c7a08adbb5849b79a2306bd29e58f33968bbe1c9ef5403b3d50214a400568ad",
-      "runtime_sha256": "2c7a08adbb5849b79a2306bd29e58f33968bbe1c9ef5403b3d50214a400568ad",
+      "composition_id": "codrops-kineticimages-index",
+      "source_entry": "index.html",
+      "runtime_entry": "index.html",
+      "source_sha256": "1605c93e75948aa2543bd1aac2cf1f54443e776598acc01e408d77dbd7ea893f",
+      "runtime_sha256": "30e74f794327befeb29b794e4c1264d188cd8fe86ba43b7995eded90a4bdfebe",
       "duration_s": 6,
       "interaction": {
         "mode": "none",

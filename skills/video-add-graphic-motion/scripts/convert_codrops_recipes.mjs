@@ -784,6 +784,7 @@ export async function discoverCodropsProjects(importsRoot) {
   const projects = [];
 
   for (const entry of entries.filter((item) => item.isDirectory() && item.name !== "_review")) {
+    if (entry.name === "KineticImages") continue;
     const projectDir = path.join(importsRoot, entry.name);
     const sourceDir = (await isDirectory(path.join(projectDir, "src")))
       ? path.join(projectDir, "src")
@@ -1143,7 +1144,7 @@ export async function rewriteExistingCodropsPaths(importsRoot) {
     let receiptChanged = false;
 
     for (const variant of receipt.variants) {
-      const interaction = receipt.project_id === "codrops-kinetic-images"
+      const interaction = receipt.project_id === "KineticImages"
         ? variant.interaction
         : interactionSpecForVariant(receipt.project_id, variant.name);
       if (JSON.stringify(variant.interaction) !== JSON.stringify(interaction)) {
