@@ -375,10 +375,15 @@ inside the displayed original-value plus-or-minus-two-second bounds, then snap e
 the rational timeline frame grid. Select one to three ordered, unique candidates from the
 hash-bound Top 3 for a shot. The page divides a new multi-candidate choice by integer timeline
 frames, lets the user reorder segments or adjust an adjacent boundary, and keeps the total shot
-range unchanged. Choose only `0.5x`, `1x`, `1.5x`, or `2x` playback for each segment; the page
-calculates source end from the allocated program duration, exposes `remaining`/`overflow`, and
-requires a visible `Fit to A-roll` result before export. Copy and Download JSON remain disabled
-when no legal fit exists, and their JSON records every ordered segment, range, and playback rate.
+range unchanged. Clip start uses a `0.1s` input step. A normal Boundary click moves the nearest
+integer-frame equivalent of `0.1s`; `Alt` on Windows/Linux or `Option` on macOS moves exactly one
+timeline frame. Choose only `0.5x`, `1x`, `1.5x`, or `2x` playback for each segment. Source end is
+read-only and is derived from source start, allocated program frames, frame duration, and playback
+rate. The page gives immediate English guidance when source coverage is invalid, including the
+shortage, latest legal start, feasible rates, and available Boundary/candidate repairs. These
+display-only diagnostics are never included in the review receipt. A visible `Fit to A-roll`
+result remains required before export. Copy and Download JSON remain disabled when no legal fit
+exists, and their JSON records every ordered segment, range, and playback rate at frame precision.
 
 `Modification notes` is optional. A non-empty value, changed program timing, or a changed prefilled
 segment forces `submission_intent: request_revision`; an explicit Request changes action may use

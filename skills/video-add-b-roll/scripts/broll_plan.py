@@ -363,7 +363,7 @@ def candidate_manifest(plan):
 def review_subject(plan):
     value = copy.deepcopy(plan)
     receipt = value.get("review")
-    receipt_ids = receipt.get("decision_skipped_shot_ids", []) if isinstance(receipt, dict) and receipt.get("status") == "approved" else []
+    receipt_ids = receipt.get("decision_skipped_shot_ids", []) if (isinstance(receipt, dict) and receipt.get("status") == "approved" and receipt.get("review_stage") != "composite") else []
     decision_skipped_ids = set(receipt_ids) if isinstance(receipt_ids, list) and all(isinstance(shot_id, str) for shot_id in receipt_ids) else set()
 
     def clean(item):

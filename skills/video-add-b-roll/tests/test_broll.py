@@ -573,9 +573,21 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             "program_range": copy.deepcopy(self.plan["shots"][0]["program_range"]),
             "playback_rate": 1.0,
         }
+        skipped = copy.deepcopy(self.plan["shots"][0])
+        skipped.update({
+            "id": "pre-skipped",
+            "program_range": {"start_s": 2.0, "end_s": 3.0},
+            "source_ranges": [{"clip_id": "one", "start_s": 2.0, "end_s": 3.0}],
+            "transcript_evidence": {"words": [self.mapped_words[1]]},
+            "candidates": [],
+            "selected": None,
+            "status": "skipped",
+        })
+        self.plan["shots"].append(skipped)
         self.plan["speaker_inset_style"] = self._speaker_style()
         self.plan = self.record_presentation(self.plan, "speaker-inset")
         selection = self._canonical_review([segment], intent="approve_selection")
+        selection["shots"].append({"id": "pre-skipped", "decision": "skip"})
         selection.update({
             "rationale": selection_rationale,
             "rationale_source": "review_ui_explicit_action",
@@ -626,6 +638,7 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             timeline=self.timeline,
         )
         self.assertEqual("selected", approved["shots"][0]["status"])
+        self.assertEqual("skipped", approved["shots"][1]["status"])
         self.assertEqual("composite", approved["review"]["review_stage"])
         self.assertEqual(
             prepared["speaker_inset"]["clearance"]["sha256"],
@@ -3133,12 +3146,87 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
             'function reorderSegment(',
             'function fitToAroll(',
             'entry.segments=',
+            'Fit applied: segment allocation now matches the A-roll duration.',
+            'Unable to fit:',
         ):
             self.assertIn(text, template)
         self.assertNotIn(
             'type="radio" name="${esc(shot.id)}" value="${esc(candidate.id)}"',
             template,
         )
+
+    def test_template_uses_coarse_frame_aligned_segment_timing(self):
+        template = build_review_page.TEMPLATE_PATH.read_text(encoding="utf-8")
+        self.assertIn("const SEGMENT_COARSE_STEP_S=0.1;", template)
+        self.assertIn(
+            "const coarseStepFrames=Math.max(1,Math.round(SEGMENT_COARSE_STEP_S/frameDuration));",
+            template,
+        )
+        self.assertIn(
+            "moveBoundary(shot,state,Number(button.dataset.index),Number(button.dataset.delta)*(event.altKey?1:coarseStepFrames))",
+            template,
+        )
+        self.assertIn('step="0.1"', template)
+        self.assertIn('class="trim-end" type="number"', template)
+        self.assertIn('class="trim-end" type="number" min="0" readonly', template)
+        self.assertNotIn("else if(target.matches('.trim-end'))segment.source_end=Number(target.value)", template)
+        self.assertIn(
+            "segment.source_start+segment.frames*frameDuration*segment.playback_rate",
+            template,
+        )
+        self.assertIn("selected.forEach(autoSourceEnd)", template)
+        self.assertIn("state.fitValid=true;state.fitMessage='';renderShotState(shot)", template)
+
+    def test_template_reports_structured_actionable_segment_errors(self):
+        template = build_review_page.TEMPLATE_PATH.read_text(encoding="utf-8")
+        for text in (
+            "reason:'source_too_short'",
+            "requiredSourceS",
+            "availableSourceS",
+            "shortageS",
+            "latestLegalStartS",
+            "candidateDurationS",
+            "feasibleRates",
+            "Source footage is too short",
+            "candidate ends at",
+            "Move the clip start earlier",
+            "choose a feasible playback rate",
+            "shorten the segment",
+            "select another candidate",
+            'aria-invalid="true"',
+            'aria-describedby="${id}"',
+        ):
+            self.assertIn(text, template)
+        self.assertIn("function segmentStatus(", template)
+        self.assertIn("function segmentStatusText(", template)
+        self.assertIn(
+            "startInvalid=!status.valid&&(status.reason==='invalid_trim'||status.reason==='source_too_short')",
+            template,
+        )
+        self.assertIn("rateInvalid=status.reason==='source_too_short'", template)
+        self.assertIn(
+            "boundaryInvalid=index&&(!status.valid||!previousStatus.valid)",
+            template,
+        )
+        self.assertIn(
+            "previousStatus=index?segmentStatus(shot,segments[index-1]):null",
+            template,
+        )
+        self.assertIn(
+            "boundaryStatusId=status.valid&&previousStatus&&!previousStatus.valid?`segment-status-${esc(shot.id)}-${index-1}`:statusId",
+            template,
+        )
+        self.assertIn(
+            "class=\"boundary-adjust${boundaryInvalid?' timing-invalid':''}\"${assist(boundaryInvalid,boundaryStatusId)}",
+            template,
+        )
+        self.assertIn("Number.isFinite(status.latestLegalStartS)", template)
+        self.assertIn("segment.source_start=target.valueAsNumber", template)
+        self.assertIn(
+            "const invalidTrim=state.selected.map(segment=>segmentStatus(shot,segment)).find(status=>status.reason==='invalid_trim')",
+            template,
+        )
+        self.assertNotIn("reason_code", template.split("function buildReviewReceipt", 1)[1])
 
     def test_template_uses_stable_candidate_tones_for_reordered_segments(self):
         template = build_review_page.TEMPLATE_PATH.read_text(encoding="utf-8")

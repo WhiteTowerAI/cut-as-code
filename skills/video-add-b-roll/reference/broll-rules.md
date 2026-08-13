@@ -274,9 +274,19 @@
 - Keep allocation with its segment when reordering. Recompute its program start/end from the new
   order without changing its duration, source range, or speed. Moving a boundary adds frames to one
   neighbor and removes the same number from the other.
+- Keep user adjustment size separate from canonical precision. Clip start uses a `0.1s` input step.
+  A normal Boundary click moves `max(1, round(0.1 / frame_duration))` timeline frames; `Alt` on
+  Windows/Linux or `Option` on macOS moves one frame. Every resulting program allocation remains
+  integer-frame aligned, continuous, non-overlapping, and collectively equal to the shot range.
 - Treat A-roll program allocation as controlling. Compute required source duration as
   `program_duration * playback_rate` and source end as `source_start + required_source_duration`.
-  Display source-end differences as `remaining` or `overflow`; never hide a repair in Copy,
+  In the new review page, make source end read-only and recalculate it after source-start, rate,
+  allocation, reorder, or fit changes.
+- Validate source coverage immediately in the page. When a trim is illegal, highlight only related
+  timing controls and show actionable English guidance with the required and available source,
+  shortage, latest legal start, feasible playback rates, and Boundary/candidate alternatives.
+  Use stable reason codes and numeric facts for page logic; keep both those diagnostics and their
+  display text out of the review receipt and B-roll plan. Never hide a repair in Copy,
   `apply_review()`, or normalization.
 - Make `Fit to A-roll` explicit. First satisfy a segment from its remaining source duration, then
   redistribute unavailable frames from the end toward earlier segments that have capacity. Preserve
