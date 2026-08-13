@@ -60,7 +60,7 @@ export const resolveGallerySelection = (response) => {
   const item = galleryById.get(normalized);
   if (!item) {
     throw new Error(
-      `Style response must be one exact gallery combination ID or the exact word \"跳过\". Received: ${rawResponse || "<empty>"}`,
+      `Style response must be one exact gallery combination ID or the exact word \"skip\". Received: ${rawResponse || "<empty>"}`,
     );
   }
 

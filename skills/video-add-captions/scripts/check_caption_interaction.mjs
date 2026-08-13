@@ -433,13 +433,49 @@ try {
   });
 
   check("standalone mode retains exact ID and skip compatibility", () => {
-    for (const [name, response, expected] of [["id", "pill-yellow", "pill-yellow"], ["skip", "skip", "clean"]]) {
+    for (const [name, response, expected] of [
+      ["id", "pill-yellow", "pill-yellow"],
+      ["skip", "skip", "clean"],
+      ["legacy-skip", "跳过", "clean"],
+    ]) {
       const statePath = join(tempRoot, `standalone-${name}.json`);
       runInteraction(["start", "--state", statePath, "--source", sourcePath, "--captions", captionsPath, "--no-open", "true"]);
       runInteraction(["select", "--state", statePath, "--response", response]);
       const state = readState(statePath);
       assert.equal(state.reviewPage, null);
       assert.equal(state.selection.choiceId, expected);
+    }
+  });
+
+  check("standalone preview advertises and accepts English approval while retaining the legacy alias", () => {
+    for (const [name, response] of [["english", "approve"], ["legacy", "确认渲染"]]) {
+      const statePath = join(tempRoot, `standalone-approval-${name}.json`);
+      const startResult = runInteraction([
+        "start", "--state", statePath, "--source", sourcePath, "--captions", captionsPath, "--no-open", "true",
+      ]);
+      assert.match(startResult.stdout, /skip/);
+      assert.doesNotMatch(startResult.stdout, /[\u3400-\u9fff]/u);
+      runInteraction(["select", "--state", statePath, "--response", "clean"]);
+
+      const evidenceDir = join(tempRoot, `standalone-approval-${name}-evidence`);
+      mkdirSync(evidenceDir);
+      const evidence = ["early", "middle", "late", "no-caption"].map((label) => {
+        const path = join(evidenceDir, `${label}.png`);
+        writeFileSync(path, tinyPng());
+        return path;
+      });
+      const projectMetaPath = join(evidenceDir, "project-meta.json");
+      writeFileSync(projectMetaPath, JSON.stringify({ interaction: {
+        statePath: resolve(statePath), selectionId: "clean", overridesSha256: null,
+      } }), "utf8");
+      const previewResult = runInteraction([
+        "preview-ready", "--state", statePath, "--project-meta", projectMetaPath,
+        "--evidence", evidence.join(","),
+      ]);
+      assert.match(previewResult.stdout, /approve/);
+      assert.doesNotMatch(previewResult.stdout, /[\u3400-\u9fff]/u);
+      runInteraction(["confirm", "--state", statePath, "--response", response]);
+      assert.equal(readState(statePath).phase, "render_approved");
     }
   });
 
@@ -842,7 +878,13 @@ try {
       "--evidence", fixture.evidence.join(",")];
     runInteraction(baseArgs, 1);
     runInteraction([...baseArgs, "--review-page", fixture.reviewPage], 1);
-    runInteraction([...baseArgs, "--review-page", fixture.reviewPage, "--timeline", fixture.timelinePath]);
+    const previewResult = runInteraction([
+      ...baseArgs, "--review-page", fixture.reviewPage, "--timeline", fixture.timelinePath,
+    ]);
+    assert.match(previewResult.stdout, /Copy summary/);
+    assert.match(previewResult.stdout, /confirm --response/);
+    assert.match(previewResult.stdout, /adjust --response/);
+    assert.doesNotMatch(previewResult.stdout, /确认渲染/);
     const state = readState(fixture.statePath);
     assert.equal(state.phase, "awaiting_preview_confirmation");
     assert.equal(state.preview.reviewPagePath, resolve(fixture.reviewPage));
@@ -854,6 +896,29 @@ try {
       sha256: interactionState.hashFile(fixture.timelinePath),
       timelineId: "main",
     });
+  });
+
+  check("bound preview prompt and parser require the same structured approval", () => {
+    const fixture = preparePreview("bound-preview-prompt-contract");
+    const previewResult = runInteraction([
+      "preview-ready", "--state", fixture.statePath, "--project-meta", fixture.projectMetaPath,
+      "--evidence", fixture.evidence.join(","), "--review-page", fixture.reviewPage,
+      "--timeline", fixture.timelinePath,
+    ]);
+    assert.match(previewResult.stdout, /Copy summary/);
+    assert.doesNotMatch(previewResult.stdout, /确认渲染/);
+
+    const rejected = runInteraction([
+      "confirm", "--state", fixture.statePath, "--response", "确认渲染",
+    ], 1);
+    assert.match(rejected.stderr, /Caption preview response must start/i);
+    assert.equal(readState(fixture.statePath).phase, "awaiting_preview_confirmation");
+
+    runInteraction([
+      "confirm", "--state", fixture.statePath,
+      "--response", previewSummary(fixture.reviewId, "approve"),
+    ]);
+    assert.equal(readState(fixture.statePath).phase, "render_approved");
   });
 
   check("composite-aware approval validates machine clearance and accepts legacy uncaptioned omission", () => {

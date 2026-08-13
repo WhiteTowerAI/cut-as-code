@@ -161,8 +161,10 @@ Read:
 
 Two honest modes share the same hash-bound state machine:
 
-- `human`: record the user's exact gallery response with `select`, show all real
-  preview evidence, and record the exact confirmation response with `confirm`.
+- `human`: pass the exact copied gallery summary to `select`, show all real
+  preview evidence, and pass the exact copied approval or revision summary to
+  `confirm` or `adjust`. Review-page-bound commands do not accept bare approval
+  phrases.
 - `agent`: use only when the user explicitly delegates caption decisions. Start
   with a non-empty delegation note, then use `agent-select` and `agent-confirm`
   with non-empty rationales.
@@ -714,7 +716,10 @@ overrides that decision.
 
 Without `--timeline`, `build_captions.py` still writes the old cue array.
 `generate_caption_project.mjs` accepts that array with the interaction receipt.
-Standalone exact ID and skip responses are legacy compatibility only.
+Standalone exact ID and skip responses are legacy compatibility only. Standalone
+`approve` is also a legacy compatibility response. Historical non-English aliases
+remain accepted as input compatibility but are never emitted or documented as
+user instructions.
 `composite_caption_overlay.ps1` accepts an overlay video or `frame_%06d.png`
 directory and writes compatible H.264/yuv420p while copying source audio. Use this
 standalone path only when no active operation changes time; canonical projects use

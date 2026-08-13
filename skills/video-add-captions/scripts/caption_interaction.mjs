@@ -28,13 +28,16 @@ const command = rawArgs.shift();
 
 const usage = `Usage:
   node caption_interaction.mjs start --state <json> --source <video> --captions <json> [--spatial-context <json>] [--review-dir <dir>] [--decision-mode human|agent] [--delegation-note <text>] [--no-open true] [--force true]
-  node caption_interaction.mjs select --state <json> --response <combination-id|跳过>
+  node caption_interaction.mjs select --state <json> --response <copied-summary|combination-id|skip>
   node caption_interaction.mjs agent-select --state <json> --choice <combination-id> --rationale <text>
   node caption_interaction.mjs preview-ready --state <json> --project-meta <json> --evidence <png1,png2,...> [--evidence-document <captions-evidence.json>] [--comparison-evidence <semantic.png,karaoke.png>] [--review-page <html> --timeline <timeline.json>]
-  node caption_interaction.mjs adjust --state <json> --response <user-feedback>
-  node caption_interaction.mjs confirm --state <json> --response 确认渲染
+  node caption_interaction.mjs adjust --state <json> --response <copied-summary|user-feedback>
+  node caption_interaction.mjs confirm --state <json> --response <copied-summary|approve>
   node caption_interaction.mjs agent-confirm --state <json> [--karaoke on|off] --rationale <text>
   node caption_interaction.mjs status --state <json>`;
+
+const standaloneApprovalResponses = new Set(["approve", "确认渲染"]);
+const isStandaloneApproval = (response) => standaloneApprovalResponses.has(response);
 
 const parseArgs = (args) => {
   const parsed = {};
@@ -88,29 +91,36 @@ const nextQuestion = (state) => {
       return "Agent decision mode is active. Inspect the maintained gallery and record one choice with agent-select.";
     }
     return [
-      "字幕样式库已在系统浏览器中打开。",
-      "请浏览全部 25 种样式，然后只回复一个组合 ID，例如 pill-yellow。",
-      "如果不想选择样式，请明确回复：跳过。此时采用默认 clean。",
-      "收到有效组合 ID 或明确的“跳过”之前，流程不会继续。",
+      `Caption style gallery: ${state.galleryPath}`,
+      "Inspect the maintained gallery and reply with one combination ID, for example pill-yellow.",
+      'Reply exactly "skip" to use the default clean style.',
+      "STOP: Wait for a valid combination ID or an explicit skip response before continuing.",
     ].join("\n");
   }
   if (state.phase === "style_selected") {
-    return `已记录样式 ${state.selection.choiceId}。现在只能生成真实视频预览，不能生成完整成片。`;
+    return `Caption style ${state.selection.choiceId} is recorded. Generate only a source-backed preview before rendering the complete caption overlay.`;
   }
   if (state.phase === "awaiting_preview_confirmation") {
     if (state.decisionMode === "agent") {
       return "Agent decision mode is active. Inspect every source-backed preview and record the rationale with agent-confirm.";
     }
+    if (state.preview?.reviewPagePath) {
+      return [
+        `Caption preview review: ${state.preview.reviewPagePath}`,
+        "Inspect every required preview in the bound review page and use Copy summary.",
+        "Pass an approval summary unchanged to confirm --response, or a revision summary unchanged to adjust --response.",
+        "STOP: Do not render the complete caption overlay until an exact copied approval summary is recorded.",
+      ].join("\n");
+    }
     return [
-      "请检查真实视频上的字幕预览。",
-      "满意时请明确回复：确认渲染。",
-      "不满意时请说明需要调整的字号、位置、颜色、背景、描边或 Karaoke。",
-      "收到明确的“确认渲染”之前，不会生成完整字幕层和最终视频。",
+      "Inspect the source-backed caption preview.",
+      'Reply exactly "approve" to approve the full caption overlay, or describe the required adjustment.',
+      'STOP: Do not render the complete caption overlay until an explicit "approve" response is recorded.',
     ].join("\n");
   }
   return state.decisionMode === "agent"
     ? "Delegated Agent approval is recorded; the complete caption overlay may be rendered."
-    : "用户已经明确确认渲染，可以生成完整字幕层和最终视频。";
+    : "Human approval is recorded; the complete caption overlay may be rendered.";
 };
 
 const appendHistory = (state, event, details = {}) => {
@@ -712,8 +722,9 @@ try {
     const revision = state.preview?.reviewPagePath
       ? parseCaptionPreviewRevision(response, state.reviewId)
       : { changes: response };
-    if (!revision.changes || (!state.preview?.reviewPagePath && response === "确认渲染")) {
-      throw new Error("Adjustment feedback must describe a change and cannot equal the render confirmation phrase.");
+    if (!revision.changes
+      || (!state.preview?.reviewPagePath && isStandaloneApproval(response))) {
+      throw new Error("Adjustment feedback must describe a change and cannot equal a standalone approval token.");
     }
     state.phase = "style_selected";
     state.updatedAt = now();
@@ -735,8 +746,8 @@ try {
       approvalDecision = parseCaptionPreviewApproval(
         response, state.reviewId, state.preview.approvalEvidence, state.preview.presentationMode,
       );
-    } else if (response !== "确认渲染") {
-      throw new Error('Render approval requires the exact user response "确认渲染".');
+    } else if (!isStandaloneApproval(response)) {
+      throw new Error('Standalone render approval requires the exact response "approve".');
     }
     assertPreviewBindings(state.preview, state);
     state.phase = "render_approved";
