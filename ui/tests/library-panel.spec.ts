@@ -1,5 +1,31 @@
 import { expect, test } from '@playwright/test'
 
+test('loads the local Inter faces used by the Library typography', async ({ page }) => {
+  await page.goto('/?scenario=1-84')
+
+  const typography = await page.evaluate(async () => {
+    await document.fonts.ready
+    const requestedWeights = [400, 500, 600]
+    const loadedWeights = await Promise.all(requestedWeights.map(async (weight) => ({
+      weight,
+      faces: (await document.fonts.load(`${weight} 11px Inter`, 'Library')).length,
+    })))
+    return {
+      family: getComputedStyle(document.querySelector('.library-panel')!).fontFamily,
+      loadedWeights,
+    }
+  })
+
+  expect(typography).toEqual({
+    family: 'Inter, ui-sans-serif, system-ui, sans-serif',
+    loadedWeights: [
+      { weight: 400, faces: 1 },
+      { weight: 500, faces: 1 },
+      { weight: 600, faces: 1 },
+    ],
+  })
+})
+
 test('renders the populated asset library at the approved panel size', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 688 })
   await page.goto('/?scenario=1-84')
@@ -164,6 +190,32 @@ test('content-card controls match the official vertical geometry', async ({ page
     placement: { top: 308, height: 50 },
     options: { top: 330, height: 28 },
     action: { top: 382, height: 36 },
+  })
+})
+
+test('caption theme controls match the official panel geometry', async ({ page }) => {
+  await page.goto('/?scenario=123-2')
+
+  const geometry = await page.locator('.library-panel').evaluate((panel) => {
+    const panelBox = panel.getBoundingClientRect()
+    const relativeBox = (selector: string) => {
+      const box = panel.querySelector(selector)!.getBoundingClientRect()
+      return {
+        left: Math.round(box.left - panelBox.left),
+        top: Math.round(box.top - panelBox.top),
+        width: box.width,
+        height: box.height,
+      }
+    }
+    return {
+      firstSwatch: relativeBox('.theme-swatch'),
+      toggle: relativeBox('.word-highlight-row input'),
+    }
+  })
+
+  expect(geometry).toEqual({
+    firstSwatch: { left: 62, top: 427, width: 18, height: 18 },
+    toggle: { left: 272, top: 466, width: 36, height: 20 },
   })
 })
 

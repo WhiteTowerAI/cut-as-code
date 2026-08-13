@@ -1,3 +1,6 @@
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
 @import "tailwindcss";
 
 :root {
@@ -11,7 +14,7 @@
   --color-focus: #79b7a7;
   color: var(--color-text);
   background: var(--color-surface);
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-family: ui-sans-serif, system-ui, sans-serif;
 }
 
 * {
@@ -53,6 +56,7 @@ button {
   border-radius: 10px;
   background: #262626;
   box-shadow: 0 4px 12px rgb(0 0 0 / 28%);
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
 }
 
 .library-titlebar {
@@ -160,7 +164,10 @@ button {
   width: 208px;
 }
 
-.library-search svg {
+.library-control-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
   flex: none;
 }
 
@@ -389,6 +396,8 @@ button {
   line-height: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transform: scaleX(0.98);
+  transform-origin: left center;
 }
 
 .asset-dropzone {
@@ -451,12 +460,13 @@ button {
   align-items: center;
   gap: 8px;
   min-height: 20px;
-  margin-top: 14px;
+  margin-top: 20px;
   color: var(--color-text-muted);
   font-size: 11px;
 }
 
 .caption-theme-row > span {
+  width: 38px;
   margin-right: 4px;
 }
 
@@ -480,7 +490,7 @@ button {
   align-items: center;
   justify-content: space-between;
   width: 296px;
-  margin-top: 12px;
+  margin-top: 10px;
   color: #f0f1f6;
   font-size: 11px;
 }
@@ -1345,6 +1355,7 @@ button {
   padding: 8px 12px;
   border-bottom: 1px solid var(--color-border);
   background: var(--color-surface);
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
 }
 
 .workspace-operation-bar strong {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { Filter, Plus, Search, Upload } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand/vanilla'
 import type { AssetView, EditorSelection, LibraryTab } from './editor-model'
@@ -71,7 +71,7 @@ const motionRecipes: readonly TileItem[] = [
 function SearchField({ placeholder, compact = false }: { placeholder: string; compact?: boolean }) {
   return (
     <label className={compact ? 'library-search library-search--compact' : 'library-search'}>
-      <Search aria-hidden="true" size={16} strokeWidth={1.7} />
+      <img className="library-control-icon" src="/fixtures/library/icon-search.svg" alt="" />
       <input aria-label={placeholder} placeholder={placeholder} />
     </label>
   )
@@ -82,10 +82,10 @@ function AssetControls() {
     <div className="library-controls">
       <SearchField placeholder="Search assets" compact />
       <button className="library-icon-button" type="button" aria-label="Import assets" title="Import assets">
-        <Upload aria-hidden="true" size={16} strokeWidth={1.7} />
+        <img className="library-control-icon" src="/fixtures/library/icon-upload.svg" alt="" />
       </button>
       <button className="library-icon-button" type="button" aria-label="Filter assets" title="Filter assets">
-        <Filter aria-hidden="true" size={16} strokeWidth={1.7} />
+        <img className="library-control-icon" src="/fixtures/library/icon-filter.svg" alt="" />
       </button>
     </div>
   )
@@ -234,7 +234,7 @@ function MotionPanel({ store }: LibraryPanelProps) {
   return (
     <>
       <label className="library-search">
-        <Search aria-hidden="true" size={16} strokeWidth={1.7} />
+        <img className="library-control-icon" src="/fixtures/library/icon-search.svg" alt="" />
         <input
           aria-label="Search motion recipes"
           placeholder="Search motion recipes"

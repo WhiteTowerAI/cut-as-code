@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-12T13:18:52.408Z",
+  "generatedAt": "2026-08-13T03:46:38.181Z",
   "strictDiffRatioThreshold": 0.01,
   "pixelChannelTolerance": 16,
   "results": [
@@ -29,9 +29,9 @@
         "width": 1440,
         "height": 1200
       },
-      "differentPixels": 148570,
+      "differentPixels": 147979,
       "totalPixels": 1728000,
-      "diffRatio": 0.08597800925925926,
+      "diffRatio": 0.08563599537037037,
       "threshold": 0.01,
       "pixelChannelTolerance": 16,
       "verdict": "fail",
@@ -69,9 +69,9 @@
         "width": 1440,
         "height": 1200
       },
-      "differentPixels": 18778,
+      "differentPixels": 18651,
       "totalPixels": 1728000,
-      "diffRatio": 0.010866898148148148,
+      "diffRatio": 0.010793402777777778,
       "threshold": 0.01,
       "pixelChannelTolerance": 16,
       "verdict": "fail",
@@ -109,9 +109,9 @@
         "width": 320,
         "height": 688
       },
-      "differentPixels": 4098,
+      "differentPixels": 3496,
       "totalPixels": 220160,
-      "diffRatio": 0.018613735465116278,
+      "diffRatio": 0.015879360465116277,
       "threshold": 0.01,
       "pixelChannelTolerance": 16,
       "verdict": "fail",
@@ -429,9 +429,9 @@
         "width": 320,
         "height": 688
       },
-      "differentPixels": 6465,
+      "differentPixels": 5461,
       "totalPixels": 220160,
-      "diffRatio": 0.02936500726744186,
+      "diffRatio": 0.0248046875,
       "threshold": 0.01,
       "pixelChannelTolerance": 16,
       "verdict": "fail",
@@ -509,9 +509,9 @@
         "width": 320,
         "height": 688
       },
-      "differentPixels": 6370,
+      "differentPixels": 4125,
       "totalPixels": 220160,
-      "diffRatio": 0.028933502906976744,
+      "diffRatio": 0.018736373546511628,
       "threshold": 0.01,
       "pixelChannelTolerance": 16,
       "verdict": "fail",
@@ -629,9 +629,9 @@
         "width": 320,
         "height": 688
       },
-      "differentPixels": 5053,
+      "differentPixels": 4823,
       "totalPixels": 220160,
-      "diffRatio": 0.022951489825581397,
+      "diffRatio": 0.021906795058139535,
       "threshold": 0.01,
       "pixelChannelTolerance": 16,
       "verdict": "fail",

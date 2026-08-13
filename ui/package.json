@@ -11,6 +11,7 @@
     "test:visual": "playwright test tests/visual.spec.ts --workers=1"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.3.0",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
