@@ -2,7 +2,7 @@ import { expect, request, test, type APIRequestContext } from '@playwright/test'
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -143,6 +143,37 @@ test('streams confined media by opaque ID with HTTP byte ranges', async () => {
   } finally {
     await isolated.client.dispose()
     await stopSidecar(isolated.process)
+  }
+})
+
+test('rejects an opaque artifact after its collected path is replaced by an outside junction', async () => {
+  const root = await createProjectFixture()
+  const registeredDirectory = path.join(root, 'review', 'registered')
+  const outsideDirectory = await mkdtemp(path.join(tmpdir(), 'cut-editor-outside-'))
+  await mkdir(registeredDirectory)
+  await writeFile(path.join(registeredDirectory, 'escape.txt'), 'INSIDE-CONTENT')
+  await writeFile(path.join(outsideDirectory, 'escape.txt'), 'OUTSIDE-SECRET')
+  const isolated = await authenticatedSidecarFor(root)
+  try {
+    const snapshotResponse = await isolated.client.get(`/v1/projects/${isolated.ready.projectId}/snapshot`)
+    const { snapshot } = await snapshotResponse.json()
+    const artifact = snapshot.artifacts.find((item: { name: string }) => item.name === 'escape.txt')
+    expect(artifact?.id).toMatch(/^artifact_[a-f0-9]+$/)
+
+    await rm(registeredDirectory, { recursive: true, force: true })
+    await symlink(outsideDirectory, registeredDirectory, 'junction')
+    const response = await isolated.client.get(
+      `/v1/projects/${isolated.ready.projectId}/artifacts/${artifact.id}`,
+    )
+    const body = Buffer.from(await response.body()).toString('utf8')
+
+    expect(response.status()).toBe(404)
+    expect(body).not.toContain('OUTSIDE-SECRET')
+  } finally {
+    await isolated.client.dispose()
+    await stopSidecar(isolated.process)
+    await rm(root, { recursive: true, force: true })
+    await rm(outsideDirectory, { recursive: true, force: true })
   }
 })
 
@@ -323,7 +354,11 @@ test('content cards save commits through sidecar and stale read sets return 409'
 })
 
 async function authenticatedSidecar() {
-  const isolated = await startSidecar(projectRoot)
+  return authenticatedSidecarFor(projectRoot)
+}
+
+async function authenticatedSidecarFor(root: string) {
+  const isolated = await startSidecar(root)
   const isolatedURLValue = isolatedURL(isolated.ready)
   const client = await request.newContext({ baseURL: isolatedURLValue })
   const launch = await armLaunch(isolated)

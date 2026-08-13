@@ -150,7 +150,7 @@ async function handleRequest(state, request, response) {
       const registry = match[2] === 'media' ? state.media : state.artifacts
       const item = registry.get(match[3])
       if (!item) return json(response, 404, { ok: false, error: 'unknown resource' })
-      return streamFile(request, response, item)
+      return streamFile(state, request, response, item)
     }
     if (route.id === 'events' && match[1] === state.projectId) {
       response.writeHead(200, {
@@ -273,26 +273,91 @@ async function hashFile(file) {
   return hash.digest('hex')
 }
 
-async function streamFile(request, response, item) {
-  const range = parseRange(request.headers.range, item.size)
+async function streamFile(state, request, response, item) {
+  const prepared = await prepareStreamItem(state, item)
+  if (!prepared) return json(response, 404, { ok: false, error: 'resource changed' })
+  const { handle, size, mediaType: currentMediaType } = prepared
+  const range = parseRange(request.headers.range, size)
   if (range === false) {
-    response.writeHead(416, { 'Content-Range': `bytes */${item.size}` })
+    await closeFileHandle(handle)
+    response.writeHead(416, { 'Content-Range': `bytes */${size}` })
     return response.end()
   }
   const start = range?.start ?? 0
-  const end = range?.end ?? item.size - 1
+  const end = range?.end ?? size - 1
   response.writeHead(range ? 206 : 200, {
     'Accept-Ranges': 'bytes',
     'Content-Length': Math.max(0, end - start + 1),
-    ...(range ? { 'Content-Range': `bytes ${start}-${end}/${item.size}` } : {}),
-    'Content-Type': item.mediaType,
+    ...(range ? { 'Content-Range': `bytes ${start}-${end}/${size}` } : {}),
+    'Content-Type': currentMediaType,
     'X-Content-Type-Options': 'nosniff',
-    ...(item.mediaType.startsWith('text/html') ? {
+    ...(currentMediaType.startsWith('text/html') ? {
       'Content-Security-Policy': "sandbox; default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'",
     } : {}),
   })
-  if (request.method === 'HEAD' || item.size === 0) return response.end()
-  fs.createReadStream(item.path, { start, end }).pipe(response)
+  if (request.method === 'HEAD' || size === 0) {
+    await closeFileHandle(handle)
+    return response.end()
+  }
+  const stream = fs.createReadStream(null, { fd: handle.fd, start, end, autoClose: false })
+  let closed = false
+  const close = () => {
+    if (closed) return
+    closed = true
+    void closeFileHandle(handle)
+  }
+  stream.once('close', close)
+  response.once('finish', close)
+  response.once('close', close)
+  stream.pipe(response)
+}
+
+async function prepareStreamItem(state, item) {
+  let resolved
+  try {
+    resolved = await fsp.realpath(item.path)
+    if (!isContained(state.root, resolved) || resolved !== item.path) return null
+    if ((await fsp.lstat(item.path)).isSymbolicLink()) return null
+    const handle = await fsp.open(resolved, 'r')
+    let keepOpen = false
+    try {
+      const reopened = await fsp.realpath(item.path)
+      if (!isContained(state.root, reopened) || reopened !== resolved) return null
+      const stat = await handle.stat()
+      const pathStat = await fsp.stat(reopened)
+      if (!stat.isFile() || !sameFileIdentity(stat, pathStat) || stat.size !== item.size) return null
+      const sha256 = await hashFileHandle(handle, stat.size)
+      if (sha256 !== item.sha256) return null
+      keepOpen = true
+      return { handle, size: stat.size, mediaType: item.mediaType }
+    } finally {
+      if (!keepOpen) await closeFileHandle(handle)
+    }
+  } catch {
+    return null
+  }
+}
+
+function sameFileIdentity(left, right) {
+  return left.dev === right.dev && left.ino === right.ino
+}
+
+async function hashFileHandle(handle, size) {
+  const hash = crypto.createHash('sha256')
+  const buffer = Buffer.allocUnsafe(64 * 1024)
+  let position = 0
+  while (position < size) {
+    const length = Math.min(buffer.length, size - position)
+    const result = await handle.read(buffer, 0, length, position)
+    if (result.bytesRead === 0) throw new Error('file changed while reading')
+    hash.update(buffer.subarray(0, result.bytesRead))
+    position += result.bytesRead
+  }
+  return hash.digest('hex')
+}
+
+async function closeFileHandle(handle) {
+  await handle.close().catch(() => {})
 }
 
 function parseRange(value, size) {
