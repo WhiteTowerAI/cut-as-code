@@ -841,6 +841,7 @@ button {
 }
 
 .viewer-menu-section {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   width: 200px;
@@ -848,8 +849,14 @@ button {
   padding: 0;
 }
 
-.viewer-menu-section + .viewer-menu-section {
-  border-top: 1px solid #30363d;
+.viewer-menu-section:nth-child(n + 3)::before {
+  position: absolute;
+  top: -1px;
+  left: 8px;
+  width: 184px;
+  height: 1px;
+  background: #30363d;
+  content: '';
 }
 
 .viewer-menu-section h3 {
@@ -909,7 +916,8 @@ button {
 }
 
 .viewer-alignment-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 31px 30px 31px 31px 30px 31px;
   width: 184px;
   height: 36px;
   margin: 0 8px;
@@ -918,7 +926,7 @@ button {
 .viewer-alignment-row button {
   display: grid;
   place-items: center;
-  width: 33.333%;
+  width: 100%;
   border: 0;
   border-right: 1px solid #30363d;
   color: #e8ebf0;

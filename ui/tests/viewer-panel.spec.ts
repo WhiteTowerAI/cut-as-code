@@ -65,6 +65,86 @@ test('the More menu and Reset Transform stay within the compact Viewer viewport'
   }
 })
 
+test('the More menu preserves the official continuous row flow and inset dividers', async ({ page }) => {
+  await page.setViewportSize({ width: 216, height: 462 })
+  await page.goto('/?scenario=57-152')
+
+  const geometry = await page.locator('.viewer-more-menu').evaluate((menu) => {
+    const box = (element: Element) => {
+      const rect = element.getBoundingClientRect()
+      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+    }
+    const sections = [...menu.querySelectorAll('.viewer-menu-section')]
+    const section = (label: string) => sections.find((element) => element.querySelector('h3')?.textContent === label)!
+    const item = (name: string) => menu.querySelector(`[aria-label="${name}"]`)
+      ?? [...menu.querySelectorAll('button')].find((element) => element.textContent?.trim() === name)!
+    const divider = (label: string) => {
+      const element = section(label)
+      const rect = element.getBoundingClientRect()
+      const style = getComputedStyle(element, '::before')
+      return {
+        x: rect.x + Number.parseFloat(style.left),
+        y: rect.y + Number.parseFloat(style.top),
+        width: Number.parseFloat(style.width),
+        height: Number.parseFloat(style.height),
+      }
+    }
+
+    return {
+      menu: box(menu),
+      sections: Object.fromEntries(['TRANSFORM', 'ALIGNMENT', 'ARRANGE', 'MEDIA'].map((label) => [label, box(section(label))])),
+      items: Object.fromEntries([
+        'Flip Horizontal', 'Flip Vertical', 'Opacity', 'Align left',
+        'Bring to Front', 'Send to Back', 'Lock Media', 'Replace Media', 'Reset Transform',
+      ].map((name) => [name, box(item(name))])),
+      dividers: [divider('ARRANGE'), divider('MEDIA')],
+    }
+  })
+
+  expect(geometry.menu).toEqual({ x: 0, y: 0, width: 216, height: 462 })
+  expect(geometry.sections).toEqual({
+    TRANSFORM: { x: 9, y: 9, width: 200, height: 156 },
+    ALIGNMENT: { x: 9, y: 165, width: 200, height: 60 },
+    ARRANGE: { x: 9, y: 225, width: 200, height: 132 },
+    MEDIA: { x: 9, y: 357, width: 200, height: 96 },
+  })
+  expect(geometry.items).toEqual({
+    'Flip Horizontal': { x: 9, y: 33, width: 200, height: 36 },
+    'Flip Vertical': { x: 9, y: 69, width: 200, height: 36 },
+    Opacity: { x: 9, y: 105, width: 200, height: 60 },
+    'Align left': { x: 17, y: 189, width: 31, height: 36 },
+    'Bring to Front': { x: 9, y: 249, width: 200, height: 36 },
+    'Send to Back': { x: 9, y: 285, width: 200, height: 36 },
+    'Lock Media': { x: 9, y: 321, width: 200, height: 36 },
+    'Replace Media': { x: 9, y: 381, width: 200, height: 36 },
+    'Reset Transform': { x: 9, y: 417, width: 200, height: 36 },
+  })
+  expect(geometry.dividers).toEqual([
+    { x: 17, y: 224, width: 184, height: 1 },
+    { x: 17, y: 356, width: 184, height: 1 },
+  ])
+})
+
+test('the More menu exposes six disabled alignment controls in the official row', async ({ page }) => {
+  await page.setViewportSize({ width: 216, height: 462 })
+  await page.goto('/?scenario=57-152')
+
+  const menu = page.getByRole('menu', { name: 'More viewer actions' })
+  const names = ['Align left', 'Align center', 'Align right', 'Align top', 'Align middle', 'Align bottom']
+  const rowBox = await page.locator('.viewer-alignment-row').boundingBox()
+  const boxes = []
+  for (const name of names) {
+    const command = menu.getByRole('menuitem', { name })
+    await expect(command).toBeDisabled()
+    boxes.push(await command.boundingBox())
+  }
+
+  expect(rowBox).toEqual({ x: 17, y: 189, width: 184, height: 36 })
+  expect(boxes).toHaveLength(6)
+  expect(boxes.every((box) => box?.y === 189 && box.height === 36)).toBe(true)
+  expect(boxes.reduce((width, box) => width + (box?.width ?? 0), 0)).toBeCloseTo(184, 4)
+})
+
 test('protocol-incompatible Viewer commands stay disabled with accessible explanations', async ({ page }) => {
   await page.goto('/?scenario=1-282')
 

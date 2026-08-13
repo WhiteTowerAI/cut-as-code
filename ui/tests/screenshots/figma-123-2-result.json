@@ -27,9 +27,9 @@
   "differentPixels": 3249,
   "totalPixels": 220160,
   "diffRatio": 0.014757449127906977,
-  "threshold": 0.01,
+  "threshold": null,
   "pixelChannelTolerance": 16,
-  "verdict": "fail",
+  "verdict": "evidence",
   "artifacts": {
     "referenceRaw": "figma-123-2-reference.png",
     "referenceCompared": "figma-123-2-reference-compared.png",

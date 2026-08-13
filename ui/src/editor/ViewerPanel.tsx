@@ -2,6 +2,12 @@ import { useEffect, type ReactNode } from 'react'
 import {
   ArrowDownToLine,
   ArrowUpToLine,
+  AlignHorizontalJustifyCenter,
+  AlignHorizontalJustifyEnd,
+  AlignHorizontalJustifyStart,
+  AlignVerticalJustifyCenter,
+  AlignVerticalJustifyEnd,
+  AlignVerticalJustifyStart,
   AudioWaveform,
   Check,
   Copy,
@@ -131,12 +137,20 @@ function SelectionToolbar({
 
 const moreMenuSections = [
   { label: 'TRANSFORM', items: ['Flip Horizontal', 'Flip Vertical', 'Opacity'] },
-  { label: 'ALIGNMENT', items: ['Align left', 'Align center', 'Align right'] },
+  { label: 'ALIGNMENT', items: ['Align left', 'Align center', 'Align right', 'Align top', 'Align middle', 'Align bottom'] },
   { label: 'ARRANGE', items: ['Bring to Front', 'Send to Back', 'Lock Media'] },
   { label: 'MEDIA', items: ['Replace Media', 'Reset Transform'] },
 ] as const
 
 function MoreMenu() {
+  const alignmentIcons = [
+    AlignHorizontalJustifyStart,
+    AlignHorizontalJustifyCenter,
+    AlignHorizontalJustifyEnd,
+    AlignVerticalJustifyStart,
+    AlignVerticalJustifyCenter,
+    AlignVerticalJustifyEnd,
+  ]
   return (
     <div className="viewer-menu viewer-more-menu" role="menu" aria-label="More viewer actions">
       {moreMenuSections.map((section) => (
@@ -146,7 +160,10 @@ function MoreMenu() {
             <div className="viewer-alignment-row">
               {section.items.map((item, index) => (
                 <button type="button" role="menuitem" disabled title={`${item} is not available in project protocol V1.`} key={item} aria-label={item}>
-                  {index === 0 ? <ArrowUpToLine aria-hidden size={18} /> : index === 1 ? <ScanLine aria-hidden size={18} /> : <ArrowDownToLine aria-hidden size={18} />}
+                  {(() => {
+                    const Icon = alignmentIcons[index]
+                    return <Icon aria-hidden size={18} />
+                  })()}
                 </button>
               ))}
             </div>

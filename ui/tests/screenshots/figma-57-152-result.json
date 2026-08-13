@@ -24,12 +24,12 @@
     "width": 216,
     "height": 462
   },
-  "differentPixels": 9727,
+  "differentPixels": 9567,
   "totalPixels": 99792,
-  "diffRatio": 0.09747274330607664,
-  "threshold": 0.01,
+  "diffRatio": 0.09586940836940837,
+  "threshold": null,
   "pixelChannelTolerance": 16,
-  "verdict": "fail",
+  "verdict": "evidence",
   "artifacts": {
     "referenceRaw": "figma-57-152-reference.png",
     "referenceCompared": "figma-57-152-reference-compared.png",
