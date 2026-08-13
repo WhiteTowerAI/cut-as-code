@@ -69,7 +69,9 @@ def operation_map(project):
     return {operation.get("id"): operation for operation in project.get("operations", [])}
 
 
-def _validate_node(node, nodes, errors, *, allow_render=False):
+def _validate_node(
+    node, nodes, errors, *, allow_render=False, dependency_mode="require_current"
+):
     node_id = node.get("id") or "<missing-id>"
     revision = node.get("revision")
     if not isinstance(revision, int) or isinstance(revision, bool) or revision < 1:
@@ -104,10 +106,33 @@ def _validate_node(node, nodes, errors, *, allow_render=False):
     for dependency in sorted(recorded_dependencies - expected_dependencies):
         errors.append(f"{node_id} based_on has unexpected dependency: {dependency}")
     for dependency, expected_revision in based_on.items():
+        if (
+            not isinstance(expected_revision, int)
+            or isinstance(expected_revision, bool)
+            or expected_revision < 1
+        ):
+            node_kind = "review" if allow_render else "operation"
+            errors.append(f"{node_kind} based_on revisions must be positive integers")
+            continue
         current = nodes.get(dependency, {}).get("revision")
         if current is None:
             errors.append(f"{node_id} based_on missing dependency: {dependency}")
-        elif expected_revision != current:
+        elif (
+            not isinstance(current, int)
+            or isinstance(current, bool)
+            or current < 1
+        ):
+            errors.append(
+                f"revision mismatch: {node_id} based_on {dependency}={expected_revision}, current={current}"
+            )
+        elif (
+            expected_revision != current
+            and not (
+                dependency_mode == "allow_stale"
+                and node.get("status") == "stale"
+                and expected_revision < current
+            )
+        ):
             errors.append(
                 f"revision mismatch: {node_id} based_on {dependency}={expected_revision}, current={current}"
             )
@@ -182,7 +207,17 @@ def _validate_operation_outputs(operation, project_root, errors):
             errors.append(f"{operation_id} missing output: {value}")
 
 
-def validate_project(project, project_root, check_files=True, check_media=False):
+def validate_project(
+    project,
+    project_root,
+    check_files=True,
+    check_media=False,
+    *,
+    dependency_mode="require_current",
+):
+    if dependency_mode not in {"require_current", "allow_stale"}:
+        raise ValueError("dependency_mode must be 'require_current' or 'allow_stale'")
+
     errors = []
     if project.get("schema_version") != 1:
         errors.append("project schema_version must be 1")
@@ -205,7 +240,7 @@ def validate_project(project, project_root, check_files=True, check_media=False)
         "changes_audio",
     )
     for operation in operations:
-        _validate_node(operation, nodes, errors)
+        _validate_node(operation, nodes, errors, dependency_mode=dependency_mode)
         operation_id = operation.get("id") or "<missing-id>"
         target = operation.get("target")
         if not isinstance(target, dict):
@@ -281,7 +316,13 @@ def validate_project(project, project_root, check_files=True, check_media=False)
             errors.append("active sequence operations violate canonical pixel order")
 
     for review in project.get("reviews", []):
-        _validate_node(review, nodes, errors, allow_render=True)
+        _validate_node(
+            review,
+            nodes,
+            errors,
+            allow_render=True,
+            dependency_mode=dependency_mode,
+        )
 
     if check_files:
         _validate_source(project, project_root, errors, check_media=check_media)
