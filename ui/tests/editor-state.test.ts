@@ -585,6 +585,7 @@ test('review conflict-shaped failure without an authoritative project remains re
 
 test('runtime snapshot displays a terminal decision without losing the unique current preview', () => {
   const snapshot: RuntimeSnapshot = {
+    snapshot_etag: 'snapshot-r3',
     read_only: false,
     errors: [],
     resources: [],
@@ -625,6 +626,7 @@ test('runtime snapshot displays a terminal decision without losing the unique cu
 
 test('runtime snapshot maps terminal status only when it binds the exact preview', () => {
   const snapshot: RuntimeSnapshot = {
+    snapshot_etag: 'snapshot-r3',
     read_only: false, errors: [], resources: [], artifacts: [], media: [],
     view: {
       operations: [{ id: 'content-cards', revision: 3, status: 'approved', etag: 'operation-r3' }],
@@ -642,7 +644,7 @@ test('runtime snapshot maps terminal status only when it binds the exact preview
   })
   expect(operation?.preview).toEqual({
     status: 'current', revision: 3, reviewId: 'review-content-cards-current',
-    snapshotEtag: 'snapshot-r3', evidenceHashes: ['sha256:current-preview'],
+    snapshotEtag: 'snapshot-r3', evidenceHashes: ['sha256:current-preview'], artifacts: [],
   })
   expect(reviewStatusText(operation!, false)).toBe('Preview approved')
   const rejected = {
@@ -650,6 +652,112 @@ test('runtime snapshot maps terminal status only when it binds the exact preview
     approval: { ...operation!.approval!, status: 'rejected' as const },
   }
   expect(reviewStatusText(rejected, false)).toBe('Preview rejected')
+})
+
+test('captions-only runtime project is projected solely from the authoritative snapshot', () => {
+  const snapshot: RuntimeSnapshot = {
+    read_only: false,
+    errors: [],
+    resources: [
+      { id: 'res_project', kind: 'project', etag: 'project-etag', size: 10 },
+      { id: 'res_timeline', kind: 'timeline', etag: 'timeline-etag', size: 20 },
+      { id: 'res_captions', kind: 'plan', etag: 'captions-plan', size: 30, operation_id: 'captions' },
+    ],
+    media: [{ id: 'asset_source', name: 'actual-source.mp4', size: 1234, media_type: 'video/mp4', url: '/v1/projects/p/media/asset_source' }],
+    artifacts: [],
+    snapshot_etag: 'snapshot-etag',
+    view: {
+      project_revision: 41,
+      active_sequence: 'main',
+      timeline: {
+        duration_s: 9,
+        fps: { num: 24, den: 1 },
+        clips: [{ id: 'clip-real', source_range: { start_s: 2, end_s: 11 }, program_range: { start_s: 0, end_s: 9 } }],
+      },
+      operations: [{ id: 'captions', revision: 7, status: 'approved', etag: 'caption-operation' }],
+      reviews: [],
+    },
+  }
+
+  const mapped = projectFromSnapshot(getScenario('1-84')!.initialState.project, snapshot)
+
+  expect(mapped).toMatchObject({
+    revision: 41,
+    durationS: 9,
+    fps: { numerator: 24, denominator: 1 },
+    assets: [{ id: 'asset_source', name: 'actual-source.mp4', kind: 'video' }],
+    operations: [{ id: 'captions', kind: 'captions', revision: 7, editable: false }],
+  })
+  expect(mapped?.tracks.map((track) => [track.id, track.kind])).toEqual([
+    ['track-video', 'video'], ['track-audio', 'audio'], ['track-captions', 'caption'],
+  ])
+  expect(mapped?.tracks[0].clips).toEqual([{
+    id: 'clip-real', sourceRange: { startS: 2, endS: 11 }, programRange: { startS: 0, endS: 9 },
+  }])
+  expect(mapped?.assets.map((asset) => asset.name)).not.toContain('Product teaser.mov')
+  expect(mapped?.durationS).not.toBe(127)
+})
+
+test('graphic-motion runtime projection preserves every authoritative operation and resource', () => {
+  const snapshot: RuntimeSnapshot = {
+    read_only: false, errors: [], snapshot_etag: 'snapshot-etag',
+    resources: [
+      { id: 'res_project', kind: 'project', etag: 'p', size: 1 },
+      { id: 'res_timeline', kind: 'timeline', etag: 't', size: 1 },
+      { id: 'res_cut', kind: 'plan', etag: 'cut', size: 1, operation_id: 'cut' },
+      { id: 'res_gm', kind: 'plan', etag: 'gm', size: 1, operation_id: 'graphic-motion' },
+    ],
+    media: [], artifacts: [],
+    view: {
+      project_revision: 8, active_sequence: 'main',
+      timeline: { duration_s: 4, fps: { num: 30000, den: 1001 }, clips: [] },
+      operations: [
+        { id: 'cut', revision: 2, status: 'approved', etag: 'cut-op' },
+        { id: 'graphic-motion', revision: 5, status: 'draft', etag: 'gm-op' },
+      ],
+      reviews: [],
+    },
+  }
+
+  const mapped = projectFromSnapshot(getScenario('1-84')!.initialState.project, snapshot)!
+
+  expect(mapped.operations?.map((operation) => operation.id)).toEqual(['cut', 'graphic-motion'])
+  expect(mapped.resources?.map((resource) => resource.id)).toEqual(['res_project', 'res_timeline', 'res_cut', 'res_gm'])
+  expect(mapped.tracks).toEqual([])
+  expect(mapped.assets).toEqual([])
+})
+
+test('content-cards runtime projection retains peer operations and binds exact current artifacts', () => {
+  const evidence = `sha256:${'a'.repeat(64)}`
+  const snapshot: RuntimeSnapshot = {
+    read_only: false, errors: [], snapshot_etag: 'snapshot-current',
+    resources: [{ id: 'res_project', kind: 'project', etag: 'p', size: 1 }],
+    media: [],
+    artifacts: [{
+      id: 'artifact_still', name: 'current.png', size: 12, media_type: 'image/png',
+      sha256: 'a'.repeat(64), url: '/v1/projects/p/artifacts/artifact_still',
+    }],
+    view: {
+      project_revision: 3, active_sequence: 'main',
+      timeline: { duration_s: 2, fps: { num: 30, den: 1 }, clips: [] },
+      operations: [
+        { id: 'captions', revision: 2, status: 'approved', etag: 'captions-op' },
+        { id: 'content-cards', revision: 3, status: 'approved', etag: 'cards-op' },
+      ],
+      reviews: [{
+        id: 'cards-review', revision: 1, status: 'draft', based_on: { 'content-cards': 3 },
+        snapshot_etag: 'snapshot-current', evidence_hashes: [evidence],
+      }],
+      content_cards_edit: { fields: { copy: 'Actual copy' }, review_template: { schema_version: 1, cards: [] } },
+    },
+  }
+
+  const mapped = projectFromSnapshot(getScenario('1-84')!.initialState.project, snapshot)!
+
+  expect(mapped.operations?.map((operation) => operation.id)).toEqual(['captions', 'content-cards'])
+  expect(mapped.operations?.find((operation) => operation.id === 'content-cards')?.preview?.artifacts).toEqual([
+    expect.objectContaining({ id: 'artifact_still', url: '/v1/projects/p/artifacts/artifact_still' }),
+  ])
 })
 
 test('getScenario resolves every dash-form Figma node and graphic motion', () => {

@@ -15,7 +15,7 @@ RUNTIME = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RUNTIME))
 
 from protocol_service import ProtocolService  # noqa: E402
-from project_snapshot import canonical_project_root  # noqa: E402
+from project_snapshot import build_snapshot, canonical_project_root  # noqa: E402
 
 
 def plan_resource_id(operation_id):
@@ -524,8 +524,8 @@ class ProtocolServiceTests(unittest.TestCase):
         decision = {
             "review_id": "content-cards-preview-r1",
             "decision": "approved",
-            "snapshot_etag": "snapshot-r1",
-            "evidence_hashes": ["sha256:preview-r1"],
+            "snapshot_etag": opened["snapshot"]["snapshot_etag"],
+            "evidence_hashes": [self.preview_hash],
             "actor": "local-user",
             "rationale": "Reviewed the bound composited evidence",
         }
@@ -562,6 +562,116 @@ class ProtocolServiceTests(unittest.TestCase):
                 }
             )
             self.assertFalse(rejected["ok"], field)
+
+    def test_review_record_rejects_forged_stale_missing_and_replaced_artifacts(self):
+        for forged in ("sha256:preview-r1", "a" * 64, "sha256:" + "A" * 64):
+            with self.subTest(forged=forged):
+                self._configure_content_cards_project()
+                project = json.loads(self.project_path.read_text(encoding="utf-8"))
+                project["reviews"][0]["evidence_hashes"] = [forged]
+                self.project_path.write_text(json.dumps(project, indent=2) + "\n", encoding="utf-8")
+                opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+                response = self.service.handle_request({
+                    "verb": "review.record", "project_id": opened["project_id"], "operation": "content-cards",
+                    "read_set": self._read_set(opened["snapshot"], "content-cards"),
+                    "decision": {
+                        "review_id": "content-cards-preview-r1", "decision": "approved",
+                        "snapshot_etag": opened["snapshot"]["snapshot_etag"], "evidence_hashes": [forged],
+                        "actor": "local-user", "rationale": "Forged evidence",
+                    },
+                })
+                self.assertFalse(response["ok"])
+
+        for mutation in ("delete", "replace"):
+            with self.subTest(mutation=mutation):
+                self._configure_content_cards_project()
+                opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+                if mutation == "delete":
+                    self.preview_path.unlink()
+                else:
+                    self.preview_path.write_bytes(b"replacement bytes")
+                response = self.service.handle_request({
+                    "verb": "review.record", "project_id": opened["project_id"], "operation": "content-cards",
+                    "read_set": self._read_set(opened["snapshot"], "content-cards"),
+                    "decision": {
+                        "review_id": "content-cards-preview-r1", "decision": "approved",
+                        "snapshot_etag": opened["snapshot"]["snapshot_etag"], "evidence_hashes": [self.preview_hash],
+                        "actor": "local-user", "rationale": "Stale artifact",
+                    },
+                })
+                self.assertFalse(response["ok"])
+
+        self._configure_content_cards_project()
+        opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+        project = json.loads(self.project_path.read_text(encoding="utf-8"))
+        project["render"]["status"] = "draft"
+        self.project_path.write_text(json.dumps(project, indent=2) + "\n", encoding="utf-8")
+        refreshed = self.service.handle_request({"verb": "get_snapshot", "project_id": opened["project_id"]})
+        response = self.service.handle_request({
+            "verb": "review.record", "project_id": opened["project_id"], "operation": "content-cards",
+            "read_set": self._read_set(refreshed["snapshot"], "content-cards"),
+            "decision": {
+                "review_id": "content-cards-preview-r1", "decision": "approved",
+                "snapshot_etag": opened["snapshot"]["snapshot_etag"], "evidence_hashes": [self.preview_hash],
+                "actor": "local-user", "rationale": "Stale snapshot",
+            },
+        })
+        self.assertFalse(response["ok"])
+
+    def test_editor_state_link_is_rejected_before_lock_or_journal_writes(self):
+        outside = self.root / "outside-editor"
+        outside.mkdir()
+        editor = self.root / "work" / ".editor"
+        try:
+            if os.name == "nt":
+                result = subprocess.run(
+                    ["cmd.exe", "/c", "mklink", "/J", str(editor), str(outside)],
+                    capture_output=True,
+                    text=True,
+                )
+                if result.returncode != 0:
+                    self.skipTest("Windows junction creation is unavailable")
+            else:
+                editor.symlink_to(outside, target_is_directory=True)
+            response = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+            self.assertFalse(response["ok"])
+            self.assertFalse((outside / "mutation.lock").exists())
+            self.assertFalse((outside / "transaction.json").exists())
+        finally:
+            if editor.exists() or editor.is_symlink():
+                if os.name == "nt":
+                    os.rmdir(editor)
+                else:
+                    editor.unlink()
+
+    def test_projectlib_writer_waits_for_the_editor_project_lease(self):
+        self._configure_content_cards_project()
+        opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+        writer = None
+
+        def start_writer():
+            nonlocal writer
+            scripts = RUNTIME.parent / "skills" / "video-understand" / "scripts"
+            script = (
+                "import sys; from pathlib import Path; "
+                f"sys.path.insert(0, {str(scripts)!r}); "
+                "import projectlib; projectlib.write_json(Path(sys.argv[1]), {'writer': 'complete'})"
+            )
+            writer = subprocess.Popen([sys.executable, "-c", script, str(self.root / "work" / "external.json")])
+            with self.assertRaises(subprocess.TimeoutExpired):
+                writer.wait(timeout=0.2)
+
+        self.service._after_prepare = start_writer
+        response = self.service.handle_request({
+            "verb": "plan.update", "project_id": opened["project_id"], "operation": "content-cards",
+            "read_set": self._read_set(opened["snapshot"], "content-cards"),
+            "review": self._cards_review(copy="Lease protected"),
+        })
+
+        self.assertTrue(response["ok"])
+        self.assertIsNotNone(writer)
+        writer.wait(timeout=5)
+        self.assertEqual({"writer": "complete"}, json.loads((self.root / "work" / "external.json").read_text(encoding="utf-8")))
 
     def test_open_project_recovers_prepared_transaction_after_plan_replacement(self):
         self._configure_content_cards_project()
@@ -748,8 +858,8 @@ class ProtocolServiceTests(unittest.TestCase):
         response = self.service.handle_request({
             "verb": "review.record", "project_id": opened["project_id"], "operation": "content-cards",
             "read_set": self._read_set(opened["snapshot"], "content-cards"), "decision": {
-                "review_id": "content-cards-preview-r1", "decision": "approved", "snapshot_etag": "snapshot-r1",
-                "evidence_hashes": ["sha256:preview-r1"], "actor": "local-user", "rationale": "Current evidence",
+                "review_id": "content-cards-preview-r1", "decision": "approved", "snapshot_etag": opened["snapshot"]["snapshot_etag"],
+                "evidence_hashes": [self.preview_hash], "actor": "local-user", "rationale": "Current evidence",
             },
         })
 
@@ -776,8 +886,8 @@ class ProtocolServiceTests(unittest.TestCase):
         response = self.service.handle_request({
             "verb": "review.record", "project_id": opened["project_id"], "operation": "content-cards",
             "read_set": self._read_set(opened["snapshot"], "content-cards"), "decision": {
-                "review_id": "content-cards-preview-r1", "decision": "approved", "snapshot_etag": "snapshot-r1",
-                "evidence_hashes": ["sha256:preview-r1"], "actor": "local-user", "rationale": "Local approval",
+                "review_id": "content-cards-preview-r1", "decision": "approved", "snapshot_etag": opened["snapshot"]["snapshot_etag"],
+                "evidence_hashes": [self.preview_hash], "actor": "local-user", "rationale": "Local approval",
             },
         })
 
@@ -812,8 +922,8 @@ class ProtocolServiceTests(unittest.TestCase):
         response = self.service.handle_request({
             "verb": "review.record", "project_id": opened["project_id"], "operation": "content-cards",
             "read_set": self._read_set(opened["snapshot"], "content-cards"), "decision": {
-                "review_id": "content-cards-preview-r1", "decision": "approved", "snapshot_etag": "snapshot-r1",
-                "evidence_hashes": ["sha256:preview-r1"], "actor": "local-user", "rationale": "Current evidence",
+                "review_id": "content-cards-preview-r1", "decision": "approved", "snapshot_etag": opened["snapshot"]["snapshot_etag"],
+                "evidence_hashes": [self.preview_hash], "actor": "local-user", "rationale": "Current evidence",
             },
         })
 
@@ -908,9 +1018,11 @@ class ProtocolServiceTests(unittest.TestCase):
         project["operations"].insert(0, captions)
         project["sequences"]["main"]["operations"] = ["captions", "content-cards", "graphic-motion"]
         self.project_path.write_text(json.dumps(project), encoding="utf-8")
+        project["reviews"][0]["snapshot_etag"] = build_snapshot(self.root)["snapshot_etag"]
+        self.project_path.write_text(json.dumps(project), encoding="utf-8")
         opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
-        decision = {"review_id": "content-cards-preview-r1", "decision": "approved", "snapshot_etag": "snapshot-r1",
-                    "evidence_hashes": ["sha256:preview-r1"], "actor": "local-user", "rationale": "Looks correct"}
+        decision = {"review_id": "content-cards-preview-r1", "decision": "approved", "snapshot_etag": opened["snapshot"]["snapshot_etag"],
+                    "evidence_hashes": [self.preview_hash], "actor": "local-user", "rationale": "Looks correct"}
 
         response = self.service.handle_request({"verb": "review.record", "project_id": opened["project_id"],
             "operation": "content-cards", "read_set": self._read_set(opened["snapshot"], "content-cards"), "decision": decision})
@@ -1045,12 +1157,18 @@ class ProtocolServiceTests(unittest.TestCase):
             {**project["operations"][0], "id": "graphic-motion", "status": "approved", "revision": 2,
              "depends_on": ["content-cards"], "based_on": {"content-cards": 1}, "plan": None},
         ]
+        self.preview_path = self.root / "review" / "03-content-cards" / "preview.png"
+        self.preview_path.parent.mkdir(parents=True, exist_ok=True)
+        self.preview_path.write_bytes(b"current preview bytes")
+        self.preview_hash = "sha256:" + hashlib.sha256(self.preview_path.read_bytes()).hexdigest()
         project["reviews"] = [{
             "id": "content-cards-preview-r1", "revision": 1, "status": "draft",
             "depends_on": ["content-cards"], "based_on": {"content-cards": 1},
-            "snapshot_etag": "snapshot-r1", "evidence_hashes": ["sha256:preview-r1"],
+            "snapshot_etag": "pending", "evidence_hashes": [self.preview_hash],
         }]
         project["render"] = {"status": "verified", "output": "../final/final.mp4"}
+        self.project_path.write_text(json.dumps(project, indent=2) + "\n", encoding="utf-8")
+        project["reviews"][0]["snapshot_etag"] = build_snapshot(self.root)["snapshot_etag"]
         self.project_path.write_text(json.dumps(project, indent=2) + "\n", encoding="utf-8")
 
     def _cards_review(self, copy="Original copy", placement="bottom"):

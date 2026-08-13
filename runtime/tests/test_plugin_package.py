@@ -72,6 +72,15 @@ EDITOR_ASSETS = {
     "card-stat.png", "city.png", "founder.png", "icon-filter.svg", "icon-search.svg",
     "icon-upload.svg", "product.png", "ASSET_MANIFEST.json",
 }
+THIRD_PARTY_COMPONENTS = {
+    ("@fontsource/inter", "5.3.0", "OFL-1.1"),
+    ("lucide-react", "0.468.0", "ISC"),
+    ("react", "19.2.8", "MIT"),
+    ("react-dom", "19.2.8", "MIT"),
+    ("scheduler", "0.27.0", "MIT"),
+    ("zustand", "5.0.14", "MIT"),
+    ("@animxyz/core", "vendored", "MIT"),
+}
 
 
 class PluginPackageTests(unittest.TestCase):
@@ -145,7 +154,10 @@ class PluginPackageTests(unittest.TestCase):
                 ".codex-plugin/plugin.json",
                 ".mcp.json",
                 "LICENSE",
+                "PACKAGE_AUDIT.json",
                 "README.md",
+                "SBOM.spdx.json",
+                "THIRD_PARTY_NOTICES.md",
                 "runtime/mcp.cjs",
                 "runtime/project_snapshot.py",
                 "runtime/protocol_service.py",
@@ -153,6 +165,36 @@ class PluginPackageTests(unittest.TestCase):
                 "ui/dist/index.html",
             }
             self.assertTrue(required.issubset(relative_names))
+            notices = archive.read("cut-as-code-editor/THIRD_PARTY_NOTICES.md").decode("utf-8")
+            self.assertIn("nexu-io/motion-anything", notices)
+            self.assertIn("b016900d9ee92fc2d3e4dc520359cc8999d2ed4e", notices)
+            for name, version, license_id in THIRD_PARTY_COMPONENTS:
+                self.assertIn(name, notices)
+                self.assertIn(version, notices)
+                self.assertIn(license_id, notices)
+
+            sbom = json.loads(archive.read("cut-as-code-editor/SBOM.spdx.json"))
+            self.assertEqual(sbom["spdxVersion"], "SPDX-2.3")
+            self.assertEqual(sbom["dataLicense"], "CC0-1.0")
+            self.assertEqual(
+                {(item["name"], item["versionInfo"], item["licenseConcluded"]) for item in sbom["packages"]},
+                THIRD_PARTY_COMPONENTS,
+            )
+            self.assertTrue(all(item["checksums"] for item in sbom["packages"]))
+
+            audit = json.loads(archive.read("cut-as-code-editor/PACKAGE_AUDIT.json"))
+            self.assertEqual(audit["schema_version"], 1)
+            self.assertEqual(audit["scope"], "all packaged files")
+            self.assertEqual(audit["license_audit"]["status"], "pass")
+            self.assertEqual(audit["license_audit"]["component_count"], len(THIRD_PARTY_COMPONENTS))
+            self.assertEqual(audit["license_audit"]["unresolved"], [])
+            self.assertEqual(audit["secret_audit"]["status"], "pass")
+            self.assertEqual(audit["secret_audit"]["findings"], [])
+            self.assertGreater(audit["secret_audit"]["files_scanned"], 0)
+            self.assertEqual(
+                audit["vendored_sources"][0]["sha256"],
+                "4a133a5e4bf9ff2b3c87d7ef3a20064ccaab3c8838cafbf540c75d658f7c451d",
+            )
             packaged_skills = {
                 Path(name).parts[1]
                 for name in relative_names

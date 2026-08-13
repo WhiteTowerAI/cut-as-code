@@ -15,6 +15,23 @@ export type AssetView = Readonly<{
   kind: 'video' | 'audio'
 }>
 
+export type RuntimeResourceView = Readonly<{
+  id: string
+  kind: string
+  etag: string
+  size: number
+  operationId?: string
+}>
+
+export type ReviewArtifactView = Readonly<{
+  id: string
+  name: string
+  size: number
+  sha256: string
+  mediaType: string
+  url: string
+}>
+
 export type TrackView = Readonly<{
   id: string
   name: string
@@ -40,6 +57,7 @@ export type OperationPreview = Readonly<{
   reviewId: string
   snapshotEtag: string
   evidenceHashes: readonly string[]
+  artifacts?: readonly ReviewArtifactView[]
 }>
 
 export type OperationApproval = Readonly<{
@@ -68,4 +86,5 @@ export type EditorProjectView = Readonly<{
   assets: readonly AssetView[]
   tracks: readonly TrackView[]
   operations?: readonly EditorOperationView[]
+  resources?: readonly RuntimeResourceView[]
 }>

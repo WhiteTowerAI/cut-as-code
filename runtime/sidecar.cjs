@@ -117,8 +117,8 @@ async function handleRequest(state, request, response) {
       await refreshFiles(state)
       const result = await state.protocol.call({ verb: 'get_snapshot', project_id: state.projectId })
       if (result.ok) {
-        result.snapshot.media = publicFiles(state.media)
-        result.snapshot.artifacts = publicFiles(state.artifacts)
+        result.snapshot.media = publicFiles(state.media, state.projectId, 'media')
+        result.snapshot.artifacts = publicFiles(state.artifacts, state.projectId, 'artifacts')
       }
       return json(response, result.ok ? 200 : 400, result)
     }
@@ -225,7 +225,14 @@ async function collectFiles(root, directories, prefix) {
       if (!stat.isFile()) continue
       const relative = path.relative(root, real).split(path.sep).join('/')
       const id = `${prefix}_${crypto.createHash('sha256').update(relative).digest('hex').slice(0, 24)}`
-      result.set(id, { id, name: path.basename(real), size: stat.size, path: real })
+      result.set(id, {
+        id,
+        name: path.basename(real),
+        size: stat.size,
+        path: real,
+        sha256: await hashFile(real),
+        mediaType: mediaType(real),
+      })
     }
   }
   return result
@@ -239,8 +246,31 @@ async function* walk(directory) {
   }
 }
 
-function publicFiles(registry) {
-  return [...registry.values()].map(({ id, name, size }) => ({ id, name, size }))
+function publicFiles(registry, projectId, collection) {
+  return [...registry.values()].map(({ id, name, size, sha256, mediaType }) => ({
+    id,
+    name,
+    size,
+    sha256,
+    media_type: mediaType,
+    url: `/v1/projects/${encodeURIComponent(projectId)}/${collection}/${encodeURIComponent(id)}`,
+  }))
+}
+
+function mediaType(file) {
+  return ({
+    '.html': 'text/html; charset=utf-8', '.htm': 'text/html; charset=utf-8',
+    '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
+    '.gif': 'image/gif', '.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime',
+    '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.json': 'application/json; charset=utf-8',
+    '.txt': 'text/plain; charset=utf-8', '.md': 'text/plain; charset=utf-8',
+  })[path.extname(file).toLowerCase()] ?? 'application/octet-stream'
+}
+
+async function hashFile(file) {
+  const hash = crypto.createHash('sha256')
+  for await (const chunk of fs.createReadStream(file)) hash.update(chunk)
+  return hash.digest('hex')
 }
 
 async function streamFile(request, response, item) {
@@ -255,6 +285,11 @@ async function streamFile(request, response, item) {
     'Accept-Ranges': 'bytes',
     'Content-Length': Math.max(0, end - start + 1),
     ...(range ? { 'Content-Range': `bytes ${start}-${end}/${item.size}` } : {}),
+    'Content-Type': item.mediaType,
+    'X-Content-Type-Options': 'nosniff',
+    ...(item.mediaType.startsWith('text/html') ? {
+      'Content-Security-Policy': "sandbox; default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'",
+    } : {}),
   })
   if (request.method === 'HEAD' || item.size === 0) return response.end()
   fs.createReadStream(item.path, { start, end }).pipe(response)

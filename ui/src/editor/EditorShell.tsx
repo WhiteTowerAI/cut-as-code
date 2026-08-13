@@ -146,9 +146,9 @@ export type RuntimeProjectStatus = Readonly<{
 export function EditorShell({ runtime }: { runtime?: RuntimeProjectStatus }) {
   const scenarioId = new URLSearchParams(window.location.search).get('scenario') ?? '1-84'
   const scenario = getScenario(scenarioId) ?? getScenario('1-84')!
-  const [bridge] = useState(() => runtime ? runtimeAdapter(runtime.client, runtime.snapshot, scenario.initialState.project) : undefined)
+  const [bridge] = useState(() => runtime ? runtimeAdapter(runtime.client, runtime.snapshot) : undefined)
   const [store] = useState(() => {
-    const runtimeProject = runtime ? projectFromSnapshot(scenario.initialState.project, runtime.snapshot) : null
+    const runtimeProject = runtime ? projectFromSnapshot(null, runtime.snapshot) : null
     const next = createEditorStore(
       { ...scenario.initialState, project: runtimeProject ?? scenario.initialState.project },
       bridge,
@@ -169,7 +169,7 @@ export function EditorShell({ runtime }: { runtime?: RuntimeProjectStatus }) {
   useEffect(() => {
     if (!runtime || !bridge) return
     bridge.sync(runtime.snapshot)
-    store.getState().setProject(projectFromSnapshot(scenario.initialState.project, runtime.snapshot))
+    store.getState().setProject(projectFromSnapshot(null, runtime.snapshot))
   }, [bridge, runtime, scenario.initialState.project, store])
   const viewerScenarios = new Set(['1-282', '57-152', '1-1026', '1-528', '123-79'])
   const timelineScenarios = new Set(['1-324', '1-1115', '1-754', '123-167'])
@@ -212,7 +212,7 @@ export function EditorShell({ runtime }: { runtime?: RuntimeProjectStatus }) {
   )
 }
 
-function runtimeAdapter(client: RuntimeApiClient, initial: RuntimeSnapshot, base: EditorProjectView | null) {
+function runtimeAdapter(client: RuntimeApiClient, initial: RuntimeSnapshot) {
   let snapshot = initial
   const readSet = (): RuntimeReadSet => {
     const operation = snapshot.view.operations?.find((item) => item.id === 'content-cards')
@@ -223,7 +223,7 @@ function runtimeAdapter(client: RuntimeApiClient, initial: RuntimeSnapshot, base
   }
   const currentProject = (next: RuntimeSnapshot) => {
     snapshot = next
-    const project = projectFromSnapshot(base, next)
+    const project = projectFromSnapshot(null, next)
     if (!project) throw new Error('Content Cards snapshot is unavailable')
     return project
   }
@@ -247,7 +247,7 @@ function runtimeAdapter(client: RuntimeApiClient, initial: RuntimeSnapshot, base
         return currentProject(response.snapshot ?? await client.getSnapshot())
       } catch (error) {
         if (error instanceof RuntimeConflictError) {
-          const project = error.snapshot ? projectFromSnapshot(base, error.snapshot) : null
+          const project = error.snapshot ? projectFromSnapshot(null, error.snapshot) : null
           throw Object.assign(error, { conflict: true, ...(project ? { project } : {}) })
         }
         throw error
@@ -270,7 +270,7 @@ function runtimeAdapter(client: RuntimeApiClient, initial: RuntimeSnapshot, base
         return currentProject(response.snapshot ?? await client.getSnapshot())
       } catch (error) {
         if (error instanceof RuntimeConflictError) {
-          const project = error.snapshot ? projectFromSnapshot(base, error.snapshot) : null
+          const project = error.snapshot ? projectFromSnapshot(null, error.snapshot) : null
           throw Object.assign(error, { conflict: true, ...(project ? { project } : {}) })
         }
         throw error
@@ -280,37 +280,93 @@ function runtimeAdapter(client: RuntimeApiClient, initial: RuntimeSnapshot, base
 }
 
 export function projectFromSnapshot(base: EditorProjectView | null, snapshot: RuntimeSnapshot): EditorProjectView | null {
-  const operation = snapshot.view.operations?.find((item) => item.id === 'content-cards')
+  const runtimeOperations = snapshot.view.operations ?? []
   const edit = snapshot.view.content_cards_edit
-  if (!base || !operation) return base
+  const timeline = snapshot.view.timeline
+  const assets = snapshot.media.map((item) => ({
+    id: item.id,
+    name: item.name,
+    kind: item.media_type?.startsWith('audio/') ? 'audio' as const : 'video' as const,
+  }))
+  const clips = timeline?.clips.map((clip) => ({
+    id: clip.id,
+    sourceRange: { startS: clip.source_range.start_s, endS: clip.source_range.end_s },
+    programRange: { startS: clip.program_range.start_s, endS: clip.program_range.end_s },
+  })) ?? []
+  const hasVideo = assets.some((asset) => asset.kind === 'video')
+  const hasAudio = assets.some((asset) => asset.kind === 'audio') || hasVideo
+  const hasCaptions = runtimeOperations.some((item) => item.id === 'captions')
+  const tracks = [
+    ...(hasVideo ? [{ id: 'track-video', name: 'Video', kind: 'video' as const, clips }] : []),
+    ...(hasAudio ? [{ id: 'track-audio', name: 'Audio', kind: 'audio' as const, clips }] : []),
+    ...(hasCaptions ? [{ id: 'track-captions', name: 'Captions', kind: 'caption' as const, clips: [] }] : []),
+  ]
+
+  return {
+    revision: snapshot.view.project_revision ?? 1,
+    durationS: timeline?.duration_s ?? 0,
+    fps: { numerator: timeline?.fps.num ?? 30, denominator: timeline?.fps.den ?? 1 },
+    assets,
+    tracks,
+    operations: runtimeOperations.map((operation) => operationFromSnapshot(
+      operation.id,
+      operation.revision,
+      snapshot,
+      operation.id === 'content-cards' ? edit?.fields : undefined,
+    )),
+    resources: snapshot.resources.map((resource) => ({
+      id: resource.id,
+      kind: resource.kind,
+      etag: resource.etag,
+      size: resource.size,
+      ...(resource.operation_id ? { operationId: resource.operation_id } : {}),
+    })),
+  }
+}
+
+function operationFromSnapshot(
+  operationId: string,
+  revision: number,
+  snapshot: RuntimeSnapshot,
+  fields?: Readonly<Record<string, unknown>>,
+) {
   const currentReviews = snapshot.view.reviews?.filter((item) =>
-    item.status === 'draft' && item.based_on?.['content-cards'] === operation.revision &&
-    item.snapshot_etag && item.evidence_hashes?.length,
+    item.status === 'draft' && item.based_on?.[operationId] === revision &&
+    item.snapshot_etag === snapshot.snapshot_etag && item.evidence_hashes?.length,
   ) ?? []
   const review = currentReviews.length === 1 ? currentReviews[0] : undefined
   const terminalReviews = snapshot.view.reviews?.filter((item) =>
     (item.status === 'approved' || item.status === 'rejected') &&
-    item.based_on?.['content-cards'] === operation.revision &&
+    item.based_on?.[operationId] === revision && item.snapshot_etag === snapshot.snapshot_etag &&
     (!review || (item.id === review.id && item.snapshot_etag === review.snapshot_etag)),
   ) ?? []
   const terminal = terminalReviews.length === 1 ? terminalReviews[0] : undefined
   const previewReceipt = review ?? terminal
+  const evidence = new Set(previewReceipt?.evidence_hashes ?? [])
+  const artifacts = snapshot.artifacts.flatMap((artifact) => {
+    if (!artifact.sha256 || !artifact.media_type || !artifact.url || !evidence.has(`sha256:${artifact.sha256}`)) return []
+    return [{
+      id: artifact.id,
+      name: artifact.name,
+      size: artifact.size,
+      sha256: artifact.sha256,
+      mediaType: artifact.media_type,
+      url: artifact.url,
+    }]
+  })
   return {
-    ...base,
-    operations: [{
-      id: 'content-cards', kind: 'content-cards', revision: operation.revision,
-      editable: !snapshot.read_only && Boolean(edit), fields: edit?.fields ?? {},
+      id: operationId, kind: operationId, revision,
+      editable: operationId === 'content-cards' && !snapshot.read_only && Boolean(fields), fields: fields ?? {},
       ...(previewReceipt ? { preview: {
-        status: 'current', revision: operation.revision,
+        status: 'current', revision,
         reviewId: previewReceipt.id, snapshotEtag: previewReceipt.snapshot_etag ?? '',
-        evidenceHashes: previewReceipt.evidence_hashes ?? [],
+        evidenceHashes: previewReceipt.evidence_hashes ?? [], artifacts,
       } as const } : {}),
       approval: terminal
-        ? { status: terminal.status as 'approved' | 'rejected', revision: operation.revision,
+        ? { status: terminal.status as 'approved' | 'rejected', revision,
             rationale: terminal.rationale, reviewId: terminal.id, snapshotEtag: terminal.snapshot_etag,
             evidenceHashes: terminal.evidence_hashes }
-        : { status: 'none' },
-    }],
+        : { status: 'none' as const },
   }
 }
 

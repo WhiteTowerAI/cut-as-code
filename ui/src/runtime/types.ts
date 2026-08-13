@@ -10,18 +10,24 @@ export type RuntimeFile = Readonly<{
   id: string
   name: string
   size: number
+  sha256?: string
+  media_type?: string
+  url?: string
 }>
 
 export type RuntimeSnapshot = Readonly<{
+  snapshot_etag?: string
   read_only: boolean
   errors: readonly string[]
   view: Readonly<{
     schema_version?: number
+    project_revision?: number
     active_sequence?: string
     operation_count?: number
     review_count?: number
     operations?: readonly RuntimeOperation[]
     reviews?: readonly RuntimeReview[]
+    timeline?: RuntimeTimeline
     content_cards_edit?: Readonly<{
       fields: Readonly<Record<string, unknown>>
       review_template: ContentCardsReview
@@ -30,6 +36,16 @@ export type RuntimeSnapshot = Readonly<{
   resources: readonly RuntimeResource[]
   media: readonly RuntimeFile[]
   artifacts: readonly RuntimeFile[]
+}>
+
+export type RuntimeTimeline = Readonly<{
+  duration_s: number
+  fps: Readonly<{ num: number; den: number }>
+  clips: readonly Readonly<{
+    id: string
+    source_range: Readonly<{ start_s: number; end_s: number }>
+    program_range: Readonly<{ start_s: number; end_s: number }>
+  }>[]
 }>
 
 export type RuntimeOperation = Readonly<{

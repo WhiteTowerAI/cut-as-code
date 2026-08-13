@@ -175,6 +175,39 @@ test('browser runtime is ready from the armed credential-free URL and refreshes 
   }
 })
 
+test('browser displays current Agent review image, video, and sandboxed HTML from opaque artifact URLs', async ({ page }) => {
+  test.setTimeout(30_000)
+  const root = await createContentCardsArtifactProjectFixture()
+  const isolated = await startSidecar(root)
+  try {
+    const browserErrors: string[] = []
+    page.on('pageerror', (error) => browserErrors.push(error.stack ?? error.message))
+    const launch = await armLaunch(isolated)
+    await page.goto(launch)
+    await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+
+    const gallery = page.getByRole('region', { name: 'Current review artifacts' })
+    await expect(gallery).toBeVisible()
+    const image = gallery.locator('img[alt="review-still.png"]')
+    await expect(image).toBeVisible()
+    await expect.poll(() => image.evaluate((element: HTMLImageElement) => element.naturalWidth)).toBeGreaterThan(0)
+    await expect(gallery.locator('video')).toHaveAttribute('src', /\/artifacts\/artifact_[a-f0-9]+$/)
+    const frame = gallery.locator('iframe[title="review-board.html"]')
+    await expect(frame).toHaveAttribute('sandbox', '')
+    await expect(frame).toHaveAttribute('src', /\/artifacts\/artifact_[a-f0-9]+$/)
+    await expect(page.locator('[data-preview-media][src*="/artifacts/"]')).toBeVisible()
+    expect(await gallery.locator('[data-artifact-url]').evaluateAll((items) => items.map((item) => item.getAttribute('data-artifact-url'))))
+      .toEqual(expect.arrayContaining([
+        expect.stringMatching(/^\/v1\/projects\/project_[a-f0-9]+\/artifacts\/artifact_[a-f0-9]+$/),
+      ]))
+    expect(browserErrors).toEqual([])
+  } finally {
+    await page.close()
+    await stopSidecar(isolated.process)
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('mutation routes forward only typed protocol commands and return conflicts', async () => {
   const isolated = await authenticatedSidecar()
   try {
@@ -425,4 +458,46 @@ async function createContentCardsProjectFixture() {
   }).replace('"__MTIME__"', sourceModifiedNs)
   await writeFile(path.join(root, 'work', 'project.json'), projectJson)
   return root
+}
+
+async function createContentCardsArtifactProjectFixture() {
+  const root = await createContentCardsProjectFixture()
+  const reviewRoot = path.join(root, 'review', '03-content-cards')
+  await mkdir(reviewRoot, { recursive: true })
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')
+  const artifacts = [
+    ['review-still.png', png],
+    ['review-preview.mp4', Buffer.from('not-a-decodable-video-but-a-real-served-video-artifact')],
+    ['review-board.html', Buffer.from('<!doctype html><title>Agent review</title><p>Current evidence</p>')],
+  ] as const
+  const hashes: string[] = []
+  for (const [name, content] of artifacts) {
+    await writeFile(path.join(reviewRoot, name), content)
+    hashes.push(`sha256:${await sha256Bytes(content)}`)
+  }
+  const projectPath = path.join(root, 'work', 'project.json')
+  const project = JSON.parse(await readFile(projectPath, 'utf8'))
+  project.reviews = [{
+    id: 'content-cards-preview-r1', revision: 1, status: 'draft', depends_on: ['content-cards'],
+    based_on: { 'content-cards': 1 }, snapshot_etag: '', evidence_hashes: hashes,
+  }]
+  await writeFile(projectPath, `${JSON.stringify(project)}\n`)
+  project.reviews[0].snapshot_etag = await authoritativeSnapshotEtag(root)
+  await writeFile(projectPath, `${JSON.stringify(project)}\n`)
+  return root
+}
+
+async function sha256Bytes(content: Buffer) {
+  const { createHash } = await import('node:crypto')
+  return createHash('sha256').update(content).digest('hex')
+}
+
+async function authoritativeSnapshotEtag(root: string) {
+  const { stdout } = await execFileAsync(process.env.CAC_PYTHON ?? bundledPython, [
+    '-c',
+    'import sys; sys.path.insert(0, sys.argv[1]); from project_snapshot import build_snapshot; print(build_snapshot(sys.argv[2])["snapshot_etag"])',
+    path.join(repositoryRoot, 'runtime'),
+    root,
+  ])
+  return stdout.trim()
 }

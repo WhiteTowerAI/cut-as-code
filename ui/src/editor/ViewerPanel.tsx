@@ -26,6 +26,7 @@ import {
 import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand/vanilla'
 import type { EditorState } from './editor-store'
+import type { ReviewArtifactView } from './editor-model'
 
 type ViewerPanelProps = {
   store: StoreApi<EditorState>
@@ -239,6 +240,10 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
   const setPlaying = useStore(store, (state) => state.setPlaying)
   const setOpenMenu = useStore(store, (state) => state.setOpenMenu)
   const contentCardsOperation = useStore(store, (state) => state.project?.operations?.find((operation) => operation.kind === 'content-cards'))
+  const operations = useStore(store, (state) => state.project?.operations)
+  const currentArtifacts = operations?.flatMap((operation) => operation.preview?.artifacts ?? []) ?? []
+  const primaryArtifact = currentArtifacts.find((artifact) => artifact.mediaType.startsWith('image/'))
+    ?? currentArtifacts.find((artifact) => artifact.mediaType.startsWith('video/'))
   const hasMedia = Boolean(project && project.durationS > 0)
   const fps = project ? project.fps.numerator / project.fps.denominator : 30
 
@@ -286,7 +291,11 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
         {hasMedia && (
           <>
             <div className="viewer-canvas">
-              <img data-preview-media src="/assets/editor/viewer-poster.png" alt="Project preview" />
+              {primaryArtifact?.mediaType.startsWith('video/') ? (
+                <video data-preview-media src={primaryArtifact.url} controls aria-label={primaryArtifact.name} />
+              ) : (
+                <img data-preview-media src={primaryArtifact?.url ?? '/assets/editor/viewer-poster.png'} alt={primaryArtifact?.name ?? 'Project preview'} />
+              )}
             </div>
             {selectionKind && (
               <>
@@ -297,6 +306,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
           </>
         )}
       </div>
+      {currentArtifacts.length ? <ArtifactGallery artifacts={currentArtifacts} /> : null}
       <footer className="viewer-playback">
         <div className="viewer-playback-left">
           <output aria-label="Playhead time">
@@ -329,6 +339,27 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
       </footer>
       {openMenu === 'viewer-more' && <MoreMenu />}
       {openMenu === 'aspect-ratio' && <AspectRatioMenu />}
+    </section>
+  )
+}
+
+function ArtifactGallery({ artifacts }: { artifacts: readonly ReviewArtifactView[] }) {
+  return (
+    <section role="region" aria-label="Current review artifacts" style={{ display: 'flex', gap: 8, padding: 8, overflowX: 'auto', background: '#17191e' }}>
+      {artifacts.map((artifact) => (
+        <figure key={artifact.id} data-artifact-url={artifact.url} style={{ flex: '0 0 180px', margin: 0 }}>
+          {artifact.mediaType.startsWith('image/') ? (
+            <img src={artifact.url} alt={artifact.name} style={{ width: '100%', height: 100, objectFit: 'contain' }} />
+          ) : artifact.mediaType.startsWith('video/') ? (
+            <video src={artifact.url} controls aria-label={artifact.name} style={{ width: '100%', height: 100 }} />
+          ) : artifact.mediaType.startsWith('text/html') ? (
+            <iframe src={artifact.url} title={artifact.name} sandbox="" style={{ width: '100%', height: 100, border: 0, background: '#fff' }} />
+          ) : (
+            <a href={artifact.url} target="_blank" rel="noreferrer">{artifact.name}</a>
+          )}
+          <figcaption style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11 }}>{artifact.name}</figcaption>
+        </figure>
+      ))}
     </section>
   )
 }

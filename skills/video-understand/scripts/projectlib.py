@@ -8,9 +8,16 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
+from contextlib import contextmanager
 from datetime import datetime
 from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
+
+if os.name == "nt":
+    import msvcrt
+else:
+    import fcntl
 
 
 STATUSES = {"draft", "approved", "verified", "failed", "stale"}
@@ -33,10 +40,110 @@ def load_json(path):
         return json.load(handle)
 
 
-def write_json(path, data):
+def write_json(path, data, *, project_lease_held=False):
     path = Path(path)
+    payload = (json.dumps(data, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    project_root = _project_root_for_write(path)
+    if project_root is None or project_lease_held:
+        _atomic_write_bytes(path, payload)
+        return
+    with project_mutation_lease(project_root):
+        _atomic_write_bytes(path, payload)
+
+
+def _atomic_write_bytes(path, payload):
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    with tempfile.NamedTemporaryFile(
+        dir=path.parent, prefix=f".{path.name}.", suffix=".tmp", delete=False
+    ) as handle:
+        temporary = Path(handle.name)
+        handle.write(payload)
+        handle.flush()
+        os.fsync(handle.fileno())
+    try:
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _project_root_for_write(path):
+    absolute = path.absolute()
+    for parent in (absolute.parent, *absolute.parents):
+        if parent.name == "work":
+            return parent.parent.resolve()
+    return None
+
+
+def _is_reparse_point(path):
+    try:
+        stat = path.lstat()
+    except FileNotFoundError:
+        return False
+    return path.is_symlink() or bool(getattr(stat, "st_file_attributes", 0) & 0x400)
+
+
+def editor_state_dir(project_root, *, create=False):
+    root = Path(project_root).resolve()
+    work = root / "work"
+    if not work.is_dir() or _is_reparse_point(work):
+        raise ValueError("project work directory is missing or redirected")
+    editor = work / ".editor"
+    if editor.exists() or editor.is_symlink():
+        if not editor.is_dir() or _is_reparse_point(editor):
+            raise ValueError("project editor state directory is redirected")
+    elif create:
+        editor.mkdir()
+    if create and (not editor.is_dir() or _is_reparse_point(editor)):
+        raise ValueError("project editor state directory is redirected")
+    resolved = editor.resolve(strict=False)
+    if os.path.commonpath((str(root), str(resolved))) != str(root):
+        raise ValueError("project editor state directory escapes root")
+    return editor
+
+
+def acquire_project_lease(project_root, *, blocking=True):
+    lock_path = editor_state_dir(project_root, create=True) / "mutation.lock"
+    descriptor = None
+    try:
+        descriptor = os.open(lock_path, os.O_CREAT | os.O_RDWR)
+        if os.path.getsize(lock_path) == 0:
+            os.write(descriptor, b"\0")
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        if os.name == "nt":
+            msvcrt.locking(descriptor, msvcrt.LK_LOCK if blocking else msvcrt.LK_NBLCK, 1)
+        else:
+            flags = fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB)
+            fcntl.flock(descriptor, flags)
+    except (OSError, BlockingIOError):
+        if descriptor is not None:
+            os.close(descriptor)
+        return None
+    os.ftruncate(descriptor, 0)
+    os.lseek(descriptor, 0, os.SEEK_SET)
+    os.write(descriptor, f"{os.getpid()}\n".encode("ascii"))
+    os.fsync(descriptor)
+    return lock_path, descriptor
+
+
+def release_project_lease(lease):
+    _path, descriptor = lease
+    os.lseek(descriptor, 0, os.SEEK_SET)
+    if os.name == "nt":
+        msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+    else:
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+    os.close(descriptor)
+
+
+@contextmanager
+def project_mutation_lease(project_root):
+    lease = acquire_project_lease(project_root, blocking=True)
+    if lease is None:
+        raise OSError("could not acquire project mutation lease")
+    try:
+        yield lease
+    finally:
+        release_project_lease(lease)
 
 
 def _sha256_file(path):

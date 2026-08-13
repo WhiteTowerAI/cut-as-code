@@ -4,15 +4,11 @@ import copy
 import hashlib
 import json
 import os
+import re
 import sys
 import tempfile
 import uuid
 from pathlib import Path
-
-if os.name == "nt":
-    import msvcrt
-else:
-    import fcntl
 
 from project_snapshot import build_snapshot, canonical_project_root, load_resource
 
@@ -71,7 +67,10 @@ class ProtocolService:
                 "ok": False,
                 "error": "project root must contain work/project.json",
             }
-        lease = self._acquire_lease(root)
+        try:
+            lease = self._acquire_lease(root)
+        except ValueError:
+            return {"ok": False, "error": "project editor state directory is unsafe"}
         if lease is None:
             recovery_error = "project mutation is busy during recovery"
         else:
@@ -168,9 +167,10 @@ class ProtocolService:
             return {"ok": False, "error": "review decision fields must be nonblank"}
         hashes = decision.get("evidence_hashes")
         if not isinstance(hashes, list) or not hashes or any(
-            not isinstance(value, str) or not value.strip() for value in hashes
+            not isinstance(value, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", value)
+            for value in hashes
         ):
-            return {"ok": False, "error": "review evidence hashes must be non-empty"}
+            return {"ok": False, "error": "review evidence hashes must be SHA-256 values"}
         review = next((item for item in project.get("reviews", [])
                        if item.get("id") == decision["review_id"]), None)
         if not review or review.get("status") != "draft":
@@ -179,6 +179,12 @@ class ProtocolService:
             return {"ok": False, "error": "review revision is stale"}
         if review.get("snapshot_etag") != decision["snapshot_etag"] or review.get("evidence_hashes") != hashes:
             return {"ok": False, "error": "review evidence binding mismatch"}
+        current_snapshot = build_snapshot(root)
+        if decision["snapshot_etag"] != current_snapshot.get("snapshot_etag"):
+            return {"ok": False, "error": "review snapshot binding is stale"}
+        current_artifact_hashes = self._review_artifact_hashes(root)
+        if any(value.removeprefix("sha256:") not in current_artifact_hashes for value in hashes):
+            return {"ok": False, "error": "review evidence artifact is missing or stale"}
         current_errors = projectlib.validate_project(
             project, root, check_files=True, dependency_mode="require_current"
         )
@@ -311,8 +317,7 @@ class ProtocolService:
         if plan_path is not None:
             writes.append((plan_path, self._json_bytes(plan)))
         writes.append((project_path, self._json_bytes(project)))
-        journal_dir = root / "work" / ".editor"
-        journal_dir.mkdir(parents=True, exist_ok=True)
+        journal_dir = projectlib.editor_state_dir(root, create=True)
         journal_path = journal_dir / "transaction.json"
         if journal_path.exists():
             raise PreparedTransactionError("pending transaction journal exists")
@@ -399,40 +404,15 @@ class ProtocolService:
 
     @staticmethod
     def _acquire_lease(root):
-        path = root / "work" / ".editor" / "mutation.lock"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            descriptor = os.open(path, os.O_CREAT | os.O_RDWR)
-            if os.path.getsize(path) == 0:
-                os.write(descriptor, b"\0")
-            os.lseek(descriptor, 0, os.SEEK_SET)
-            if os.name == "nt":
-                msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
-            else:
-                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except (OSError, BlockingIOError):
-            if 'descriptor' in locals():
-                os.close(descriptor)
-            return None
-        os.ftruncate(descriptor, 0)
-        os.lseek(descriptor, 0, os.SEEK_SET)
-        os.write(descriptor, f"{os.getpid()}\n".encode("ascii"))
-        os.fsync(descriptor)
-        return path, descriptor
+        return projectlib.acquire_project_lease(root, blocking=False)
 
     @staticmethod
     def _release_lease(lease):
-        _path, descriptor = lease
-        ProtocolService._unlock_descriptor(descriptor)
-        os.close(descriptor)
+        projectlib.release_project_lease(lease)
 
     @staticmethod
     def _unlock_descriptor(descriptor):
         os.lseek(descriptor, 0, os.SEEK_SET)
-        if os.name == "nt":
-            msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
-        else:
-            fcntl.flock(descriptor, fcntl.LOCK_UN)
 
     @staticmethod
     def _json_bytes(value):
@@ -455,7 +435,7 @@ class ProtocolService:
             temporary.unlink(missing_ok=True)
 
     def _recover(self, root):
-        journal = root / "work" / ".editor" / "transaction.json"
+        journal = projectlib.editor_state_dir(root, create=True) / "transaction.json"
         if not journal.is_file():
             return None
         try:
@@ -519,6 +499,24 @@ class ProtocolService:
             return None
         except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
             return "ambiguous transaction recovery"
+
+    @staticmethod
+    def _review_artifact_hashes(root):
+        review_root = root / "review"
+        if not review_root.is_dir():
+            return set()
+        hashes = set()
+        for path in review_root.rglob("*"):
+            if not path.is_file():
+                continue
+            try:
+                resolved = path.resolve(strict=True)
+                if os.path.commonpath((str(root), str(resolved))) != str(root):
+                    continue
+                hashes.add(hashlib.sha256(resolved.read_bytes()).hexdigest())
+            except (OSError, ValueError):
+                continue
+        return hashes
 
     def _validate_recovered(self, root, targets):
         proposed = {path: item["new_content"] for path, item in targets}

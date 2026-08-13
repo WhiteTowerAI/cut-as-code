@@ -46,7 +46,7 @@ function Copy-AllowlistedTree {
 
 function Assert-PackageContents {
     param([Parameter(Mandatory = $true)][string]$Root)
-    $requiredFiles = @('.codex-plugin\plugin.json', '.mcp.json', 'LICENSE', 'README.md', 'runtime\mcp.cjs', 'runtime\project_snapshot.py', 'runtime\protocol_service.py', 'runtime\sidecar.cjs', 'ui\dist\index.html')
+    $requiredFiles = @('.codex-plugin\plugin.json', '.mcp.json', 'LICENSE', 'PACKAGE_AUDIT.json', 'README.md', 'SBOM.spdx.json', 'THIRD_PARTY_NOTICES.md', 'runtime\mcp.cjs', 'runtime\project_snapshot.py', 'runtime\protocol_service.py', 'runtime\sidecar.cjs', 'ui\dist\index.html')
     foreach ($requiredFile in $requiredFiles) {
         if (-not (Test-Path -LiteralPath (Join-Path $Root $requiredFile) -PathType Leaf)) { throw "Package is missing required file: $requiredFile" }
     }
@@ -108,6 +108,8 @@ try {
         Copy-AllowlistedTree -Source (Join-Path $repoRoot "skills\$skillName") -Destination (Join-Path $packageRoot "skills\$skillName") -GraphicMotion:($skillName -eq 'video-add-graphic-motion')
     }
     Copy-Item -LiteralPath (Join-Path $repoRoot 'runtime\package-video-add-graphic-motion.SKILL.md') -Destination (Join-Path $packageRoot 'skills\video-add-graphic-motion\SKILL.md') -Force
+    & node (Join-Path $repoRoot 'scripts\generate_package_compliance.cjs') $repoRoot $packageRoot
+    if ($LASTEXITCODE -ne 0) { throw "Package compliance generation failed with exit code $LASTEXITCODE" }
     Assert-PackageContents -Root $packageRoot
     Write-DeterministicZip -Root $packageRoot -Output $outputAbsolute
     Write-Output "Built local plugin package: $outputAbsolute"

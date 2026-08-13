@@ -88,6 +88,7 @@ def build_snapshot(project_root):
         sequences.get(active_sequence, {}) if isinstance(active_sequence, str) else {}
     )
     timeline_value = sequence.get("timeline") if isinstance(sequence, dict) else None
+    timeline = None
     if isinstance(timeline_value, str) and timeline_value.strip():
         _register_path(
             resources,
@@ -97,6 +98,10 @@ def build_snapshot(project_root):
             "timeline",
             owner=active_sequence,
         )
+        try:
+            timeline = json.loads(_contained_path(root, timeline_value).read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
+            timeline = None
 
     operations = project.get("operations")
     if not isinstance(operations, list):
@@ -127,12 +132,28 @@ def build_snapshot(project_root):
 
     view = {
         "schema_version": project.get("schema_version"),
+        "project_revision": project.get("revision", 1),
         "active_sequence": project.get("active_sequence"),
         "operation_count": len(operations),
         "review_count": len(reviews),
         "operations": [_node_view(node) for node in operations if isinstance(node, dict)],
         "reviews": [_node_view(node) for node in reviews if isinstance(node, dict)],
     }
+    if isinstance(timeline, dict):
+        clips = timeline.get("clips") if isinstance(timeline.get("clips"), list) else []
+        fps = timeline.get("fps") if isinstance(timeline.get("fps"), dict) else {}
+        view["timeline"] = {
+            "duration_s": timeline.get("program_duration_s", 0),
+            "fps": {"num": fps.get("num", 30), "den": fps.get("den", 1)},
+            "clips": [
+                {
+                    "id": clip.get("id"),
+                    "source_range": clip.get("source_range"),
+                    "program_range": clip.get("program_range"),
+                }
+                for clip in clips if isinstance(clip, dict)
+            ],
+        }
     cards = next((node for node in operations if isinstance(node, dict) and node.get("id") == "content-cards"), None)
     if cards and isinstance(cards.get("plan"), str):
         try:
@@ -142,7 +163,9 @@ def build_snapshot(project_root):
             edit_model = None
         if edit_model:
             view["content_cards_edit"] = edit_model
-    return _snapshot(resources, _unique(errors), view)
+    snapshot = _snapshot(resources, _unique(errors), view)
+    snapshot["snapshot_etag"] = _snapshot_binding(project, snapshot["resources"])
+    return snapshot
 
 
 def load_resource(project_root, resource):
@@ -225,6 +248,21 @@ def _node_view(node):
         if field in node:
             item[field] = node[field]
     return item
+
+
+def _snapshot_binding(project, resources):
+    stable_project = dict(project)
+    stable_project["reviews"] = []
+    value = json.dumps(
+        {
+            "project": stable_project,
+            "resources": [item["etag"] for item in resources if item.get("kind") != "project"],
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(value).hexdigest()
 
 
 def _content_cards_edit_model(plan):
