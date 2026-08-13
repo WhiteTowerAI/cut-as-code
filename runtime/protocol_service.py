@@ -14,6 +14,12 @@ class ProtocolService:
     def handle_request(self, request):
         if not isinstance(request, dict):
             return {"ok": False, "error": "request must be an object"}
+        try:
+            return self._dispatch(request)
+        except Exception:
+            return {"ok": False, "error": "invalid request"}
+
+    def _dispatch(self, request):
         verb = request.get("verb")
         if verb == "open_project":
             return self._open_project(request)
@@ -40,17 +46,29 @@ class ProtocolService:
         }
 
     def _get_snapshot(self, request):
-        root = self._projects.get(request.get("project_id"))
+        project_id = request.get("project_id")
+        invalid = self._validate_id("project_id", project_id)
+        if invalid:
+            return invalid
+        root = self._projects.get(project_id)
         if root is None:
             return {"ok": False, "error": "unknown project_id"}
         return {"ok": True, "snapshot": self._public_snapshot(build_snapshot(root))}
 
     def _get_resource(self, request):
-        root = self._projects.get(request.get("project_id"))
+        project_id = request.get("project_id")
+        invalid = self._validate_id("project_id", project_id)
+        if invalid:
+            return invalid
+        resource_id = request.get("resource_id")
+        invalid = self._validate_id("resource_id", resource_id)
+        if invalid:
+            return invalid
+        root = self._projects.get(project_id)
         if root is None:
             return {"ok": False, "error": "unknown project_id"}
         snapshot = build_snapshot(root)
-        resource = snapshot["_registry"].get(request.get("resource_id"))
+        resource = snapshot["_registry"].get(resource_id)
         if resource is None:
             return {"ok": False, "error": "unknown resource_id"}
         try:
@@ -62,6 +80,12 @@ class ProtocolService:
     @staticmethod
     def _public_snapshot(snapshot):
         return {key: value for key, value in snapshot.items() if not key.startswith("_")}
+
+    @staticmethod
+    def _validate_id(name, value):
+        if not isinstance(value, str) or not value.strip():
+            return {"ok": False, "error": f"{name} must be a nonblank string"}
+        return None
 
 
 def main():

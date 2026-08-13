@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -17,6 +18,9 @@ sys.path.insert(0, str(PROJECTLIB_DIR))
 import projectlib  # noqa: E402
 
 
+_UNPARSED = object()
+
+
 def file_etag(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -30,17 +34,27 @@ def canonical_project_root(value):
     if not isinstance(value, (str, Path)) or not str(value).strip():
         raise ValueError("project root must contain work/project.json")
     root = Path(value).resolve(strict=False)
-    if not (root / "work" / "project.json").is_file():
-        raise ValueError("project root must contain work/project.json")
+    _manifest_path(root)
     return root
+
+
+def _manifest_path(root):
+    manifest = (root / "work" / "project.json").resolve(strict=False)
+    try:
+        contained = os.path.commonpath((str(root), str(manifest))) == str(root)
+    except ValueError:
+        contained = False
+    if not contained or not manifest.is_file():
+        raise ValueError("project root must contain work/project.json")
+    return manifest
 
 
 def build_snapshot(project_root):
     root = canonical_project_root(project_root)
-    project_path = root / "work" / "project.json"
+    project_path = _manifest_path(root)
     resources = [_resource("project", project_path)]
     errors = []
-    project = None
+    project = _UNPARSED
 
     try:
         project = json.loads(project_path.read_bytes().decode("utf-8"))
@@ -50,7 +64,7 @@ def build_snapshot(project_root):
         errors.append(f"invalid project JSON: {exc}")
 
     if not isinstance(project, dict):
-        if project is not None:
+        if project is not _UNPARSED:
             errors.append("invalid project JSON: root must be an object")
         return _snapshot(resources, errors, {})
 
@@ -69,16 +83,19 @@ def build_snapshot(project_root):
     sequences = project.get("sequences")
     if not isinstance(sequences, dict):
         sequences = {}
-    sequence = sequences.get(project.get("active_sequence"), {})
+    active_sequence = project.get("active_sequence")
+    sequence = (
+        sequences.get(active_sequence, {}) if isinstance(active_sequence, str) else {}
+    )
     timeline_value = sequence.get("timeline") if isinstance(sequence, dict) else None
-    if timeline_value:
+    if isinstance(timeline_value, str) and timeline_value.strip():
         _register_path(
             resources,
             errors,
             root,
             timeline_value,
             "timeline",
-            owner=str(project.get("active_sequence", "")),
+            owner=active_sequence,
         )
 
     operations = project.get("operations")
@@ -89,13 +106,20 @@ def build_snapshot(project_root):
         reviews = []
     nodes = [*operations, *reviews]
     for node in nodes:
-        if not isinstance(node, dict) or not node.get("plan"):
+        if not isinstance(node, dict):
+            continue
+        plan = node.get("plan")
+        if plan is None:
+            continue
+        if not isinstance(plan, str) or not plan.strip():
+            node_id = node.get("id") or "<missing-id>"
+            errors.append(f"{node_id} plan must be a nonblank string")
             continue
         _register_path(
             resources,
             errors,
             root,
-            node["plan"],
+            plan,
             "plan",
             owner=str(node.get("id", "")),
             operation_id=str(node.get("id", "")),
@@ -127,7 +151,7 @@ def load_resource(project_root, resource):
 def _register_path(resources, errors, root, value, kind, owner="", **metadata):
     try:
         path = _contained_path(root, value)
-    except ValueError as exc:
+    except (OSError, TypeError, ValueError) as exc:
         errors.append(str(exc))
         return
     if not path.is_file():
@@ -183,6 +207,6 @@ def _node_view(node):
     }
     if "target" in node:
         item["target"] = node.get("target")
-    if node.get("plan"):
+    if isinstance(node.get("plan"), str) and node["plan"].strip():
         item["plan_resource_id"] = resource_id("plan", str(node.get("id", "")))
     return item

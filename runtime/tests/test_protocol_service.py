@@ -6,12 +6,14 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 RUNTIME = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RUNTIME))
 
 from protocol_service import ProtocolService  # noqa: E402
+from project_snapshot import canonical_project_root  # noqa: E402
 
 
 def plan_resource_id(operation_id):
@@ -187,6 +189,22 @@ class ProtocolServiceTests(unittest.TestCase):
             response["snapshot"]["errors"],
         )
 
+    def test_non_object_json_roots_open_read_only_with_exact_error(self):
+        for value in (None, [], ["project"], "project", 1, 1.5, True):
+            with self.subTest(value=value):
+                self.project_path.write_text(json.dumps(value), encoding="utf-8")
+
+                response = self.service.handle_request(
+                    {"verb": "open_project", "project_root": str(self.root)}
+                )
+
+                self.assertTrue(response["ok"])
+                self.assertTrue(response["snapshot"]["read_only"])
+                self.assertEqual(
+                    ["invalid project JSON: root must be an object"],
+                    response["snapshot"]["errors"],
+                )
+
     def test_invalid_project_opens_read_only_with_projectlib_diagnostics(self):
         project = self._project()
         project["schema_version"] = 99
@@ -217,6 +235,33 @@ class ProtocolServiceTests(unittest.TestCase):
             response["snapshot"]["errors"],
         )
         self.assertEqual(0, response["snapshot"]["view"]["operation_count"])
+
+    def test_malformed_active_sequence_and_plan_values_do_not_crash_snapshot(self):
+        malformed = (
+            ("active_sequence", []),
+            ("plan", []),
+            ("plan", {"path": "captions/captions-plan.json"}),
+        )
+        for field, value in malformed:
+            with self.subTest(field=field, value=value):
+                project = self._project()
+                if field == "active_sequence":
+                    project[field] = value
+                else:
+                    project["operations"][0][field] = value
+                self.project_path.write_text(json.dumps(project), encoding="utf-8")
+
+                response = self.service.handle_request(
+                    {"verb": "open_project", "project_root": str(self.root)}
+                )
+
+                self.assertTrue(response["ok"])
+                self.assertTrue(response["snapshot"]["read_only"])
+                if field == "plan":
+                    self.assertNotIn(
+                        "plan",
+                        {item["kind"] for item in response["snapshot"]["resources"]},
+                    )
 
     def test_root_and_registered_resources_must_remain_inside_project(self):
         outside = Path(self.temp_dir.name).parent / "not-a-project"
@@ -253,6 +298,64 @@ class ProtocolServiceTests(unittest.TestCase):
             response,
         )
 
+    def test_manifest_resolved_path_must_remain_inside_project_root(self):
+        root = self.root
+        manifest = root / "work" / "project.json"
+        escaped = root.parent / "outside-project.json"
+        real_resolve = Path.resolve
+
+        def resolve_path(path, strict=False):
+            if path == manifest:
+                return escaped
+            return real_resolve(path, strict=strict)
+
+        with mock.patch.object(Path, "resolve", autospec=True, side_effect=resolve_path):
+            with self.assertRaisesRegex(
+                ValueError, "project root must contain work/project.json"
+            ):
+                canonical_project_root(root)
+
+    def test_unhashable_and_blank_resource_identifiers_are_rejected(self):
+        opened = self.service.handle_request(
+            {"verb": "open_project", "project_root": str(self.root)}
+        )
+        project_id = opened["project_id"]
+
+        for invalid in (None, "", "   ", []):
+            with self.subTest(project_id=invalid):
+                self.assertEqual(
+                    {
+                        "ok": False,
+                        "error": "project_id must be a nonblank string",
+                    },
+                    self.service.handle_request(
+                        {"verb": "get_snapshot", "project_id": invalid}
+                    ),
+                )
+        for invalid in (None, "", "   ", {}):
+            with self.subTest(resource_id=invalid):
+                self.assertEqual(
+                    {
+                        "ok": False,
+                        "error": "resource_id must be a nonblank string",
+                    },
+                    self.service.handle_request(
+                        {
+                            "verb": "get_resource",
+                            "project_id": project_id,
+                            "resource_id": invalid,
+                        }
+                    ),
+                )
+
+    def test_request_exception_boundary_returns_fixed_error(self):
+        with mock.patch.object(
+            self.service, "_dispatch", side_effect=RuntimeError("private detail")
+        ):
+            response = self.service.handle_request({"verb": "get_snapshot"})
+
+        self.assertEqual({"ok": False, "error": "invalid request"}, response)
+
     def test_json_line_entrypoint_rejects_unknown_verbs(self):
         result = subprocess.run(
             [sys.executable, str(RUNTIME / "protocol_service.py")],
@@ -265,6 +368,30 @@ class ProtocolServiceTests(unittest.TestCase):
         self.assertEqual(
             {"ok": False, "error": "unknown verb"},
             json.loads(result.stdout),
+        )
+        self.assertEqual("", result.stderr)
+
+    def test_json_line_loop_survives_a_malformed_request(self):
+        result = subprocess.run(
+            [sys.executable, str(RUNTIME / "protocol_service.py")],
+            input=(
+                '{"verb":"get_snapshot","project_id":[]}\n'
+                '{"verb":"run_shell","command":"whoami"}\n'
+            ),
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+
+        self.assertEqual(
+            [
+                {
+                    "ok": False,
+                    "error": "project_id must be a nonblank string",
+                },
+                {"ok": False, "error": "unknown verb"},
+            ],
+            [json.loads(line) for line in result.stdout.splitlines()],
         )
         self.assertEqual("", result.stderr)
 
