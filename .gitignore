@@ -16,6 +16,7 @@ skills/video-add-graphic-motion/tests/
 .vscode/
 # HyperFrames preview cache + regenerable self-check stills/gallery
 .hyperframes/
+**/.thumbnails/
 # snapshots/
 # gallery.html
 
