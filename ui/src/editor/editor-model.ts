@@ -28,10 +28,37 @@ export type ClipView = Readonly<{
   programRange: Readonly<{ startS: number; endS: number }>
 }>
 
+export type ContentCardEditableField = 'copy' | 'layout' | 'placement' | 'enabled'
+
+export type ContentCardLayout = 'lower-third' | 'quote' | 'statistic'
+
+export type ContentCardPlacement = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+
+export type OperationPreview = Readonly<{
+  status: 'current' | 'stale'
+  revision: number
+}>
+
+export type OperationApproval = Readonly<{
+  status: 'none' | 'approved' | 'rejected' | 'invalidated'
+  revision?: number
+}>
+
+export type EditorOperationView = Readonly<{
+  id: string
+  kind: string
+  revision: number
+  editable: boolean
+  fields: Readonly<Record<string, unknown>>
+  preview?: OperationPreview
+  approval?: OperationApproval
+}>
+
 export type EditorProjectView = Readonly<{
   revision: number
   durationS: number
   fps: Readonly<{ numerator: number; denominator: number }>
   assets: readonly AssetView[]
   tracks: readonly TrackView[]
+  operations?: readonly EditorOperationView[]
 }>
