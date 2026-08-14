@@ -240,4 +240,3 @@ Prefer `python -m unittest` over `pytest` — the suites use `unittest` fixtures
 - `.github/workflows/clawhub-publish.yml` publishes `skills/` to ClawHub (dry-run on PRs,
   real publish on `main`). A skill directory's `SKILL.md` frontmatter `name` is its published
   slug and slash-command trigger — renaming a directory renames the command.
-- Editor UI work under `ui/` must use Playwright with installed Chrome for screenshot-based visual inspection and interaction verification; typecheck/build alone are insufficient.
