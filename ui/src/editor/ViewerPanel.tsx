@@ -144,7 +144,7 @@ type FinalFrameState = {
 function formatTimecode(timeS: number, fps: number) {
   const safeTimeS = Math.max(0, Number.isFinite(timeS) ? timeS : 0)
   const wholeSeconds = Math.floor(safeTimeS)
-  const frames = Math.min(fps - 1, Math.floor((safeTimeS - wholeSeconds) * fps))
+  const frames = Math.min(Math.ceil(fps) - 1, Math.floor((safeTimeS - wholeSeconds) * fps))
   const hours = Math.floor(wholeSeconds / 3600)
   const minutes = Math.floor((wholeSeconds % 3600) / 60)
   const seconds = wholeSeconds % 60

@@ -232,6 +232,41 @@ test('the caption Viewer frame uses its canonical twenty-second project clock', 
   await expect(page.getByLabel('Playhead time')).toHaveText('00:00:06:26 / 00:00:20:00')
 })
 
+test('the Viewer renders 30000/1001 timecode with an integer two-digit frame field', async ({ page }) => {
+  await page.route('**/v1/projects/project_fractional/snapshot', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        snapshot: {
+          read_only: true,
+          errors: [],
+          view: {
+            project_revision: 1,
+            active_sequence: 'main',
+            timeline: {
+              duration_s: 1.999,
+              fps: { num: 30000, den: 1001 },
+              clips: [{
+                id: 'clip-1',
+                source_range: { start_s: 0, end_s: 1.999 },
+                program_range: { start_s: 0, end_s: 1.999 },
+              }],
+            },
+          },
+          resources: [],
+          media: [],
+          artifacts: [],
+        },
+      }),
+    })
+  })
+
+  await page.goto('/?project=project_fractional')
+
+  await expect(page.getByLabel('Playhead time')).toHaveText('00:00:00:00 / 00:00:01:29')
+})
+
 test('the caption selection and toolbar occupy their transcript-safe stage positions', async ({ page }) => {
   await page.setViewportSize({ width: 680, height: 688 })
   await page.goto('/?scenario=123-79')
