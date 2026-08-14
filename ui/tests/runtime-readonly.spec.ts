@@ -851,6 +851,90 @@ test('seeking during a boundary hold cancels the stale hold deadline', async ({ 
   }
 })
 
+test('installed Chrome treats Pause clicked during a boundary hold as explicit user intent', async ({ page }) => {
+  test.setTimeout(30_000)
+  const root = await createSlowBoundaryHoldProjectFixture()
+  const isolated = await startSidecar(root)
+  try {
+    await page.goto(await armLaunch(isolated))
+    await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+
+    const viewer = page.getByRole('region', { name: 'Viewer', exact: true })
+    const source = viewer.locator('video[aria-label="source.mp4"]')
+    await expect.poll(() => source.evaluate((video) => video.readyState)).toBeGreaterThanOrEqual(2)
+    await source.evaluate((video) => new Promise<void>((resolve) => {
+      video.addEventListener('seeked', () => resolve(), { once: true })
+      video.currentTime = 0.36
+    }))
+    const held = source.evaluate((video) => new Promise<number>((resolve, reject) => {
+      const timeout = window.setTimeout(() => reject(new Error('first clip did not enter its boundary hold')), 5_000)
+      const onPause = () => {
+        if (video.currentTime < 0.35 || video.currentTime >= 0.4) return
+        window.clearTimeout(timeout)
+        video.removeEventListener('pause', onPause)
+        resolve(video.currentTime)
+      }
+      video.addEventListener('pause', onPause)
+    }))
+    await viewer.getByRole('button', { name: 'Play' }).click()
+    const heldSourceTime = await held
+
+    await viewer.getByRole('button', { name: 'Pause' }).click()
+    await page.waitForTimeout(500)
+
+    await expect(source).toHaveJSProperty('paused', true)
+    await expect.poll(() => source.evaluate((video) => video.currentTime)).toBeCloseTo(heldSourceTime, 3)
+    await expect(viewer.getByRole('button', { name: 'Play' })).toBeVisible()
+  } finally {
+    await page.close()
+    await stopSidecar(isolated.process)
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('same-source successor seek retires the hold before the native seek early return', async ({ page }) => {
+  test.setTimeout(30_000)
+  const root = await createSlowOverlappingBoundaryHoldProjectFixture()
+  const isolated = await startSidecar(root)
+  try {
+    await page.goto(await armLaunch(isolated))
+    await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+
+    const viewer = page.getByRole('region', { name: 'Viewer', exact: true })
+    const source = viewer.locator('video[aria-label="source.mp4"]')
+    await expect.poll(() => source.evaluate((video) => video.readyState)).toBeGreaterThanOrEqual(2)
+    await source.evaluate((video) => new Promise<void>((resolve) => {
+      video.addEventListener('seeked', () => resolve(), { once: true })
+      video.currentTime = 0.36
+    }))
+    const held = source.evaluate((video) => new Promise<number>((resolve, reject) => {
+      const timeout = window.setTimeout(() => reject(new Error('overlap predecessor did not enter its boundary hold')), 5_000)
+      const onPause = () => {
+        if (video.currentTime < 0.35 || video.currentTime >= 0.4) return
+        window.clearTimeout(timeout)
+        video.removeEventListener('pause', onPause)
+        resolve(video.currentTime)
+      }
+      video.addEventListener('pause', onPause)
+    }))
+    await viewer.getByRole('button', { name: 'Play' }).click()
+    const heldSourceTime = await held
+
+    await page.locator('[data-timeline-surface]').click({ position: { x: 438, y: 40 } })
+    await expect(viewer.getByLabel('Playhead time')).toHaveText('00:00:02:00 / 00:00:04:00')
+    await page.waitForTimeout(500)
+
+    await expect(source).toHaveJSProperty('paused', true)
+    await expect.poll(() => source.evaluate((video) => video.currentTime)).toBeCloseTo(heldSourceTime, 3)
+    await expect(viewer.getByRole('button', { name: 'Play' })).toBeVisible()
+    await expect(viewer.getByLabel('Playhead time')).toHaveText('00:00:02:00 / 00:00:04:00')
+  } finally {
+    await page.close()
+    await stopSidecar(isolated.process)
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 for (const playbackRate of [0.01, 32]) {
   test(`installed Chrome disables native playback for legal protocol rate ${playbackRate}`, async ({ page }) => {
     test.setTimeout(30_000)
@@ -1173,6 +1257,31 @@ async function createSlowBoundaryHoldProjectFixture() {
       {
         id: 'clip-slow-b',
         source_range: { start_s: 0.6, end_s: 0.8 },
+        program_range: { start_s: 2, end_s: 4 },
+        speed: 0.1,
+      },
+    ],
+  }))
+  return root
+}
+
+async function createSlowOverlappingBoundaryHoldProjectFixture() {
+  const root = await createProjectFixture()
+  await writeFile(path.join(root, 'work', 'timeline.json'), JSON.stringify({
+    schema_version: 1,
+    source_duration_s: 1,
+    program_duration_s: 4,
+    fps: { num: 30, den: 1 },
+    clips: [
+      {
+        id: 'clip-slow-overlap-a',
+        source_range: { start_s: 0.2, end_s: 0.4 },
+        program_range: { start_s: 0, end_s: 2 },
+        speed: 0.1,
+      },
+      {
+        id: 'clip-slow-overlap-b',
+        source_range: { start_s: 0.3666666666666667, end_s: 0.5666666666666667 },
         program_range: { start_s: 2, end_s: 4 },
         speed: 0.1,
       },

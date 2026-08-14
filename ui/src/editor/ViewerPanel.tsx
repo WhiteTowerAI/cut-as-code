@@ -374,6 +374,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
   const nativeProgramTimeRef = useRef<number | null>(null)
   const activeClipRef = useRef<ClipView | null>(null)
   const holdingBoundaryRef = useRef(false)
+  const cancelBoundaryHoldRef = useRef<(() => boolean) | null>(null)
   const unsupportedPlaybackRate = videoClips
     .map(playbackRateForClip)
     .find((playbackRate) => playbackRate !== null && !supportsNativePlaybackRate(playbackRate))
@@ -384,7 +385,14 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     ? project.fps.denominator / project.fps.numerator
     : 1 / 30
 
+  function retireBoundaryHold() {
+    const retired = cancelBoundaryHoldRef.current?.() ?? false
+    if (retired) setPlaying(false)
+    return retired
+  }
+
   function seekProjectVideo(programTimeS: number) {
+    retireBoundaryHold()
     const video = projectVideoRef.current
     const finalClip = videoClips.at(-1)
     if (video && project && finalClip && programTimeS >= project.durationS - 0.0001) {
@@ -495,6 +503,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
       holdingBoundaryRef.current = false
       return canceled
     }
+    cancelBoundaryHoldRef.current = stopBoundaryHold
 
     const schedulePresentedFrame = () => {
       if (disposed || video.paused || cancelScheduledFrame) return
@@ -510,7 +519,10 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
           holdingBoundaryRef.current = true
           video.pause()
           const handle = window.setTimeout(() => {
-            if (disposed || holdId !== boundaryHoldId || activeClipRef.current?.id !== heldClip?.id) return
+            if (disposed || holdId !== boundaryHoldId || activeClipRef.current?.id !== heldClip?.id) {
+              if (holdId === boundaryHoldId) stopBoundaryHold()
+              return
+            }
             cancelBoundaryHold = null
             holdingBoundaryRef.current = false
             const nextClip = heldClip ? nextClipInProgramOrder(heldClip, videoClips) : undefined
@@ -609,6 +621,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
       document.removeEventListener('visibilitychange', pauseFallbackWhenHidden)
       stopBoundaryCheck()
       stopBoundaryHold()
+      if (cancelBoundaryHoldRef.current === stopBoundaryHold) cancelBoundaryHoldRef.current = null
     }
   }, [canPlay, projectVideo?.url, project?.durationS, sourceFrameDurationS, videoClips])
 
@@ -616,7 +629,9 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     const video = projectVideoRef.current
     if (!video) return
     const playback = createPlaybackController(video)
-    if (playback.isPlaying()) {
+    if (isPlaying) {
+      retireBoundaryHold()
+      setPlaying(false)
       playback.pause()
       return
     }
