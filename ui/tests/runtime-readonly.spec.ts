@@ -422,27 +422,60 @@ test('native Viewer retimes 2x clips and skips an excluded source gap per frame'
     const observedFrames = source.evaluate(async (video) => await new Promise<{
       playbackRate: number
       sourceTimes: number[]
+      finalPresentedSourceTime: number | null
     }>((resolve, reject) => {
       const sourceTimes: number[] = []
-      const requestVideoFrame = video.requestVideoFrameCallback.bind(video)
-      Object.defineProperty(video, 'requestVideoFrameCallback', {
-        configurable: true,
-        value: (callback: VideoFrameRequestCallback) => requestVideoFrame((now, metadata) => {
-          sourceTimes.push(metadata.mediaTime)
-          callback(now, metadata)
-        }),
-      })
-      const timeout = window.setTimeout(() => reject(new Error('video did not stop at the program end')), 5_000)
+      const finalSourceTime = 0.8 - 1 / 30
+      let finalFreezeStarted = false
+      let finalSeeked = false
+      let finalPresentedSourceTime: number | null = null
+      let paused = false
+      let endpointPublished = false
+      let settled = false
       const playhead = document.querySelector('[aria-label="Playhead time"]')!
-      const observer = new MutationObserver(() => finish())
+      const timeout = window.setTimeout(() => reject(new Error(
+        `video did not settle: current=${video.currentTime} paused=${video.paused}`
+        + ` freezeStarted=${finalFreezeStarted} seeked=${finalSeeked}`
+        + ` presented=${finalPresentedSourceTime} endpoint=${playhead.textContent}`
+        + ` frames=${JSON.stringify(sourceTimes)}`,
+      )), 5_000)
+      const observer = new MutationObserver(() => {
+        endpointPublished = playhead.textContent === '00:00:00:06 / 00:00:00:06'
+        finish()
+      })
       const finish = () => {
-        if (!video.paused || !playhead.textContent?.startsWith('00:00:00:06')) return
+        if (settled || !paused || !finalSeeked || !endpointPublished) return
+        if (video.requestVideoFrameCallback && finalPresentedSourceTime === null) return
+        settled = true
         window.clearTimeout(timeout)
         observer.disconnect()
-        resolve({ playbackRate: video.playbackRate, sourceTimes })
+        resolve({ playbackRate: video.playbackRate, sourceTimes, finalPresentedSourceTime })
       }
-      video.addEventListener('pause', finish, { once: true })
+      const observeFrame = () => {
+        if (!video.requestVideoFrameCallback || settled) return
+        video.requestVideoFrameCallback((_now, metadata) => {
+          sourceTimes.push(metadata.mediaTime)
+          if (finalFreezeStarted && finalSeeked && metadata.mediaTime >= 0.6 && metadata.mediaTime < 0.8) {
+            finalPresentedSourceTime = metadata.mediaTime
+          }
+          finish()
+          observeFrame()
+        })
+      }
+      video.addEventListener('seeking', () => {
+        if (Math.abs(video.currentTime - finalSourceTime) < 0.01) finalFreezeStarted = true
+      })
+      video.addEventListener('seeked', () => {
+        if (Math.abs(video.currentTime - finalSourceTime) >= 0.01) return
+        finalSeeked = true
+        finish()
+      })
+      video.addEventListener('pause', () => {
+        paused = true
+        finish()
+      }, { once: true })
       observer.observe(playhead, { childList: true, characterData: true, subtree: true })
+      observeFrame()
     }))
 
     await viewer.getByRole('button', { name: 'Play' }).click()
@@ -452,31 +485,63 @@ test('native Viewer retimes 2x clips and skips an excluded source gap per frame'
     expect(observed.sourceTimes.some((timeS) => timeS >= 0.4 && timeS < 0.6)).toBe(false)
     expect(observed.sourceTimes.some((timeS) => timeS >= 0.6 && timeS < 0.8)).toBe(true)
     expect(observed.sourceTimes.some((timeS) => timeS >= 0.8)).toBe(false)
-    await expect.poll(() => source.evaluate((video) => video.currentTime)).toBeLessThan(0.8)
-    await page.evaluate(() => new Promise<void>((resolve) => {
-      window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()))
-    }))
+    if (observed.finalPresentedSourceTime !== null) {
+      expect(observed.finalPresentedSourceTime).toBeGreaterThanOrEqual(0.6)
+      expect(observed.finalPresentedSourceTime).toBeLessThan(0.8)
+    }
     const settledEndpoint = await source.evaluate((video) => ({
       currentTime: video.currentTime,
       paused: video.paused,
     }))
     expect(settledEndpoint.paused).toBe(true)
     expect(settledEndpoint.currentTime).toBeLessThan(0.8)
-    await expect.poll(() => page.evaluate(() => {
-      const timecode = document.querySelector('[aria-label="Playhead time"]')!.textContent!.split(' / ')[0]
-      const [hours, minutes, seconds, frames] = timecode.split(':').map(Number)
-      return hours * 3600 + minutes * 60 + seconds + frames / 30
-    })).toBeCloseTo(0.2, 5)
+    await expect(viewer.getByLabel('Playhead time')).toHaveText('00:00:00:06 / 00:00:00:06')
 
-    const replayStart = source.evaluate((video) => new Promise<number>((resolve, reject) => {
-      const timeout = window.setTimeout(() => reject(new Error('replay did not seek to the first clip')), 2_000)
-      video.addEventListener('seeking', () => {
+    const replayStart = source.evaluate((video) => new Promise<{
+      mediaTime: number
+      paused: boolean
+      readyState: number
+    }>((resolve, reject) => {
+      let playing = false
+      let firstClipFrame: number | null = null
+      const timeout = window.setTimeout(() => reject(new Error('replay did not present a playing first-clip frame')), 2_000)
+      const finish = () => {
+        if (!playing || firstClipFrame === null) return
         window.clearTimeout(timeout)
-        resolve(video.currentTime)
+        resolve({ mediaTime: firstClipFrame, paused: video.paused, readyState: video.readyState })
+      }
+      video.addEventListener('playing', () => {
+        playing = true
+        finish()
       }, { once: true })
+      const observeFrame = () => {
+        if (!video.requestVideoFrameCallback) {
+          if (!video.paused && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
+            && video.currentTime >= 0.2 && video.currentTime < 0.4) {
+            firstClipFrame = video.currentTime
+            finish()
+            return
+          }
+          window.setTimeout(observeFrame, 0)
+          return
+        }
+        video.requestVideoFrameCallback((_now, metadata) => {
+          if (metadata.mediaTime >= 0.2 && metadata.mediaTime < 0.4) {
+            firstClipFrame = metadata.mediaTime
+            finish()
+            return
+          }
+          observeFrame()
+        })
+      }
+      observeFrame()
     }))
     await viewer.getByRole('button', { name: 'Play' }).click()
-    expect(await replayStart).toBeCloseTo(0.2, 2)
+    const replay = await replayStart
+    expect(replay.paused).toBe(false)
+    expect(replay.readyState).toBeGreaterThanOrEqual(2)
+    expect(replay.mediaTime).toBeGreaterThanOrEqual(0.2)
+    expect(replay.mediaTime).toBeLessThan(0.4)
     await source.evaluate((video) => video.pause())
   } finally {
     await page.close()
@@ -542,7 +607,7 @@ test('native Viewer presents late frames before proactive 2x clip boundaries', a
   }
 })
 
-test('native Viewer fallback pauses when hidden and proactively schedules clip boundaries', async ({ page }) => {
+test('native Viewer fallback pauses when hidden', async ({ page }) => {
   test.setTimeout(30_000)
   const root = await createRetimedProjectFixture()
   const isolated = await startSidecar(root)
@@ -576,31 +641,55 @@ test('native Viewer fallback pauses when hidden and proactively schedules clip b
       Object.defineProperty(document, 'hidden', { configurable: true, value: false })
       document.dispatchEvent(new Event('visibilitychange'))
     })
-    const completedFallback = source.evaluate((video) => new Promise<{
-      currentTime: number
-      seeks: number[]
+  } finally {
+    await page.close()
+    await stopSidecar(isolated.process)
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('native Viewer fallback transitions after the native clock reaches the clip boundary', async ({ page }) => {
+  test.setTimeout(30_000)
+  const root = await createRetimedProjectFixture()
+  const isolated = await startSidecar(root)
+  try {
+    await page.goto(await armLaunch(isolated))
+    await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+
+    const viewer = page.getByRole('region', { name: 'Viewer', exact: true })
+    const source = viewer.locator('video[aria-label="source.mp4"]')
+    await expect.poll(() => source.evaluate((video) => video.readyState)).toBeGreaterThanOrEqual(2)
+    await expect.poll(() => source.evaluate((video) => video.currentTime)).toBeCloseTo(0.2, 2)
+    await source.evaluate((video) => {
+      Object.defineProperty(video, 'requestVideoFrameCallback', { configurable: true, value: undefined })
+      Object.defineProperty(document, 'hidden', { configurable: true, value: false })
+    })
+
+    const transitioned = source.evaluate((video) => new Promise<{
+      targetTime: number
+      maxFirstClipTime: number
     }>((resolve, reject) => {
-      const seeks: number[] = []
-      const timeout = window.setTimeout(() => reject(new Error('fallback playback did not reach the program end')), 5_000)
-      video.addEventListener('seeking', () => seeks.push(video.currentTime))
-      video.addEventListener('pause', () => {
+      const timeout = window.setTimeout(() => reject(new Error('fallback did not enter the second clip from native media time')), 5_000)
+      let maxFirstClipTime = video.currentTime
+      const sampler = window.setInterval(() => {
+        if (video.currentTime < 0.4) maxFirstClipTime = Math.max(maxFirstClipTime, video.currentTime)
+      }, 2)
+      const onSeeked = () => {
+        if (video.currentTime < 0.59 || video.currentTime >= 0.8) return
         window.clearTimeout(timeout)
-        resolve({ currentTime: video.currentTime, seeks })
-      }, { once: true })
+        window.clearInterval(sampler)
+        video.removeEventListener('seeked', onSeeked)
+        resolve({ targetTime: video.currentTime, maxFirstClipTime })
+      }
+      video.addEventListener('seeked', onSeeked)
     }))
     await viewer.getByRole('button', { name: 'Play' }).click()
-    const fallback = await completedFallback
+    const transition = await transitioned
 
-    expect(fallback.seeks.some((timeS) => Math.abs(timeS - 0.6) < 0.01)).toBe(true)
-    await page.evaluate(() => new Promise<void>((resolve) => {
-      window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()))
-    }))
-    expect(await source.evaluate((video) => video.currentTime)).toBeLessThan(0.8)
-    await expect.poll(() => page.evaluate(() => {
-      const timecode = document.querySelector('[aria-label="Playhead time"]')!.textContent!.split(' / ')[0]
-      const [hours, minutes, seconds, frames] = timecode.split(':').map(Number)
-      return hours * 3600 + minutes * 60 + seconds + frames / 30
-    })).toBeCloseTo(0.2, 5)
+    expect(transition.maxFirstClipTime).toBeGreaterThanOrEqual(0.35)
+    expect(transition.targetTime).toBeCloseTo(0.6, 1)
+    await source.evaluate((video) => video.pause())
+    await expect(viewer.getByLabel('Playhead time')).toHaveText('00:00:00:03 / 00:00:00:06')
   } finally {
     await page.close()
     await stopSidecar(isolated.process)

@@ -109,6 +109,29 @@ export function nativeBoundaryDelayMs(
   return remainingSourceTimeS / Math.max(playbackRate, Number.EPSILON) * 1000
 }
 
+export type NativeBoundaryWakeupDecision =
+  | { action: 'reschedule'; delayMs: number }
+  | { action: 'boundary'; sourceTimeS: number }
+
+export function nativeBoundaryWakeup(
+  currentSourceTimeS: number,
+  clip: ClipView,
+  sourceFrameDurationS: number,
+  playbackRate: number,
+): NativeBoundaryWakeupDecision {
+  const boundarySourceTimeS = lastPresentedSourceTime(clip, sourceFrameDurationS)
+  if (currentSourceTimeS < boundarySourceTimeS - sourceFrameDurationS / 100) {
+    return {
+      action: 'reschedule',
+      delayMs: nativeBoundaryDelayMs(currentSourceTimeS, clip, sourceFrameDurationS, playbackRate),
+    }
+  }
+  return {
+    action: 'boundary',
+    sourceTimeS: currentSourceTimeS,
+  }
+}
+
 type FrameDrivenVideo = HTMLVideoElement & {
   requestVideoFrameCallback?: (callback: (now: number, metadata: VideoFrameCallbackMetadata) => void) => number
   cancelVideoFrameCallback?: (handle: number) => void
@@ -445,17 +468,25 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
 
     const scheduleBoundaryTimer = () => {
       if (disposed || video.paused || cancelBoundaryTimer) return
-      const activeClip = sourceClipAtTime(video.currentTime, videoClips)
-      const boundarySourceTimeS = activeClip ? lastPresentedSourceTime(activeClip, sourceFrameDurationS) : video.currentTime
-      const delayMs = activeClip
-        ? nativeBoundaryDelayMs(video.currentTime, activeClip, sourceFrameDurationS, video.playbackRate)
-        : 0
+      const scheduledSourceTimeS = video.currentTime
+      const activeClip = sourceClipAtTime(scheduledSourceTimeS, videoClips)
+      const scheduledDecision = activeClip
+        ? nativeBoundaryWakeup(scheduledSourceTimeS, activeClip, sourceFrameDurationS, video.playbackRate)
+        : { action: 'boundary', sourceTimeS: scheduledSourceTimeS } as const
       const handle = window.setTimeout(() => {
         cancelBoundaryTimer = null
         if (disposed || video.paused) return
-        syncPresentedFrame(video, boundarySourceTimeS)
+        const decision = activeClip
+          ? nativeBoundaryWakeup(video.currentTime, activeClip, sourceFrameDurationS, video.playbackRate)
+          : { action: 'boundary', sourceTimeS: video.currentTime } as const
+        if (decision.action === 'reschedule') {
+          syncProgramTime(video)
+          scheduleBoundaryTimer()
+          return
+        }
+        syncPresentedFrame(video, decision.sourceTimeS)
         scheduleBoundaryTimer()
-      }, delayMs)
+      }, scheduledDecision.action === 'reschedule' ? scheduledDecision.delayMs : 0)
       cancelBoundaryTimer = () => window.clearTimeout(handle)
     }
 

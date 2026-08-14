@@ -3,6 +3,7 @@ import {
   createPlaybackController,
   lastPresentedSourceTime,
   nativeBoundaryDelayMs,
+  nativeBoundaryWakeup,
 } from '../src/editor/ViewerPanel'
 import type { ClipView } from '../src/editor/editor-model'
 
@@ -41,6 +42,36 @@ test('native playback boundary uses one source frame and rate only for wall-cloc
 
   expect(lastPresentedSourceTime(clip, 1 / 30)).toBeCloseTo(0.366667, 5)
   expect(nativeBoundaryDelayMs(0.2, clip, 1 / 30, 2)).toBeCloseTo(83.333333, 5)
+})
+
+test('boundary wakeup reschedules when the native media clock has not advanced', async () => {
+  const clip: ClipView = {
+    id: 'clip-fast-a',
+    sourceRange: { startS: 0.2, endS: 0.4 },
+    programRange: { startS: 0, endS: 0.1 },
+  }
+
+  const decision = nativeBoundaryWakeup(0.2, clip, 1 / 30, 2)
+
+  expect(decision.action).toBe('reschedule')
+  if (decision.action === 'reschedule') {
+    expect(decision.delayMs).toBeCloseTo(83.333333, 5)
+  }
+})
+
+test('boundary wakeup publishes the actual native source time at the threshold', async () => {
+  const clip: ClipView = {
+    id: 'clip-fast-a',
+    sourceRange: { startS: 0.2, endS: 0.4 },
+    programRange: { startS: 0, endS: 0.1 },
+  }
+
+  const decision = nativeBoundaryWakeup(0.37, clip, 1 / 30, 2)
+
+  expect(decision.action).toBe('boundary')
+  if (decision.action === 'boundary') {
+    expect(decision.sourceTimeS).toBe(0.37)
+  }
 })
 
 test('opening one Viewer menu closes the other and Escape closes the open menu', async ({ page }) => {
