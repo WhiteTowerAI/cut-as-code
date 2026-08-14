@@ -464,8 +464,6 @@ test('native Viewer retimes 2x clips and skips an excluded source gap per frame'
     }>((resolve, reject) => {
       const sourceTimes: number[] = []
       const finalSourceTime = 0.8 - 1 / 30
-      let finalFreezeStarted = false
-      let finalSeeked = false
       let finalPresentedSourceTime: number | null = null
       let paused = false
       let endpointPublished = false
@@ -473,7 +471,6 @@ test('native Viewer retimes 2x clips and skips an excluded source gap per frame'
       const playhead = document.querySelector('[aria-label="Playhead time"]')!
       const timeout = window.setTimeout(() => reject(new Error(
         `video did not settle: current=${video.currentTime} paused=${video.paused}`
-        + ` freezeStarted=${finalFreezeStarted} seeked=${finalSeeked}`
         + ` presented=${finalPresentedSourceTime} endpoint=${playhead.textContent}`
         + ` frames=${JSON.stringify(sourceTimes)}`,
       )), 5_000)
@@ -482,32 +479,25 @@ test('native Viewer retimes 2x clips and skips an excluded source gap per frame'
         finish()
       })
       const finish = () => {
-        if (settled || !paused || !finalSeeked || !endpointPublished) return
-        if (video.requestVideoFrameCallback && finalPresentedSourceTime === null) return
+        if (settled || !paused || !endpointPublished || finalPresentedSourceTime === null) return
         settled = true
         window.clearTimeout(timeout)
         observer.disconnect()
-        resolve({ playbackRate: video.playbackRate, sourceTimes, finalPresentedSourceTime })
+        window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+          resolve({ playbackRate: video.playbackRate, sourceTimes, finalPresentedSourceTime })
+        }))
       }
       const observeFrame = () => {
         if (!video.requestVideoFrameCallback || settled) return
         video.requestVideoFrameCallback((_now, metadata) => {
           sourceTimes.push(metadata.mediaTime)
-          if (finalFreezeStarted && finalSeeked && metadata.mediaTime >= 0.6 && metadata.mediaTime < 0.8) {
+          if (metadata.mediaTime >= finalSourceTime - 0.001 && metadata.mediaTime < 0.8) {
             finalPresentedSourceTime = metadata.mediaTime
           }
           finish()
           observeFrame()
         })
       }
-      video.addEventListener('seeking', () => {
-        if (Math.abs(video.currentTime - finalSourceTime) < 0.01) finalFreezeStarted = true
-      })
-      video.addEventListener('seeked', () => {
-        if (Math.abs(video.currentTime - finalSourceTime) >= 0.01) return
-        finalSeeked = true
-        finish()
-      })
       video.addEventListener('pause', () => {
         paused = true
         finish()
@@ -532,7 +522,7 @@ test('native Viewer retimes 2x clips and skips an excluded source gap per frame'
       paused: video.paused,
     }))
     expect(settledEndpoint.paused).toBe(true)
-    expect(settledEndpoint.currentTime).toBeLessThan(0.8)
+    expect(settledEndpoint.currentTime).toBeCloseTo(0.8 - 1 / 30, 2)
     await expect(viewer.getByLabel('Playhead time')).toHaveText('00:00:00:06 / 00:00:00:06')
 
     const replayStart = source.evaluate((video) => new Promise<{
