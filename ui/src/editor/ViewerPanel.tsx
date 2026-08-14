@@ -620,7 +620,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
       video.removeEventListener('seeked', restartBoundaryCheck)
       document.removeEventListener('visibilitychange', pauseFallbackWhenHidden)
       stopBoundaryCheck()
-      stopBoundaryHold()
+      if (stopBoundaryHold()) setPlaying(false)
       if (cancelBoundaryHoldRef.current === stopBoundaryHold) cancelBoundaryHoldRef.current = null
     }
   }, [canPlay, projectVideo?.url, project?.durationS, sourceFrameDurationS, videoClips])

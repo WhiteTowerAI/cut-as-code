@@ -935,6 +935,54 @@ test('same-source successor seek retires the hold before the native seek early r
   }
 })
 
+test('runtime clip refresh during a boundary hold publishes stopped playback', async ({ page }) => {
+  test.setTimeout(30_000)
+  const root = await createSlowBoundaryHoldProjectFixture()
+  const isolated = await startSidecar(root)
+  try {
+    await page.goto(await armLaunch(isolated))
+    await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+
+    const viewer = page.getByRole('region', { name: 'Viewer', exact: true })
+    const source = viewer.locator('video[aria-label="source.mp4"]')
+    await expect.poll(() => source.evaluate((video) => video.readyState)).toBeGreaterThanOrEqual(2)
+    await source.evaluate((video) => new Promise<void>((resolve) => {
+      video.addEventListener('seeked', () => resolve(), { once: true })
+      video.currentTime = 0.36
+    }))
+    const held = source.evaluate((video) => new Promise<number>((resolve, reject) => {
+      const timeout = window.setTimeout(() => reject(new Error('first clip did not enter its boundary hold')), 5_000)
+      const onPause = () => {
+        if (video.currentTime < 0.35 || video.currentTime >= 0.4) return
+        window.clearTimeout(timeout)
+        video.removeEventListener('pause', onPause)
+        resolve(video.currentTime)
+      }
+      video.addEventListener('pause', onPause)
+    }))
+    await viewer.getByRole('button', { name: 'Play' }).click()
+    const heldSourceTime = await held
+
+    const refreshBefore = Number(await page.locator('html').getAttribute('data-runtime-refresh-count'))
+    const timelinePath = path.join(root, 'work', 'timeline.json')
+    const timeline = JSON.parse(await readFile(timelinePath, 'utf8'))
+    timeline.clips[1].id = 'clip-slow-b-refreshed'
+    await writeFile(timelinePath, JSON.stringify(timeline))
+    await expect.poll(async () => Number(
+      await page.locator('html').getAttribute('data-runtime-refresh-count'),
+    )).toBeGreaterThan(refreshBefore)
+    await page.waitForTimeout(500)
+
+    await expect(source).toHaveJSProperty('paused', true)
+    await expect.poll(() => source.evaluate((video) => video.currentTime)).toBeCloseTo(heldSourceTime, 3)
+    await expect(viewer.getByRole('button', { name: 'Play' })).toBeVisible()
+  } finally {
+    await page.close()
+    await stopSidecar(isolated.process)
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 for (const playbackRate of [0.01, 32]) {
   test(`installed Chrome disables native playback for legal protocol rate ${playbackRate}`, async ({ page }) => {
     test.setTimeout(30_000)
