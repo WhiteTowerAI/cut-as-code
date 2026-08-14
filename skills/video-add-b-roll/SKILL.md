@@ -385,11 +385,17 @@ display-only diagnostics are never included in the review receipt. A visible `Fi
 result remains required before export. Copy and Download JSON remain disabled when no legal fit
 exists, and their JSON records every ordered segment, range, and playback rate at frame precision.
 
-`Modification notes` is optional. A non-empty value, changed program timing, or a changed prefilled
-segment forces `submission_intent: request_revision`; an explicit Request changes action may use
-empty notes. `submission_intent: approve` means an ordinary-route approval, while
-`submission_intent: approve_selection` means the authoritative B-roll content decision for the
-speaker-inset route.
+The route is chosen once in Agent chat before the first candidate page. Candidate, skip,
+program/source timing, segment boundary/order/speed, Fit to A-roll, and Ken Burns edits made with
+that page's controls do not force revision. Leave `Modification notes` empty and explicitly select
+Approve to export the current exact configuration: `submission_intent: approve` for the ordinary
+route or `submission_intent: approve_selection` for the speaker-inset route. Python revalidates the
+export before applying it directly.
+
+Enter non-empty natural-language `Modification notes` only for requested changes the page controls
+cannot express. This selects Request changes and exports `submission_intent: request_revision`;
+Empty Request changes is invalid. Only such natural-language requests enter the revision, rebuild,
+and new-page flow. Candidate selection and speaker composite approval remain separate.
 `Copy` is the primary handoff and places the complete JSON in both a readonly textarea and the
 clipboard when available. `Download JSON` downloads those same bytes for durable local transfer.
 Both preserve the same explicit approval receipt bytes; neither mutates the plan until the Agent
@@ -453,7 +459,7 @@ For an `ordinary` chat decision, apply the received one-page approval JSON and d
 interaction receipt:
 
 ```powershell
-python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]); sys.path.insert(0,sys.argv[2]); import broll_plan,projectlib; path=root/'work/b-roll/broll-plan.json'; plan=projectlib.load_json(path); review=projectlib.load_json(sys.argv[3]); timeline=projectlib.load_json(root/'work/timeline.json'); updated=broll_plan.apply_review(plan,review,mode=sys.argv[4],actor=sys.argv[5],rationale=review['rationale'],interaction_path=root/'work/b-roll/broll-interaction.json',timeline=timeline); projectlib.write_json(path,updated)" $ProjectRoot $BrollScripts $ReviewExport human "Actual user name"
+python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]); sys.path.insert(0,sys.argv[2]); import broll_plan,projectlib; path=root/'work/b-roll/broll-plan.json'; plan=projectlib.load_json(path); review=projectlib.load_json(sys.argv[3]); timeline=projectlib.load_json(root/'work/timeline.json'); transcript=projectlib.load_json(root/'work/understand/transcript.json'); updated=broll_plan.apply_review(plan,review,mode=sys.argv[4],actor=sys.argv[5],rationale=review['rationale'],interaction_path=root/'work/b-roll/broll-interaction.json',timeline=timeline,transcript=transcript,project_root=root); projectlib.write_json(path,updated)" $ProjectRoot $BrollScripts $ReviewExport human "Actual user name"
 ```
 
 Use `human` and the actual human actor only after explicit user export. A new human approve uses
@@ -463,7 +469,7 @@ reason. Agent mode still requires the real Agent actor and a specific exported A
 For a `speaker-inset` chat decision, apply the first-page authoritative selection:
 
 ```powershell
-python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]); sys.path.insert(0,sys.argv[2]); import broll_plan,projectlib; path=root/'work/b-roll/broll-plan.json'; plan=projectlib.load_json(path); selection=projectlib.load_json(sys.argv[3]); timeline=projectlib.load_json(root/'work/timeline.json'); updated=broll_plan.approve_selection(plan,selection,mode=sys.argv[4],actor=sys.argv[5],rationale=selection['rationale'],project_root=root,timeline=timeline); projectlib.write_json(path,updated)" $ProjectRoot $BrollScripts $ReviewExport human "Actual user name"
+python -c "import sys; from pathlib import Path; root=Path(sys.argv[1]); sys.path.insert(0,sys.argv[2]); import broll_plan,projectlib; path=root/'work/b-roll/broll-plan.json'; plan=projectlib.load_json(path); selection=projectlib.load_json(sys.argv[3]); timeline=projectlib.load_json(root/'work/timeline.json'); transcript=projectlib.load_json(root/'work/understand/transcript.json'); updated=broll_plan.approve_selection(plan,selection,mode=sys.argv[4],actor=sys.argv[5],rationale=selection['rationale'],project_root=root,timeline=timeline,transcript=transcript); projectlib.write_json(path,updated)" $ProjectRoot $BrollScripts $ReviewExport human "Actual user name"
 ```
 
 Then use

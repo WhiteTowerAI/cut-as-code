@@ -127,17 +127,21 @@
   mapping, and a minimum duration of one rational timeline frame. Move each visible control by
   0.5 seconds per action, display time values with at most two decimal places, and snap exported
   values to frame boundaries without replacing untouched canonical values with display rounding.
-- Treat `Modification notes` as optional `revision_notes`. Preserve the user's text exactly. A
-  non-empty value requests a revision and is never an approval rationale.
-- Set `submission_intent` to `approve` for an ordinary-route exact configuration and
-  `approve_selection` with `approval_scope: "b-roll-selection"` for the speaker-inset route's
-  authoritative B-roll candidate, timing, segment-order, speed, and skip decision. Set it to
-  `request_revision` for changed program timing, a changed prefilled segment, non-empty notes, or
-  an explicit Request changes action.
-- Reject `request_revision` in `apply_review()` before any plan or receipt write. Validate its
-  review UUID, plan/candidate/video hashes, explicit action, timing, and selected candidate; then
-  rebuild the proposal, source mapping, transcript evidence, hashes, and a new immutable page.
-  Stop for approval again. Never convert revision notes into human authority.
+- Choose `ordinary` or `speaker-inset` once in Agent chat before publishing the first candidate
+  page. Candidate, skip, program/source timing, segment boundary/order/speed, Fit to A-roll, and
+  Ken Burns edits made with that page's controls do not request a revision.
+- With `Modification notes` empty, explicit Approve exports the current exact configuration.
+  Use `submission_intent: approve` for the ordinary route and `approve_selection` with
+  `approval_scope: "b-roll-selection"` for the speaker-inset route. Python must revalidate the
+  exact page, bindings, media, timeline, transcript, timing, segments, and source coverage before
+  applying the configuration directly.
+- Preserve non-empty natural-language `Modification notes` exactly and use them only for requested
+  changes the page controls cannot express. They select Request changes and export
+  `submission_intent: request_revision`; Empty Request changes is invalid. Reject it in
+  `apply_review()` before any plan or receipt write, then use the existing validation,
+  revision/rebuild, and new immutable page flow. Never convert revision notes into human authority.
+- Candidate selection and speaker composite approval remain separate. The first page approves B-roll
+  content; it never approves the later exact speaker composite.
 - Human mode requires an explicit user `Copy` or `Download JSON` action. Both controls must use one
   receipt builder, the same validation, and the same JSON bytes while the form is unchanged. Copy
   keeps a readonly textarea fallback when clipboard access fails. The controls record explicit
