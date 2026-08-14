@@ -67,6 +67,36 @@ export function sourceTimeToProgramTime(sourceTimeS: number, clips: readonly Cli
   return clip.programRange.startS + (sourceTimeS - clip.sourceRange.startS) * programDuration / sourceDuration
 }
 
+function programClipAtTime(programTimeS: number, clips: readonly ClipView[]) {
+  return clips.find((clip) =>
+    programTimeS >= clip.programRange.startS && programTimeS < clip.programRange.endS,
+  ) ?? clips.at(-1)
+}
+
+function sourceClipAtTime(sourceTimeS: number, clips: readonly ClipView[]) {
+  return clips.find((clip) =>
+    sourceTimeS >= clip.sourceRange.startS && sourceTimeS < clip.sourceRange.endS,
+  )
+}
+
+function playbackRateForClip(clip: ClipView) {
+  const sourceDuration = clip.sourceRange.endS - clip.sourceRange.startS
+  const programDuration = clip.programRange.endS - clip.programRange.startS
+  return sourceDuration > 0 && programDuration > 0 ? sourceDuration / programDuration : null
+}
+
+function applyClipPlaybackRate(video: HTMLVideoElement, clip: ClipView) {
+  const playbackRate = playbackRateForClip(clip)
+  if (playbackRate !== null && Math.abs(video.playbackRate - playbackRate) > 0.001) {
+    video.playbackRate = playbackRate
+  }
+}
+
+type FrameDrivenVideo = HTMLVideoElement & {
+  requestVideoFrameCallback?: (callback: () => void) => number
+  cancelVideoFrameCallback?: (handle: number) => void
+}
+
 function formatTimecode(timeS: number, fps: number) {
   const safeTimeS = Math.max(0, Number.isFinite(timeS) ? timeS : 0)
   const wholeSeconds = Math.floor(safeTimeS)
@@ -276,11 +306,15 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
   const canPlay = Boolean(projectVideo && !primaryArtifact && videoClips.length)
   const hasTimeline = Boolean(project && project.durationS > 0)
   const fps = project ? project.fps.numerator / project.fps.denominator : 30
+  const sourceFrameDurationS = project ? project.fps.denominator / project.fps.numerator : 1 / 30
 
   function seekProjectVideo(programTimeS: number) {
     const video = projectVideoRef.current
+    const clip = programClipAtTime(programTimeS, videoClips)
     const sourceTimeS = programTimeToSourceTime(programTimeS, videoClips)
-    if (!video || sourceTimeS === null || Math.abs(video.currentTime - sourceTimeS) < 0.01) return
+    if (!video || !clip || sourceTimeS === null) return
+    applyClipPlaybackRate(video, clip)
+    if (Math.abs(video.currentTime - sourceTimeS) < 0.01) return
     createPlaybackController(video).seek(sourceTimeS)
   }
 
@@ -289,8 +323,18 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
   }, [currentTimeS, projectVideo?.url, videoClips])
 
   function syncProgramTime(video: HTMLVideoElement) {
-    const programTimeS = sourceTimeToProgramTime(video.currentTime, videoClips)
-    if (programTimeS !== null) {
+    const activeClip = sourceClipAtTime(video.currentTime, videoClips)
+    if (activeClip) {
+      const nextClip = videoClips.find((clip) => clip.sourceRange.startS >= activeClip.sourceRange.endS)
+      if (nextClip && video.currentTime >= activeClip.sourceRange.endS - sourceFrameDurationS) {
+        applyClipPlaybackRate(video, nextClip)
+        createPlaybackController(video).seek(nextClip.sourceRange.startS)
+        seek(nextClip.programRange.startS)
+        return
+      }
+      applyClipPlaybackRate(video, activeClip)
+      const programTimeS = sourceTimeToProgramTime(video.currentTime, videoClips)
+      if (programTimeS === null) return
       seek(programTimeS)
       return
     }
@@ -304,6 +348,46 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     seek(project?.durationS ?? 0)
     setPlaying(false)
   }
+
+  useEffect(() => {
+    const video = projectVideoRef.current
+    if (!video || !canPlay) return
+    const frameVideo = video as FrameDrivenVideo
+    let cancelScheduledFrame: (() => void) | null = null
+    let disposed = false
+
+    const scheduleBoundaryCheck = () => {
+      if (disposed || video.paused || cancelScheduledFrame) return
+      const tick = () => {
+        cancelScheduledFrame = null
+        if (disposed || video.paused) return
+        syncProgramTime(video)
+        scheduleBoundaryCheck()
+      }
+      if (frameVideo.requestVideoFrameCallback) {
+        const handle = frameVideo.requestVideoFrameCallback(tick)
+        cancelScheduledFrame = () => frameVideo.cancelVideoFrameCallback?.(handle)
+        return
+      }
+      const handle = window.requestAnimationFrame(tick)
+      cancelScheduledFrame = () => window.cancelAnimationFrame(handle)
+    }
+
+    const stopBoundaryCheck = () => {
+      cancelScheduledFrame?.()
+      cancelScheduledFrame = null
+    }
+
+    video.addEventListener('play', scheduleBoundaryCheck)
+    video.addEventListener('pause', stopBoundaryCheck)
+    if (!video.paused) scheduleBoundaryCheck()
+    return () => {
+      disposed = true
+      video.removeEventListener('play', scheduleBoundaryCheck)
+      video.removeEventListener('pause', stopBoundaryCheck)
+      stopBoundaryCheck()
+    }
+  }, [canPlay, projectVideo?.url, project?.durationS, videoClips])
 
   function togglePlayback() {
     const video = projectVideoRef.current

@@ -390,6 +390,59 @@ test('browser projects opaque project media into a playable Viewer and shared ti
   }
 })
 
+test('native Viewer retimes 2x clips and skips an excluded source gap per frame', async ({ page }) => {
+  test.setTimeout(30_000)
+  const root = await createRetimedProjectFixture()
+  const isolated = await startSidecar(root)
+  try {
+    await page.goto(await armLaunch(isolated))
+    await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+
+    const viewer = page.getByRole('region', { name: 'Viewer', exact: true })
+    const source = viewer.locator('video[aria-label="source.mp4"]')
+    await expect.poll(() => source.evaluate((video) => video.readyState)).toBeGreaterThanOrEqual(2)
+    await expect.poll(() => source.evaluate((video) => video.currentTime)).toBeCloseTo(0.2, 1)
+
+    const observedFrames = source.evaluate(async (video) => await new Promise<{
+      playbackRate: number
+      sourceTimes: number[]
+    }>((resolve, reject) => {
+      const sourceTimes: number[] = []
+      const timeout = window.setTimeout(() => reject(new Error('did not reach second source clip')), 5_000)
+      const observe = () => {
+        sourceTimes.push(video.currentTime)
+        if (video.currentTime >= 0.65) {
+          window.clearTimeout(timeout)
+          resolve({ playbackRate: video.playbackRate, sourceTimes })
+          return
+        }
+        if ('requestVideoFrameCallback' in video) video.requestVideoFrameCallback(observe)
+        else window.requestAnimationFrame(observe)
+      }
+      if ('requestVideoFrameCallback' in video) video.requestVideoFrameCallback(observe)
+      else window.requestAnimationFrame(observe)
+    }))
+
+    await viewer.getByRole('button', { name: 'Play' }).click()
+    const observed = await observedFrames
+    await source.evaluate((video) => video.pause())
+
+    expect(observed.playbackRate).toBeCloseTo(2, 5)
+    expect(observed.sourceTimes.some((timeS) => timeS >= 0.4 && timeS < 0.6)).toBe(false)
+    await expect.poll(() => page.evaluate(() => {
+      const video = document.querySelector<HTMLVideoElement>('video[data-project-media]')!
+      const timecode = document.querySelector('[aria-label="Playhead time"]')!.textContent!.split(' / ')[0]
+      const [hours, minutes, seconds, frames] = timecode.split(':').map(Number)
+      const programTime = hours * 3600 + minutes * 60 + seconds + frames / 30
+      return Math.abs(programTime - (0.1 + (video.currentTime - 0.6) / 2))
+    })).toBeLessThan(0.08)
+  } finally {
+    await page.close()
+    await stopSidecar(isolated.process)
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('mutation routes forward only typed protocol commands and return conflicts', async () => {
   const isolated = await authenticatedSidecar()
   try {
@@ -614,6 +667,31 @@ async function createProjectFixture() {
     }],
     reviews: [],
     render: { status: 'draft' },
+  }))
+  return root
+}
+
+async function createRetimedProjectFixture() {
+  const root = await createProjectFixture()
+  await writeFile(path.join(root, 'work', 'timeline.json'), JSON.stringify({
+    schema_version: 1,
+    source_duration_s: 1,
+    program_duration_s: 0.2,
+    fps: { num: 30, den: 1 },
+    clips: [
+      {
+        id: 'clip-fast-a',
+        source_range: { start_s: 0.2, end_s: 0.4 },
+        program_range: { start_s: 0, end_s: 0.1 },
+        speed: 2,
+      },
+      {
+        id: 'clip-fast-b',
+        source_range: { start_s: 0.6, end_s: 0.8 },
+        program_range: { start_s: 0.1, end_s: 0.2 },
+        speed: 2,
+      },
+    ],
   }))
   return root
 }
