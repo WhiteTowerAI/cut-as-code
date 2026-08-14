@@ -314,6 +314,9 @@ export function projectFromSnapshot(base: EditorProjectView | null, snapshot: Ru
     durationS: timeline?.duration_s ?? 0,
     fps: { numerator: timeline?.fps.num ?? 30, denominator: timeline?.fps.den ?? 1 },
     assets,
+    sourceAssetId: snapshot.view.source_media_id && assets.some((asset) => asset.id === snapshot.view.source_media_id)
+      ? snapshot.view.source_media_id
+      : undefined,
     tracks,
     operations: runtimeOperations.map((operation) => operationFromSnapshot(
       operation.id,

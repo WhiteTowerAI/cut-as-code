@@ -86,6 +86,7 @@ export type EditorProjectView = Readonly<{
   durationS: number
   fps: Readonly<{ numerator: number; denominator: number }>
   assets: readonly AssetView[]
+  sourceAssetId?: string
   tracks: readonly TrackView[]
   operations?: readonly EditorOperationView[]
   resources?: readonly RuntimeResourceView[]

@@ -1,18 +1,13 @@
 import { expect, test } from '@playwright/test'
 import { createPlaybackController } from '../src/editor/ViewerPanel'
 
-test('play and pause use the single Viewer playback control', async ({ page }) => {
+test('Viewer playback is unavailable without an authoritative project video', async ({ page }) => {
   await page.setViewportSize({ width: 680, height: 688 })
   await page.goto('/?scenario=1-282')
 
   const play = page.getByRole('button', { name: 'Play' })
   await expect(play).toBeVisible()
-  await play.click()
-
-  const pause = page.getByRole('button', { name: 'Pause' })
-  await expect(pause).toBeVisible()
-  await pause.click()
-  await expect(play).toBeVisible()
+  await expect(play).toBeDisabled()
 })
 
 test('playback controller seeks the assigned media element', async () => {

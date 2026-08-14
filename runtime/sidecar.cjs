@@ -119,6 +119,9 @@ async function handleRequest(state, request, response) {
       if (result.ok) {
         result.snapshot.media = publicFiles(state.media, state.projectId, 'media')
         result.snapshot.artifacts = publicFiles(state.artifacts, state.projectId, 'artifacts')
+        if (result.snapshot.view?.source_media_id && !state.media.has(result.snapshot.view.source_media_id)) {
+          delete result.snapshot.view.source_media_id
+        }
       }
       return json(response, result.ok ? 200 : 400, result)
     }

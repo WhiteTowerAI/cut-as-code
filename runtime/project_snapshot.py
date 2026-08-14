@@ -139,6 +139,9 @@ def build_snapshot(project_root):
         "operations": [_node_view(node) for node in operations if isinstance(node, dict)],
         "reviews": [_node_view(node) for node in reviews if isinstance(node, dict)],
     }
+    source_media_id = _source_media_id(root, project_path, project)
+    if source_media_id:
+        view["source_media_id"] = source_media_id
     if isinstance(timeline, dict):
         clips = timeline.get("clips") if isinstance(timeline.get("clips"), list) else []
         fps = timeline.get("fps") if isinstance(timeline.get("fps"), dict) else {}
@@ -225,6 +228,21 @@ def _snapshot(resources, errors, view):
         "resources": public_resources,
         "_registry": registry,
     }
+
+
+def _source_media_id(root, project_path, project):
+    source = project.get("source")
+    value = source.get("path") if isinstance(source, dict) else None
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        path = (project_path.parent / value).resolve(strict=True)
+        if os.path.commonpath((str(root), str(path))) != str(root) or not path.is_file():
+            return None
+        relative = path.relative_to(root).as_posix()
+    except (OSError, ValueError):
+        return None
+    return "asset_" + hashlib.sha256(relative.encode("utf-8")).hexdigest()[:24]
 
 
 def _unique(values):

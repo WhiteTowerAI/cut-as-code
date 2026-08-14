@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import {
   ArrowDownToLine,
   ArrowUpToLine,
@@ -27,6 +27,7 @@ import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand/vanilla'
 import type { EditorState } from './editor-store'
 import type { ReviewArtifactView } from './editor-model'
+import type { ClipView } from './editor-model'
 
 type ViewerPanelProps = {
   store: StoreApi<EditorState>
@@ -41,6 +42,29 @@ export function createPlaybackController(video: HTMLVideoElement) {
     getDuration: () => video.duration,
     isPlaying: () => !video.paused,
   }
+}
+
+export function programTimeToSourceTime(programTimeS: number, clips: readonly ClipView[]) {
+  const clip = clips.find((candidate) =>
+    programTimeS >= candidate.programRange.startS && programTimeS < candidate.programRange.endS,
+  ) ?? clips.at(-1)
+  if (!clip) return null
+  const programDuration = clip.programRange.endS - clip.programRange.startS
+  const sourceDuration = clip.sourceRange.endS - clip.sourceRange.startS
+  if (programDuration <= 0 || sourceDuration <= 0) return null
+  const offset = Math.min(Math.max(programTimeS - clip.programRange.startS, 0), programDuration)
+  return clip.sourceRange.startS + offset * sourceDuration / programDuration
+}
+
+export function sourceTimeToProgramTime(sourceTimeS: number, clips: readonly ClipView[]) {
+  const clip = clips.find((candidate) =>
+    sourceTimeS >= candidate.sourceRange.startS && sourceTimeS < candidate.sourceRange.endS,
+  )
+  if (!clip) return null
+  const programDuration = clip.programRange.endS - clip.programRange.startS
+  const sourceDuration = clip.sourceRange.endS - clip.sourceRange.startS
+  if (programDuration <= 0 || sourceDuration <= 0) return null
+  return clip.programRange.startS + (sourceTimeS - clip.sourceRange.startS) * programDuration / sourceDuration
 }
 
 function formatTimecode(timeS: number, fps: number) {
@@ -244,32 +268,54 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
   const currentArtifacts = operations?.flatMap((operation) => operation.preview?.artifacts ?? []) ?? []
   const primaryArtifact = currentArtifacts.find((artifact) => artifact.mediaType.startsWith('image/'))
     ?? currentArtifacts.find((artifact) => artifact.mediaType.startsWith('video/'))
-  const projectVideo = project?.assets.find((asset) =>
-    asset.kind === 'video' && asset.mediaType?.startsWith('video/') && asset.url,
-  )
+  const projectVideo = project?.sourceAssetId
+    ? project.assets.find((asset) => asset.id === project.sourceAssetId && asset.kind === 'video' && asset.mediaType?.startsWith('video/') && asset.url)
+    : undefined
+  const videoClips = project?.tracks.find((track) => track.kind === 'video')?.clips ?? []
+  const projectVideoRef = useRef<HTMLVideoElement>(null)
+  const canPlay = Boolean(projectVideo && !primaryArtifact && videoClips.length)
   const hasTimeline = Boolean(project && project.durationS > 0)
   const fps = project ? project.fps.numerator / project.fps.denominator : 30
 
+  function seekProjectVideo(programTimeS: number) {
+    const video = projectVideoRef.current
+    const sourceTimeS = programTimeToSourceTime(programTimeS, videoClips)
+    if (!video || sourceTimeS === null || Math.abs(video.currentTime - sourceTimeS) < 0.01) return
+    createPlaybackController(video).seek(sourceTimeS)
+  }
+
   useEffect(() => {
-    if (!isPlaying || !project?.durationS) return
-    let frameId = 0
-    let previous = performance.now()
-    const tick = (now: number) => {
-      const elapsedS = (now - previous) / 1000
-      previous = now
-      const state = store.getState()
-      const nextTimeS = state.currentTimeS + elapsedS
-      if (nextTimeS >= project.durationS) {
-        state.seek(project.durationS)
-        state.setPlaying(false)
-        return
-      }
-      state.seek(nextTimeS)
-      frameId = requestAnimationFrame(tick)
+    seekProjectVideo(currentTimeS)
+  }, [currentTimeS, projectVideo?.url, videoClips])
+
+  function syncProgramTime(video: HTMLVideoElement) {
+    const programTimeS = sourceTimeToProgramTime(video.currentTime, videoClips)
+    if (programTimeS !== null) {
+      seek(programTimeS)
+      return
     }
-    frameId = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(frameId)
-  }, [isPlaying, project?.durationS, store])
+    const nextClip = videoClips.find((clip) => video.currentTime < clip.sourceRange.startS)
+    if (nextClip) {
+      createPlaybackController(video).seek(nextClip.sourceRange.startS)
+      seek(nextClip.programRange.startS)
+      return
+    }
+    createPlaybackController(video).pause()
+    seek(project?.durationS ?? 0)
+    setPlaying(false)
+  }
+
+  function togglePlayback() {
+    const video = projectVideoRef.current
+    if (!video) return
+    const playback = createPlaybackController(video)
+    if (playback.isPlaying()) {
+      playback.pause()
+      return
+    }
+    seekProjectVideo(currentTimeS)
+    void playback.play().catch(() => setPlaying(false))
+  }
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -299,7 +345,18 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
               ) : primaryArtifact?.mediaType.startsWith('image/') ? (
                 <img data-preview-media src={primaryArtifact.url} alt={primaryArtifact.name} />
               ) : projectVideo ? (
-                <video data-project-media src={projectVideo.url} aria-label={projectVideo.name} />
+                <video
+                  ref={projectVideoRef}
+                  data-project-media
+                  src={projectVideo.url}
+                  aria-label={projectVideo.name}
+                  onLoadedMetadata={(event) => seekProjectVideo(currentTimeS)}
+                  onTimeUpdate={(event) => syncProgramTime(event.currentTarget)}
+                  onSeeked={(event) => syncProgramTime(event.currentTarget)}
+                  onPlay={() => setPlaying(true)}
+                  onPause={() => setPlaying(false)}
+                  onEnded={() => { seek(project?.durationS ?? 0); setPlaying(false) }}
+                />
               ) : (
                 <div className="viewer-empty-state" role="status">Project video unavailable</div>
               )}
@@ -325,8 +382,8 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
           className="viewer-play-button"
           type="button"
           aria-label={isPlaying ? 'Pause' : 'Play'}
-          disabled={!hasTimeline}
-          onClick={() => setPlaying(!isPlaying)}
+          disabled={!canPlay}
+          onClick={togglePlayback}
         >
           {isPlaying ? <Pause aria-hidden size={20} fill="currentColor" /> : <Play aria-hidden size={20} fill="currentColor" />}
         </button>

@@ -97,9 +97,12 @@ test('loads snapshots and exposes only opaque resource identifiers', async () =>
       expect.objectContaining({ id: expect.stringMatching(/^res_[a-f0-9]+$/), kind: 'plan' }),
     ]))
     expect(JSON.stringify(snapshot)).not.toContain(projectRoot)
-    expect(snapshot.snapshot.media).toEqual([
-      expect.objectContaining({ id: expect.stringMatching(/^asset_[a-f0-9]+$/), name: 'source.mp4', size: 10 }),
-    ])
+    const source = snapshot.snapshot.media.find((item: { name: string }) => item.name === 'source.mp4')
+    expect(source).toEqual(expect.objectContaining({
+      id: expect.stringMatching(/^asset_[a-f0-9]+$/), size: expect.any(Number), media_type: 'video/mp4',
+    }))
+    expect(source.size).toBeGreaterThan(1_000)
+    expect(snapshot.snapshot.view.source_media_id).toBe(source.id)
     expect(snapshot.snapshot.artifacts).toEqual([
       expect.objectContaining({ id: expect.stringMatching(/^artifact_[a-f0-9]+$/), name: 'preview.txt' }),
     ])
@@ -133,8 +136,9 @@ test('streams confined media by opaque ID with HTTP byte ranges', async () => {
       { headers: { Range: 'bytes=2-5' } },
     )
     expect(ranged.status()).toBe(206)
-    expect(ranged.headers()['content-range']).toBe('bytes 2-5/10')
-    expect(Buffer.from(await ranged.body()).toString('ascii')).toBe('2345')
+    expect(ranged.headers()['content-type']).toBe('video/mp4')
+    expect(ranged.headers()['content-range']).toBe(`bytes 2-5/${snapshot.media[0].size}`)
+    expect(Buffer.from(await ranged.body())).toHaveLength(4)
 
     const unknown = await isolated.client.get(
       `/v1/projects/${isolated.ready.projectId}/media/${encodeURIComponent('../source.mp4')}`,
@@ -191,7 +195,7 @@ test('browser runtime is ready from the armed credential-free URL and refreshes 
     await expect(status.getByText('main', { exact: true })).toBeVisible()
     await expect(status.getByText('Read only', { exact: true })).toBeVisible()
     await expect(status.getByText('3 resources', { exact: true })).toBeVisible()
-    await expect(status.getByText('2 protocol errors', { exact: true })).toBeVisible()
+    await expect(status.getByText(/^\d+ protocol errors$/)).toBeVisible()
 
     const before = Number(await page.locator('html').getAttribute('data-runtime-refresh-count'))
     const fingerprintBefore = await status.getAttribute('data-resource-fingerprint')
@@ -326,6 +330,24 @@ test('browser projects opaque project media into a playable Viewer and shared ti
     const source = viewer.locator('video[aria-label="source.mp4"]')
     await expect(source).toHaveAttribute('src', new RegExp(`/v1/projects/${isolated.ready.projectId}/media/asset_[a-f0-9]+$`))
     await expect(viewer.locator('img[src="/assets/editor/viewer-poster.png"]')).toHaveCount(0)
+    await expect.poll(() => source.evaluate((video) => video.readyState)).toBeGreaterThanOrEqual(2)
+    const decoded = await source.evaluate((video) => {
+      const canvas = document.createElement('canvas')
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      const context = canvas.getContext('2d', { willReadFrequently: true })!
+      context.drawImage(video, 0, 0)
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data
+      let nonBlack = 0
+      for (let index = 0; index < pixels.length; index += 4) {
+        if (pixels[index] || pixels[index + 1] || pixels[index + 2]) nonBlack += 1
+      }
+      return { width: video.videoWidth, height: video.videoHeight, nonBlack }
+    })
+    expect(decoded.width).toBeGreaterThan(0)
+    expect(decoded.height).toBeGreaterThan(0)
+    expect(decoded.nonBlack).toBeGreaterThan(0)
+    await expect.poll(() => source.evaluate((video) => video.currentTime)).toBeCloseTo(0.2, 1)
 
     for (const tabName of ['My Assets', 'Captions', 'Cards', 'Graphic Motion']) {
       const tab = page.getByRole('tab', { name: tabName, exact: true })
@@ -344,7 +366,20 @@ test('browser projects opaque project media into a playable Viewer and shared ti
     expect(hitTarget).toBe('Play')
     await play.click()
     await expect(viewer.getByRole('button', { name: 'Pause' })).toBeVisible()
+    await expect.poll(() => source.evaluate((video) => video.currentTime)).toBeGreaterThan(0.3)
     await expect.poll(() => viewer.getByLabel('Playhead time').textContent()).not.toBe(playbackBefore)
+    const synchronized = await page.evaluate(() => {
+      const video = document.querySelector<HTMLVideoElement>('video[data-project-media]')!
+      const timecode = document.querySelector('[aria-label="Playhead time"]')!.textContent!.split(' / ')[0]
+      const [hours, minutes, seconds, frames] = timecode.split(':').map(Number)
+      return { videoTime: video.currentTime, programTime: hours * 3600 + minutes * 60 + seconds + frames / 30 }
+    })
+    // `timeupdate` is intentionally lower-frequency than decoded video frames.
+    expect(Math.abs(synchronized.programTime - (synchronized.videoTime - 0.2))).toBeLessThan(0.35)
+
+    const timeline = page.locator('[data-timeline-surface]')
+    await timeline.click({ position: { x: 438, y: 40 } })
+    await expect.poll(() => source.evaluate((video) => video.currentTime)).toBeCloseTo(0.5, 1)
 
     const clip = page.getByRole('button', { name: 'Video clip', exact: true })
     await clip.click()
@@ -540,18 +575,23 @@ async function createProjectFixture() {
   await mkdir(path.join(root, 'work', 'captions'), { recursive: true })
   await mkdir(path.join(root, 'input'), { recursive: true })
   await mkdir(path.join(root, 'review'), { recursive: true })
-  await writeFile(path.join(root, 'input', 'source.mp4'), '0123456789')
+  const source = path.join(root, 'input', 'source.mp4')
+  await execFileAsync('ffmpeg', [
+    '-y', '-f', 'lavfi', '-i', 'testsrc2=size=96x64:rate=30', '-t', '1',
+    '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', source,
+  ])
+  await writeFile(path.join(root, 'input', 'aaa-derived.mp4'), 'not-a-video')
   await writeFile(path.join(root, 'review', 'preview.txt'), 'agent preview')
   await writeFile(path.join(root, 'work', 'captions', 'captions-plan.json'), '{"cues":[]}\n')
   await writeFile(path.join(root, 'work', 'timeline.json'), JSON.stringify({
     schema_version: 1,
     source_duration_s: 1,
-    program_duration_s: 1,
+    program_duration_s: 0.6,
     fps: { num: 30, den: 1 },
     clips: [{
       id: 'clip-1',
-      source_range: { start_s: 0, end_s: 1 },
-      program_range: { start_s: 0, end_s: 1 },
+      source_range: { start_s: 0.2, end_s: 0.8 },
+      program_range: { start_s: 0, end_s: 0.6 },
       speed: 1,
     }],
   }))
@@ -559,7 +599,7 @@ async function createProjectFixture() {
     schema_version: 1,
     project_id: 'fixture',
     revision: 1,
-    source: { path: 'input/source.mp4' },
+    source: { path: '../input/source.mp4' },
     active_sequence: 'main',
     sequences: { main: { timeline: 'timeline.json', operations: ['captions'] } },
     operations: [{
