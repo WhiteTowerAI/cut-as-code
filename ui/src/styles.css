@@ -1395,6 +1395,14 @@ button {
   width: min(480px, calc(100% - 24px));
 }
 
+.workspace-review {
+  position: absolute;
+  z-index: 40;
+  top: 64px;
+  right: 504px;
+  left: 412px;
+}
+
 .protocol-resource-inspector {
   border: 1px solid #30333b;
   border-radius: 6px;

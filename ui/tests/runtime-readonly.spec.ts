@@ -241,6 +241,44 @@ test('keeps the primary workspace visible while project data is collapsed', asyn
   }
 })
 
+test('content cards review keeps Viewer and Timeline meaningfully visible in the first viewport', async ({ page }) => {
+  test.setTimeout(30_000)
+  const root = await createContentCardsArtifactProjectFixture()
+  const isolated = await startSidecar(root)
+  try {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto(await armLaunch(isolated))
+    await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+
+    const reviewButton = page.getByRole('button', { name: 'Approve preview' })
+    await expect(reviewButton).toBeVisible()
+    const reviewHitTarget = await reviewButton.evaluate((button) => {
+      const rect = button.getBoundingClientRect()
+      return document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2) === button
+    })
+    expect(reviewHitTarget).toBe(true)
+
+    const visibleHeights = await page.evaluate(() => {
+      const clippedHeight = (selector: string) => {
+        const rect = document.querySelector(selector)!.getBoundingClientRect()
+        return Math.max(0, Math.min(window.innerHeight, rect.bottom) - Math.max(0, rect.top))
+      }
+      return {
+        viewer: clippedHeight('.viewer-panel'),
+        timeline: clippedHeight('.timeline-panel'),
+      }
+    })
+    expect(visibleHeights.viewer).toBeGreaterThan(300)
+    expect(visibleHeights.timeline).toBeGreaterThan(100)
+    await expect(page.getByText('Project data', { exact: true })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Protocol resources' })).toBeHidden()
+  } finally {
+    await page.close()
+    await stopSidecar(isolated.process)
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('browser inspects every registered protocol resource by its server-issued ID', async ({ page }) => {
   const isolated = await startSidecar(projectRoot)
   try {
@@ -577,10 +615,16 @@ test('native Viewer presents late frames before proactive 2x clip boundaries', a
         }),
       })
       const timeout = window.setTimeout(() => reject(new Error('long retimed playback did not stop')), 5_000)
-      video.addEventListener('pause', () => {
+      const playhead = document.querySelector('[aria-label="Playhead time"]')!
+      const finish = () => {
+        if (playhead.textContent !== '00:00:00:18 / 00:00:00:18') return
         window.clearTimeout(timeout)
+        observer.disconnect()
         resolve({ playbackRate: video.playbackRate, sourceTimes })
-      }, { once: true })
+      }
+      const observer = new MutationObserver(finish)
+      observer.observe(playhead, { childList: true, characterData: true, subtree: true })
+      video.addEventListener('pause', finish)
     }))
 
     await viewer.getByRole('button', { name: 'Play' }).click()
@@ -593,7 +637,7 @@ test('native Viewer presents late frames before proactive 2x clip boundaries', a
     ).toBe(true)
     expect(observed.sourceTimes.some((timeS) => timeS >= 0.8 && timeS < 1)).toBe(false)
     expect(
-      observed.sourceTimes.some((timeS) => timeS >= 1.45 && timeS < 1.6),
+      observed.sourceTimes.some((timeS) => timeS >= 1.6 - 1 / 30 - 0.001 && timeS < 1.6),
       `presented source frames: ${JSON.stringify(observed.sourceTimes)}`,
     ).toBe(true)
     expect(
@@ -696,6 +740,61 @@ test('native Viewer fallback transitions after the native clock reaches the clip
     await rm(root, { recursive: true, force: true })
   }
 })
+
+test('native Viewer follows canonical clip order across a tolerated one-frame source overlap', async ({ page }) => {
+  test.setTimeout(30_000)
+  const root = await createOverlappingProjectFixture()
+  const isolated = await startSidecar(root)
+  try {
+    await page.goto(await armLaunch(isolated))
+    await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+
+    const viewer = page.getByRole('region', { name: 'Viewer', exact: true })
+    const source = viewer.locator('video[aria-label="source.mp4"]')
+    await expect.poll(() => source.evaluate((video) => video.readyState)).toBeGreaterThanOrEqual(2)
+    await viewer.getByRole('button', { name: 'Play' }).click()
+
+    await expect.poll(() => source.evaluate((video) => video.currentTime)).toBeGreaterThan(0.62)
+    const programTimeS = await viewer.getByLabel('Playhead time').evaluate((output) => {
+      const [hours, minutes, seconds, frames] = output.textContent!.split(' / ')[0].split(':').map(Number)
+      return hours * 3600 + minutes * 60 + seconds + frames / 30
+    })
+    expect(programTimeS).toBeGreaterThanOrEqual(0.4)
+    expect(programTimeS).toBeLessThan(0.633334)
+    await source.evaluate((video) => video.pause())
+  } finally {
+    await page.close()
+    await stopSidecar(isolated.process)
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+for (const playbackRate of [0.01, 32]) {
+  test(`installed Chrome disables native playback for legal protocol rate ${playbackRate}`, async ({ page }) => {
+    test.setTimeout(30_000)
+    const root = await createPlaybackRateProjectFixture(playbackRate)
+    const isolated = await startSidecar(root)
+    try {
+      await page.goto(await armLaunch(isolated))
+      await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+
+      const viewer = page.getByRole('region', { name: 'Viewer', exact: true })
+      const source = viewer.locator('video[aria-label="source.mp4"]')
+      const play = viewer.getByRole('button', { name: 'Play' })
+      await expect(play).toBeDisabled()
+      await expect(play).toHaveAttribute('title', new RegExp(`${playbackRate}.*browser`, 'i'))
+      await expect(source).toBeVisible()
+
+      await page.locator('[data-timeline-surface]').click({ position: { x: 300, y: 40 } })
+      await expect(source).not.toHaveJSProperty('currentTime', Number.NaN)
+      await expect(viewer.getByLabel('Playhead time')).not.toBeEmpty()
+    } finally {
+      await page.close()
+      await stopSidecar(isolated.process)
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+}
 
 test('mutation routes forward only typed protocol commands and return conflicts', async () => {
   const isolated = await authenticatedSidecar()
@@ -946,6 +1045,51 @@ async function createRetimedProjectFixture() {
         speed: 2,
       },
     ],
+  }))
+  return root
+}
+
+async function createOverlappingProjectFixture() {
+  const root = await createProjectFixture()
+  await writeFile(path.join(root, 'work', 'timeline.json'), JSON.stringify({
+    schema_version: 1,
+    source_duration_s: 1,
+    program_duration_s: 0.6333333333333333,
+    fps: { num: 30, den: 1 },
+    clips: [
+      {
+        id: 'clip-overlap-a',
+        source_range: { start_s: 0.2, end_s: 0.6 },
+        program_range: { start_s: 0, end_s: 0.4 },
+        speed: 1,
+      },
+      {
+        id: 'clip-overlap-b',
+        source_range: { start_s: 0.5666666666666667, end_s: 0.8 },
+        program_range: { start_s: 0.4, end_s: 0.6333333333333333 },
+        speed: 1,
+      },
+    ],
+  }))
+  return root
+}
+
+async function createPlaybackRateProjectFixture(playbackRate: number) {
+  const root = await createProjectFixture()
+  const sourceStartS = playbackRate < 1 ? 0.2 : 0
+  const sourceDurationS = playbackRate < 1 ? 0.01 : 0.96
+  const programDurationS = sourceDurationS / playbackRate
+  await writeFile(path.join(root, 'work', 'timeline.json'), JSON.stringify({
+    schema_version: 1,
+    source_duration_s: 1,
+    program_duration_s: programDurationS,
+    fps: { num: 30, den: 1 },
+    clips: [{
+      id: `clip-rate-${playbackRate}`,
+      source_range: { start_s: sourceStartS, end_s: sourceStartS + sourceDurationS },
+      program_range: { start_s: 0, end_s: programDurationS },
+      speed: playbackRate,
+    }],
   }))
   return root
 }

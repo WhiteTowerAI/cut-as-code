@@ -79,17 +79,37 @@ function sourceClipAtTime(sourceTimeS: number, clips: readonly ClipView[]) {
   )
 }
 
+function nextClipInProgramOrder(activeClip: ClipView, clips: readonly ClipView[]) {
+  const activeIndex = clips.findIndex((clip) => clip.id === activeClip.id)
+  return activeIndex >= 0 ? clips[activeIndex + 1] : undefined
+}
+
 function playbackRateForClip(clip: ClipView) {
   const sourceDuration = clip.sourceRange.endS - clip.sourceRange.startS
   const programDuration = clip.programRange.endS - clip.programRange.startS
   return sourceDuration > 0 && programDuration > 0 ? sourceDuration / programDuration : null
 }
 
+function supportsNativePlaybackRate(playbackRate: number) {
+  const probe = document.createElement('video')
+  try {
+    probe.playbackRate = playbackRate
+    return Math.abs(probe.playbackRate - playbackRate) <= 0.001
+  } catch {
+    return false
+  }
+}
+
 function applyClipPlaybackRate(video: HTMLVideoElement, clip: ClipView) {
   const playbackRate = playbackRateForClip(clip)
   if (playbackRate !== null && Math.abs(video.playbackRate - playbackRate) > 0.001) {
-    video.playbackRate = playbackRate
+    try {
+      video.playbackRate = playbackRate
+    } catch {
+      return false
+    }
   }
+  return playbackRate !== null
 }
 
 export function lastPresentedSourceTime(clip: ClipView, sourceFrameDurationS: number) {
@@ -104,7 +124,7 @@ export function nativeBoundaryDelayMs(
 ) {
   const remainingSourceTimeS = Math.max(
     0,
-    lastPresentedSourceTime(clip, sourceFrameDurationS) - currentSourceTimeS,
+    clip.sourceRange.endS - currentSourceTimeS,
   )
   return remainingSourceTimeS / Math.max(playbackRate, Number.EPSILON) * 1000
 }
@@ -119,8 +139,7 @@ export function nativeBoundaryWakeup(
   sourceFrameDurationS: number,
   playbackRate: number,
 ): NativeBoundaryWakeupDecision {
-  const boundarySourceTimeS = lastPresentedSourceTime(clip, sourceFrameDurationS)
-  if (currentSourceTimeS < boundarySourceTimeS - sourceFrameDurationS / 100) {
+  if (currentSourceTimeS < clip.sourceRange.endS) {
     return {
       action: 'reschedule',
       delayMs: nativeBoundaryDelayMs(currentSourceTimeS, clip, sourceFrameDurationS, playbackRate),
@@ -349,7 +368,11 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
   const projectVideoRef = useRef<HTMLVideoElement>(null)
   const finalFrameStateRef = useRef<FinalFrameState | null>(null)
   const nativeProgramTimeRef = useRef<number | null>(null)
-  const canPlay = Boolean(projectVideo && !primaryArtifact && videoClips.length)
+  const activeClipRef = useRef<ClipView | null>(null)
+  const unsupportedPlaybackRate = videoClips
+    .map(playbackRateForClip)
+    .find((playbackRate) => playbackRate !== null && !supportsNativePlaybackRate(playbackRate))
+  const canPlay = Boolean(projectVideo && !primaryArtifact && videoClips.length && unsupportedPlaybackRate === undefined)
   const hasTimeline = Boolean(project && project.durationS > 0)
   const fps = project ? project.fps.numerator / project.fps.denominator : 30
   const sourceFrameDurationS = project && project.fps.numerator > 0
@@ -361,6 +384,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     const finalClip = videoClips.at(-1)
     if (video && project && finalClip && programTimeS >= project.durationS - 0.0001) {
       const finalSourceTimeS = lastPresentedSourceTime(finalClip, sourceFrameDurationS)
+      activeClipRef.current = finalClip
       finalFrameStateRef.current = { sourceTimeS: finalSourceTimeS }
       applyClipPlaybackRate(video, finalClip)
       if (Math.abs(video.currentTime - finalSourceTimeS) >= 0.0001) {
@@ -372,6 +396,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     const clip = programClipAtTime(programTimeS, videoClips)
     const sourceTimeS = programTimeToSourceTime(programTimeS, videoClips)
     if (!video || !clip || sourceTimeS === null) return
+    activeClipRef.current = clip
     applyClipPlaybackRate(video, clip)
     if (Math.abs(video.currentTime - sourceTimeS) < 0.01) return
     createPlaybackController(video).seek(sourceTimeS)
@@ -398,8 +423,8 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
       }
       return
     }
-    const activeClip = sourceClipAtTime(video.currentTime, videoClips)
-    if (!activeClip) return
+    const activeClip = activeClipRef.current ?? sourceClipAtTime(video.currentTime, videoClips)
+    if (!activeClip || video.currentTime < activeClip.sourceRange.startS || video.currentTime >= activeClip.sourceRange.endS) return
     applyClipPlaybackRate(video, activeClip)
     const programTimeS = sourceTimeToProgramTime(video.currentTime, videoClips)
     if (programTimeS !== null) publishNativeProgramTime(programTimeS)
@@ -407,6 +432,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
 
   function transitionToNextClip(video: HTMLVideoElement, nextClip: ClipView) {
     finalFrameStateRef.current = null
+    activeClipRef.current = nextClip
     applyClipPlaybackRate(video, nextClip)
     createPlaybackController(video).seek(nextClip.sourceRange.startS)
     publishNativeProgramTime(nextClip.programRange.startS)
@@ -416,6 +442,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     const finalSourceTimeS = lastPresentedSourceTime(clip, sourceFrameDurationS)
     const finalProgramTimeS = project?.durationS ?? clip.programRange.endS
     finalFrameStateRef.current = { sourceTimeS: finalSourceTimeS }
+    activeClipRef.current = clip
     const playback = createPlaybackController(video)
     playback.seek(finalSourceTimeS)
     playback.pause()
@@ -424,16 +451,15 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
   }
 
   function syncPresentedFrame(video: HTMLVideoElement, presentedSourceTimeS: number) {
-    const activeClip = sourceClipAtTime(presentedSourceTimeS, videoClips)
+    const activeClip = activeClipRef.current ?? sourceClipAtTime(presentedSourceTimeS, videoClips)
     if (!activeClip) {
       const nextClip = videoClips.find((clip) => presentedSourceTimeS < clip.sourceRange.startS)
       if (nextClip) transitionToNextClip(video, nextClip)
       else if (videoClips.at(-1)) finishPlayingClip(video, videoClips.at(-1)!)
       return true
     }
-    const nextClip = videoClips.find((clip) => clip.sourceRange.startS >= activeClip.sourceRange.endS)
-    const finalPresentedSourceTimeS = lastPresentedSourceTime(activeClip, sourceFrameDurationS)
-    if (presentedSourceTimeS >= finalPresentedSourceTimeS - sourceFrameDurationS / 100) {
+    const nextClip = nextClipInProgramOrder(activeClip, videoClips)
+    if (presentedSourceTimeS >= activeClip.sourceRange.endS) {
       if (nextClip) transitionToNextClip(video, nextClip)
       else finishPlayingClip(video, activeClip)
       return true
@@ -441,7 +467,9 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     applyClipPlaybackRate(video, activeClip)
     const programTimeS = sourceTimeToProgramTime(presentedSourceTimeS, videoClips)
     if (programTimeS !== null) publishNativeProgramTime(programTimeS)
-    return false
+    return presentedSourceTimeS >= lastPresentedSourceTime(activeClip, sourceFrameDurationS) - sourceFrameDurationS / 100
+      ? 'hold'
+      : false
   }
 
   useEffect(() => {
@@ -450,6 +478,8 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     const frameVideo = video as FrameDrivenVideo
     let cancelScheduledFrame: (() => void) | null = null
     let cancelBoundaryTimer: (() => void) | null = null
+    let cancelBoundaryHold: (() => void) | null = null
+    let holdingBoundary = false
     let disposed = false
 
     const schedulePresentedFrame = () => {
@@ -457,7 +487,29 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
       const tick = (presentedSourceTimeS: number) => {
         cancelScheduledFrame = null
         if (disposed || video.paused) return
-        if (syncPresentedFrame(video, presentedSourceTimeS)) restartBoundaryTimer()
+        const result = syncPresentedFrame(video, presentedSourceTimeS)
+        if (result === 'hold') {
+          const playbackRate = Math.max(video.playbackRate, Number.EPSILON)
+          stopBoundaryCheck()
+          holdingBoundary = true
+          video.pause()
+          const handle = window.setTimeout(() => {
+            cancelBoundaryHold = null
+            if (disposed) return
+            holdingBoundary = false
+            const activeClip = activeClipRef.current
+            const nextClip = activeClip ? nextClipInProgramOrder(activeClip, videoClips) : undefined
+            if (activeClip && nextClip) {
+              transitionToNextClip(video, nextClip)
+              void video.play().catch(() => setPlaying(false))
+            } else if (activeClip) {
+              finishPlayingClip(video, activeClip)
+            }
+          }, sourceFrameDurationS / playbackRate * 1000)
+          cancelBoundaryHold = () => window.clearTimeout(handle)
+          return
+        }
+        if (result) restartBoundaryTimer()
         schedulePresentedFrame()
       }
       if (frameVideo.requestVideoFrameCallback) {
@@ -469,7 +521,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     const scheduleBoundaryTimer = () => {
       if (disposed || video.paused || cancelBoundaryTimer) return
       const scheduledSourceTimeS = video.currentTime
-      const activeClip = sourceClipAtTime(scheduledSourceTimeS, videoClips)
+      const activeClip = activeClipRef.current ?? sourceClipAtTime(scheduledSourceTimeS, videoClips)
       const scheduledDecision = activeClip
         ? nativeBoundaryWakeup(scheduledSourceTimeS, activeClip, sourceFrameDurationS, video.playbackRate)
         : { action: 'boundary', sourceTimeS: scheduledSourceTimeS } as const
@@ -497,6 +549,10 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
       cancelBoundaryTimer = null
     }
 
+    const handlePause = () => {
+      if (!holdingBoundary) stopBoundaryCheck()
+    }
+
     const restartBoundaryTimer = () => {
       cancelBoundaryTimer?.()
       cancelBoundaryTimer = null
@@ -522,17 +578,18 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     }
 
     video.addEventListener('play', startBoundaryCheck)
-    video.addEventListener('pause', stopBoundaryCheck)
+    video.addEventListener('pause', handlePause)
     video.addEventListener('seeked', restartBoundaryCheck)
     document.addEventListener('visibilitychange', pauseFallbackWhenHidden)
     if (!video.paused) startBoundaryCheck()
     return () => {
       disposed = true
       video.removeEventListener('play', startBoundaryCheck)
-      video.removeEventListener('pause', stopBoundaryCheck)
+      video.removeEventListener('pause', handlePause)
       video.removeEventListener('seeked', restartBoundaryCheck)
       document.removeEventListener('visibilitychange', pauseFallbackWhenHidden)
       stopBoundaryCheck()
+      cancelBoundaryHold?.()
     }
   }, [canPlay, projectVideo?.url, project?.durationS, sourceFrameDurationS, videoClips])
 
@@ -592,7 +649,11 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
                   onTimeUpdate={(event) => syncProgramTime(event.currentTarget)}
                   onSeeked={(event) => syncProgramTime(event.currentTarget)}
                   onPlay={() => setPlaying(true)}
-                  onPause={() => setPlaying(false)}
+                  onPause={() => {
+                    if (!activeClipRef.current || videoClips.at(-1)?.id === activeClipRef.current.id || finalFrameStateRef.current) {
+                      setPlaying(false)
+                    }
+                  }}
                   onEnded={(event) => {
                     const finalClip = videoClips.at(-1)
                     if (finalClip) finishPlayingClip(event.currentTarget, finalClip)
@@ -625,6 +686,9 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
           type="button"
           aria-label={isPlaying ? 'Pause' : 'Play'}
           disabled={!canPlay}
+          title={unsupportedPlaybackRate === undefined
+            ? undefined
+            : `Playback rate ${unsupportedPlaybackRate} cannot be represented by this browser. Use timeline seeking for manual review.`}
           onClick={togglePlayback}
         >
           {isPlaying ? <Pause aria-hidden size={20} fill="currentColor" /> : <Play aria-hidden size={20} fill="currentColor" />}

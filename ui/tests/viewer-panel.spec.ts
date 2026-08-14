@@ -41,7 +41,7 @@ test('native playback boundary uses one source frame and rate only for wall-cloc
   }
 
   expect(lastPresentedSourceTime(clip, 1 / 30)).toBeCloseTo(0.366667, 5)
-  expect(nativeBoundaryDelayMs(0.2, clip, 1 / 30, 2)).toBeCloseTo(83.333333, 5)
+  expect(nativeBoundaryDelayMs(0.2, clip, 1 / 30, 2)).toBeCloseTo(100, 5)
 })
 
 test('boundary wakeup reschedules when the native media clock has not advanced', async () => {
@@ -55,11 +55,11 @@ test('boundary wakeup reschedules when the native media clock has not advanced',
 
   expect(decision.action).toBe('reschedule')
   if (decision.action === 'reschedule') {
-    expect(decision.delayMs).toBeCloseTo(83.333333, 5)
+    expect(decision.delayMs).toBeCloseTo(100, 5)
   }
 })
 
-test('boundary wakeup publishes the actual native source time at the threshold', async () => {
+test('boundary wakeup waits through the final source frame presentation interval', async () => {
   const clip: ClipView = {
     id: 'clip-fast-a',
     sourceRange: { startS: 0.2, endS: 0.4 },
@@ -68,10 +68,28 @@ test('boundary wakeup publishes the actual native source time at the threshold',
 
   const decision = nativeBoundaryWakeup(0.37, clip, 1 / 30, 2)
 
-  expect(decision.action).toBe('boundary')
-  if (decision.action === 'boundary') {
-    expect(decision.sourceTimeS).toBe(0.37)
+  expect(decision.action).toBe('reschedule')
+  if (decision.action === 'reschedule') {
+    expect(decision.delayMs).toBeCloseTo(15, 5)
   }
+})
+
+test('the last legal source frame keeps its full presentation interval before the boundary', async () => {
+  const clip: ClipView = {
+    id: 'clip-fast-a',
+    sourceRange: { startS: 0.2, endS: 0.4 },
+    programRange: { startS: 0, endS: 0.1 },
+  }
+  const frameDurationS = 1 / 30
+
+  const duringFinalFrame = nativeBoundaryWakeup(0.4 - frameDurationS, clip, frameDurationS, 2)
+  const afterFinalFrame = nativeBoundaryWakeup(0.4, clip, frameDurationS, 2)
+
+  expect(duringFinalFrame.action).toBe('reschedule')
+  if (duringFinalFrame.action === 'reschedule') {
+    expect(duringFinalFrame.delayMs).toBeCloseTo(frameDurationS / 2 * 1000, 5)
+  }
+  expect(afterFinalFrame).toEqual({ action: 'boundary', sourceTimeS: 0.4 })
 })
 
 test('opening one Viewer menu closes the other and Escape closes the open menu', async ({ page }) => {
