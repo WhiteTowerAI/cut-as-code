@@ -93,7 +93,7 @@ function applyClipPlaybackRate(video: HTMLVideoElement, clip: ClipView) {
 }
 
 type FrameDrivenVideo = HTMLVideoElement & {
-  requestVideoFrameCallback?: (callback: () => void) => number
+  requestVideoFrameCallback?: (callback: (now: number, metadata: VideoFrameCallbackMetadata) => void) => number
   cancelVideoFrameCallback?: (handle: number) => void
 }
 
@@ -303,10 +303,13 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     : undefined
   const videoClips = project?.tracks.find((track) => track.kind === 'video')?.clips ?? []
   const projectVideoRef = useRef<HTMLVideoElement>(null)
+  const finalFrameSeekRef = useRef<number | null>(null)
   const canPlay = Boolean(projectVideo && !primaryArtifact && videoClips.length)
   const hasTimeline = Boolean(project && project.durationS > 0)
   const fps = project ? project.fps.numerator / project.fps.denominator : 30
-  const sourceFrameDurationS = project ? project.fps.denominator / project.fps.numerator : 1 / 30
+  const sourceFrameDurationS = project && project.fps.numerator > 0
+    ? project.fps.denominator / project.fps.numerator
+    : 1 / 30
 
   function seekProjectVideo(programTimeS: number) {
     const video = projectVideoRef.current
@@ -323,30 +326,51 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
   }, [currentTimeS, projectVideo?.url, videoClips])
 
   function syncProgramTime(video: HTMLVideoElement) {
+    if (finalFrameSeekRef.current !== null) {
+      if (Math.abs(video.currentTime - finalFrameSeekRef.current) < 0.01) return
+      finalFrameSeekRef.current = null
+    }
     const activeClip = sourceClipAtTime(video.currentTime, videoClips)
-    if (activeClip) {
-      const nextClip = videoClips.find((clip) => clip.sourceRange.startS >= activeClip.sourceRange.endS)
-      if (nextClip && video.currentTime >= activeClip.sourceRange.endS - sourceFrameDurationS) {
-        applyClipPlaybackRate(video, nextClip)
-        createPlaybackController(video).seek(nextClip.sourceRange.startS)
-        seek(nextClip.programRange.startS)
-        return
-      }
-      applyClipPlaybackRate(video, activeClip)
-      const programTimeS = sourceTimeToProgramTime(video.currentTime, videoClips)
-      if (programTimeS === null) return
-      seek(programTimeS)
-      return
-    }
-    const nextClip = videoClips.find((clip) => video.currentTime < clip.sourceRange.startS)
-    if (nextClip) {
-      createPlaybackController(video).seek(nextClip.sourceRange.startS)
-      seek(nextClip.programRange.startS)
-      return
-    }
-    createPlaybackController(video).pause()
-    seek(project?.durationS ?? 0)
+    if (!activeClip) return
+    applyClipPlaybackRate(video, activeClip)
+    const programTimeS = sourceTimeToProgramTime(video.currentTime, videoClips)
+    if (programTimeS !== null) seek(programTimeS)
+  }
+
+  function transitionToNextClip(video: HTMLVideoElement, nextClip: ClipView) {
+    applyClipPlaybackRate(video, nextClip)
+    createPlaybackController(video).seek(nextClip.sourceRange.startS)
+    seek(nextClip.programRange.startS)
+  }
+
+  function finishPlayingClip(video: HTMLVideoElement, clip: ClipView) {
+    const finalSourceTimeS = Math.max(clip.sourceRange.startS, clip.sourceRange.endS - sourceFrameDurationS)
+    finalFrameSeekRef.current = finalSourceTimeS
+    const playback = createPlaybackController(video)
+    playback.pause()
+    if (Math.abs(video.currentTime - finalSourceTimeS) >= 0.01) playback.seek(finalSourceTimeS)
+    seek(project?.durationS ?? clip.programRange.endS)
     setPlaying(false)
+  }
+
+  function syncPresentedFrame(video: HTMLVideoElement, presentedSourceTimeS: number) {
+    const activeClip = sourceClipAtTime(presentedSourceTimeS, videoClips)
+    if (!activeClip) {
+      const nextClip = videoClips.find((clip) => presentedSourceTimeS < clip.sourceRange.startS)
+      if (nextClip) transitionToNextClip(video, nextClip)
+      else if (videoClips.at(-1)) finishPlayingClip(video, videoClips.at(-1)!)
+      return
+    }
+    const nextClip = videoClips.find((clip) => clip.sourceRange.startS >= activeClip.sourceRange.endS)
+    const presentedSourceAdvanceS = 2 * sourceFrameDurationS * Math.max(video.playbackRate, Number.EPSILON)
+    if (presentedSourceTimeS >= activeClip.sourceRange.endS - presentedSourceAdvanceS) {
+      if (nextClip) transitionToNextClip(video, nextClip)
+      else finishPlayingClip(video, activeClip)
+      return
+    }
+    applyClipPlaybackRate(video, activeClip)
+    const programTimeS = sourceTimeToProgramTime(presentedSourceTimeS, videoClips)
+    if (programTimeS !== null) seek(programTimeS)
   }
 
   useEffect(() => {
@@ -358,18 +382,18 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
 
     const scheduleBoundaryCheck = () => {
       if (disposed || video.paused || cancelScheduledFrame) return
-      const tick = () => {
+      const tick = (presentedSourceTimeS: number) => {
         cancelScheduledFrame = null
         if (disposed || video.paused) return
-        syncProgramTime(video)
+        syncPresentedFrame(video, presentedSourceTimeS)
         scheduleBoundaryCheck()
       }
       if (frameVideo.requestVideoFrameCallback) {
-        const handle = frameVideo.requestVideoFrameCallback(tick)
+        const handle = frameVideo.requestVideoFrameCallback((_now, metadata) => tick(metadata.mediaTime))
         cancelScheduledFrame = () => frameVideo.cancelVideoFrameCallback?.(handle)
         return
       }
-      const handle = window.requestAnimationFrame(tick)
+      const handle = window.requestAnimationFrame(() => tick(video.currentTime))
       cancelScheduledFrame = () => window.cancelAnimationFrame(handle)
     }
 

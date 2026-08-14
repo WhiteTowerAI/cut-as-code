@@ -403,39 +403,55 @@ test('native Viewer retimes 2x clips and skips an excluded source gap per frame'
     await expect.poll(() => source.evaluate((video) => video.readyState)).toBeGreaterThanOrEqual(2)
     await expect.poll(() => source.evaluate((video) => video.currentTime)).toBeCloseTo(0.2, 1)
 
+    await source.evaluate((video) => new Promise<void>((resolve) => {
+      video.addEventListener('seeked', () => resolve(), { once: true })
+      video.currentTime = 0.38
+    }))
+    await expect.poll(() => source.evaluate((video) => video.currentTime)).toBeCloseTo(0.38, 2)
+    await expect.poll(() => page.evaluate(() => {
+      const timecode = document.querySelector('[aria-label="Playhead time"]')!.textContent!.split(' / ')[0]
+      const [hours, minutes, seconds, frames] = timecode.split(':').map(Number)
+      return hours * 3600 + minutes * 60 + seconds + frames / 30
+    })).toBeCloseTo(0.09, 1)
+    await source.evaluate((video) => new Promise<void>((resolve) => {
+      video.addEventListener('seeked', () => resolve(), { once: true })
+      video.currentTime = 0.2
+    }))
+
     const observedFrames = source.evaluate(async (video) => await new Promise<{
       playbackRate: number
       sourceTimes: number[]
     }>((resolve, reject) => {
       const sourceTimes: number[] = []
-      const timeout = window.setTimeout(() => reject(new Error('did not reach second source clip')), 5_000)
-      const observe = () => {
-        sourceTimes.push(video.currentTime)
-        if (video.currentTime >= 0.65) {
+      const timeout = window.setTimeout(() => reject(new Error('video did not stop at the program end')), 5_000)
+      const finish = () => {
+        window.clearTimeout(timeout)
+        resolve({ playbackRate: video.playbackRate, sourceTimes })
+      }
+      const observe = (_now: number, metadata: VideoFrameCallbackMetadata) => {
+        sourceTimes.push(metadata.mediaTime)
+        if (video.paused) {
           window.clearTimeout(timeout)
           resolve({ playbackRate: video.playbackRate, sourceTimes })
           return
         }
-        if ('requestVideoFrameCallback' in video) video.requestVideoFrameCallback(observe)
-        else window.requestAnimationFrame(observe)
+        video.requestVideoFrameCallback(observe)
       }
-      if ('requestVideoFrameCallback' in video) video.requestVideoFrameCallback(observe)
-      else window.requestAnimationFrame(observe)
+      video.addEventListener('pause', finish, { once: true })
+      video.requestVideoFrameCallback(observe)
     }))
 
     await viewer.getByRole('button', { name: 'Play' }).click()
     const observed = await observedFrames
-    await source.evaluate((video) => video.pause())
 
     expect(observed.playbackRate).toBeCloseTo(2, 5)
     expect(observed.sourceTimes.some((timeS) => timeS >= 0.4 && timeS < 0.6)).toBe(false)
+    expect(observed.sourceTimes.some((timeS) => timeS >= 0.8)).toBe(false)
     await expect.poll(() => page.evaluate(() => {
-      const video = document.querySelector<HTMLVideoElement>('video[data-project-media]')!
       const timecode = document.querySelector('[aria-label="Playhead time"]')!.textContent!.split(' / ')[0]
       const [hours, minutes, seconds, frames] = timecode.split(':').map(Number)
-      const programTime = hours * 3600 + minutes * 60 + seconds + frames / 30
-      return Math.abs(programTime - (0.1 + (video.currentTime - 0.6) / 2))
-    })).toBeLessThan(0.08)
+      return hours * 3600 + minutes * 60 + seconds + frames / 30
+    })).toBeCloseTo(0.2, 5)
   } finally {
     await page.close()
     await stopSidecar(isolated.process)
