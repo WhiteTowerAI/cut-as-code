@@ -139,7 +139,10 @@
   changes the page controls cannot express. They select Request changes and export
   `submission_intent: request_revision`; Empty Request changes is invalid. Reject it in
   `apply_review()` before any plan or receipt write, then use the existing validation,
-  revision/rebuild, and new immutable page flow. Never convert revision notes into human authority.
+  revision/rebuild, and new immutable page flow. The rebuilt proposal carries the first route
+  binding forward; do not ask the user to choose ordinary or speaker-inset again. The
+  `presentation-decision.json` receipt remains unchanged, and its candidate-manifest and
+  review-video bindings remain mandatory. Never convert revision notes into human authority.
 - Candidate selection and speaker composite approval remain separate. The first page approves B-roll
   content; it never approves the later exact speaker composite.
 - Human mode requires an explicit user `Copy` or `Download JSON` action. Both controls must use one
@@ -171,7 +174,10 @@
   review-video bindings in `work/b-roll/presentation-decision.json` with
   `rationale_source: "agent_chat_explicit_action"`. The plan binds that receipt by SHA-256. This
   chat decision selects a route only; it cannot impersonate a `review_ui_explicit_action` or replace
-  either webpage approval.
+  either webpage approval. A candidate revision may change the unapproved proposal's timing and
+  segment defaults while preserving the first route binding. Do not ask the user to choose ordinary
+  or speaker-inset again. The `presentation-decision.json` receipt remains unchanged. A changed
+  candidate manifest or review video still requires a new chat choice.
 - An `ordinary` choice removes `speaker_inset_style` and uses the existing one-page workflow. A
   `speaker-inset` choice installs the default style. When enabled, require
   `shape: "rounded-rectangle"`, `width_ratio: 0.39`, `aspect_ratio: 0.80`, a 3px `#9E9E9E` border,
@@ -253,7 +259,8 @@
   analysis, Agent input, preview, clearance, and style hashes. It approves only ROI, layout,
   clearance, continuity, style, and exact composite pixels.
 - A candidate revision creates a new candidate UUID page and approved selection receipt before
-  speaker artifacts are rebuilt. A composite-only revision creates a new composite UUID page while
+  speaker artifacts are rebuilt while preserving the first ordinary or speaker-inset route. A
+  composite-only revision creates a new composite UUID page while
   preserving `selection_sha256`; it cannot change candidate IDs, order, timing, source ranges, or
   speed. Derive the durable candidate decision manifest from the approved selection after composite
   approval.

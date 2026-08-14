@@ -440,6 +440,9 @@ def presentation_errors(plan, *, project_root=None, required=False):
         errors.append("presentation decision path is invalid")
     if not _is_sha256(presentation.get("sha256")):
         errors.append("presentation decision SHA-256 is invalid")
+    carried_from = presentation.get("carried_from_plan_sha256")
+    if carried_from is not None and not _is_sha256(carried_from):
+        errors.append("presentation carried plan SHA-256 is invalid")
     if mode == "speaker-inset":
         style = plan.get("speaker_inset_style")
         if not speaker_inset.style_enabled(style) or speaker_inset.style_errors(style):
@@ -462,6 +465,11 @@ def presentation_errors(plan, *, project_root=None, required=False):
         return errors + ["presentation decision artifact is invalid"]
     if not isinstance(receipt, dict):
         return errors + ["presentation decision artifact must be an object"]
+    current_plan_sha256 = canonical_sha256(presentation_subject(plan))
+    receipt_plan_sha256 = receipt.get("plan_sha256")
+    if (receipt_plan_sha256 != current_plan_sha256
+            and (carried_from is None or receipt_plan_sha256 != carried_from)):
+        errors.append("presentation decision plan_sha256 does not match")
     expected = {
         "schema_version": 1,
         "status": "chosen",
@@ -472,7 +480,6 @@ def presentation_errors(plan, *, project_root=None, required=False):
         "actor": presentation.get("actor"),
         "timestamp": presentation.get("timestamp"),
         "presentation_mode": mode,
-        "plan_sha256": canonical_sha256(presentation_subject(plan)),
         "candidate_manifest_sha256": canonical_sha256(candidate_manifest(plan)),
         "review_video_sha256": plan.get("input_hashes", {}).get("review_video_sha256"),
     }
@@ -2046,10 +2053,16 @@ def rebuild_plan_from_revision(plan, request, timeline, transcript):
     result["decision"] = None
     result["review"] = None
     for key in (
-        "candidate_ranking", "presentation", "speaker_inset_style", "selection",
-        "speaker_inset", "review_status", "visual_review",
+        "candidate_ranking", "selection", "speaker_inset", "review_status",
+        "visual_review",
     ):
         result.pop(key, None)
+    presentation = result.get("presentation")
+    if isinstance(presentation, dict):
+        presentation.setdefault(
+            "carried_from_plan_sha256",
+            canonical_sha256(presentation_subject(plan)),
+        )
     for shot in result["shots"]:
         entry = entries[shot["id"]]
         shot.pop("normalized", None)

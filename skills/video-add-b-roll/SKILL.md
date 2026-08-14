@@ -339,8 +339,10 @@ actual `user_response`, the Agent `presentation_mode` recommendation and rationa
 actor, a UUID and timestamp, `explicit_user_action: true`, and
 `rationale_source: "agent_chat_explicit_action"`. It writes the hash-bound
 `work/b-roll/presentation-decision.json` receipt and the plan's `presentation` binding. The receipt
-binds the review-video, candidate manifest, and pre-review plan hashes. A changed candidate, plan,
-or review video requires a new chat choice before a review page can be published.
+binds the review-video, candidate manifest, and pre-review plan hashes. A changed candidate
+manifest or review video requires a new chat choice before a review page can be published. A
+candidate revision may change shot timing and segment defaults while carrying the original route
+binding forward.
 
 Choosing `ordinary` removes any speaker style and continues to the existing one-page exact
 candidate review. Choosing `speaker-inset` installs the default rounded-rectangle style while
@@ -395,7 +397,11 @@ export before applying it directly.
 Enter non-empty natural-language `Modification notes` only for requested changes the page controls
 cannot express. This selects Request changes and exports `submission_intent: request_revision`;
 Empty Request changes is invalid. Only such natural-language requests enter the revision, rebuild,
-and new-page flow. Candidate selection and speaker composite approval remain separate.
+and new-page flow. The rebuilt proposal preserves the first `ordinary` or `speaker-inset` route;
+do not ask the user to choose ordinary or speaker-inset again. The
+`presentation-decision.json` receipt remains unchanged; only its existing plan binding is carried
+forward with an explicit revision marker. Candidate selection and speaker composite approval remain
+separate.
 `Copy` is the primary handoff and places the complete JSON in both a readonly textarea and the
 clipboard when available. `Download JSON` downloads those same bytes for durable local transfer.
 Both preserve the same explicit approval receipt bytes; neither mutates the plan until the Agent
@@ -448,6 +454,11 @@ python "$BrollScripts/candidate_analysis.py" reclassify `
   "$ProjectRoot/work/b-roll/candidate-analysis.json"
 ```
 
+The rebuilt proposal preserves the original `presentation` decision and, for `speaker-inset`, its
+validated style. Do not call `record_chat_presentation_decision()` again after a candidate revision.
+The original `presentation-decision.json` receipt remains unchanged and its candidate-manifest and
+review-video bindings remain mandatory.
+
 Inspect every `agent_rescore_required` marker. When true, compare the revised transcript evidence
 against the same frozen frames and write a truthful Agent score update; never carry a semantic
 rationale across changed evidence by inference. Rerun `rank` and `acquire` so the plan binds the new
@@ -484,7 +495,8 @@ clearance, continuity, style, and exact composite pixels. Agent recommendation i
 present the exact composite page and stop for user approval.
 
 A candidate revision creates a new candidate UUID page and selection receipt before rebuilding
-speaker artifacts. A composite-only revision creates a new composite UUID page while preserving
+speaker artifacts while preserving the first selected `ordinary` or `speaker-inset` route. A
+composite-only revision creates a new composite UUID page while preserving
 the approved `selection_sha256`; it cannot silently change B-roll. After composite approval,
 derive candidate decisions from the approved selection and transition `composite_pending` shots
 without asking for the same content decision again.

@@ -413,6 +413,14 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             self.assertIn("empty request changes", normalized)
             self.assertIn("page controls cannot express", normalized)
             self.assertIn("candidate selection and speaker composite approval remain separate", normalized)
+            self.assertIn(
+                "do not ask the user to choose ordinary or speaker-inset again",
+                normalized,
+            )
+            self.assertIn(
+                "`presentation-decision.json` receipt remains unchanged",
+                normalized,
+            )
             self.assertNotIn(
                 "changed program timing, a changed prefilled segment, non-empty notes",
                 normalized,
@@ -424,6 +432,10 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         )
         self.assertIn(
             "project_root=root,timeline=timeline,transcript=transcript",
+            skill,
+        )
+        self.assertNotIn(
+            "A changed candidate, plan, or review video requires a new chat choice",
             skill,
         )
 
@@ -1552,8 +1564,97 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
                     ),
                 )
 
-    def test_revision_rebuild_clears_stale_presentation_route(self):
+    def test_revision_rebuild_preserves_the_original_presentation_route(self):
+        for mode in ("ordinary", "speaker-inset"):
+            with self.subTest(mode=mode):
+                presented = self.record_presentation(copy.deepcopy(self.plan), mode)
+                original_subject_sha256 = broll_plan.canonical_sha256(
+                    broll_plan.presentation_subject(presented)
+                )
+                receipt_path = self.root / "work/b-roll/presentation-decision.json"
+                original_receipt = receipt_path.read_bytes()
+                original_receipt_sha256 = broll_plan.sha256_file(receipt_path)
+                request = self.review_for(
+                    presented,
+                    [{
+                        "id": "shot", "decision": "select",
+                        "requested_program_range": {"start_s": 1.0, "end_s": 3.0},
+                        "segments": [{
+                            "candidate_id": "asset",
+                            "source_range": {"start_s": 0.0, "end_s": 2.0},
+                            "program_range": {"start_s": 1.0, "end_s": 3.0},
+                            "playback_rate": 1.0,
+                        }],
+                    }],
+                    submission_intent="request_revision",
+                    explicit_user_action=True,
+                    revision_notes="Use the revised range.",
+                )
+                request.pop("rationale")
+
+                rebuilt = broll_plan.rebuild_plan_from_revision(
+                    presented, request, self.timeline, self.transcript,
+                )
+
+                self.assertEqual(mode, rebuilt["presentation"]["mode"])
+                self.assertEqual(
+                    original_subject_sha256,
+                    rebuilt["presentation"]["carried_from_plan_sha256"],
+                )
+                self.assertEqual(
+                    mode == "speaker-inset",
+                    "speaker_inset_style" in rebuilt,
+                )
+                self.assertEqual([], broll_plan.presentation_errors(
+                    rebuilt, project_root=self.root, required=True,
+                ))
+                self.assertEqual(original_receipt, receipt_path.read_bytes())
+                self.assertEqual(
+                    original_receipt_sha256, broll_plan.sha256_file(receipt_path),
+                )
+                other_mode = "ordinary" if mode == "speaker-inset" else "speaker-inset"
+                with self.assertRaisesRegex(ValueError, "already recorded"):
+                    self.record_presentation(rebuilt, other_mode)
+
+    def test_presentation_route_survives_multiple_revisions(self):
         presented = self.record_presentation(self.plan, "speaker-inset")
+
+        def revise(plan, notes):
+            request = self.review_for(
+                plan,
+                [{
+                    "id": "shot", "decision": "select",
+                    "requested_program_range": {"start_s": 1.0, "end_s": 3.0},
+                    "segments": [{
+                        "candidate_id": "asset",
+                        "source_range": {"start_s": 0.0, "end_s": 2.0},
+                        "program_range": {"start_s": 1.0, "end_s": 3.0},
+                        "playback_rate": 1.0,
+                    }],
+                }],
+                submission_intent="request_revision",
+                explicit_user_action=True,
+                revision_notes=notes,
+            )
+            request.pop("rationale")
+            return broll_plan.rebuild_plan_from_revision(
+                plan, request, self.timeline, self.transcript,
+            )
+
+        first = revise(presented, "Use the revised range.")
+        second = revise(first, "Keep this route and candidate timing.")
+
+        self.assertEqual("speaker-inset", second["presentation"]["mode"])
+        self.assertEqual(
+            first["presentation"]["carried_from_plan_sha256"],
+            second["presentation"]["carried_from_plan_sha256"],
+        )
+        self.assertEqual([], broll_plan.presentation_errors(
+            second, project_root=self.root, required=True,
+        ))
+
+    def test_carried_presentation_still_rejects_stale_artifact_bindings(self):
+        presented = self.record_presentation(self.plan, "ordinary")
         request = self.review_for(
             presented,
             [{
@@ -1571,14 +1672,53 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             revision_notes="Use the revised range.",
         )
         request.pop("rationale")
-
         rebuilt = broll_plan.rebuild_plan_from_revision(
             presented, request, self.timeline, self.transcript,
         )
 
-        self.assertNotIn("presentation", rebuilt)
-        self.assertNotIn("speaker_inset_style", rebuilt)
-        self.assertEqual("ordinary", self.record_presentation(rebuilt, "ordinary")["presentation"]["mode"])
+        stale_candidate = copy.deepcopy(rebuilt)
+        stale_candidate["shots"][0]["candidates"][0]["provenance"]["creator"] = "changed"
+        self.assertTrue(any(
+            "candidate_manifest_sha256" in error
+            for error in broll_plan.presentation_errors(
+                stale_candidate, project_root=self.root, required=True,
+            )
+        ))
+
+        stale_video = copy.deepcopy(rebuilt)
+        stale_video["input_hashes"]["review_video_sha256"] = "c" * 64
+        self.assertTrue(any(
+            "review_video_sha256" in error
+            for error in broll_plan.presentation_errors(
+                stale_video, project_root=self.root, required=True,
+            )
+        ))
+
+        receipt_path = self.root / "work/b-roll/presentation-decision.json"
+        original_receipt = receipt_path.read_bytes()
+        receipt_path.write_bytes(b"tampered")
+        self.assertIn(
+            "presentation decision artifact is missing or stale",
+            broll_plan.presentation_errors(
+                rebuilt, project_root=self.root, required=True,
+            ),
+        )
+        receipt_path.write_bytes(original_receipt)
+
+    def test_presentation_receipt_requires_a_plan_hash_without_revision_carry(self):
+        presented = self.record_presentation(self.plan, "ordinary")
+        receipt_path = self.root / "work/b-roll/presentation-decision.json"
+        receipt = projectlib.load_json(receipt_path)
+        receipt.pop("plan_sha256")
+        projectlib.write_json(receipt_path, receipt)
+        presented["presentation"]["sha256"] = broll_plan.sha256_file(receipt_path)
+
+        self.assertIn(
+            "presentation decision plan_sha256 does not match",
+            broll_plan.presentation_errors(
+                presented, project_root=self.root, required=True,
+            ),
+        )
 
     def test_legacy_long_trim_exposes_requested_and_effective_ranges(self):
         review = self.review_for(self.plan, [{
@@ -3143,6 +3283,51 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
                     plan, self.timeline, self.transcript, self.video,
                     self.review_dir, project_root=self.root,
                     review_id="123e4567-e89b-12d3-a456-426614174010",
+                )
+
+    def test_build_review_page_reuses_the_original_route_after_revision(self):
+        for index, mode in enumerate(("ordinary", "speaker-inset"), 11):
+            with self.subTest(mode=mode):
+                plan = copy.deepcopy(self.plan)
+                if mode == "speaker-inset":
+                    plan.pop("presentation")
+                    plan = self.record_presentation(plan, mode)
+                request = self.review_for(
+                    plan,
+                    [{
+                        "id": "shot", "decision": "select",
+                        "requested_program_range": {"start_s": 1.0, "end_s": 3.0},
+                        "segments": [{
+                            "candidate_id": "asset",
+                            "source_range": {"start_s": 0.0, "end_s": 2.0},
+                            "program_range": {"start_s": 1.0, "end_s": 3.0},
+                            "playback_rate": 1.0,
+                        }],
+                    }],
+                    submission_intent="request_revision",
+                    explicit_user_action=True,
+                    revision_notes="Use the revised range.",
+                )
+                request.pop("rationale")
+                rebuilt = broll_plan.rebuild_plan_from_revision(
+                    plan, request, self.timeline, self.transcript,
+                )
+
+                review_id = f"123e4567-e89b-12d3-a456-4266141740{index}"
+                with mock.patch.object(
+                        build_review_page, "_extract_frame", side_effect=self._frame):
+                    result = build_review_page.build_review_page(
+                        rebuilt, self.timeline, self.transcript, self.video,
+                        self.review_dir, project_root=self.root, review_id=review_id,
+                    )
+                payload = json.loads(base64.b64decode(
+                    build_review_page.PAYLOAD_RE.search(
+                        result["page"].read_text(encoding="utf-8")
+                    ).group(1)
+                ))
+                self.assertEqual(
+                    "selection" if mode == "speaker-inset" else "standard",
+                    payload["review_mode"],
                 )
 
     def test_review_page_switches_selection_intent_and_publishes_composite_assets(self):
