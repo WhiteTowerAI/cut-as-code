@@ -61,6 +61,10 @@ export function sourceTimeToProgramTime(sourceTimeS: number, clips: readonly Cli
     sourceTimeS >= candidate.sourceRange.startS && sourceTimeS < candidate.sourceRange.endS,
   )
   if (!clip) return null
+  return sourceTimeToProgramTimeInClip(sourceTimeS, clip)
+}
+
+function sourceTimeToProgramTimeInClip(sourceTimeS: number, clip: ClipView) {
   const programDuration = clip.programRange.endS - clip.programRange.startS
   const sourceDuration = clip.sourceRange.endS - clip.sourceRange.startS
   if (programDuration <= 0 || sourceDuration <= 0) return null
@@ -369,6 +373,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
   const finalFrameStateRef = useRef<FinalFrameState | null>(null)
   const nativeProgramTimeRef = useRef<number | null>(null)
   const activeClipRef = useRef<ClipView | null>(null)
+  const holdingBoundaryRef = useRef(false)
   const unsupportedPlaybackRate = videoClips
     .map(playbackRateForClip)
     .find((playbackRate) => playbackRate !== null && !supportsNativePlaybackRate(playbackRate))
@@ -426,7 +431,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     const activeClip = activeClipRef.current ?? sourceClipAtTime(video.currentTime, videoClips)
     if (!activeClip || video.currentTime < activeClip.sourceRange.startS || video.currentTime >= activeClip.sourceRange.endS) return
     applyClipPlaybackRate(video, activeClip)
-    const programTimeS = sourceTimeToProgramTime(video.currentTime, videoClips)
+    const programTimeS = sourceTimeToProgramTimeInClip(video.currentTime, activeClip)
     if (programTimeS !== null) publishNativeProgramTime(programTimeS)
   }
 
@@ -465,7 +470,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
       return true
     }
     applyClipPlaybackRate(video, activeClip)
-    const programTimeS = sourceTimeToProgramTime(presentedSourceTimeS, videoClips)
+    const programTimeS = sourceTimeToProgramTimeInClip(presentedSourceTimeS, activeClip)
     if (programTimeS !== null) publishNativeProgramTime(programTimeS)
     return presentedSourceTimeS >= lastPresentedSourceTime(activeClip, sourceFrameDurationS) - sourceFrameDurationS / 100
       ? 'hold'
@@ -479,8 +484,17 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     let cancelScheduledFrame: (() => void) | null = null
     let cancelBoundaryTimer: (() => void) | null = null
     let cancelBoundaryHold: (() => void) | null = null
-    let holdingBoundary = false
+    let boundaryHoldId = 0
     let disposed = false
+
+    const stopBoundaryHold = () => {
+      const canceled = cancelBoundaryHold !== null
+      boundaryHoldId += 1
+      cancelBoundaryHold?.()
+      cancelBoundaryHold = null
+      holdingBoundaryRef.current = false
+      return canceled
+    }
 
     const schedulePresentedFrame = () => {
       if (disposed || video.paused || cancelScheduledFrame) return
@@ -491,19 +505,20 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
         if (result === 'hold') {
           const playbackRate = Math.max(video.playbackRate, Number.EPSILON)
           stopBoundaryCheck()
-          holdingBoundary = true
+          const heldClip = activeClipRef.current
+          const holdId = ++boundaryHoldId
+          holdingBoundaryRef.current = true
           video.pause()
           const handle = window.setTimeout(() => {
+            if (disposed || holdId !== boundaryHoldId || activeClipRef.current?.id !== heldClip?.id) return
             cancelBoundaryHold = null
-            if (disposed) return
-            holdingBoundary = false
-            const activeClip = activeClipRef.current
-            const nextClip = activeClip ? nextClipInProgramOrder(activeClip, videoClips) : undefined
-            if (activeClip && nextClip) {
+            holdingBoundaryRef.current = false
+            const nextClip = heldClip ? nextClipInProgramOrder(heldClip, videoClips) : undefined
+            if (heldClip && nextClip) {
               transitionToNextClip(video, nextClip)
               void video.play().catch(() => setPlaying(false))
-            } else if (activeClip) {
-              finishPlayingClip(video, activeClip)
+            } else if (heldClip) {
+              finishPlayingClip(video, heldClip)
             }
           }, sourceFrameDurationS / playbackRate * 1000)
           cancelBoundaryHold = () => window.clearTimeout(handle)
@@ -550,7 +565,9 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     }
 
     const handlePause = () => {
-      if (!holdingBoundary) stopBoundaryCheck()
+      if (holdingBoundaryRef.current) return
+      stopBoundaryHold()
+      stopBoundaryCheck()
     }
 
     const restartBoundaryTimer = () => {
@@ -560,6 +577,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     }
 
     const startBoundaryCheck = () => {
+      stopBoundaryHold()
       if (!frameVideo.requestVideoFrameCallback && document.hidden) {
         video.pause()
         return
@@ -569,6 +587,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     }
 
     const restartBoundaryCheck = () => {
+      if (stopBoundaryHold()) setPlaying(false)
       stopBoundaryCheck()
       startBoundaryCheck()
     }
@@ -589,7 +608,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
       video.removeEventListener('seeked', restartBoundaryCheck)
       document.removeEventListener('visibilitychange', pauseFallbackWhenHidden)
       stopBoundaryCheck()
-      cancelBoundaryHold?.()
+      stopBoundaryHold()
     }
   }, [canPlay, projectVideo?.url, project?.durationS, sourceFrameDurationS, videoClips])
 
@@ -650,9 +669,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
                   onSeeked={(event) => syncProgramTime(event.currentTarget)}
                   onPlay={() => setPlaying(true)}
                   onPause={() => {
-                    if (!activeClipRef.current || videoClips.at(-1)?.id === activeClipRef.current.id || finalFrameStateRef.current) {
-                      setPlaying(false)
-                    }
+                    if (!holdingBoundaryRef.current) setPlaying(false)
                   }}
                   onEnded={(event) => {
                     const finalClip = videoClips.at(-1)
