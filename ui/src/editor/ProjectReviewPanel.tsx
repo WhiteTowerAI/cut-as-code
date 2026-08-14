@@ -73,29 +73,31 @@ export function ProtocolResourceInspector({ resources, client }: Readonly<{ reso
   }, [client, resourceId, selectedResource?.etag])
 
   return (
-    <section
-      aria-label="Protocol resources"
-      data-resource-id={resourceId}
-      data-resource-kind={selectedResource?.kind ?? ''}
-      data-resource-size={selectedResource ? String(selectedResource.size) : ''}
-      data-resource-operation={selectedResource?.operation_id ?? ''}
-      style={{ padding: 12, borderBottom: '1px solid #30333b', background: '#17191e' }}
-    >
-      <label>
-        <span className="sr-only">Protocol resource</span>
-        <select aria-label="Protocol resource" value={resourceId} onChange={(event) => setResourceId(event.target.value)}>
-          {resources.map((item) => <option key={item.id} value={item.id}>{item.kind}{item.operation_id ? `: ${item.operation_id}` : ''}</option>)}
-        </select>
-      </label>
-      {resourceIsCurrent && resource ? (
-        <div style={{ marginTop: 8 }}>
-          <output data-resource-kind>{selectedResource?.kind ?? resource.kind}</output>
-          <output data-resource-size>{selectedResource?.size ?? resource.size ?? 0}</output>
-          <output data-resource-operation>{selectedResource?.operation_id ?? resource.operation_id ?? ''}</output>
-          <output data-resource-etag>{resource.etag}</output>
-          <pre style={{ maxHeight: 160, overflow: 'auto', margin: '8px 0 0', whiteSpace: 'pre-wrap' }}>{JSON.stringify(resource.content, null, 2)}</pre>
-        </div>
-      ) : <output>Loading resource</output>}
-    </section>
+    <details className="protocol-resource-inspector">
+      <summary>Project data</summary>
+      <section
+        aria-label="Protocol resources"
+        data-resource-id={resourceId}
+        data-resource-kind={selectedResource?.kind ?? ''}
+        data-resource-size={selectedResource ? String(selectedResource.size) : ''}
+        data-resource-operation={selectedResource?.operation_id ?? ''}
+      >
+        <label>
+          <span className="sr-only">Protocol resource</span>
+          <select aria-label="Protocol resource" value={resourceId} onChange={(event) => setResourceId(event.target.value)}>
+            {resources.map((item) => <option key={item.id} value={item.id}>{item.kind}{item.operation_id ? `: ${item.operation_id}` : ''}</option>)}
+          </select>
+        </label>
+        {resourceIsCurrent && resource ? (
+          <div className="protocol-resource-content">
+            <output data-resource-kind>{selectedResource?.kind ?? resource.kind}</output>
+            <output data-resource-size>{selectedResource?.size ?? resource.size ?? 0}</output>
+            <output data-resource-operation>{selectedResource?.operation_id ?? resource.operation_id ?? ''}</output>
+            <output data-resource-etag>{resource.etag}</output>
+            <pre>{JSON.stringify(resource.content, null, 2)}</pre>
+          </div>
+        ) : <output>Loading resource</output>}
+      </section>
+    </details>
   )
 }

@@ -206,12 +206,44 @@ test('browser runtime is ready from the armed credential-free URL and refreshes 
   }
 })
 
+test('keeps the primary workspace visible while project data is collapsed', async ({ page }) => {
+  const isolated = await startSidecar(projectRoot)
+  try {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    const launch = await armLaunch(isolated)
+    await page.goto(launch)
+    await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+
+    const projectData = page.getByText('Project data', { exact: true })
+    await expect(projectData).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Protocol resources' })).toBeHidden()
+
+    const geometry = await page.locator('.workspace-primary').evaluate((element) => {
+      const rect = element.getBoundingClientRect()
+      return { top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height }
+    })
+    expect(geometry.top).toBeGreaterThanOrEqual(52)
+    expect(geometry.top).toBeLessThan(100)
+    expect(geometry.bottom).toBeLessThanOrEqual(800)
+    expect(geometry.width).toBeGreaterThan(1000)
+    expect(geometry.height).toBeGreaterThan(600)
+
+    await expect(page.getByRole('region', { name: 'Library', exact: true })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Viewer', exact: true })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Graphic Motion', exact: true })).toBeVisible()
+  } finally {
+    await page.close()
+    await stopSidecar(isolated.process)
+  }
+})
+
 test('browser inspects every registered protocol resource by its server-issued ID', async ({ page }) => {
   const isolated = await startSidecar(projectRoot)
   try {
     const launch = await armLaunch(isolated)
     await page.goto(launch)
     await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+    await page.getByText('Project data', { exact: true }).click()
     const inspector = page.getByRole('region', { name: 'Protocol resources' })
     const picker = inspector.getByLabel('Protocol resource')
     await expect(picker).toHaveCount(1)

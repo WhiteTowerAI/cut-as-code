@@ -103,7 +103,11 @@ function Workspace({ store, runtime }: { store: ReturnType<typeof createEditorSt
         <button type="button" disabled title="Export is not connected in this verification surface">Export</button>
       </header>
       {contentCardsOperation ? <ProjectReviewPanel operation={contentCardsOperation} store={store} /> : null}
-      {runtime && runtime.snapshot.resources.length ? <ProtocolResourceInspector resources={runtime.snapshot.resources} client={runtime.client} /> : null}
+      {runtime && runtime.snapshot.resources.length ? (
+        <div className="workspace-project-data">
+          <ProtocolResourceInspector resources={runtime.snapshot.resources} client={runtime.client} />
+        </div>
+      ) : null}
       <div className="workspace-primary">
         <LibraryPanel store={store} />
         <ViewerPanel store={store} />
