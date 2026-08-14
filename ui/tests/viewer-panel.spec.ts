@@ -1,5 +1,10 @@
 import { expect, test } from '@playwright/test'
-import { createPlaybackController } from '../src/editor/ViewerPanel'
+import {
+  createPlaybackController,
+  lastPresentedSourceTime,
+  nativeBoundaryDelayMs,
+} from '../src/editor/ViewerPanel'
+import type { ClipView } from '../src/editor/editor-model'
 
 test('Viewer playback is unavailable without an authoritative project video', async ({ page }) => {
   await page.setViewportSize({ width: 680, height: 688 })
@@ -25,6 +30,17 @@ test('playback controller seeks the assigned media element', async () => {
   expect(playback.getTime()).toBe(42.25)
   expect(playback.getDuration()).toBe(127)
   expect(playback.isPlaying()).toBe(false)
+})
+
+test('native playback boundary uses one source frame and rate only for wall-clock delay', async () => {
+  const clip: ClipView = {
+    id: 'clip-fast-a',
+    sourceRange: { startS: 0.2, endS: 0.4 },
+    programRange: { startS: 0, endS: 0.1 },
+  }
+
+  expect(lastPresentedSourceTime(clip, 1 / 30)).toBeCloseTo(0.366667, 5)
+  expect(nativeBoundaryDelayMs(0.2, clip, 1 / 30, 2)).toBeCloseTo(83.333333, 5)
 })
 
 test('opening one Viewer menu closes the other and Escape closes the open menu', async ({ page }) => {

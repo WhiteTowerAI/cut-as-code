@@ -92,9 +92,30 @@ function applyClipPlaybackRate(video: HTMLVideoElement, clip: ClipView) {
   }
 }
 
+export function lastPresentedSourceTime(clip: ClipView, sourceFrameDurationS: number) {
+  return Math.max(clip.sourceRange.startS, clip.sourceRange.endS - sourceFrameDurationS)
+}
+
+export function nativeBoundaryDelayMs(
+  currentSourceTimeS: number,
+  clip: ClipView,
+  sourceFrameDurationS: number,
+  playbackRate: number,
+) {
+  const remainingSourceTimeS = Math.max(
+    0,
+    lastPresentedSourceTime(clip, sourceFrameDurationS) - currentSourceTimeS,
+  )
+  return remainingSourceTimeS / Math.max(playbackRate, Number.EPSILON) * 1000
+}
+
 type FrameDrivenVideo = HTMLVideoElement & {
   requestVideoFrameCallback?: (callback: (now: number, metadata: VideoFrameCallbackMetadata) => void) => number
   cancelVideoFrameCallback?: (handle: number) => void
+}
+
+type FinalFrameState = {
+  sourceTimeS: number
 }
 
 function formatTimecode(timeS: number, fps: number) {
@@ -303,7 +324,8 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     : undefined
   const videoClips = project?.tracks.find((track) => track.kind === 'video')?.clips ?? []
   const projectVideoRef = useRef<HTMLVideoElement>(null)
-  const finalFrameSeekRef = useRef<number | null>(null)
+  const finalFrameStateRef = useRef<FinalFrameState | null>(null)
+  const nativeProgramTimeRef = useRef<number | null>(null)
   const canPlay = Boolean(projectVideo && !primaryArtifact && videoClips.length)
   const hasTimeline = Boolean(project && project.durationS > 0)
   const fps = project ? project.fps.numerator / project.fps.denominator : 30
@@ -313,6 +335,17 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
 
   function seekProjectVideo(programTimeS: number) {
     const video = projectVideoRef.current
+    const finalClip = videoClips.at(-1)
+    if (video && project && finalClip && programTimeS >= project.durationS - 0.0001) {
+      const finalSourceTimeS = lastPresentedSourceTime(finalClip, sourceFrameDurationS)
+      finalFrameStateRef.current = { sourceTimeS: finalSourceTimeS }
+      applyClipPlaybackRate(video, finalClip)
+      if (Math.abs(video.currentTime - finalSourceTimeS) >= 0.0001) {
+        createPlaybackController(video).seek(finalSourceTimeS)
+      }
+      return
+    }
+    finalFrameStateRef.current = null
     const clip = programClipAtTime(programTimeS, videoClips)
     const sourceTimeS = programTimeToSourceTime(programTimeS, videoClips)
     if (!video || !clip || sourceTimeS === null) return
@@ -321,35 +354,49 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     createPlaybackController(video).seek(sourceTimeS)
   }
 
+  function publishNativeProgramTime(programTimeS: number) {
+    nativeProgramTimeRef.current = programTimeS
+    seek(programTimeS)
+  }
+
   useEffect(() => {
+    if (nativeProgramTimeRef.current !== null && Math.abs(currentTimeS - nativeProgramTimeRef.current) < 0.0001) {
+      nativeProgramTimeRef.current = null
+      return
+    }
     seekProjectVideo(currentTimeS)
   }, [currentTimeS, projectVideo?.url, videoClips])
 
   function syncProgramTime(video: HTMLVideoElement) {
-    if (finalFrameSeekRef.current !== null) {
-      if (Math.abs(video.currentTime - finalFrameSeekRef.current) < 0.01) return
-      finalFrameSeekRef.current = null
+    const finalFrameState = finalFrameStateRef.current
+    if (finalFrameState) {
+      if (Math.abs(video.currentTime - finalFrameState.sourceTimeS) >= 0.01) {
+        createPlaybackController(video).seek(finalFrameState.sourceTimeS)
+      }
+      return
     }
     const activeClip = sourceClipAtTime(video.currentTime, videoClips)
     if (!activeClip) return
     applyClipPlaybackRate(video, activeClip)
     const programTimeS = sourceTimeToProgramTime(video.currentTime, videoClips)
-    if (programTimeS !== null) seek(programTimeS)
+    if (programTimeS !== null) publishNativeProgramTime(programTimeS)
   }
 
   function transitionToNextClip(video: HTMLVideoElement, nextClip: ClipView) {
+    finalFrameStateRef.current = null
     applyClipPlaybackRate(video, nextClip)
     createPlaybackController(video).seek(nextClip.sourceRange.startS)
-    seek(nextClip.programRange.startS)
+    publishNativeProgramTime(nextClip.programRange.startS)
   }
 
   function finishPlayingClip(video: HTMLVideoElement, clip: ClipView) {
-    const finalSourceTimeS = Math.max(clip.sourceRange.startS, clip.sourceRange.endS - sourceFrameDurationS)
-    finalFrameSeekRef.current = finalSourceTimeS
+    const finalSourceTimeS = lastPresentedSourceTime(clip, sourceFrameDurationS)
+    const finalProgramTimeS = project?.durationS ?? clip.programRange.endS
+    finalFrameStateRef.current = { sourceTimeS: finalSourceTimeS }
     const playback = createPlaybackController(video)
+    playback.seek(finalSourceTimeS)
     playback.pause()
-    if (Math.abs(video.currentTime - finalSourceTimeS) >= 0.01) playback.seek(finalSourceTimeS)
-    seek(project?.durationS ?? clip.programRange.endS)
+    publishNativeProgramTime(finalProgramTimeS)
     setPlaying(false)
   }
 
@@ -359,18 +406,19 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
       const nextClip = videoClips.find((clip) => presentedSourceTimeS < clip.sourceRange.startS)
       if (nextClip) transitionToNextClip(video, nextClip)
       else if (videoClips.at(-1)) finishPlayingClip(video, videoClips.at(-1)!)
-      return
+      return true
     }
     const nextClip = videoClips.find((clip) => clip.sourceRange.startS >= activeClip.sourceRange.endS)
-    const presentedSourceAdvanceS = 2 * sourceFrameDurationS * Math.max(video.playbackRate, Number.EPSILON)
-    if (presentedSourceTimeS >= activeClip.sourceRange.endS - presentedSourceAdvanceS) {
+    const finalPresentedSourceTimeS = lastPresentedSourceTime(activeClip, sourceFrameDurationS)
+    if (presentedSourceTimeS >= finalPresentedSourceTimeS - sourceFrameDurationS / 100) {
       if (nextClip) transitionToNextClip(video, nextClip)
       else finishPlayingClip(video, activeClip)
-      return
+      return true
     }
     applyClipPlaybackRate(video, activeClip)
     const programTimeS = sourceTimeToProgramTime(presentedSourceTimeS, videoClips)
-    if (programTimeS !== null) seek(programTimeS)
+    if (programTimeS !== null) publishNativeProgramTime(programTimeS)
+    return false
   }
 
   useEffect(() => {
@@ -378,40 +426,84 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     if (!video || !canPlay) return
     const frameVideo = video as FrameDrivenVideo
     let cancelScheduledFrame: (() => void) | null = null
+    let cancelBoundaryTimer: (() => void) | null = null
     let disposed = false
 
-    const scheduleBoundaryCheck = () => {
+    const schedulePresentedFrame = () => {
       if (disposed || video.paused || cancelScheduledFrame) return
       const tick = (presentedSourceTimeS: number) => {
         cancelScheduledFrame = null
         if (disposed || video.paused) return
-        syncPresentedFrame(video, presentedSourceTimeS)
-        scheduleBoundaryCheck()
+        if (syncPresentedFrame(video, presentedSourceTimeS)) restartBoundaryTimer()
+        schedulePresentedFrame()
       }
       if (frameVideo.requestVideoFrameCallback) {
         const handle = frameVideo.requestVideoFrameCallback((_now, metadata) => tick(metadata.mediaTime))
         cancelScheduledFrame = () => frameVideo.cancelVideoFrameCallback?.(handle)
-        return
       }
-      const handle = window.requestAnimationFrame(() => tick(video.currentTime))
-      cancelScheduledFrame = () => window.cancelAnimationFrame(handle)
+    }
+
+    const scheduleBoundaryTimer = () => {
+      if (disposed || video.paused || cancelBoundaryTimer) return
+      const activeClip = sourceClipAtTime(video.currentTime, videoClips)
+      const boundarySourceTimeS = activeClip ? lastPresentedSourceTime(activeClip, sourceFrameDurationS) : video.currentTime
+      const delayMs = activeClip
+        ? nativeBoundaryDelayMs(video.currentTime, activeClip, sourceFrameDurationS, video.playbackRate)
+        : 0
+      const handle = window.setTimeout(() => {
+        cancelBoundaryTimer = null
+        if (disposed || video.paused) return
+        syncPresentedFrame(video, boundarySourceTimeS)
+        scheduleBoundaryTimer()
+      }, delayMs)
+      cancelBoundaryTimer = () => window.clearTimeout(handle)
     }
 
     const stopBoundaryCheck = () => {
       cancelScheduledFrame?.()
       cancelScheduledFrame = null
+      cancelBoundaryTimer?.()
+      cancelBoundaryTimer = null
     }
 
-    video.addEventListener('play', scheduleBoundaryCheck)
+    const restartBoundaryTimer = () => {
+      cancelBoundaryTimer?.()
+      cancelBoundaryTimer = null
+      scheduleBoundaryTimer()
+    }
+
+    const startBoundaryCheck = () => {
+      if (!frameVideo.requestVideoFrameCallback && document.hidden) {
+        video.pause()
+        return
+      }
+      schedulePresentedFrame()
+      scheduleBoundaryTimer()
+    }
+
+    const restartBoundaryCheck = () => {
+      stopBoundaryCheck()
+      startBoundaryCheck()
+    }
+
+    const pauseFallbackWhenHidden = () => {
+      if (!frameVideo.requestVideoFrameCallback && document.hidden && !video.paused) video.pause()
+    }
+
+    video.addEventListener('play', startBoundaryCheck)
     video.addEventListener('pause', stopBoundaryCheck)
-    if (!video.paused) scheduleBoundaryCheck()
+    video.addEventListener('seeked', restartBoundaryCheck)
+    document.addEventListener('visibilitychange', pauseFallbackWhenHidden)
+    if (!video.paused) startBoundaryCheck()
     return () => {
       disposed = true
-      video.removeEventListener('play', scheduleBoundaryCheck)
+      video.removeEventListener('play', startBoundaryCheck)
       video.removeEventListener('pause', stopBoundaryCheck)
+      video.removeEventListener('seeked', restartBoundaryCheck)
+      document.removeEventListener('visibilitychange', pauseFallbackWhenHidden)
       stopBoundaryCheck()
     }
-  }, [canPlay, projectVideo?.url, project?.durationS, videoClips])
+  }, [canPlay, projectVideo?.url, project?.durationS, sourceFrameDurationS, videoClips])
 
   function togglePlayback() {
     const video = projectVideoRef.current
@@ -421,7 +513,14 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
       playback.pause()
       return
     }
-    seekProjectVideo(currentTimeS)
+    const restartFromBeginning = Boolean(project && currentTimeS >= project.durationS - 0.0001)
+    if (restartFromBeginning) {
+      finalFrameStateRef.current = null
+      seek(0)
+      seekProjectVideo(0)
+    } else {
+      seekProjectVideo(currentTimeS)
+    }
     void playback.play().catch(() => setPlaying(false))
   }
 
@@ -463,7 +562,11 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
                   onSeeked={(event) => syncProgramTime(event.currentTarget)}
                   onPlay={() => setPlaying(true)}
                   onPause={() => setPlaying(false)}
-                  onEnded={() => { seek(project?.durationS ?? 0); setPlaying(false) }}
+                  onEnded={(event) => {
+                    const finalClip = videoClips.at(-1)
+                    if (finalClip) finishPlayingClip(event.currentTarget, finalClip)
+                    else { seek(project?.durationS ?? 0); setPlaying(false) }
+                  }}
                 />
               ) : (
                 <div className="viewer-empty-state" role="status">Project video unavailable</div>

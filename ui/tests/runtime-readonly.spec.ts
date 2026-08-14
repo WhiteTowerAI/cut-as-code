@@ -417,28 +417,32 @@ test('native Viewer retimes 2x clips and skips an excluded source gap per frame'
       video.addEventListener('seeked', () => resolve(), { once: true })
       video.currentTime = 0.2
     }))
+    await expect.poll(() => source.evaluate((video) => video.currentTime)).toBeCloseTo(0.2, 2)
 
     const observedFrames = source.evaluate(async (video) => await new Promise<{
       playbackRate: number
       sourceTimes: number[]
     }>((resolve, reject) => {
       const sourceTimes: number[] = []
+      const requestVideoFrame = video.requestVideoFrameCallback.bind(video)
+      Object.defineProperty(video, 'requestVideoFrameCallback', {
+        configurable: true,
+        value: (callback: VideoFrameRequestCallback) => requestVideoFrame((now, metadata) => {
+          sourceTimes.push(metadata.mediaTime)
+          callback(now, metadata)
+        }),
+      })
       const timeout = window.setTimeout(() => reject(new Error('video did not stop at the program end')), 5_000)
+      const playhead = document.querySelector('[aria-label="Playhead time"]')!
+      const observer = new MutationObserver(() => finish())
       const finish = () => {
+        if (!video.paused || !playhead.textContent?.startsWith('00:00:00:06')) return
         window.clearTimeout(timeout)
+        observer.disconnect()
         resolve({ playbackRate: video.playbackRate, sourceTimes })
       }
-      const observe = (_now: number, metadata: VideoFrameCallbackMetadata) => {
-        sourceTimes.push(metadata.mediaTime)
-        if (video.paused) {
-          window.clearTimeout(timeout)
-          resolve({ playbackRate: video.playbackRate, sourceTimes })
-          return
-        }
-        video.requestVideoFrameCallback(observe)
-      }
       video.addEventListener('pause', finish, { once: true })
-      video.requestVideoFrameCallback(observe)
+      observer.observe(playhead, { childList: true, characterData: true, subtree: true })
     }))
 
     await viewer.getByRole('button', { name: 'Play' }).click()
@@ -446,7 +450,152 @@ test('native Viewer retimes 2x clips and skips an excluded source gap per frame'
 
     expect(observed.playbackRate).toBeCloseTo(2, 5)
     expect(observed.sourceTimes.some((timeS) => timeS >= 0.4 && timeS < 0.6)).toBe(false)
+    expect(observed.sourceTimes.some((timeS) => timeS >= 0.6 && timeS < 0.8)).toBe(true)
     expect(observed.sourceTimes.some((timeS) => timeS >= 0.8)).toBe(false)
+    await expect.poll(() => source.evaluate((video) => video.currentTime)).toBeLessThan(0.8)
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()))
+    }))
+    const settledEndpoint = await source.evaluate((video) => ({
+      currentTime: video.currentTime,
+      paused: video.paused,
+    }))
+    expect(settledEndpoint.paused).toBe(true)
+    expect(settledEndpoint.currentTime).toBeLessThan(0.8)
+    await expect.poll(() => page.evaluate(() => {
+      const timecode = document.querySelector('[aria-label="Playhead time"]')!.textContent!.split(' / ')[0]
+      const [hours, minutes, seconds, frames] = timecode.split(':').map(Number)
+      return hours * 3600 + minutes * 60 + seconds + frames / 30
+    })).toBeCloseTo(0.2, 5)
+
+    const replayStart = source.evaluate((video) => new Promise<number>((resolve, reject) => {
+      const timeout = window.setTimeout(() => reject(new Error('replay did not seek to the first clip')), 2_000)
+      video.addEventListener('seeking', () => {
+        window.clearTimeout(timeout)
+        resolve(video.currentTime)
+      }, { once: true })
+    }))
+    await viewer.getByRole('button', { name: 'Play' }).click()
+    expect(await replayStart).toBeCloseTo(0.2, 2)
+    await source.evaluate((video) => video.pause())
+  } finally {
+    await page.close()
+    await stopSidecar(isolated.process)
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('native Viewer presents late frames before proactive 2x clip boundaries', async ({ page }) => {
+  test.setTimeout(30_000)
+  const root = await createLongRetimedProjectFixture()
+  const isolated = await startSidecar(root)
+  try {
+    await page.goto(await armLaunch(isolated))
+    await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+
+    const viewer = page.getByRole('region', { name: 'Viewer', exact: true })
+    const source = viewer.locator('video[aria-label="source.mp4"]')
+    await expect.poll(() => source.evaluate((video) => video.readyState)).toBeGreaterThanOrEqual(2)
+    await expect.poll(() => source.evaluate((video) => video.currentTime)).toBeCloseTo(0.2, 2)
+
+    const observedFrames = source.evaluate((video) => new Promise<{
+      playbackRate: number
+      sourceTimes: number[]
+    }>((resolve, reject) => {
+      const sourceTimes: number[] = []
+      const requestVideoFrame = video.requestVideoFrameCallback.bind(video)
+      Object.defineProperty(video, 'requestVideoFrameCallback', {
+        configurable: true,
+        value: (callback: VideoFrameRequestCallback) => requestVideoFrame((now, metadata) => {
+          sourceTimes.push(metadata.mediaTime)
+          callback(now, metadata)
+        }),
+      })
+      const timeout = window.setTimeout(() => reject(new Error('long retimed playback did not stop')), 5_000)
+      video.addEventListener('pause', () => {
+        window.clearTimeout(timeout)
+        resolve({ playbackRate: video.playbackRate, sourceTimes })
+      }, { once: true })
+    }))
+
+    await viewer.getByRole('button', { name: 'Play' }).click()
+    const observed = await observedFrames
+
+    expect(observed.playbackRate).toBeCloseTo(2, 5)
+    expect(
+      observed.sourceTimes.some((timeS) => timeS >= 0.65 && timeS < 0.8),
+      `presented source frames: ${JSON.stringify(observed.sourceTimes)}`,
+    ).toBe(true)
+    expect(observed.sourceTimes.some((timeS) => timeS >= 0.8 && timeS < 1)).toBe(false)
+    expect(
+      observed.sourceTimes.some((timeS) => timeS >= 1.45 && timeS < 1.6),
+      `presented source frames: ${JSON.stringify(observed.sourceTimes)}`,
+    ).toBe(true)
+    expect(
+      observed.sourceTimes.some((timeS) => timeS >= 1.6),
+      `presented source frames: ${JSON.stringify(observed.sourceTimes)}`,
+    ).toBe(false)
+  } finally {
+    await page.close()
+    await stopSidecar(isolated.process)
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('native Viewer fallback pauses when hidden and proactively schedules clip boundaries', async ({ page }) => {
+  test.setTimeout(30_000)
+  const root = await createRetimedProjectFixture()
+  const isolated = await startSidecar(root)
+  try {
+    await page.goto(await armLaunch(isolated))
+    await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+
+    const viewer = page.getByRole('region', { name: 'Viewer', exact: true })
+    const source = viewer.locator('video[aria-label="source.mp4"]')
+    await expect.poll(() => source.evaluate((video) => video.readyState)).toBeGreaterThanOrEqual(2)
+    await source.evaluate((video) => {
+      Object.defineProperty(video, 'requestVideoFrameCallback', { configurable: true, value: undefined })
+      Object.defineProperty(document, 'hidden', { configurable: true, value: false })
+    })
+
+    const pausedWhileHidden = source.evaluate((video) => new Promise<number>((resolve, reject) => {
+      const timeout = window.setTimeout(() => reject(new Error('fallback playback did not pause while hidden')), 2_000)
+      video.addEventListener('pause', () => {
+        window.clearTimeout(timeout)
+        resolve(video.currentTime)
+      }, { once: true })
+    }))
+    await viewer.getByRole('button', { name: 'Play' }).click()
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'hidden', { configurable: true, value: true })
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    expect(await pausedWhileHidden).toBeLessThan(0.4)
+
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'hidden', { configurable: true, value: false })
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    const completedFallback = source.evaluate((video) => new Promise<{
+      currentTime: number
+      seeks: number[]
+    }>((resolve, reject) => {
+      const seeks: number[] = []
+      const timeout = window.setTimeout(() => reject(new Error('fallback playback did not reach the program end')), 5_000)
+      video.addEventListener('seeking', () => seeks.push(video.currentTime))
+      video.addEventListener('pause', () => {
+        window.clearTimeout(timeout)
+        resolve({ currentTime: video.currentTime, seeks })
+      }, { once: true })
+    }))
+    await viewer.getByRole('button', { name: 'Play' }).click()
+    const fallback = await completedFallback
+
+    expect(fallback.seeks.some((timeS) => Math.abs(timeS - 0.6) < 0.01)).toBe(true)
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()))
+    }))
+    expect(await source.evaluate((video) => video.currentTime)).toBeLessThan(0.8)
     await expect.poll(() => page.evaluate(() => {
       const timecode = document.querySelector('[aria-label="Playhead time"]')!.textContent!.split(' / ')[0]
       const [hours, minutes, seconds, frames] = timecode.split(':').map(Number)
@@ -705,6 +854,36 @@ async function createRetimedProjectFixture() {
         id: 'clip-fast-b',
         source_range: { start_s: 0.6, end_s: 0.8 },
         program_range: { start_s: 0.1, end_s: 0.2 },
+        speed: 2,
+      },
+    ],
+  }))
+  return root
+}
+
+async function createLongRetimedProjectFixture() {
+  const root = await createProjectFixture()
+  await execFileAsync('ffmpeg', [
+    '-y', '-f', 'lavfi', '-i', 'testsrc2=size=96x64:rate=30', '-t', '2',
+    '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
+    path.join(root, 'input', 'source.mp4'),
+  ])
+  await writeFile(path.join(root, 'work', 'timeline.json'), JSON.stringify({
+    schema_version: 1,
+    source_duration_s: 2,
+    program_duration_s: 0.6,
+    fps: { num: 30, den: 1 },
+    clips: [
+      {
+        id: 'clip-long-a',
+        source_range: { start_s: 0.2, end_s: 0.8 },
+        program_range: { start_s: 0, end_s: 0.3 },
+        speed: 2,
+      },
+      {
+        id: 'clip-long-b',
+        source_range: { start_s: 1, end_s: 1.6 },
+        program_range: { start_s: 0.3, end_s: 0.6 },
         speed: 2,
       },
     ],
