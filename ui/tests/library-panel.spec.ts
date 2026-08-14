@@ -40,7 +40,7 @@ test('renders the populated asset library at the approved panel size', async ({ 
     scrollWidth: element.scrollWidth,
   }))
   expect(dimensions.clientWidth).toBe(296)
-  expect(dimensions.scrollWidth).toBeGreaterThan(dimensions.clientWidth)
+  expect(dimensions.scrollWidth).toBe(dimensions.clientWidth)
   await expect(page.getByRole('tab', { name: 'Transcript' })).toHaveCount(0)
 })
 
@@ -62,7 +62,7 @@ test('project-backed previews use nonblank frozen local artwork', async ({ page 
   const previews = page.locator('[data-asset-id] img[data-library-preview]')
   await expect(previews).toHaveCount(4)
   for (const preview of await previews.all()) {
-    await expect(preview).toHaveAttribute('src', /^\/fixtures\/library\/[a-z-]+\.png$/)
+    await expect(preview).toHaveAttribute('src', /^\/assets\/editor\/[a-z-]+\.png$/)
     const sample = await preview.evaluate(async (element) => {
       const image = element as HTMLImageElement
       if (!image.complete) await image.decode()
@@ -125,7 +125,7 @@ test('caption and content-card previews use frozen official child artwork', asyn
     await expect(previews).toHaveCount(count)
 
     for (const preview of await previews.all()) {
-      await expect(preview).toHaveAttribute('src', new RegExp(`^/fixtures/library/${prefix}-[a-z-]+\\.png$`))
+      await expect(preview).toHaveAttribute('src', new RegExp(`^/assets/editor/${prefix}-[a-z-]+\\.png$`))
       expect(await preview.evaluate((element) => element.parentElement!.children.length)).toBe(1)
       const sample = await preview.evaluate(async (element) => {
         const image = element as HTMLImageElement
@@ -216,7 +216,7 @@ test('caption theme controls match the official panel geometry', async ({ page }
   })
 })
 
-test('pages the compact four-tab strip while preserving the official first page', async ({ page }) => {
+test('keeps Graphic Motion discoverable in the compact four-tab strip', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 688 })
   await page.goto('/?scenario=1-84')
 
@@ -235,6 +235,7 @@ test('pages the compact four-tab strip while preserving the official first page'
     return {
       scrollLeft: Math.round(node.scrollLeft),
       clientWidth: node.clientWidth,
+      scrollWidth: node.scrollWidth,
       assets: relativeBox('assets'),
       captions: relativeBox('captions'),
       cards: relativeBox('cards'),
@@ -255,15 +256,16 @@ test('pages the compact four-tab strip while preserving the official first page'
   expect(await tabGeometry()).toEqual({
     scrollLeft: 0,
     clientWidth: 296,
-    assets: { left: 0, width: 76 },
-    captions: { left: 80, width: 76 },
-    cards: { left: 160, width: 60 },
-    motion: { left: 296, width: 112 },
+    scrollWidth: 296,
+    assets: { left: 0, width: 72 },
+    captions: { left: 76, width: 64 },
+    cards: { left: 143, width: 47 },
+    motion: { left: 195, width: 98 },
   })
 
   await motion.evaluate((element) => element.click())
   await expect(motion).toHaveAttribute('aria-selected', 'true')
-  await expect.poll(selectedTabViewport).toEqual({ scrollLeft: 112, left: 184, right: 296, clientWidth: 296 })
+  await expect.poll(selectedTabViewport).toEqual({ scrollLeft: 0, left: 195, right: 292, clientWidth: 296 })
 
   await assets.evaluate((element) => element.click())
   await expect(assets).toHaveAttribute('aria-selected', 'true')
@@ -272,14 +274,14 @@ test('pages the compact four-tab strip while preserving the official first page'
   await assets.focus()
   await page.keyboard.press('End')
   await expect(motion).toBeFocused()
-  await expect.poll(selectedTabViewport).toEqual({ scrollLeft: 112, left: 184, right: 296, clientWidth: 296 })
+  await expect.poll(selectedTabViewport).toEqual({ scrollLeft: 0, left: 195, right: 292, clientWidth: 296 })
 
   await page.keyboard.press('Home')
   await expect(assets).toBeFocused()
   await expect.poll(() => tablist.evaluate((node) => Math.round(node.scrollLeft))).toBe(0)
 })
 
-test('keeps the workspace Library on the same initial three-tab page', async ({ page }) => {
+test('keeps Graphic Motion discoverable in the workspace Library', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1200 })
   await page.goto('/?scenario=1-1373')
 
@@ -294,7 +296,7 @@ test('keeps the workspace Library on the same initial three-tab page', async ({ 
     }
   })
 
-  expect(geometry).toEqual({ scrollLeft: 0, clientWidth: 296, motionLeft: 296 })
+  expect(geometry).toEqual({ scrollLeft: 0, clientWidth: 296, motionLeft: 195 })
 })
 
 test('expands the empty workspace drop zone to the Library content width', async ({ page }) => {
@@ -341,7 +343,7 @@ test('switches the single library panel across all four tabs', async ({ page }) 
   await expect(page.getByPlaceholder('Search motion recipes')).toBeVisible()
   await expect(page.getByText('XYZ Fade Up', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Insert motion' })).toBeVisible()
-  expect(await page.getByRole('tablist', { name: 'Library sections' }).evaluate((node) => node.scrollLeft)).toBeGreaterThan(0)
+  expect(await page.getByRole('tablist', { name: 'Library sections' }).evaluate((node) => node.scrollLeft)).toBe(0)
 
   await assets.click()
   await expect(assets).toHaveAttribute('aria-selected', 'true')

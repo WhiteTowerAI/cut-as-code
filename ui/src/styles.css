@@ -88,7 +88,7 @@ button {
 .library-tab {
   flex: none;
   height: 28px;
-  padding: 0 10px;
+  padding: 0 8px;
   border: 0;
   border-radius: 6px;
   color: var(--color-text-muted);
@@ -98,20 +98,6 @@ button {
   line-height: normal;
   white-space: nowrap;
   cursor: pointer;
-}
-
-.library-tab[data-tab='assets'],
-.library-tab[data-tab='captions'] {
-  width: 76px;
-}
-
-.library-tab[data-tab='cards'] {
-  width: 60px;
-}
-
-.library-tab[data-tab='graphic-motion'] {
-  width: 112px;
-  margin-left: 72px;
 }
 
 .library-tab[aria-selected='true'] {

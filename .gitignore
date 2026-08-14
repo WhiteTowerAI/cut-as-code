@@ -13,6 +13,16 @@ skills/video-add-graphic-motion/tests/
 .claude/worktrees/
 .worktree/
 .vscode/
+
+# Playwright output; keep the checked-in *-reference.png baselines.
+ui/playwright-report/
+ui/test-results/
+ui/tests/screenshots/*-browser.png
+ui/tests/screenshots/*-diff.png
+ui/tests/screenshots/*-reference-compared.png
+ui/tests/screenshots/*-result.json
+ui/tests/screenshots/visual-comparison-results.json
+
 # HyperFrames preview cache + regenerable self-check stills/gallery
 .hyperframes/
 # snapshots/
