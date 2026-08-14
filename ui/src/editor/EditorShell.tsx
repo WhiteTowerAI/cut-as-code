@@ -292,6 +292,8 @@ export function projectFromSnapshot(base: EditorProjectView | null, snapshot: Ru
     id: item.id,
     name: item.name,
     kind: item.media_type?.startsWith('audio/') ? 'audio' as const : 'video' as const,
+    mediaType: item.media_type,
+    url: item.url,
   }))
   const clips = timeline?.clips.map((clip) => ({
     id: clip.id,

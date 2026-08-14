@@ -244,7 +244,10 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
   const currentArtifacts = operations?.flatMap((operation) => operation.preview?.artifacts ?? []) ?? []
   const primaryArtifact = currentArtifacts.find((artifact) => artifact.mediaType.startsWith('image/'))
     ?? currentArtifacts.find((artifact) => artifact.mediaType.startsWith('video/'))
-  const hasMedia = Boolean(project && project.durationS > 0)
+  const projectVideo = project?.assets.find((asset) =>
+    asset.kind === 'video' && asset.mediaType?.startsWith('video/') && asset.url,
+  )
+  const hasTimeline = Boolean(project && project.durationS > 0)
   const fps = project ? project.fps.numerator / project.fps.denominator : 30
 
   useEffect(() => {
@@ -288,13 +291,17 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
         </output>
       ) : null}
       <div className="viewer-stage">
-        {hasMedia && (
+        {hasTimeline ? (
           <>
             <div className="viewer-canvas">
               {primaryArtifact?.mediaType.startsWith('video/') ? (
                 <video data-preview-media src={primaryArtifact.url} controls aria-label={primaryArtifact.name} />
+              ) : primaryArtifact?.mediaType.startsWith('image/') ? (
+                <img data-preview-media src={primaryArtifact.url} alt={primaryArtifact.name} />
+              ) : projectVideo ? (
+                <video data-project-media src={projectVideo.url} aria-label={projectVideo.name} />
               ) : (
-                <img data-preview-media src={primaryArtifact?.url ?? '/assets/editor/viewer-poster.png'} alt={primaryArtifact?.name ?? 'Project preview'} />
+                <div className="viewer-empty-state" role="status">Project video unavailable</div>
               )}
             </div>
             {selectionKind && (
@@ -304,7 +311,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
               </>
             )}
           </>
-        )}
+        ) : <div className="viewer-empty-state" role="status">Project video unavailable</div>}
       </div>
       {currentArtifacts.length ? <ArtifactGallery artifacts={currentArtifacts} /> : null}
       <footer className="viewer-playback">
@@ -318,7 +325,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
           className="viewer-play-button"
           type="button"
           aria-label={isPlaying ? 'Pause' : 'Play'}
-          disabled={!hasMedia}
+          disabled={!hasTimeline}
           onClick={() => setPlaying(!isPlaying)}
         >
           {isPlaying ? <Pause aria-hidden size={20} fill="currentColor" /> : <Play aria-hidden size={20} fill="currentColor" />}

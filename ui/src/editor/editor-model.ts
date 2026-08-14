@@ -13,6 +13,8 @@ export type AssetView = Readonly<{
   id: string
   name: string
   kind: 'video' | 'audio'
+  mediaType?: string
+  url?: string
 }>
 
 export type RuntimeResourceView = Readonly<{

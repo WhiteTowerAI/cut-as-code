@@ -315,6 +315,46 @@ test('browser displays current Agent review image, video, and sandboxed HTML fro
   }
 })
 
+test('browser projects opaque project media into a playable Viewer and shared timeline', async ({ page }) => {
+  const isolated = await startSidecar(projectRoot)
+  try {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto(await armLaunch(isolated))
+    await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+
+    const viewer = page.getByRole('region', { name: 'Viewer', exact: true })
+    const source = viewer.locator('video[aria-label="source.mp4"]')
+    await expect(source).toHaveAttribute('src', new RegExp(`/v1/projects/${isolated.ready.projectId}/media/asset_[a-f0-9]+$`))
+    await expect(viewer.locator('img[src="/assets/editor/viewer-poster.png"]')).toHaveCount(0)
+
+    for (const tabName of ['My Assets', 'Captions', 'Cards', 'Graphic Motion']) {
+      const tab = page.getByRole('tab', { name: tabName, exact: true })
+      await expect(tab).toBeVisible()
+      await tab.click()
+      await expect(tab).toHaveAttribute('aria-selected', 'true')
+    }
+
+    const play = viewer.getByRole('button', { name: 'Play' })
+    const playbackBefore = await viewer.getByLabel('Playhead time').textContent()
+    const hitTarget = await play.evaluate((button) => {
+      const box = button.getBoundingClientRect()
+      return document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+        ?.closest('button')?.getAttribute('aria-label')
+    })
+    expect(hitTarget).toBe('Play')
+    await play.click()
+    await expect(viewer.getByRole('button', { name: 'Pause' })).toBeVisible()
+    await expect.poll(() => viewer.getByLabel('Playhead time').textContent()).not.toBe(playbackBefore)
+
+    const clip = page.getByRole('button', { name: 'Video clip', exact: true })
+    await clip.click()
+    await expect(clip).toHaveAttribute('aria-pressed', 'true')
+  } finally {
+    await page.close()
+    await stopSidecar(isolated.process)
+  }
+})
+
 test('mutation routes forward only typed protocol commands and return conflicts', async () => {
   const isolated = await authenticatedSidecar()
   try {

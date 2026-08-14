@@ -642,11 +642,22 @@ button {
   background: #fff;
 }
 
-.viewer-canvas img {
+.viewer-canvas img,
+.viewer-canvas video {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.viewer-empty-state {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: #a9adb9;
+  background: #111214;
+  font-size: 13px;
 }
 
 .viewer-selection-bounds {

@@ -167,32 +167,13 @@ test('protocol-incompatible Viewer commands stay disabled with accessible explan
   }
 })
 
-test('the populated preview renders real nonblank local pixels', async ({ page }) => {
+test('the populated fixture explicitly reports unavailable project video', async ({ page }) => {
   await page.setViewportSize({ width: 680, height: 688 })
   await page.goto('/?scenario=1-282')
 
-  const preview = page.locator('[data-preview-media]')
-  await expect(preview).toBeVisible()
-  await expect(preview).toHaveAttribute('src', /^\/assets\/editor\/viewer-poster\.png$/)
-  const sample = await preview.evaluate((element) => {
-    const image = element as HTMLImageElement
-    const canvas = document.createElement('canvas')
-    canvas.width = 8
-    canvas.height = 8
-    const context = canvas.getContext('2d', { willReadFrequently: true })!
-    context.drawImage(image, 0, 0, canvas.width, canvas.height)
-    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data
-    const colors = new Set<string>()
-    let nonTransparent = 0
-    for (let index = 0; index < pixels.length; index += 4) {
-      colors.add(`${pixels[index]},${pixels[index + 1]},${pixels[index + 2]}`)
-      if (pixels[index + 3] > 0) nonTransparent += 1
-    }
-    return { colorCount: colors.size, nonTransparent }
-  })
-
-  expect(sample.nonTransparent).toBe(64)
-  expect(sample.colorCount).toBeGreaterThan(4)
+  const viewer = page.getByRole('region', { name: 'Viewer', exact: true })
+  await expect(viewer.getByText('Project video unavailable', { exact: true })).toBeVisible()
+  await expect(viewer.locator('img[src="/assets/editor/viewer-poster.png"]')).toHaveCount(0)
 })
 
 test('the standalone Viewer frame uses its canonical five-second project clock', async ({ page }) => {
