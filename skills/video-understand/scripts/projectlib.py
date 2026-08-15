@@ -19,6 +19,7 @@ CONTRIBUTION_KINDS = {
     "video-filter",
     "audio-filter",
     "overlay",
+    "timeline-insert",
     "precomputed-asset",
     "output-constraint",
 }
@@ -1357,6 +1358,7 @@ def build_render_plan(project, project_root):
                 "timeline-transform": "input",
                 "video-filter": "plan",
                 "overlay": "asset",
+                "timeline-insert": "asset",
                 "precomputed-asset": "asset",
             }.get(kind)
             resolved_paths = {}
@@ -1373,7 +1375,7 @@ def build_render_plan(project, project_root):
                 errors.append(f"{operation_id} {kind} requires {required_path}")
             elif required_path:
                 required = resolved_paths[required_path]
-                if kind == "overlay" and contribution.get("asset_type") == "image-sequence":
+                if kind in {"overlay", "timeline-insert"} and contribution.get("asset_type") == "image-sequence":
                     _validate_image_sequence(
                         contribution,
                         required,
@@ -1385,6 +1387,23 @@ def build_render_plan(project, project_root):
                     errors.append(
                         f"{operation_id} missing {required_path}: {contribution[required_path]}"
                     )
+
+            if kind == "timeline-insert":
+                anchor_s = contribution.get("anchor_s")
+                duration_s = contribution.get("duration_s")
+                base_duration_s = timeline.get("program_duration_s") if timeline else None
+                if (
+                    isinstance(anchor_s, bool)
+                    or not isinstance(anchor_s, (int, float))
+                    or isinstance(duration_s, bool)
+                    or not isinstance(duration_s, (int, float))
+                    or duration_s <= 0
+                    or base_duration_s is None
+                    or anchor_s < 0
+                    or anchor_s > base_duration_s
+                    or contribution.get("audio") != {"mode": "silence"}
+                ):
+                    errors.append(f"{operation_id} timeline-insert contract is invalid")
 
             if kind == "video-filter":
                 if contribution.get("target") not in ("base-video", "composite"):

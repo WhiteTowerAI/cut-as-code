@@ -59,6 +59,7 @@
         "motion_family": "decode reveal",
         "interaction_model": "finite activation",
         "timing_rationale": "Start on signal and resolve before the next idea.",
+        "presentation_mode": "overlay",
         "compositing_mode": "transparent-overlay",
         "recipe_queries": ["technical text decode signal"]
       },

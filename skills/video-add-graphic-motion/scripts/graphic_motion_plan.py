@@ -658,6 +658,13 @@ def _frame_errors(cue_id, cue, render, program, timeline, project_root, verify_f
         and not (alpha_min < 255 and alpha_max > 0)
     ):
         errors.append(f"{cue_id} render sequence has no usable alpha")
+    if (
+        verify_files
+        and intent.get("presentation_mode", "overlay") == "timeline-insert"
+        and frames
+        and (alpha_min != 255 or alpha_max != 255)
+    ):
+        errors.append(f"{cue_id} timeline insert frames must be fully opaque")
     return list(dict.fromkeys(errors))
 
 
@@ -898,17 +905,34 @@ def validate_plan(plan, timeline, project=None, project_root=None, verify_files=
         if not program or not _source_ranges_match(cue.get("source_ranges"), program, timeline):
             errors.append(f"{cue_id} source_ranges do not match timeline")
         intent = cue.get("intent")
+        presentation_mode = (
+            intent.get("presentation_mode", "overlay")
+            if isinstance(intent, dict) else None
+        )
         if (
             not isinstance(intent, dict)
             or any(not _nonblank(intent.get(key)) for key in (
                 "content", "purpose", "motion_family", "interaction_model", "timing_rationale",
             ))
+            or not _one_of(presentation_mode, {"overlay", "timeline-insert"})
             or not _one_of(intent.get("compositing_mode"), {"transparent-overlay", "opaque-full-frame"})
             or not isinstance(intent.get("recipe_queries"), list)
             or not intent.get("recipe_queries")
             or any(not _nonblank(item) for item in intent.get("recipe_queries", []))
         ):
             errors.append(f"{cue_id} motion intent is incomplete")
+        selection = cue.get("selection") if isinstance(cue.get("selection"), dict) else {}
+        if (
+            presentation_mode == "timeline-insert"
+            and selection.get("structural_role") not in STRUCTURAL_ROLES
+        ):
+            errors.append(f"{cue_id} timeline insert requires a structural role")
+        if (
+            presentation_mode == "timeline-insert"
+            and isinstance(intent, dict)
+            and intent.get("compositing_mode") != "opaque-full-frame"
+        ):
+            errors.append(f"{cue_id} timeline insert must be opaque full-frame")
         errors.extend(_evidence_errors(
             cue_id,
             cue,
@@ -929,14 +953,26 @@ def validate_plan(plan, timeline, project=None, project_root=None, verify_files=
 
         render = cue.get("render")
         expected_duration = program[1] - program[0] if program else None
+        render_kind = "timeline-insert" if presentation_mode == "timeline-insert" else "overlay"
+        position_valid = (
+            render.get("start_s") == program[0]
+            if isinstance(render, dict) and render_kind == "overlay" and program
+            else (
+                _number(render.get("anchor_s")) is not None
+                and 0 <= float(render["anchor_s"]) <= duration
+                and render.get("audio") == {"mode": "silence"}
+            )
+            if isinstance(render, dict) and render_kind == "timeline-insert"
+            else False
+        )
         if (
             not isinstance(render, dict)
-            or render.get("kind") != "overlay"
+            or render.get("kind") != render_kind
             or render.get("asset_type") != "image-sequence"
             or render.get("asset") != f"cache/graphic-motion/rendered/{cue_id}"
             or render.get("fps") != timeline.get("fps")
             or not program
-            or render.get("start_s") != program[0]
+            or not position_valid
             or render.get("duration_s") != expected_duration
             or not re.fullmatch(r"[A-Za-z0-9._-]*%0?[1-9][0-9]*d[A-Za-z0-9._-]*", str(render.get("pattern", "")))
             or Path(str(render.get("pattern", ""))).name != render.get("pattern")
@@ -997,12 +1033,12 @@ def validate_plan(plan, timeline, project=None, project_root=None, verify_files=
     return errors
 
 
-def _verified_overlays(plan):
+def _verified_renders(plan):
     cues = plan.get("cues", []) if isinstance(plan, dict) else []
-    overlays = [copy.deepcopy(cue.get("render")) for cue in cues if isinstance(cue, dict) and cue.get("status") == "verified"]
-    if any(not isinstance(item, dict) for item in overlays):
+    renders = [copy.deepcopy(cue.get("render")) for cue in cues if isinstance(cue, dict) and cue.get("status") == "verified"]
+    if any(not isinstance(item, dict) for item in renders):
         raise ValueError("verified cues require render contributions")
-    return overlays
+    return renders
 
 
 def register_operation(project, plan, timeline, project_root, *, plan_path="graphic-motion/graphic-motion-plan.json"):
@@ -1022,17 +1058,18 @@ def register_operation(project, plan, timeline, project_root, *, plan_path="grap
         raise ValueError("plan dependencies do not match current dependencies")
     if plan.get("based_on") != based_on:
         raise ValueError("plan based_on does not match current revisions")
-    overlays = _verified_overlays(plan)
+    renders = _verified_renders(plan)
     old = [item for item in result["operations"] if isinstance(item, dict) and item.get("id") == "graphic-motion"]
     sequence = result.get("sequences", {}).get(result.get("active_sequence"), {})
     if not isinstance(sequence, dict) or not isinstance(sequence.get("operations"), list):
         raise ValueError("active sequence operations must be a list")
-    if not overlays:
+    if not renders:
         if old:
             result["operations"] = [item for item in result["operations"] if item.get("id") != "graphic-motion"]
             sequence["operations"] = [item for item in sequence["operations"] if item != "graphic-motion"]
             result.setdefault("render", {})["status"] = "draft"
         return result
+    has_timeline_insert = any(item.get("kind") == "timeline-insert" for item in renders)
     common = {
         "id": "graphic-motion",
         "skill": "video-add-graphic-motion",
@@ -1042,16 +1079,16 @@ def register_operation(project, plan, timeline, project_root, *, plan_path="grap
         "plan": plan_path,
         "plan_sha256": canonical_sha256(plan),
         "delivery_bindings": copy.deepcopy(plan.get("delivery_bindings")),
-        "outputs": [item["asset"] for item in overlays],
+        "outputs": [item["asset"] for item in renders],
         "target": {"sequence": result["active_sequence"], "scope": "graphic-motion"},
         "effects": {
-            "changes_timeline": False,
+            "changes_timeline": has_timeline_insert,
             "changes_geometry": False,
             "changes_video_pixels": True,
-            "changes_audio": False,
+            "changes_audio": has_timeline_insert,
             "adds_track": "graphic-motion",
         },
-        "render": overlays,
+        "render": renders,
         "check": {"status": "pass", "report": "../review/04-graphic-motion/graphic-motion-summary.md"},
     }
     expected = {**common, "revision": old[0].get("revision") if len(old) == 1 else None}
