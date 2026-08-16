@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react'
 import {
   ArrowDownToLine,
   ArrowUpToLine,
@@ -26,8 +34,7 @@ import {
 import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand/vanilla'
 import type { EditorState } from './editor-store'
-import type { ReviewArtifactView } from './editor-model'
-import type { ClipView } from './editor-model'
+import type { ClipView, EditorLayerView, LayerTransform, ReviewArtifactView } from './editor-model'
 
 type ViewerPanelProps = {
   store: StoreApi<EditorState>
@@ -63,6 +70,54 @@ export function sourceTimeToProgramTime(sourceTimeS: number, clips: readonly Cli
   if (!clip) return null
   return sourceTimeToProgramTimeInClip(sourceTimeS, clip)
 }
+
+export function isLayerActive(layer: EditorLayerView, programTimeS: number) {
+  return programTimeS >= layer.programRange.startS && programTimeS < layer.programRange.endS
+}
+
+export function graphicMotionFrameNumber(layer: EditorLayerView, programTimeS: number) {
+  const sequence = layer.imageSequence
+  if (!sequence || sequence.frameCount <= 0 || sequence.fps.numerator <= 0 || sequence.fps.denominator <= 0) return null
+  const fps = sequence.fps.numerator / sequence.fps.denominator
+  const offset = Math.max(0, programTimeS - layer.programRange.startS)
+  const frame = sequence.startNumber + Math.floor(offset * fps + 1e-9)
+  return Math.min(frame, sequence.startNumber + sequence.frameCount - 1)
+}
+
+function clampTransform(transform: LayerTransform): LayerTransform {
+  return {
+    x: Math.min(1, Math.max(0, transform.x)),
+    y: Math.min(1, Math.max(0, transform.y)),
+    scale: Math.min(4, Math.max(0.1, transform.scale)),
+  }
+}
+
+function layerSelectionKind(layer: EditorLayerView) {
+  return layer.kind === 'caption' ? 'caption' as const
+    : layer.kind === 'card' ? 'card' as const
+      : 'graphic-motion' as const
+}
+
+function layerText(layer: EditorLayerView) {
+  return typeof layer.content.text === 'string' ? layer.content.text : ''
+}
+
+function layerFrameUrl(layer: EditorLayerView, programTimeS: number) {
+  const frame = graphicMotionFrameNumber(layer, programTimeS)
+  const template = layer.imageSequence?.frameUrlTemplate
+  return frame === null || !template ? undefined : template.replace('%d', String(frame))
+}
+
+type LayerPointerState = Readonly<{
+  pointerId: number
+  mode: 'move' | 'scale'
+  layer: EditorLayerView
+  transform: LayerTransform
+  startClientX: number
+  startClientY: number
+  canvasWidth: number
+  canvasHeight: number
+}>
 
 function sourceTimeToProgramTimeInClip(sourceTimeS: number, clip: ClipView) {
   const programDuration = clip.programRange.endS - clip.programRange.startS
@@ -375,6 +430,9 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
   const seek = useStore(store, (state) => state.seek)
   const setPlaying = useStore(store, (state) => state.setPlaying)
   const setOpenMenu = useStore(store, (state) => state.setOpenMenu)
+  const select = useStore(store, (state) => state.select)
+  const editOperationDraft = useStore(store, (state) => state.editOperationDraft)
+  const operationDrafts = useStore(store, (state) => state.operationDrafts)
   const contentCardsOperation = useStore(store, (state) => state.project?.operations?.find((operation) => operation.kind === 'content-cards'))
   const operations = useStore(store, (state) => state.project?.operations)
   const currentArtifacts = operations?.flatMap((operation) => operation.preview?.artifacts ?? []) ?? []
@@ -392,10 +450,11 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
   const activeClipRef = useRef<ClipView | null>(null)
   const holdingBoundaryRef = useRef(false)
   const cancelBoundaryHoldRef = useRef<(() => boolean) | null>(null)
+  const layerPointerRef = useRef<LayerPointerState | null>(null)
   const unsupportedPlaybackRate = videoClips
     .map(playbackRateForClip)
     .find((playbackRate) => playbackRate !== null && !supportsNativePlaybackRate(playbackRate))
-  const canPlay = Boolean(projectVideo && !primaryArtifact && videoClips.length && unsupportedPlaybackRate === undefined)
+  const canPlay = Boolean(projectVideo && videoClips.length && unsupportedPlaybackRate === undefined)
   const hasTimeline = Boolean(project && project.durationS > 0)
   const runtime = Boolean(project?.runtime)
   const fps = project ? project.fps.numerator / project.fps.denominator : 30
@@ -403,6 +462,16 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     ? project.fps.denominator / project.fps.numerator
     : 1 / 30
   const sequenceGeometry = project?.sequenceGeometry
+  const layers = project?.layers?.map((layer) => {
+    const draft = operationDrafts[layer.operationId]
+    return draft?.fields.cueId === layer.cueId && draft.fields.transform
+      ? { ...layer, transform: draft.fields.transform }
+      : layer
+  }) ?? []
+  const activeLayers = layers.filter((layer) => isLayerActive(layer, currentTimeS))
+  const selectedLayer = activeLayers.find((layer) =>
+    selection?.id === layer.cueId && selection.kind === layerSelectionKind(layer),
+  )
 
   const fitPreview = useCallback(() => {
     const stage = stageRef.current
@@ -703,6 +772,66 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [setOpenMenu])
 
+  function beginLayerPointer(
+    event: ReactPointerEvent<HTMLElement>,
+    layer: EditorLayerView,
+    mode: 'move' | 'scale',
+  ) {
+    if (event.button !== 0) return
+    const canvas = event.currentTarget.closest('.viewer-canvas')
+    const rect = canvas?.getBoundingClientRect()
+    if (!rect?.width || !rect.height) return
+    event.preventDefault()
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    select({ kind: layerSelectionKind(layer), id: layer.cueId })
+    layerPointerRef.current = {
+      pointerId: event.pointerId,
+      mode,
+      layer,
+      transform: layer.transform,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      canvasWidth: rect.width,
+      canvasHeight: rect.height,
+    }
+  }
+
+  function moveLayerPointer(event: ReactPointerEvent<HTMLElement>) {
+    const state = layerPointerRef.current
+    if (!state || state.pointerId !== event.pointerId) return
+    event.preventDefault()
+    const deltaX = event.clientX - state.startClientX
+    const deltaY = event.clientY - state.startClientY
+    const transform = state.mode === 'move'
+      ? clampTransform({
+          ...state.transform,
+          x: state.transform.x + deltaX / state.canvasWidth,
+          y: state.transform.y + deltaY / state.canvasHeight,
+        })
+      : clampTransform({
+          ...state.transform,
+          scale: state.transform.scale + (deltaX + deltaY) / Math.min(state.canvasWidth, state.canvasHeight),
+        })
+    editOperationDraft(state.layer.operationId, { cueId: state.layer.cueId, transform })
+  }
+
+  function endLayerPointer(event: ReactPointerEvent<HTMLElement>) {
+    if (layerPointerRef.current?.pointerId !== event.pointerId) return
+    layerPointerRef.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+  }
+
+  function resetLayerTransform(layer: EditorLayerView) {
+    select({ kind: layerSelectionKind(layer), id: layer.cueId })
+    editOperationDraft(layer.operationId, {
+      cueId: layer.cueId,
+      transform: { x: 0.5, y: 0.5, scale: 1 },
+    })
+  }
+
   const selectionKind = runtime ? null : selection?.kind === 'caption' ? 'caption' : selection ? 'video' : null
   const toggleMenu = (menu: 'viewer-more' | 'aspect-ratio') => setOpenMenu(openMenu === menu ? null : menu)
 
@@ -724,11 +853,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
               data-fit-mode={sequenceGeometry ? 'fit' : undefined}
               style={fitSize ? { width: fitSize.width, height: fitSize.height } : undefined}
             >
-              {primaryArtifact?.mediaType.startsWith('video/') ? (
-                <video data-preview-media src={primaryArtifact.url} controls aria-label={primaryArtifact.name} />
-              ) : primaryArtifact?.mediaType.startsWith('image/') ? (
-                <img data-preview-media src={primaryArtifact.url} alt={primaryArtifact.name} />
-              ) : projectVideo ? (
+              {projectVideo ? (
                 <video
                   ref={projectVideoRef}
                   data-project-media
@@ -750,6 +875,62 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
               ) : (
                 <div className="viewer-empty-state" role="status">Project video unavailable</div>
               )}
+              {activeLayers.map((layer) => {
+                const selected = selection?.id === layer.cueId && selection.kind === layerSelectionKind(layer)
+                const frameUrl = layerFrameUrl(layer, currentTimeS)
+                const style = {
+                  '--layer-x': layer.transform.x,
+                  '--layer-y': layer.transform.y,
+                  '--layer-scale': layer.transform.scale,
+                  zIndex: layer.zIndex,
+                } as CSSProperties
+                return (
+                  <div
+                    className={`viewer-layer viewer-layer--${layer.kind}${selected ? ' viewer-layer--selected' : ''}`}
+                    data-viewer-layer={layer.kind}
+                    data-layer-id={layer.id}
+                    data-layer-x={layer.transform.x}
+                    data-layer-y={layer.transform.y}
+                    data-layer-scale={layer.transform.scale}
+                    data-layer-selected={selected || undefined}
+                    style={style}
+                    key={layer.id}
+                    onPointerDown={(event) => beginLayerPointer(event, layer, 'move')}
+                    onPointerMove={moveLayerPointer}
+                    onPointerUp={endLayerPointer}
+                    onPointerCancel={endLayerPointer}
+                  >
+                    {layer.kind === 'graphic-motion' ? (
+                      frameUrl ? <img src={frameUrl} alt="" draggable={false} /> : null
+                    ) : layer.kind === 'caption' ? (
+                      <span className="viewer-layer-caption-text">{layerText(layer)}</span>
+                    ) : (
+                      <span className="viewer-layer-card-text">{layerText(layer)}</span>
+                    )}
+                  </div>
+                )
+              })}
+              {selectedLayer ? (
+                <div className="viewer-layer-controls" aria-label="Layer transform controls">
+                  <button
+                    className="viewer-layer-reset"
+                    type="button"
+                    aria-label="Reset layer transform"
+                    title="Reset layer transform"
+                    onClick={() => resetLayerTransform(selectedLayer)}
+                  ><RotateCw aria-hidden size={14} /></button>
+                  <button
+                    className="viewer-layer-scale-handle"
+                    type="button"
+                    aria-label="Scale layer"
+                    title="Scale layer"
+                    onPointerDown={(event) => beginLayerPointer(event, selectedLayer, 'scale')}
+                    onPointerMove={moveLayerPointer}
+                    onPointerUp={endLayerPointer}
+                    onPointerCancel={endLayerPointer}
+                  />
+                </div>
+              ) : null}
             </div>
             {selectionKind && (
               <>
@@ -760,7 +941,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
           </>
         ) : <div className="viewer-empty-state" role="status">Project video unavailable</div>}
       </div>
-      {currentArtifacts.length ? <ArtifactGallery artifacts={currentArtifacts} /> : null}
+      {currentArtifacts.length ? <ArtifactGallery artifacts={currentArtifacts} primaryArtifactId={primaryArtifact?.id} /> : null}
       <footer className="viewer-playback">
         <div className="viewer-playback-left">
           <output aria-label="Playhead time">
@@ -806,15 +987,21 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
   )
 }
 
-function ArtifactGallery({ artifacts }: { artifacts: readonly ReviewArtifactView[] }) {
+function ArtifactGallery({
+  artifacts,
+  primaryArtifactId,
+}: {
+  artifacts: readonly ReviewArtifactView[]
+  primaryArtifactId?: string
+}) {
   return (
     <section role="region" aria-label="Current review artifacts" style={{ display: 'flex', gap: 8, padding: 8, overflowX: 'auto', background: '#17191e' }}>
       {artifacts.map((artifact) => (
         <figure key={artifact.id} data-artifact-url={artifact.url} style={{ flex: '0 0 180px', margin: 0 }}>
           {artifact.mediaType.startsWith('image/') ? (
-            <img src={artifact.url} alt={artifact.name} style={{ width: '100%', height: 100, objectFit: 'contain' }} />
+            <img data-preview-media={artifact.id === primaryArtifactId || undefined} src={artifact.url} alt={artifact.name} style={{ width: '100%', height: 100, objectFit: 'contain' }} />
           ) : artifact.mediaType.startsWith('video/') ? (
-            <video src={artifact.url} controls aria-label={artifact.name} style={{ width: '100%', height: 100 }} />
+            <video data-preview-media={artifact.id === primaryArtifactId || undefined} src={artifact.url} controls aria-label={artifact.name} style={{ width: '100%', height: 100 }} />
           ) : artifact.mediaType.startsWith('text/html') ? (
             <iframe src={artifact.url} title={artifact.name} sandbox="" style={{ width: '100%', height: 100, border: 0, background: '#fff' }} />
           ) : (

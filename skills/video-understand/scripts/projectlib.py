@@ -1289,6 +1289,7 @@ def _validate_graphic_motion_plan(
     try:
         domain_errors = _graphic_motion_module().validate_plan(
             plan, timeline, project=project, project_root=project_root, verify_files=True,
+            require_library_match=False,
         )
     except Exception as exc:
         errors.append(prefix + f"domain validation failed: {exc}")
@@ -1340,6 +1341,111 @@ def _validate_graphic_motion_plan(
             errors.append(prefix + "bound file is missing")
         elif _sha256_file(path) != binding["sha256"]:
             errors.append(prefix + "bound file SHA-256 is stale")
+
+
+_DEFAULT_EDITOR_TRANSFORM = {"x": 0.5, "y": 0.5, "scale": 1.0}
+
+
+def _editor_transform(value):
+    if value is None:
+        return dict(_DEFAULT_EDITOR_TRANSFORM)
+    if not isinstance(value, dict) or set(value) != {"x", "y", "scale"}:
+        raise ValueError("editor_transform must contain x, y, and scale")
+    x, y, scale = value["x"], value["y"], value["scale"]
+    if any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in (x, y, scale)):
+        raise ValueError("editor_transform values must be numbers")
+    if not 0 <= x <= 1 or not 0 <= y <= 1 or not 0.1 <= scale <= 4:
+        raise ValueError("editor_transform is out of range")
+    return {"x": float(x), "y": float(y), "scale": float(scale)}
+
+
+def _editor_transforms_for_contributions(operation_id, plan, contribution_count):
+    if operation_id == "graphic-motion":
+        cues = [
+            cue for cue in plan.get("cues", [])
+            if isinstance(cue, dict) and cue.get("status") == "verified"
+        ]
+    elif operation_id == "captions":
+        cues = [cue for cue in plan.get("cues", []) if isinstance(cue, dict)]
+    elif operation_id == "content-cards":
+        cues = [cue for cue in plan.get("cards", []) if isinstance(cue, dict)]
+    else:
+        return []
+    transforms = [_editor_transform(cue.get("editor_transform")) for cue in cues]
+    if len(transforms) == contribution_count:
+        return transforms
+    if all(transform == _DEFAULT_EDITOR_TRANSFORM for transform in transforms):
+        return [dict(_DEFAULT_EDITOR_TRANSFORM) for _ in range(contribution_count)]
+    raise ValueError(f"{operation_id} editor transforms require per-cue overlay assets")
+
+
+def _expand_editor_overlay_contributions(operation_id, plan, contributions, fps):
+    """Slice one full-program image sequence into cue-scoped overlay inputs."""
+    if operation_id == "captions":
+        cues = [cue for cue in plan.get("cues", []) if isinstance(cue, dict)]
+    elif operation_id == "content-cards":
+        cues = [cue for cue in plan.get("cards", []) if isinstance(cue, dict)]
+    else:
+        return list(contributions)
+
+    overlays = [item for item in contributions if isinstance(item, dict) and item.get("kind") == "overlay"]
+    if len(cues) <= 1 or len(overlays) != 1 or len(cues) == len(overlays):
+        return list(contributions)
+    transforms = [_editor_transform(cue.get("editor_transform")) for cue in cues]
+    if all(transform == _DEFAULT_EDITOR_TRANSFORM for transform in transforms):
+        return list(contributions)
+
+    base = overlays[0]
+    if base.get("asset_type") != "image-sequence":
+        raise ValueError(f"{operation_id} editor transforms require per-cue overlay assets")
+    if not isinstance(fps, dict) or fps.get("num", 0) <= 0 or fps.get("den", 0) <= 0:
+        raise ValueError(f"{operation_id} editor transforms require a valid timeline fps")
+    if base.get("fps") != fps:
+        raise ValueError(f"{operation_id} editor overlay fps does not match timeline fps")
+    base_start_number = base.get("start_number", 1)
+    if isinstance(base_start_number, bool) or not isinstance(base_start_number, int):
+        raise ValueError(f"{operation_id} editor overlay start_number must be an integer")
+
+    rate = fps["num"] / fps["den"]
+    base_start_frame = round(float(base.get("start_s", 0)) * rate)
+    expanded = []
+    previous_end = None
+    for index, cue in enumerate(cues, 1):
+        program_range = cue.get("program_range")
+        if isinstance(program_range, dict):
+            start = program_range.get("start_s")
+            end = program_range.get("end_s")
+        else:
+            start = cue.get("program_start_s")
+            duration = cue.get("duration_s")
+            end = start + duration if isinstance(start, (int, float)) and isinstance(duration, (int, float)) else None
+        if any(isinstance(value, bool) or not isinstance(value, (int, float)) for value in (start, end)):
+            raise ValueError(f"{operation_id} cue {index} program range is invalid")
+        start, end = float(start), float(end)
+        start_frame = round(start * rate)
+        end_frame = round(end * rate)
+        if start_frame < base_start_frame or end_frame <= start_frame:
+            raise ValueError(f"{operation_id} cue {index} program range is invalid")
+        if previous_end is not None and start_frame < previous_end:
+            raise ValueError(f"{operation_id} editor transforms require non-overlapping cues")
+        previous_end = end_frame
+        item = dict(base)
+        item.update({
+            "start_s": round(start, 9),
+            "duration_s": round(end - start, 9),
+            "start_number": base_start_number + start_frame - base_start_frame,
+        })
+        expanded.append(item)
+
+    output = []
+    replaced = False
+    for contribution in contributions:
+        if contribution is base and not replaced:
+            output.extend(expanded)
+            replaced = True
+        else:
+            output.append(contribution)
+    return output
 
 
 def build_render_plan(project, project_root):
@@ -1476,6 +1582,22 @@ def build_render_plan(project, project_root):
                     )
             if len(errors) != before:
                 continue
+        editor_transforms = None
+        if operation_id in {"captions", "content-cards", "graphic-motion"} and operation.get("plan"):
+            try:
+                editor_plan = load_json(resolve_project_path(project_root, operation["plan"]))
+                contributions = _expand_editor_overlay_contributions(
+                    operation_id, editor_plan, contributions, timeline.get("fps") if timeline else None
+                )
+                overlay_count = sum(
+                    isinstance(item, dict) and item.get("kind") == "overlay"
+                    for item in contributions
+                )
+                editor_transforms = iter(
+                    _editor_transforms_for_contributions(operation_id, editor_plan, overlay_count)
+                )
+            except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                errors.append(f"{operation_id} invalid editor transform mapping: {exc}")
         for contribution in contributions:
             if not isinstance(contribution, dict):
                 errors.append(f"{operation_id} render contribution must be an object")
@@ -1500,6 +1622,8 @@ def build_render_plan(project, project_root):
                     except (OSError, ValueError, json.JSONDecodeError) as exc:
                         errors.append(f"{operation_id} invalid caption plan: {exc}")
             item = {"operation": operation_id, **contribution}
+            if kind == "overlay" and editor_transforms is not None:
+                item["editor_transform"] = next(editor_transforms)
 
             required_path = {
                 "timeline-transform": "input",

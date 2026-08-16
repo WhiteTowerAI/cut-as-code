@@ -100,6 +100,100 @@ test('select replaces the existing editor selection', () => {
   expect(store.getState().selection).toEqual({ kind: 'caption', id: 'caption-3' })
 })
 
+test('layer transform changes stay local until Save Changes submits the typed draft', async () => {
+  let submitted: ContentCardsDraftChange | undefined
+  const transformedProject: EditorProjectView = {
+    ...project,
+    operations: project.operations?.map((operation) => operation.id === 'captions'
+      ? {
+          ...operation,
+          fields: {
+            cues: [{
+              id: 'cue-001',
+              text: 'First caption',
+              transform: { x: 0.5, y: 0.5, scale: 1 },
+            }],
+          },
+        }
+      : operation),
+  }
+  const savedProject: EditorProjectView = {
+    ...transformedProject,
+    revision: transformedProject.revision + 1,
+    operations: transformedProject.operations?.map((operation) => operation.id === 'captions'
+      ? { ...operation, revision: operation.revision + 1 }
+      : operation),
+  }
+  const store = createEditorStore({
+    project: transformedProject,
+    activeTab: 'captions',
+    selection: { kind: 'caption', id: 'cue-001' },
+    currentTimeS: 0,
+    isPlaying: false,
+    timelineZoom: 1,
+    snapEnabled: true,
+    openMenu: null,
+  }, {
+    save: async (_operationId, draft) => {
+      submitted = draft
+      return savedProject
+    },
+    review: async () => savedProject,
+  })
+
+  store.getState().editOperationDraft('captions', {
+    cueId: 'cue-001',
+    transform: { x: 0.7, y: 0.35, scale: 1.25 },
+  })
+
+  expect(store.getState().project?.operations?.find((item) => item.id === 'captions')?.fields)
+    .toMatchObject({ cues: [{ transform: { x: 0.5, y: 0.5, scale: 1 } }] })
+  expect(store.getState().getOperationDraft('captions')).toMatchObject({
+    dirty: true,
+    fields: { cueId: 'cue-001', transform: { x: 0.7, y: 0.35, scale: 1.25 } },
+  })
+
+  await store.getState().saveOperationDraft('captions')
+
+  expect(submitted).toEqual({
+    cueId: 'cue-001',
+    transform: { x: 0.7, y: 0.35, scale: 1.25 },
+  })
+})
+
+test('layer transform drafts use value equality and reject out-of-range values', () => {
+  const store = createStateStore()
+  store.getState().setProject({
+    ...project,
+    operations: project.operations?.map((operation) => operation.id === 'captions'
+      ? {
+          ...operation,
+          fields: {
+            cues: [{
+              id: 'cue-001',
+              text: 'First caption',
+              transform: { x: 0.5, y: 0.5, scale: 1 },
+            }],
+          },
+        }
+      : operation),
+  })
+
+  store.getState().editOperationDraft('captions', {
+    cueId: 'cue-001',
+    transform: { x: 0.5, y: 0.5, scale: 1 },
+  })
+  expect(store.getState().getOperationDraft('captions')).toMatchObject({ dirty: false })
+
+  store.getState().editOperationDraft('captions', {
+    cueId: 'cue-001',
+    transform: { x: 1.1, y: 0.5, scale: 1 },
+  })
+  expect(store.getState().getOperationDraft('captions')).toMatchObject({
+    fields: { transform: { x: 0.5, y: 0.5, scale: 1 } },
+  })
+})
+
 test('setOpenMenu keeps only the assigned menu open', () => {
   const store = createStateStore()
 
@@ -854,6 +948,62 @@ test('runtime projection creates independent real card and motion lanes without 
   expect(mapped.tracks[2].clips?.[0]).toMatchObject({ id: 'card-002', summary: 'Actual quote', programRange: { startS: 6, endS: 8 } })
   expect(mapped.tracks[3].clips?.[0]).toMatchObject({ id: 'motion-001', summary: 'Actual motion', programRange: { startS: 0, endS: 5 } })
   expect(JSON.stringify(mapped)).not.toContain('City Walk')
+})
+
+test('runtime projection maps composited Viewer layers without exposing filesystem paths', () => {
+  const snapshot: RuntimeSnapshot = {
+    read_only: false,
+    errors: [],
+    resources: [],
+    media: [],
+    artifacts: [],
+    view: {
+      project_id: 'layered-project',
+      project_revision: 1,
+      active_sequence: 'main',
+      timeline: { duration_s: 5, fps: { num: 30000, den: 1001 }, clips: [] },
+      layers: [
+        {
+          id: 'layer_caption', operation_id: 'captions', cue_id: 'caption-001',
+          kind: 'caption', media_type: 'dom', z_index: 100,
+          program_range: { start_s: 0, end_s: 5 },
+          transform: { x: 0.5, y: 0.85, scale: 1 },
+          content: { text: 'A real caption', style: { preset: 'clean' } },
+        },
+        {
+          id: 'layer_motion', operation_id: 'graphic-motion', cue_id: 'gm-001',
+          kind: 'graphic-motion', media_type: 'image-sequence', z_index: 300,
+          program_range: { start_s: 0, end_s: 5 },
+          transform: { x: 0.5, y: 0.5, scale: 1 },
+          content: { text: 'THE REAL TONY STARK?' },
+          image_sequence: {
+            pattern: 'frame_%06d.png', start_number: 1,
+            fps: { num: 30000, den: 1001 }, frame_count: 150,
+            frame_url_template: '/v1/projects/layered-project/layers/layer_motion/frames/%d',
+          },
+        },
+      ],
+    },
+  }
+
+  const mapped = projectFromSnapshot(null, snapshot)
+
+  expect(mapped?.layers).toEqual([
+    expect.objectContaining({
+      id: 'layer_caption', operationId: 'captions', cueId: 'caption-001',
+      kind: 'caption', mediaType: 'dom', zIndex: 100,
+      programRange: { startS: 0, endS: 5 },
+      transform: { x: 0.5, y: 0.85, scale: 1 },
+    }),
+    expect.objectContaining({
+      id: 'layer_motion', kind: 'graphic-motion', mediaType: 'image-sequence', zIndex: 300,
+      imageSequence: expect.objectContaining({
+        startNumber: 1, frameCount: 150,
+        frameUrlTemplate: '/v1/projects/layered-project/layers/layer_motion/frames/%d',
+      }),
+    }),
+  ])
+  expect(JSON.stringify(mapped)).not.toContain('work/cache')
 })
 
 test('graphic-motion runtime projection preserves every authoritative operation and resource', () => {

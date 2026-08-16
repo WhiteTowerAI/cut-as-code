@@ -7,6 +7,7 @@ import type {
   EditorSelection,
   LibraryTab,
   MenuId,
+  LayerTransform,
 } from './editor-model'
 
 export type ContentCardsDraftChange = Readonly<{
@@ -16,6 +17,7 @@ export type ContentCardsDraftChange = Readonly<{
   placement?: ContentCardPlacement
   enabled?: boolean
   text?: string
+  transform?: LayerTransform
 }>
 
 export type OperationDraft = Readonly<{
@@ -54,18 +56,36 @@ function isSupportedOperation(
 function isOperationDraftChange(operation: EditorOperationView, value: unknown): value is ContentCardsDraftChange {
   if (!value || typeof value !== 'object') return false
   const allowed = operation.kind === 'content-cards'
-    ? ['cueId', 'copy', 'layout', 'placement', 'enabled']
+    ? ['cueId', 'copy', 'layout', 'placement', 'enabled', 'transform']
     : operation.kind === 'captions'
-      ? ['cueId', 'text']
-      : ['cueId', 'enabled']
+      ? ['cueId', 'text', 'transform']
+      : ['cueId', 'enabled', 'transform']
   return Object.entries(value).every(([field, fieldValue]) => {
     if (!allowed.includes(field)) return false
     if (field === 'cueId') return typeof fieldValue === 'string' && Boolean(fieldValue.trim())
     if (field === 'enabled') return typeof fieldValue === 'boolean'
     if (field === 'copy' || field === 'text') return typeof fieldValue === 'string'
+    if (field === 'transform') return isLayerTransform(fieldValue)
     if (field === 'layout') return contentCardLayouts.includes(fieldValue as ContentCardLayout)
     return contentCardPlacements.includes(fieldValue as ContentCardPlacement)
   })
+}
+
+function isLayerTransform(value: unknown): value is LayerTransform {
+  if (!value || typeof value !== 'object') return false
+  const transform = value as Record<string, unknown>
+  if (Object.keys(transform).length !== 3 || !['x', 'y', 'scale'].every((field) => field in transform)) return false
+  const { x, y, scale } = transform
+  return typeof x === 'number' && Number.isFinite(x) && x >= 0 && x <= 1
+    && typeof y === 'number' && Number.isFinite(y) && y >= 0 && y <= 1
+    && typeof scale === 'number' && Number.isFinite(scale) && scale >= 0.1 && scale <= 4
+}
+
+function fieldValueMatches(authority: unknown, draft: unknown) {
+  if (isLayerTransform(authority) && isLayerTransform(draft)) {
+    return authority.x === draft.x && authority.y === draft.y && authority.scale === draft.scale
+  }
+  return authority === draft
 }
 
 function fieldsMatch(
@@ -79,7 +99,7 @@ function fieldsMatch(
     : undefined
   return Object.entries(draft).every(([field, value]) => {
     if (field === 'cueId') return Boolean(cue)
-    return (cue ?? authority)[field] === value
+    return fieldValueMatches((cue ?? authority)[field], value)
   })
 }
 

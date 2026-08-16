@@ -1,4 +1,4 @@
-import type { ContentCardsReview, ResourceResponse, RuntimeMutationResponse, RuntimeReadSet, RuntimeResourceContent, RuntimeSnapshot, SnapshotResponse } from './types'
+import type { ContentCardsReview, ResourceResponse, RuntimeExportJob, RuntimeExportResponse, RuntimeMutationResponse, RuntimeReadSet, RuntimeResourceContent, RuntimeSnapshot, SnapshotResponse } from './types'
 
 export class RuntimeConflictError extends Error {
   constructor(readonly snapshot?: RuntimeSnapshot) {
@@ -36,6 +36,21 @@ export class RuntimeApiClient {
     return () => events.close()
   }
 
+  async startExport(): Promise<RuntimeExportJob> {
+    return this.exportRequest(`/v1/projects/${encodeURIComponent(this.projectId)}/exports`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+  }
+
+  async getExportStatus(): Promise<RuntimeExportJob> {
+    return this.exportRequest(`/v1/projects/${encodeURIComponent(this.projectId)}/exports/status`, {
+      credentials: 'same-origin',
+    })
+  }
+
   async updateContentCards(readSet: RuntimeReadSet, review: ContentCardsReview) {
     return this.updatePlan('content-cards', readSet, review)
   }
@@ -65,5 +80,13 @@ export class RuntimeApiClient {
     if (response.status === 409 && value.snapshot) throw new RuntimeConflictError(value.snapshot)
     if (!response.ok || !value.ok) throw new Error(value.error ?? 'Protocol mutation failed')
     return value
+  }
+
+
+  private async exportRequest(path: string, init: RequestInit): Promise<RuntimeExportJob> {
+    const response = await fetch(path, init)
+    const value = await response.json() as RuntimeExportResponse
+    if (!response.ok || !value.ok) throw new Error(value.error ?? 'Video export failed')
+    return value.job
   }
 }

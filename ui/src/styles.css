@@ -814,6 +814,99 @@ button {
   object-fit: contain;
 }
 
+.viewer-layer {
+  position: absolute;
+  top: calc(var(--layer-y) * 100%);
+  left: calc(var(--layer-x) * 100%);
+  max-width: 88%;
+  touch-action: none;
+  transform: translate(-50%, -50%) scale(var(--layer-scale));
+  transform-origin: center;
+  cursor: move;
+  user-select: none;
+}
+
+.viewer-layer--caption {
+  width: min(76%, 760px);
+  padding: 10px 18px;
+  border-radius: 5px;
+  color: #fff;
+  background: rgb(7 9 12 / 76%);
+  font-size: clamp(12px, 1.9cqw, 28px);
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 85%);
+}
+
+.viewer-layer--card {
+  width: min(44%, 520px);
+  padding: 12px 16px;
+  border: 1px solid rgb(255 255 255 / 28%);
+  border-radius: 5px;
+  color: #f7f8fa;
+  background: rgb(20 23 28 / 88%);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 28%);
+  font-size: clamp(12px, 1.7cqw, 24px);
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.viewer-layer--graphic-motion {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+}
+
+.viewer-layer--graphic-motion:not(.viewer-layer--selected) {
+  pointer-events: none;
+}
+
+.viewer-layer--graphic-motion img {
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  object-fit: contain;
+}
+
+.viewer-layer--selected {
+  outline: 1px solid #fff;
+  outline-offset: 2px;
+}
+
+.viewer-layer-controls {
+  position: absolute;
+  z-index: 1000;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.viewer-layer-reset,
+.viewer-layer-scale-handle {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid #454a54;
+  border-radius: 4px;
+  color: #f7f8fa;
+  background: #1b1e24;
+}
+
+.viewer-layer-reset {
+  cursor: pointer;
+}
+
+.viewer-layer-scale-handle {
+  border-color: #7267ef;
+  background: #fff;
+  cursor: nwse-resize;
+}
+
 .viewer-canvas--fitted {
   max-width: calc(100% - 48px);
   max-height: calc(100% - 48px);
@@ -1575,13 +1668,33 @@ button {
 
 .runtime-status-secondary { color: #7f8490; }
 
+.workspace-export-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+}
+
+.workspace-export-status {
+  max-width: 260px;
+  overflow: hidden;
+  color: #aeb3bd;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-export-status--succeeded { color: #86d5a2; }
+.workspace-export-status--failed { color: #ff9b9b; }
+
 .workspace-operation-bar strong {
   font-size: 13px;
   font-weight: 600;
 }
 
 .workspace-operation-bar button {
-  width: 88px;
+  width: 112px;
   height: 36px;
   border: 0;
   border-radius: 6px;
@@ -1590,6 +1703,11 @@ button {
   font-size: 11px;
   font-weight: 600;
   opacity: 1;
+}
+
+.workspace-operation-bar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .workspace-project-data {

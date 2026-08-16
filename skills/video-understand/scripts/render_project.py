@@ -87,6 +87,26 @@ def _grade_filter(contribution, project_root, plan_dir):
     return chain or "null", cwd
 
 
+def _overlay_transform_filters(value):
+    if value is None:
+        return None, None
+    if not isinstance(value, dict) or set(value) != {"x", "y", "scale"}:
+        raise ValueError("overlay editor_transform must contain x, y, and scale")
+    x, y, scale = value["x"], value["y"], value["scale"]
+    if any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in (x, y, scale)):
+        raise ValueError("overlay editor_transform values must be numbers")
+    if not 0 <= x <= 1 or not 0 <= y <= 1 or not 0.1 <= scale <= 4:
+        raise ValueError("overlay editor_transform is out of range")
+    if float(x) == 0.5 and float(y) == 0.5 and float(scale) == 1.0:
+        return None, None
+    scale_filter = None if float(scale) == 1.0 else f"scale=iw*{float(scale):g}:ih*{float(scale):g}"
+    position = (
+        f"x='main_w*{float(x):g}-overlay_w/2':"
+        f"y='main_h*{float(y):g}-overlay_h/2'"
+    )
+    return scale_filter, position
+
+
 def _build(plan, project_root, plan_dir):
     if plan.get("schema_version") != 1:
         raise ValueError("render plan schema_version must be 1")
@@ -180,6 +200,7 @@ def _build(plan, project_root, plan_dir):
                     "pattern": contribution.get("pattern"),
                     "start_number": contribution.get("start_number", 1),
                     "fps": contribution.get("fps"),
+                    "editor_transform": contribution.get("editor_transform"),
                     "start_frame": start_frame,
                     "end_frame": end_frame,
                 }
@@ -206,6 +227,7 @@ def _build(plan, project_root, plan_dir):
                 {
                     "path": _resolve(project_root, plan_dir, contribution["asset"]),
                     "asset_type": "file",
+                    "editor_transform": contribution.get("editor_transform"),
                     "start_frame": start_frame,
                     "end_frame": end_frame,
                 }
@@ -254,15 +276,22 @@ def _build(plan, project_root, plan_dir):
         duration_filter = ""
         if end_frame is not None:
             duration_filter = f"trim=end_frame={end_frame - start_frame},"
+        scale_filter, overlay_position = _overlay_transform_filters(
+            overlay_spec.get("editor_transform")
+        )
+        transform_filter = f"{scale_filter}," if scale_filter else ""
         graph.append(
-            f"[{next_input}:v:0]{duration_filter}setpts=PTS-STARTPTS+"
+            f"[{next_input}:v:0]{duration_filter}{transform_filter}setpts=PTS-STARTPTS+"
             f"({start_frame}*{fps['den']}/{fps['num']})/TB[{overlay_label}]"
         )
         enable = ""
         if end_frame is not None:
             enable = f":enable='between(n,{start_frame},{end_frame - 1})'"
+        overlay_filter = "overlay=" + (
+            f"{overlay_position}:" if overlay_position else ""
+        ) + "eof_action=pass:shortest=0:format=auto"
         graph.append(
-            f"[{video_label}][{overlay_label}]overlay=eof_action=pass:shortest=0:format=auto"
+            f"[{video_label}][{overlay_label}]{overlay_filter}"
             f"{enable}[{output_label}]"
         )
         video_label = output_label

@@ -65,10 +65,36 @@ export type RuntimeSnapshot = Readonly<{
     graphic_motion_edit?: Readonly<{
       cues: readonly RuntimeGraphicMotionCue[]
     }>
+    layers?: readonly RuntimeLayer[]
   }>
   resources: readonly RuntimeResource[]
   media: readonly RuntimeFile[]
   artifacts: readonly RuntimeFile[]
+}>
+
+export type RuntimeLayerTransform = Readonly<{
+  x: number
+  y: number
+  scale: number
+}>
+
+export type RuntimeLayer = Readonly<{
+  id: string
+  operation_id: string
+  cue_id: string
+  kind: 'caption' | 'card' | 'graphic-motion'
+  media_type: 'dom' | 'image-sequence'
+  z_index: number
+  program_range: Readonly<{ start_s: number; end_s: number }>
+  transform: RuntimeLayerTransform
+  content: Readonly<Record<string, unknown>>
+  image_sequence?: Readonly<{
+    pattern: string
+    start_number: number
+    fps: Readonly<{ num: number; den: number }>
+    frame_count: number
+    frame_url_template?: string
+  }>
 }>
 
 export type RuntimeTimeline = Readonly<{
@@ -88,6 +114,7 @@ export type RuntimeCaptionCue = Readonly<{
   text: string
   program_range: Readonly<{ start_s: number; end_s: number }>
   source_ranges?: readonly Readonly<{ start_s: number; end_s: number }>[]
+  transform?: RuntimeLayerTransform
 }>
 
 export type RuntimeCardCue = Readonly<{
@@ -99,6 +126,7 @@ export type RuntimeCardCue = Readonly<{
   enabled: boolean
   program_range: Readonly<{ start_s: number; end_s: number }>
   data?: Readonly<Record<string, unknown>>
+  transform?: RuntimeLayerTransform
 }>
 
 export type RuntimeGraphicMotionCue = Readonly<{
@@ -112,6 +140,7 @@ export type RuntimeGraphicMotionCue = Readonly<{
   source_status?: string
   license_status?: string
   program_range: Readonly<{ start_s: number; end_s: number }>
+  transform?: RuntimeLayerTransform
 }>
 
 export type RuntimeOperation = Readonly<{
@@ -156,6 +185,22 @@ export type RuntimeMutationResponse = Readonly<{
   result?: 'committed' | 'no_change'
   error?: string
   snapshot?: RuntimeSnapshot
+}>
+
+export type RuntimeExportJob = Readonly<{
+  id?: string
+  status: 'idle' | 'running' | 'succeeded' | 'failed'
+  startedAt?: string
+  finishedAt?: string
+  output?: string
+  size?: number
+  error?: string
+}>
+
+export type RuntimeExportResponse = Readonly<{
+  ok: boolean
+  job: RuntimeExportJob
+  error?: string
 }>
 
 export type SnapshotResponse = Readonly<{

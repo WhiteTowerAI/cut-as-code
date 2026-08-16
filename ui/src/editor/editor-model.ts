@@ -37,6 +37,31 @@ export type ReviewArtifactView = Readonly<{
   url: string
 }>
 
+export type LayerTransform = Readonly<{
+  x: number
+  y: number
+  scale: number
+}>
+
+export type EditorLayerView = Readonly<{
+  id: string
+  operationId: string
+  cueId: string
+  kind: 'caption' | 'card' | 'graphic-motion'
+  mediaType: 'dom' | 'image-sequence'
+  zIndex: number
+  programRange: Readonly<{ startS: number; endS: number }>
+  transform: LayerTransform
+  content: Readonly<Record<string, unknown>>
+  imageSequence?: Readonly<{
+    pattern: string
+    startNumber: number
+    fps: Readonly<{ numerator: number; denominator: number }>
+    frameCount: number
+    frameUrlTemplate?: string
+  }>
+}>
+
 export type TrackView = Readonly<{
   id: string
   name: string
@@ -101,6 +126,7 @@ export type EditorProjectView = Readonly<{
   assets: readonly AssetView[]
   sourceAssetId?: string
   tracks: readonly TrackView[]
+  layers?: readonly EditorLayerView[]
   operations?: readonly EditorOperationView[]
   resources?: readonly RuntimeResourceView[]
 }>

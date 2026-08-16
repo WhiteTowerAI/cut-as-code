@@ -1,7 +1,9 @@
 """Regression coverage for editor-only stale project snapshots."""
 
 import copy
+import json
 import sys
+import tempfile
 import unittest
 from unittest import mock
 from pathlib import Path
@@ -14,6 +16,188 @@ import projectlib  # noqa: E402
 
 
 class EditorProtocolFreshnessTests(unittest.TestCase):
+    def test_build_render_plan_expands_caption_cues_into_independent_layers(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "work/render").mkdir(parents=True)
+            (root / "work/captions/overlay-frames").mkdir(parents=True)
+            (root / "work/review").mkdir()
+            (root / "source.mp4").write_bytes(b"source")
+            for name in ("frame_000007.png", "frame_000031.png"):
+                (root / "work/captions/overlay-frames" / name).write_bytes(b"frame")
+            for index in range(1, 5):
+                (root / "work/review" / f"caption-{index}.png").write_bytes(b"evidence")
+
+            timeline = {
+                "schema_version": 1,
+                "timeline_id": "main",
+                "source_asset_id": "source",
+                "fps": {"num": 30, "den": 1},
+                "source_duration_s": 2.0,
+                "program_duration_s": 2.0,
+                "clips": [{
+                    "id": "clip-001",
+                    "source_range": {"start_s": 0.0, "end_s": 2.0},
+                    "program_range": {"start_s": 0.0, "end_s": 2.0},
+                    "speed": 1.0,
+                    "decision_ref": "keep",
+                }],
+            }
+            (root / "work/timeline.json").write_text(json.dumps(timeline), encoding="utf-8")
+
+            caption_plan = {
+                "schema_version": 1,
+                "target": "overlay",
+                "timebase": "program",
+                "timeline_id": "main",
+                "source_transcript": "work/transcript.json",
+                "program_duration_s": 2.0,
+                "style": {
+                    "status": "approved",
+                    "selection_mode": "agent",
+                    "selection_rationale": "test",
+                    "choice_id": "preset-1",
+                    "preset": "clean",
+                    "resolved": {"font": "sans"},
+                },
+                "review": {
+                    "status": "approved",
+                    "evidence": [f"review/caption-{index}.png" for index in range(1, 5)],
+                },
+                "cues": [
+                    {
+                        "id": "caption-1",
+                        "start": 0.2,
+                        "end": 0.8,
+                        "program_range": {"start_s": 0.2, "end_s": 0.8},
+                        "editor_transform": {"x": 0.5, "y": 0.8, "scale": 1.0},
+                        "words": [{
+                            "clip_id": "clip-001",
+                            "source_range": {"start_s": 0.2, "end_s": 0.8},
+                            "program_range": {"start_s": 0.2, "end_s": 0.8},
+                        }],
+                    },
+                    {
+                        "id": "caption-2",
+                        "start": 1.0,
+                        "end": 1.5,
+                        "program_range": {"start_s": 1.0, "end_s": 1.5},
+                        "editor_transform": {"x": 0.5, "y": 0.6, "scale": 1.2},
+                        "words": [{
+                            "clip_id": "clip-001",
+                            "source_range": {"start_s": 1.0, "end_s": 1.5},
+                            "program_range": {"start_s": 1.0, "end_s": 1.5},
+                        }],
+                    },
+                ],
+                "renderer_recipe": {
+                    "engine": "hyperframes",
+                    "asset_type": "image-sequence",
+                "asset": "captions/overlay-frames",
+                    "fps": {"num": 30, "den": 1},
+                    "runtime_assets": [{"path": "runtime.js", "sha256": "0" * 64}],
+                },
+            }
+            (root / "work/captions/captions-plan.json").write_text(
+                json.dumps(caption_plan), encoding="utf-8"
+            )
+
+            project = {
+                "schema_version": 1,
+                "active_sequence": "main",
+                "source": {"path": "../source.mp4", "fingerprint": {"sha256": "0" * 64}},
+                "sequences": {"main": {"timeline": "timeline.json", "operations": ["captions"]}},
+                "operations": [{
+                    "id": "captions",
+                    "status": "approved",
+                    "skill": "video-add-captions",
+                    "plan": "captions/captions-plan.json",
+                    "render": {
+                        "kind": "overlay",
+                        "asset": "captions/overlay-frames",
+                        "asset_type": "image-sequence",
+                        "pattern": "frame_%06d.png",
+                        "start_number": 1,
+                        "fps": {"num": 30, "den": 1},
+                    },
+                }],
+                "render": {
+                    "plan": "render/render-plan.json",
+                    "output": "../final/final-video.mp4",
+                },
+            }
+
+            with mock.patch.object(projectlib, "validate_project", return_value=[]):
+                render_plan = projectlib.build_render_plan(project, root)
+
+            captions = [
+                item for item in render_plan["contributions"] if item["operation"] == "captions"
+            ]
+            self.assertEqual(2, len(captions))
+            self.assertEqual(
+                [(0.2, 0.6, 7, 0.5, 0.8, 1.0), (1.0, 0.5, 31, 0.5, 0.6, 1.2)],
+                [
+                    (
+                        item["start_s"], item["duration_s"], item["start_number"],
+                        item["editor_transform"]["x"], item["editor_transform"]["y"],
+                        item["editor_transform"]["scale"],
+                    )
+                    for item in captions
+                ],
+            )
+
+    def test_editor_transforms_map_only_when_cues_and_overlay_contributions_are_unambiguous(self):
+        motion_plan = {
+            "cues": [
+                {"id": "gm-1", "status": "verified", "editor_transform": {"x": 0.2, "y": 0.3, "scale": 0.8}},
+                {"id": "gm-2", "status": "verified"},
+            ]
+        }
+
+        self.assertEqual([
+            {"x": 0.2, "y": 0.3, "scale": 0.8},
+            {"x": 0.5, "y": 0.5, "scale": 1.0},
+        ], projectlib._editor_transforms_for_contributions("graphic-motion", motion_plan, 2))
+
+        caption_plan = {
+            "cues": [
+                {
+                    "id": "caption-1",
+                    "program_range": {"start_s": 0.2, "end_s": 0.8},
+                    "editor_transform": {"x": 0.5, "y": 0.8, "scale": 1.0},
+                },
+                {
+                    "id": "caption-2",
+                    "program_range": {"start_s": 1.0, "end_s": 1.5},
+                },
+            ]
+        }
+        contribution = {
+            "kind": "overlay",
+            "asset": "cache/captions/overlay-frames",
+            "asset_type": "image-sequence",
+            "pattern": "frame_%06d.png",
+            "start_number": 1,
+            "fps": {"num": 30, "den": 1},
+        }
+
+        expanded = projectlib._expand_editor_overlay_contributions(
+            "captions", caption_plan, [contribution], {"num": 30, "den": 1}
+        )
+
+        self.assertEqual(2, len(expanded))
+        self.assertEqual({"start_s": 0.2, "duration_s": 0.6, "start_number": 7}, {
+            key: expanded[0][key] for key in ("start_s", "duration_s", "start_number")
+        })
+        self.assertEqual({"start_s": 1.0, "duration_s": 0.5, "start_number": 31}, {
+            key: expanded[1][key] for key in ("start_s", "duration_s", "start_number")
+        })
+
+        self.assertEqual([
+            {"x": 0.5, "y": 0.8, "scale": 1.0},
+            {"x": 0.5, "y": 0.5, "scale": 1.0},
+        ], projectlib._editor_transforms_for_contributions("captions", caption_plan, len(expanded)))
+
     def test_validate_project_rejects_stale_dependency_by_default(self):
         project = self._project_with_stale_dependency()
 

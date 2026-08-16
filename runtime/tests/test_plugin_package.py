@@ -427,6 +427,7 @@ process.stdout.write(JSON.stringify({
                 if name.startswith("runtime/") and Path(name).suffix in {".cjs", ".py"}
             }
             self.assertEqual(set(executable_sources), {
+                "runtime/export_project.py",
                 "runtime/mcp.cjs",
                 "runtime/project_snapshot.py",
                 "runtime/protocol_service.py",
@@ -441,7 +442,7 @@ process.stdout.write(JSON.stringify({
             for source in executable_sources.values():
                 for forbidden in ("execFile", "spawnSync", "shell: true", "codex exec", "/v1/render", "/v1/preview", "/v1/jobs", "/v1/shell", "/v1/exec", "/v1/files"):
                     self.assertNotIn(forbidden, source)
-            self.assertEqual(sidecar.count("spawn("), 1)
+            self.assertEqual(sidecar.count("spawn("), 2)
             self.assertEqual(mcp.count("spawn("), 1)
             self.assertIn("startProtocolService", sidecar)
             self.assertIn("sidecar.cjs", mcp)
@@ -471,9 +472,12 @@ process.stdout.write(JSON.stringify({
             ["GET", "/v1/projects/project_a/snapshot"],
             ["POST", "/v1/projects/project_a/transactions"],
             ["POST", "/v1/projects/project_a/reviews/decision"],
+            ["POST", "/v1/projects/project_a/exports"],
+            ["GET", "/v1/projects/project_a/exports/status"],
             ["GET", "/v1/projects/project_a/resources/res_a1"],
             ["GET", "/v1/projects/project_a/media/asset_a1"],
             ["GET", "/v1/projects/project_a/artifacts/artifact_a1"],
+            ["GET", "/v1/projects/project_a/layers/layer_a1/frames/1"],
             ["GET", "/v1/projects/project_a/events"],
             ["GET", "/assets/index.js"],
             ["HEAD", "/assets/index.js"],
@@ -499,11 +503,11 @@ process.stdout.write(JSON.stringify({
         audit = json.loads(result.stdout)
         self.assertEqual(
             audit["declared"],
-            ["launch", "meta", "snapshot", "transaction", "review", "resource", "file", "events", "static"],
+            ["launch", "meta", "snapshot", "transaction", "review", "export-start", "export-status", "resource", "file", "layer-frame", "events", "static"],
         )
         self.assertEqual(
             audit["actual"],
-            ["launch", "meta", "snapshot", "transaction", "review", "resource", "file", "file", "events", "static", "static", None, None, None, None],
+            ["launch", "meta", "snapshot", "transaction", "review", "export-start", "export-status", "resource", "file", "file", "layer-frame", "events", "static", "static", None, None, None, None],
         )
 
     def _assert_unknown_third_party_asset_is_rejected(

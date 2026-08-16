@@ -130,7 +130,7 @@ class ProjectSnapshotTests(unittest.TestCase):
                 "schema_version": 1,
                 "style": {"status": "approved", "preset": "clean"},
                 "cues": [
-                    {"id": "cue-001", "index": 1, "start": 1, "end": 2, "text": "First real caption", "program_range": {"start_s": 1, "end_s": 2}},
+                    {"id": "cue-001", "index": 1, "start": 1, "end": 2, "text": "First real caption", "program_range": {"start_s": 1, "end_s": 2}, "editor_transform": {"x": 0.4, "y": 0.8, "scale": 1.2}},
                     {"id": "cue-002", "index": 2, "start": 3, "end": 4, "text": "Second real caption", "program_range": {"start_s": 3, "end_s": 4}},
                 ],
             }), encoding="utf-8")
@@ -139,7 +139,7 @@ class ProjectSnapshotTests(unittest.TestCase):
                 "brief": {"theme": "editorial", "target_card_count": 2},
                 "cards": [
                     {"id": "card-001", "card_type": "title", "program_start_s": 2, "duration_s": 2, "copy": {"text": "First card"}, "placement": {"region": "top"}, "visual_treatment": {"layout": "default"}},
-                    {"id": "card-002", "card_type": "quote", "program_start_s": 6, "duration_s": 2, "copy": {"text": "Second card"}, "placement": {"region": "bottom"}, "visual_treatment": {"layout": "quote"}},
+                    {"id": "card-002", "card_type": "quote", "program_start_s": 6, "duration_s": 2, "copy": {"text": "Second card"}, "placement": {"region": "bottom"}, "visual_treatment": {"layout": "quote"}, "editor_transform": {"x": 0.6, "y": 0.7, "scale": 0.9}},
                 ],
             }), encoding="utf-8")
             (root / "work" / "graphic-motion" / "graphic-motion-plan.json").write_text(json.dumps({
@@ -155,6 +155,21 @@ class ProjectSnapshotTests(unittest.TestCase):
                         "manifest": {"path": "work/cache/recipe.motion.yaml", "sha256": "a" * 64},
                         "files": [{"path": "work/cache/source/LICENSE", "sha256": "b" * 64}],
                     },
+                    "render": {
+                        "kind": "overlay",
+                        "asset": "cache/graphic-motion/rendered/motion-001",
+                        "asset_type": "image-sequence",
+                        "pattern": "frame_%06d.png",
+                        "start_number": 1,
+                        "fps": {"num": 30, "den": 1},
+                        "start_s": 0,
+                        "duration_s": 5,
+                        "frames": [
+                            {"path": "work/cache/graphic-motion/rendered/motion-001/frame_000001.png", "sha256": "c" * 64},
+                            {"path": "work/cache/graphic-motion/rendered/motion-001/frame_000002.png", "sha256": "d" * 64},
+                        ],
+                    },
+                    "editor_transform": {"x": 0.55, "y": 0.5, "scale": 1.1},
                     "review": {"status": "approved", "mode": "agent"},
                 }],
             }), encoding="utf-8")
@@ -188,6 +203,36 @@ class ProjectSnapshotTests(unittest.TestCase):
         self.assertEqual("recipe-real", view["graphic_motion_edit"]["cues"][0]["recipe_id"])
         self.assertEqual("bound", view["graphic_motion_edit"]["cues"][0]["source_status"])
         self.assertEqual("unknown", view["graphic_motion_edit"]["cues"][0]["license_status"])
+        self.assertEqual(
+            ["caption", "caption", "card", "card", "graphic-motion"],
+            [layer["kind"] for layer in view["layers"]],
+        )
+        self.assertEqual(
+            {"x": 0.4, "y": 0.8, "scale": 1.2},
+            view["layers"][0]["transform"],
+        )
+        self.assertEqual(
+            {"x": 0.5, "y": 0.5, "scale": 1.0},
+            view["layers"][1]["transform"],
+        )
+        self.assertEqual(
+            {"x": 0.6, "y": 0.7, "scale": 0.9},
+            view["layers"][3]["transform"],
+        )
+        motion = view["layers"][4]
+        self.assertEqual("image-sequence", motion["media_type"])
+        self.assertEqual({"start_s": 0, "end_s": 5}, motion["program_range"])
+        self.assertEqual(
+            {
+                "pattern": "frame_%06d.png",
+                "start_number": 1,
+                "fps": {"num": 30, "den": 1},
+                "frame_count": 2,
+            },
+            motion["image_sequence"],
+        )
+        self.assertNotIn("asset", json.dumps(view["layers"]))
+        self.assertNotIn("work/cache", json.dumps(view["layers"]))
 
 
 if __name__ == "__main__":

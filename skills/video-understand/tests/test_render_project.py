@@ -31,6 +31,55 @@ def _frame_pixel(path, frame):
 
 
 class OverlayFrameBoundaryTests(unittest.TestCase):
+    def test_overlay_editor_transform_scales_and_positions_from_normalized_center(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            render_dir = root / "work" / "render"
+            render_dir.mkdir(parents=True)
+            (root / "final").mkdir()
+            _color_video(root / "source.mp4", "black", 60)
+            _color_video(root / "overlay.mp4", "red", 10)
+            timeline = {
+                "schema_version": 1,
+                "timeline_id": "source",
+                "source_asset_id": "source",
+                "fps": {"num": 60, "den": 1},
+                "source_duration_s": 1.0,
+                "program_duration_s": 1.0,
+                "clips": [{
+                    "id": "clip-001",
+                    "source_range": {"start_s": 0.0, "end_s": 1.0},
+                    "program_range": {"start_s": 0.0, "end_s": 1.0},
+                    "speed": 1.0,
+                }],
+            }
+            (root / "work" / "timeline.json").write_text(json.dumps(timeline), encoding="utf-8")
+            plan = {
+                "schema_version": 1,
+                "sequence": "main",
+                "source": "../../source.mp4",
+                "timeline": "../timeline.json",
+                "contributions": [{
+                    "operation": "graphic-motion",
+                    "kind": "overlay",
+                    "asset": "../../overlay.mp4",
+                    "start_s": 0,
+                    "duration_s": 0.5,
+                    "editor_transform": {"x": 0.25, "y": 0.75, "scale": 0.5},
+                }],
+                "output": "../../final/output.mp4",
+            }
+
+            command = render_project.build_command(plan, root)
+            graph = command[command.index("-filter_complex") + 1]
+
+            self.assertIn("scale=iw*0.5:ih*0.5", graph)
+            self.assertIn("overlay=x='main_w*0.25-overlay_w/2':y='main_h*0.75-overlay_h/2'", graph)
+
+    def test_default_editor_transform_preserves_the_existing_overlay_graph(self):
+        overlay = {"x": 0.5, "y": 0.5, "scale": 1.0}
+        self.assertEqual((None, None), render_project._overlay_transform_filters(overlay))
+
     def test_overlay_uses_exact_first_and_last_frame_on_rational_boundaries(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

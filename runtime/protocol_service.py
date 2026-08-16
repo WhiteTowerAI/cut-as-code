@@ -143,21 +143,65 @@ class ProtocolService:
     def _apply_plan_update(self, context, review):
         root, snapshot, project, operation, plan_path, plan, expected = context
         operation_id = operation.get("id")
+        transform_only = False
         if operation_id == "content-cards":
             try:
-                updated_plan = apply_cards_review.apply_review(plan, review)
+                if not isinstance(review, dict):
+                    raise ValueError("content-cards review must be an object")
+                editor_transform = review.get("editor_transform")
+                transform_only = set(review) == {"schema_version", "editor_transform"}
+                if transform_only and review.get("schema_version") != 1:
+                    raise ValueError("content-cards transform schema_version must be 1")
+                typed_review = {
+                    key: copy.deepcopy(value)
+                    for key, value in review.items()
+                    if key != "editor_transform"
+                }
+                updated_plan = copy.deepcopy(plan) if transform_only else apply_cards_review.apply_review(plan, typed_review)
+                if editor_transform is not None:
+                    if (not isinstance(editor_transform, dict)
+                            or set(editor_transform) != {"cue_id", "x", "y", "scale"}):
+                        raise ValueError("content-cards editor_transform is invalid")
+                    cue_id = editor_transform["cue_id"]
+                    transform = {key: editor_transform[key] for key in ("x", "y", "scale")}
+                    self._validate_editor_transform(transform)
+                    updated_plan = self._apply_editor_transform(
+                        updated_plan, "content-cards", cue_id, transform
+                    )
             except (TypeError, ValueError) as exc:
                 return {"ok": False, "error": f"invalid content-cards review: {exc}"}
         elif operation_id == "captions":
             try:
-                updated_plan = self._apply_caption_update(plan, review)
-                self._validate_caption_plan(updated_plan)
+                transform_only = (
+                    isinstance(review, dict)
+                    and set(review) == {"schema_version", "cue_id", "editor_transform"}
+                )
+                if transform_only:
+                    if review.get("schema_version") != 1:
+                        raise ValueError("caption update schema_version must be 1")
+                    updated_plan = self._apply_editor_transform(
+                        plan, "captions", review.get("cue_id"), review.get("editor_transform")
+                    )
+                else:
+                    updated_plan = self._apply_caption_update(plan, review)
+                    self._validate_caption_plan(updated_plan)
             except (TypeError, ValueError) as exc:
                 return {"ok": False, "error": f"invalid captions update: {exc}"}
         elif operation_id == "graphic-motion":
             try:
-                updated_plan = self._apply_graphic_motion_update(plan, review)
-                self._validate_graphic_motion_plan(root, project, updated_plan)
+                transform_only = (
+                    isinstance(review, dict)
+                    and set(review) == {"schema_version", "cue_id", "editor_transform"}
+                )
+                if transform_only:
+                    if review.get("schema_version") != 1:
+                        raise ValueError("graphic-motion update schema_version must be 1")
+                    updated_plan = self._apply_editor_transform(
+                        plan, "graphic-motion", review.get("cue_id"), review.get("editor_transform")
+                    )
+                else:
+                    updated_plan = self._apply_graphic_motion_update(plan, review)
+                    self._validate_graphic_motion_plan(root, project, updated_plan)
             except (TypeError, ValueError) as exc:
                 return {"ok": False, "error": f"invalid graphic-motion update: {exc}"}
         else:
@@ -166,63 +210,123 @@ class ProtocolService:
             return {"ok": True, "result": "no_change", "snapshot": self._public_snapshot(snapshot)}
         updated_project = copy.deepcopy(project)
         changed = next(item for item in updated_project["operations"] if item.get("id") == operation_id)
-        changed.update({"revision": changed["revision"] + 1, "status": "stale", "outputs": []})
-        if isinstance(changed.get("check"), dict):
-            changed["check"] = {**changed["check"], "status": "pending"}
-        self._invalidate_dependents(updated_project, operation_id)
+        changed["revision"] += 1
+        if transform_only:
+            if "plan_sha256" in changed:
+                payload = json.dumps(
+                    updated_plan, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+                ).encode("utf-8")
+                changed["plan_sha256"] = hashlib.sha256(payload).hexdigest()
+            self._advance_transform_dependencies(updated_project, operation_id, changed["revision"])
+        else:
+            changed.update({"status": "stale", "outputs": []})
+            if isinstance(changed.get("check"), dict):
+                changed["check"] = {**changed["check"], "status": "pending"}
+            self._invalidate_dependents(updated_project, operation_id)
         updated_project.setdefault("render", {})["status"] = "draft"
         return self._commit(root, plan_path, updated_plan, updated_project, expected, "plan.update", operation_id)
 
     @staticmethod
     def _apply_caption_update(plan, update):
-        if not isinstance(update, dict) or set(update) != {"schema_version", "cue_id", "text"}:
-            raise ValueError("caption update must contain schema_version, cue_id, and text")
+        if (not isinstance(update, dict)
+                or not {"schema_version", "cue_id"}.issubset(update)
+                or set(update) - {"schema_version", "cue_id", "text", "editor_transform"}):
+            raise ValueError("caption update must contain only typed cue fields")
+        if "text" not in update and "editor_transform" not in update:
+            raise ValueError("caption update must change text or editor_transform")
         if update.get("schema_version") != 1:
             raise ValueError("caption update schema_version must be 1")
         cue_id = update.get("cue_id")
-        text = update.get("text")
         if not isinstance(cue_id, str) or not cue_id.strip():
             raise ValueError("caption cue_id must be nonblank")
-        if not isinstance(text, str) or not text.strip():
-            raise ValueError("caption text must be nonblank")
-        if len(text) > 500:
-            raise ValueError("caption text is too long")
         updated = copy.deepcopy(plan)
         cue = next((item for item in updated.get("cues", []) if isinstance(item, dict) and item.get("id") == cue_id), None)
         if cue is None:
             raise ValueError("caption cue does not exist")
-        cue["text"] = text.strip()
-        cue["lines"] = [text.strip()]
-        updated["review"] = {"status": "pending", "evidence": []}
+        if "text" in update:
+            text = update["text"]
+            if not isinstance(text, str) or not text.strip():
+                raise ValueError("caption text must be nonblank")
+            if len(text) > 500:
+                raise ValueError("caption text is too long")
+            cue["text"] = text.strip()
+            cue["lines"] = [text.strip()]
+        if "editor_transform" in update:
+            ProtocolService._validate_editor_transform(update["editor_transform"])
+            updated = ProtocolService._apply_editor_transform(
+                updated, "captions", cue_id, update["editor_transform"]
+            )
+        if "text" in update:
+            updated["review"] = {"status": "pending", "evidence": []}
         return updated
 
     @staticmethod
     def _apply_graphic_motion_update(plan, update):
-        if not isinstance(update, dict) or set(update) != {"schema_version", "cue_id", "enabled"}:
-            raise ValueError("graphic-motion update must contain schema_version, cue_id, and enabled")
+        if (not isinstance(update, dict)
+                or not {"schema_version", "cue_id"}.issubset(update)
+                or set(update) - {"schema_version", "cue_id", "enabled", "editor_transform"}):
+            raise ValueError("graphic-motion update must contain only typed cue fields")
+        if "enabled" not in update and "editor_transform" not in update:
+            raise ValueError("graphic-motion update must change enabled or editor_transform")
         if update.get("schema_version") != 1:
             raise ValueError("graphic-motion update schema_version must be 1")
         cue_id = update.get("cue_id")
-        enabled = update.get("enabled")
         if not isinstance(cue_id, str) or not cue_id.strip():
             raise ValueError("graphic-motion cue_id must be nonblank")
-        if not isinstance(enabled, bool):
-            raise ValueError("graphic-motion enabled must be boolean")
         updated = copy.deepcopy(plan)
         cue = next((item for item in updated.get("cues", []) if isinstance(item, dict) and item.get("id") == cue_id), None)
         if cue is None:
             raise ValueError("graphic-motion cue does not exist")
-        if enabled:
-            cue["status"] = "verified"
-            cue.pop("skip_reason", None)
-        else:
-            cue["status"] = "skipped"
-            cue["skip_reason"] = "Disabled in the Protocol V1 editor"
+        if "enabled" in update:
+            enabled = update["enabled"]
+            if not isinstance(enabled, bool):
+                raise ValueError("graphic-motion enabled must be boolean")
+            if enabled:
+                cue["status"] = "verified"
+                cue.pop("skip_reason", None)
+            else:
+                cue["status"] = "skipped"
+                cue["skip_reason"] = "Disabled in the Protocol V1 editor"
+        if "editor_transform" in update:
+            ProtocolService._validate_editor_transform(update["editor_transform"])
+            updated = ProtocolService._apply_editor_transform(
+                updated, "graphic-motion", cue_id, update["editor_transform"]
+            )
         bindings = list(graphic_motion_plan._input_bindings(updated))
         for item in updated.get("cues", []):
             if isinstance(item, dict) and item.get("status") == "verified":
                 bindings.extend(graphic_motion_plan._cue_bindings(item))
         updated["delivery_bindings"] = bindings
+        return updated
+
+    @staticmethod
+    def _validate_editor_transform(transform):
+        if not isinstance(transform, dict) or set(transform) != {"x", "y", "scale"}:
+            raise ValueError("editor_transform must contain x, y, and scale")
+        x, y, scale = transform["x"], transform["y"], transform["scale"]
+        if any(isinstance(value, bool) or not isinstance(value, (int, float)) for value in (x, y, scale)):
+            raise ValueError("editor_transform values must be numbers")
+        if not 0 <= x <= 1 or not 0 <= y <= 1:
+            raise ValueError("editor_transform position must be normalized")
+        if not 0.1 <= scale <= 4:
+            raise ValueError("editor_transform scale is out of range")
+        return {"x": float(x), "y": float(y), "scale": float(scale)}
+
+    @staticmethod
+    def _apply_editor_transform(plan, operation_id, cue_id, transform):
+        if not isinstance(cue_id, str) or not cue_id.strip():
+            raise ValueError("editor_transform cue_id must be nonblank")
+        transform = ProtocolService._validate_editor_transform(transform)
+        collection = "cards" if operation_id == "content-cards" else "cues"
+        updated = copy.deepcopy(plan)
+        cue = next((item for item in updated.get(collection, [])
+                    if isinstance(item, dict) and item.get("id") == cue_id), None)
+        if cue is None:
+            raise ValueError("editor_transform cue does not exist")
+        if transform == {"x": 0.5, "y": 0.5, "scale": 1.0}:
+            cue.pop("editor_transform", None)
+        else:
+            cue["editor_transform"] = transform
         return updated
 
     def _record_review(self, request):
@@ -359,6 +463,16 @@ class ProtocolService:
                     node["status"] = "stale"
                     stale.add(node.get("id"))
                     changed = True
+        for review in project.get("reviews", []):
+            if changed_id in review.get("depends_on", []):
+                review["status"] = "stale"
+
+    @staticmethod
+    def _advance_transform_dependencies(project, changed_id, revision):
+        for operation in project.get("operations", []):
+            based_on = operation.get("based_on")
+            if isinstance(based_on, dict) and changed_id in based_on:
+                based_on[changed_id] = revision
         for review in project.get("reviews", []):
             if changed_id in review.get("depends_on", []):
                 review["status"] = "stale"

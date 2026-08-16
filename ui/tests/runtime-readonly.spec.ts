@@ -1,8 +1,9 @@
 import { expect, request, test, type APIRequestContext } from '@playwright/test'
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { execFile } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { promisify } from 'node:util'
-import { cp, mkdtemp, mkdir, readFile, rm, symlink, utimes, writeFile } from 'node:fs/promises'
+import { cp, mkdtemp, mkdir, readFile, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -17,6 +18,7 @@ type StartedSidecar = Readonly<{
   process: ChildProcessWithoutNullStreams
   ready: ReadyMessage
   readLine: () => Promise<string>
+  getStderr: () => string
 }>
 
 const uiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -158,6 +160,79 @@ test('streams confined media by opaque ID with HTTP byte ranges', async () => {
       `/v1/projects/${isolated.ready.projectId}/media/${encodeURIComponent('../source.mp4')}`,
     )
     expect(unknown.status()).toBe(404)
+  } finally {
+    await isolated.client.dispose()
+    await stopSidecar(isolated.process)
+  }
+})
+
+test('serves only declared hash-bound Graphic Motion frames through opaque layer URLs', async () => {
+  const root = await createGraphicMotionLayerProjectFixture()
+  const isolated = await authenticatedSidecarFor(root)
+  try {
+    const snapshotResponse = await isolated.client.get(`/v1/projects/${isolated.ready.projectId}/snapshot`)
+    expect(snapshotResponse.status()).toBe(200)
+    const snapshotBody = await snapshotResponse.json()
+    const layer = snapshotBody.snapshot.view.layers[0]
+    expect(layer).toMatchObject({
+      kind: 'graphic-motion',
+      media_type: 'image-sequence',
+      image_sequence: { frame_count: 1, frame_url_template: expect.stringContaining('/layers/') },
+    })
+    expect(JSON.stringify(layer)).not.toContain('work/cache')
+
+    const frameURL = layer.image_sequence.frame_url_template.replace('%d', '1')
+    const frame = await isolated.client.get(frameURL)
+    expect(frame.status()).toBe(200)
+    expect(frame.headers()['content-type']).toBe('image/png')
+    await frame.body()
+
+    const undeclared = await isolated.client.get(layer.image_sequence.frame_url_template.replace('%d', '2'))
+    expect(undeclared.status()).toBe(404)
+    await undeclared.body()
+
+    await writeFile(path.join(root, 'work', 'cache', 'graphic-motion', 'rendered', 'motion-001', 'frame_000001.png'), 'tampered')
+    const changed = await isolated.client.get(frameURL)
+    expect(changed.status()).toBe(404)
+    await changed.body()
+  } finally {
+    await stopSidecar(isolated.process)
+    await isolated.client.dispose()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('explicit export is origin-checked, accepts no command payload, and exposes fixed job status', async () => {
+  const isolated = await authenticatedSidecar()
+  try {
+    const baseURL = isolatedURL(isolated.ready)
+    const path = `/v1/projects/${isolated.ready.projectId}/exports`
+    const forged = await isolated.client.post(path, {
+      headers: { Origin: 'http://attacker.invalid' },
+      data: {},
+    })
+    expect(forged.status()).toBe(403)
+
+    const arbitrary = await isolated.client.post(path, {
+      headers: { Origin: baseURL },
+      data: { command: 'calc.exe' },
+    })
+    expect(arbitrary.status()).toBe(400)
+
+    const started = await isolated.client.post(path, {
+      headers: { Origin: baseURL },
+      data: {},
+    })
+    expect(started.status()).toBe(202)
+    const job = await started.json()
+    expect(job).toMatchObject({ ok: true, job: { status: 'running' } })
+    expect(job.job.id).toMatch(/^export_[a-f0-9]+$/)
+
+    await expect.poll(async () => {
+      const response = await isolated.client.get(`${path}/status`)
+      expect(response.status()).toBe(200)
+      return (await response.json()).job.status
+    }, { timeout: 15_000 }).toBe('failed')
   } finally {
     await isolated.client.dispose()
     await stopSidecar(isolated.process)
@@ -398,11 +473,11 @@ test('browser projects opaque project media into a playable Viewer and shared ti
       canvas.width = video.videoWidth
       canvas.height = video.videoHeight
       const context = canvas.getContext('2d', { willReadFrequently: true })!
+      const initialTime = video.currentTime
       let nonBlack = 0
       for (const sampleTime of [0.5, 30]) {
         await new Promise<void>((resolve) => {
-          const done = () => video.requestVideoFrameCallback(() => resolve())
-          video.addEventListener('seeked', done, { once: true })
+          video.addEventListener('seeked', () => resolve(), { once: true })
           video.currentTime = Math.min(sampleTime, Math.max(0, video.duration - 0.1))
         })
         context.drawImage(video, 0, 0)
@@ -412,6 +487,10 @@ test('browser projects opaque project media into a playable Viewer and shared ti
         }
         if (nonBlack > 0) break
       }
+      await new Promise<void>((resolve) => {
+        video.addEventListener('seeked', () => resolve(), { once: true })
+        video.currentTime = initialTime
+      })
       return { width: video.videoWidth, height: video.videoHeight, nonBlack }
     })
     expect(decoded.width).toBeGreaterThan(0)
@@ -742,6 +821,7 @@ test('native Viewer fallback transitions after the native clock reaches the clip
       }, 2)
       const onSeeked = () => {
         if (video.currentTime < 0.59 || video.currentTime >= 0.8) return
+        video.pause()
         window.clearTimeout(timeout)
         window.clearInterval(sampler)
         video.removeEventListener('seeked', onSeeked)
@@ -789,6 +869,7 @@ test('native Viewer follows canonical clip order across a tolerated one-frame so
 
     expect(await enteredOverlap).toBeCloseTo(0.5666666666666667, 2)
     await expect(source).toHaveJSProperty('paused', true)
+    await expect.poll(() => source.evaluate((video) => video.currentTime)).toBeCloseTo(0.5666666666666667, 2)
     const programTimeS = await viewer.getByLabel('Playhead time').evaluate((output) => {
       const [hours, minutes, seconds, frames] = output.textContent!.split(' / ')[0].split(':').map(Number)
       return hours * 3600 + minutes * 60 + seconds + frames / 30
@@ -831,7 +912,7 @@ test('installed Chrome publishes a real user Pause before the final clip', async
 
 test('seeking during a boundary hold cancels the stale hold deadline', async ({ page }) => {
   test.setTimeout(30_000)
-  const root = await createSlowBoundaryHoldProjectFixture()
+  const root = await createSlowBoundaryHoldProjectFixture(0.0625, 10)
   const isolated = await startSidecar(root)
   try {
     await page.goto(await armLaunch(isolated))
@@ -845,27 +926,34 @@ test('seeking during a boundary hold cancels the stale hold deadline', async ({ 
       video.currentTime = 0.36
     }))
     const held = source.evaluate((video) => new Promise<number>((resolve, reject) => {
-      const timeout = window.setTimeout(() => reject(new Error(
-        `first clip did not enter its boundary hold: current=${video.currentTime} paused=${video.paused}`,
-      )), 5_000)
-      const onPause = () => {
-        if (video.currentTime < 0.35 || video.currentTime >= 0.4) return
-        window.clearTimeout(timeout)
-        video.removeEventListener('pause', onPause)
-        resolve(video.currentTime)
+      const deadline = performance.now() + 5_000
+      const poll = () => {
+        if (video.paused && video.currentTime >= 0.35 && video.currentTime < 0.4) {
+          resolve(video.currentTime)
+          return
+        }
+        if (performance.now() >= deadline) {
+          reject(new Error(`first clip did not enter its boundary hold: current=${video.currentTime} paused=${video.paused}`))
+          return
+        }
+        requestAnimationFrame(poll)
       }
-      video.addEventListener('pause', onPause)
+      poll()
     }))
     await viewer.getByRole('button', { name: 'Play' }).click()
     expect(await held).toBeGreaterThanOrEqual(0.35)
 
-    await page.locator('[data-timeline-surface]').click({ position: { x: 547.5, y: 40 } })
-    await expect(source).toHaveJSProperty('currentTime', 0.65)
-    await expect(viewer.getByLabel('Playhead time')).toHaveText('00:00:02:15 / 00:00:04:00')
-    await page.waitForTimeout(500)
+    const timelineSurface = page.locator('[data-timeline-surface]')
+    const timelineSurfaceBox = await timelineSurface.boundingBox()
+    expect(timelineSurfaceBox).not.toBeNull()
+    await timelineSurface.click({ position: { x: timelineSurfaceBox!.width * 4.8 / 6.4, y: 40 } })
+    await expect.poll(() => source.evaluate((video) => video.currentTime)).toBeCloseTo(0.7, 2)
+    await expect(viewer.getByLabel('Playhead time')).toHaveText('00:00:04:08 / 00:00:06:04')
+    await expect(viewer.getByRole('button', { name: 'Play' })).toBeVisible()
+    await page.waitForTimeout(2_000)
 
-    await expect(source).toHaveJSProperty('currentTime', 0.65)
-    await expect(viewer.getByLabel('Playhead time')).toHaveText('00:00:02:15 / 00:00:04:00')
+    await expect(source).toHaveJSProperty('paused', true)
+    await expect(viewer.getByLabel('Playhead time')).toHaveText('00:00:04:08 / 00:00:06:04')
   } finally {
     await page.close()
     await stopSidecar(isolated.process)
@@ -942,7 +1030,10 @@ test('same-source successor seek retires the hold before the native seek early r
     await viewer.getByRole('button', { name: 'Play' }).click()
     const heldSourceTime = await held
 
-    await page.locator('[data-timeline-surface]').click({ position: { x: 438, y: 40 } })
+    const timelineSurface = page.locator('[data-timeline-surface]')
+    const timelineSurfaceBox = await timelineSurface.boundingBox()
+    expect(timelineSurfaceBox).not.toBeNull()
+    await timelineSurface.click({ position: { x: timelineSurfaceBox!.width * 2 / 4, y: 40 } })
     await expect(viewer.getByLabel('Playhead time')).toHaveText('00:00:02:00 / 00:00:04:00')
     await page.waitForTimeout(500)
 
@@ -1182,7 +1273,7 @@ test('real 42-sol Graphic Motion cue can be disabled, saved, and locally discard
       return response.json()
     }, isolated.ready.projectId)
     expect(opened.snapshot.read_only, JSON.stringify(opened.snapshot.errors)).toBe(false)
-    await expect(page.locator('[data-runtime-project-status]')).toContainText('musk-3min-opener')
+    await expect(page.locator('[data-runtime-project-status]')).toContainText(isolated.ready.projectId)
     await expect(page.getByText('original-video.mp4', { exact: true })).toBeVisible()
     await expect(page.getByText('City Walk', { exact: true })).toHaveCount(0)
 
@@ -1228,6 +1319,122 @@ test('real 42-sol Graphic Motion cue can be disabled, saved, and locally discard
   }
 })
 
+test('real 42-sol saves a transformed Graphic Motion layer without rendering and exports only on demand', async ({ page }) => {
+  const sourceRoot = process.env.CAC_REAL_EDITOR_PROJECT
+  test.skip(!sourceRoot || process.env.CAC_REAL_EXPORT_E2E !== '1', 'Set CAC_REAL_EDITOR_PROJECT and CAC_REAL_EXPORT_E2E=1')
+  test.setTimeout(600_000)
+  const root = await mkdtemp(path.join(tmpdir(), 'cut-editor-real-export-'))
+  await cp(sourceRoot!, root, { recursive: true, preserveTimestamps: true })
+  await refreshSourceFingerprint(root)
+  const finalPath = path.join(root, 'final', 'final-video.mp4')
+  const beforeSave = {
+    hash: await sha256File(finalPath),
+    stat: await stat(finalPath),
+  }
+  const isolated = await startSidecar(root)
+  let exportRequests = 0
+  page.on('request', (request) => {
+    if (/\/exports(?:\/status)?$/.test(new URL(request.url()).pathname)) exportRequests += 1
+  })
+  try {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto(await armLaunch(isolated))
+    await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+
+    const timelineSurface = page.locator('[data-timeline-surface]')
+    const timelineSurfaceBox = await timelineSurface.boundingBox()
+    expect(timelineSurfaceBox).not.toBeNull()
+    await timelineSurface.click({ position: { x: timelineSurfaceBox!.width * 2 / 167.973152, y: 40 } })
+    await page.getByRole('tab', { name: 'Graphic Motion' }).click()
+    await page.getByRole('button', { name: /THE REAL TONY STARK/ }).click()
+
+    const layer = page.locator('[data-viewer-layer="graphic-motion"]')
+    await expect(layer).toBeVisible()
+    const initialTransform = await layer.evaluate((element) => ({
+      x: Number(element.getAttribute('data-layer-x')),
+      y: Number(element.getAttribute('data-layer-y')),
+      scale: Number(element.getAttribute('data-layer-scale')),
+    }))
+    const layerBox = await layer.boundingBox()
+    expect(layerBox).not.toBeNull()
+    await page.mouse.move(layerBox!.x + layerBox!.width / 2, layerBox!.y + layerBox!.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(layerBox!.x + layerBox!.width / 2 + 72, layerBox!.y + layerBox!.height / 2 + 36)
+    await page.mouse.up()
+
+    const scaleHandle = page.getByRole('button', { name: 'Scale layer' })
+    const scaleBox = await scaleHandle.boundingBox()
+    expect(scaleBox).not.toBeNull()
+    await page.mouse.move(scaleBox!.x + scaleBox!.width / 2, scaleBox!.y + scaleBox!.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(scaleBox!.x + scaleBox!.width / 2 + 36, scaleBox!.y + scaleBox!.height / 2 + 18)
+    await page.mouse.up()
+
+    const editedTransform = await layer.evaluate((element) => ({
+      x: Number(element.getAttribute('data-layer-x')),
+      y: Number(element.getAttribute('data-layer-y')),
+      scale: Number(element.getAttribute('data-layer-scale')),
+    }))
+    expect(editedTransform.x).not.toBe(initialTransform.x)
+    expect(editedTransform.y).not.toBe(initialTransform.y)
+    expect(editedTransform.scale).not.toBe(initialTransform.scale)
+    expect(exportRequests).toBe(0)
+
+    const transaction = page.waitForResponse((response) =>
+      response.request().method() === 'POST' && response.url().endsWith('/transactions'),
+    )
+    await page.getByRole('button', { name: 'Save Changes' }).click()
+    const transactionResponse = await transaction
+    const transactionBody = await transactionResponse.json()
+    expect(transactionResponse.status(), JSON.stringify({ transactionBody, editedTransform })).toBe(200)
+    await expect.poll(async () => {
+      const plan = JSON.parse(await readFile(path.join(root, 'work', 'graphic-motion', 'graphic-motion-plan.json'), 'utf8'))
+      return plan.cues[0].editor_transform
+    }).toEqual(editedTransform)
+
+    const afterSaveStat = await stat(finalPath)
+    expect(await sha256File(finalPath)).toBe(beforeSave.hash)
+    expect(afterSaveStat.size).toBe(beforeSave.stat.size)
+    expect(afterSaveStat.mtimeMs).toBe(beforeSave.stat.mtimeMs)
+    expect(exportRequests).toBe(0)
+    const savedProject = JSON.parse(await readFile(path.join(root, 'work', 'project.json'), 'utf8'))
+    expect(savedProject.render.status).toBe('draft')
+
+    await page.getByRole('button', { name: 'Export Video' }).click()
+    let terminalJob: { status?: string; error?: string } | undefined
+    await expect.poll(async () => {
+      terminalJob = await page.evaluate(async (projectId) => {
+        const response = await fetch(`/v1/projects/${projectId}/exports/status`)
+        return (await response.json()).job
+      }, isolated.ready.projectId)
+      return terminalJob?.status
+    }, { timeout: 480_000, intervals: [250, 500, 1_000] }).toMatch(/^(succeeded|failed)$/)
+    expect(terminalJob, isolated.getStderr()).toMatchObject({ status: 'succeeded' })
+    await expect(page.getByRole('status', { name: 'Export status' })).toHaveText('Export complete')
+    expect(exportRequests).toBeGreaterThan(1)
+
+    const afterExportStat = await stat(finalPath)
+    expect(afterExportStat.size).toBeGreaterThan(0)
+    expect(afterExportStat.mtimeMs).toBeGreaterThan(beforeSave.stat.mtimeMs)
+    expect(await sha256File(finalPath)).not.toBe(beforeSave.hash)
+    const exportedProject = JSON.parse(await readFile(path.join(root, 'work', 'project.json'), 'utf8'))
+    expect(exportedProject.render.status).toBe('verified')
+
+    const { stdout } = await execFileAsync('ffprobe', [
+      '-v', 'error', '-show_entries', 'stream=codec_type,width,height:format=duration', '-of', 'json', finalPath,
+    ])
+    const probe = JSON.parse(stdout)
+    expect(probe.streams).toEqual(expect.arrayContaining([
+      expect.objectContaining({ codec_type: 'video', width: 1280, height: 720 }),
+    ]))
+    expect(Number(probe.format.duration)).toBeCloseTo(167.973152, 1)
+  } finally {
+    await page.close()
+    await stopSidecar(isolated.process)
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('real 42-sol workspace passes the desktop viewport and visual audit', async ({ page }) => {
   const sourceRoot = process.env.CAC_REAL_EDITOR_PROJECT
   const visualOutput = process.env.CAC_EDITOR_VISUAL_OUTPUT
@@ -1253,6 +1460,33 @@ test('real 42-sol workspace passes the desktop viewport and visual audit', async
     const timelineSurface = page.locator('[data-timeline-surface]')
     const timelineSurfaceBox = await timelineSurface.boundingBox()
     expect(timelineSurfaceBox).not.toBeNull()
+    await timelineSurface.click({ position: { x: timelineSurfaceBox!.width * 2 / 167.973152, y: 40 } })
+    await expect.poll(() => source.evaluate((video) => video.currentTime)).toBeCloseTo(2, 0)
+    const graphicMotion = page.locator('[data-viewer-layer="graphic-motion"]')
+    await expect(graphicMotion).toBeVisible()
+    const motionFrame = graphicMotion.locator('img')
+    await expect(motionFrame).toHaveAttribute('src', /\/layers\/layer_[a-f0-9]+\/frames\/60$/)
+    const motionPixels = await motionFrame.evaluate(async (image: HTMLImageElement) => {
+      await image.decode()
+      const canvas = document.createElement('canvas')
+      canvas.width = image.naturalWidth
+      canvas.height = image.naturalHeight
+      const context = canvas.getContext('2d', { willReadFrequently: true })!
+      context.drawImage(image, 0, 0)
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data
+      let nonTransparent = 0
+      for (let index = 3; index < pixels.length; index += 4) {
+        if (pixels[index]) nonTransparent += 1
+      }
+      return { width: canvas.width, height: canvas.height, nonTransparent }
+    })
+    expect(motionPixels).toMatchObject({ width: 1280, height: 720 })
+    expect(motionPixels.nonTransparent, JSON.stringify(motionPixels)).toBeGreaterThan(0)
+    await page.screenshot({
+      path: path.join(visualOutput!, 'real-42-sol-layered-2s.png'),
+      fullPage: false,
+    })
+
     await timelineSurface.click({ position: { x: timelineSurfaceBox!.width * 30 / 167.973152, y: 40 } })
     await expect.poll(() => source.evaluate((video) => video.currentTime)).toBeCloseTo(30, 0)
     await page.getByRole('button', { name: 'Play' }).click()
@@ -1403,6 +1637,7 @@ async function startSidecar(root: string): Promise<StartedSidecar> {
   const queuedLines: string[] = []
   const lineWaiters: Array<(line: string) => void> = []
   let stdout = ''
+  let stderr = ''
   child.stdout.on('data', (chunk) => {
     stdout += chunk.toString()
     while (stdout.includes('\n')) {
@@ -1414,19 +1649,18 @@ async function startSidecar(root: string): Promise<StartedSidecar> {
       else queuedLines.push(line)
     }
   })
+  child.stderr.on('data', (chunk) => { stderr += chunk.toString() })
   const readLine = () => new Promise<string>((resolve) => {
     const line = queuedLines.shift()
     if (line !== undefined) resolve(line)
     else lineWaiters.push(resolve)
   })
   const message = await new Promise<ReadyMessage>((resolve, reject) => {
-    let stderr = ''
     const timeout = setTimeout(() => reject(new Error(`sidecar startup timed out: ${stderr}`)), 10_000)
     void readLine().then((line) => {
       clearTimeout(timeout)
       resolve(JSON.parse(line))
     })
-    child.stderr.on('data', (chunk) => { stderr += chunk.toString() })
     child.once('exit', (code) => {
       clearTimeout(timeout)
       reject(new Error(`sidecar exited ${code}: ${stderr}`))
@@ -1436,7 +1670,7 @@ async function startSidecar(root: string): Promise<StartedSidecar> {
     child.kill()
     return waitForExit(child, 2_000).then(() => { throw error })
   })
-  return { process: child, ready: message, readLine }
+  return { process: child, ready: message, readLine, getStderr: () => stderr }
 }
 
 let controlRequestId = 0
@@ -1523,6 +1757,59 @@ async function createProjectFixture() {
   return root
 }
 
+async function createGraphicMotionLayerProjectFixture() {
+  const root = await mkdtemp(path.join(tmpdir(), 'cut-editor-layer-'))
+  const frameRoot = path.join(root, 'work', 'cache', 'graphic-motion', 'rendered', 'motion-001')
+  await mkdir(frameRoot, { recursive: true })
+  await mkdir(path.join(root, 'work', 'graphic-motion'), { recursive: true })
+  await mkdir(path.join(root, 'input'), { recursive: true })
+  const frame = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')
+  const framePath = path.join(frameRoot, 'frame_000001.png')
+  await writeFile(framePath, frame)
+  await writeFile(path.join(root, 'input', 'source.mp4'), 'video')
+  await writeFile(path.join(root, 'work', 'timeline.json'), JSON.stringify({
+    schema_version: 1,
+    timeline_id: 'main',
+    source_duration_s: 1,
+    program_duration_s: 1,
+    fps: { num: 30, den: 1 },
+    clips: [{
+      id: 'clip-1', source_range: { start_s: 0, end_s: 1 },
+      program_range: { start_s: 0, end_s: 1 }, speed: 1,
+    }],
+  }))
+  await writeFile(path.join(root, 'work', 'graphic-motion', 'graphic-motion-plan.json'), JSON.stringify({
+    schema_version: 3,
+    cues: [{
+      id: 'motion-001', status: 'verified', program_range: { start_s: 0, end_s: 1 },
+      intent: { content: 'Bound motion' }, selection: { chosen_recipe_id: 'fixture' },
+      recipe: {}, review: {},
+      render: {
+        kind: 'overlay', asset: 'cache/graphic-motion/rendered/motion-001',
+        asset_type: 'image-sequence', pattern: 'frame_%06d.png', start_number: 1,
+        fps: { num: 30, den: 1 }, start_s: 0, duration_s: 1,
+        frames: [{
+          path: 'work/cache/graphic-motion/rendered/motion-001/frame_000001.png',
+          sha256: createHash('sha256').update(frame).digest('hex'),
+        }],
+      },
+    }],
+  }))
+  await writeFile(path.join(root, 'work', 'project.json'), JSON.stringify({
+    schema_version: 1,
+    project_id: 'layer-fixture',
+    source: { path: '../input/source.mp4' },
+    active_sequence: 'main',
+    sequences: { main: { timeline: 'timeline.json', operations: ['graphic-motion'] } },
+    operations: [{
+      id: 'graphic-motion', revision: 1, status: 'verified',
+      plan: 'graphic-motion/graphic-motion-plan.json', depends_on: [], based_on: {},
+    }],
+    reviews: [], render: { status: 'draft' },
+  }))
+  return root
+}
+
 async function createRetimedProjectFixture() {
   const root = await createProjectFixture()
   await writeFile(path.join(root, 'work', 'timeline.json'), JSON.stringify({
@@ -1573,25 +1860,33 @@ async function createOverlappingProjectFixture() {
   return root
 }
 
-async function createSlowBoundaryHoldProjectFixture() {
+async function createSlowBoundaryHoldProjectFixture(speed = 0.1, fps = 30) {
   const root = await createProjectFixture()
+  const clipProgramDurationS = 0.2 / speed
+  if (fps !== 30) {
+    await execFileAsync('ffmpeg', [
+      '-y', '-f', 'lavfi', '-i', `testsrc2=size=96x64:rate=${fps}`, '-t', '1',
+      '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
+      path.join(root, 'input', 'source.mp4'),
+    ])
+  }
   await writeFile(path.join(root, 'work', 'timeline.json'), JSON.stringify({
     schema_version: 1,
     source_duration_s: 1,
-    program_duration_s: 4,
-    fps: { num: 30, den: 1 },
+    program_duration_s: clipProgramDurationS * 2,
+    fps: { num: fps, den: 1 },
     clips: [
       {
         id: 'clip-slow-a',
         source_range: { start_s: 0.2, end_s: 0.4 },
-        program_range: { start_s: 0, end_s: 2 },
-        speed: 0.1,
+        program_range: { start_s: 0, end_s: clipProgramDurationS },
+        speed,
       },
       {
         id: 'clip-slow-b',
         source_range: { start_s: 0.6, end_s: 0.8 },
-        program_range: { start_s: 2, end_s: 4 },
-        speed: 0.1,
+        program_range: { start_s: clipProgramDurationS, end_s: clipProgramDurationS * 2 },
+        speed,
       },
     ],
   }))
@@ -1801,6 +2096,10 @@ async function createContentCardsArtifactProjectFixture() {
 async function sha256Bytes(content: Buffer) {
   const { createHash } = await import('node:crypto')
   return createHash('sha256').update(content).digest('hex')
+}
+
+async function sha256File(file: string) {
+  return createHash('sha256').update(await readFile(file)).digest('hex')
 }
 
 async function authoritativeSnapshotEtag(root: string) {

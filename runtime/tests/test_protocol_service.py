@@ -14,6 +14,7 @@ from unittest import mock
 RUNTIME = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RUNTIME))
 
+import protocol_service  # noqa: E402
 from protocol_service import ProtocolService  # noqa: E402
 from project_snapshot import build_snapshot, canonical_project_root  # noqa: E402
 
@@ -176,6 +177,239 @@ class ProtocolServiceTests(unittest.TestCase):
         self.assertEqual({"status": "pending", "evidence": []}, updated["review"])
         project = json.loads(self.project_path.read_text(encoding="utf-8"))
         self.assertEqual((2, "stale"), (project["operations"][0]["revision"], project["operations"][0]["status"]))
+
+    def test_caption_update_persists_a_typed_editor_transform_without_rendering(self):
+        self.plan.write_text(json.dumps({
+            "schema_version": 1,
+            "target": "overlay",
+            "timeline_id": "main",
+            "timebase": "program",
+            "program_duration_s": 1.0,
+            "style": {"status": "approved", "preset": "clean"},
+            "review": {"status": "approved", "evidence": ["old"]},
+            "cues": [{
+                "id": "cue-001", "index": 1, "start": 0.0, "end": 0.4,
+                "text": "First", "lines": ["First"],
+                "program_range": {"start_s": 0.0, "end_s": 0.4},
+            }],
+        }, indent=2) + "\n", encoding="utf-8")
+        opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+
+        response = self.service.handle_request({
+            "verb": "plan.update", "project_id": opened["project_id"], "operation": "captions",
+            "read_set": self._read_set(opened["snapshot"], "captions"),
+            "review": {
+                "schema_version": 1, "cue_id": "cue-001", "text": "First",
+                "editor_transform": {"x": 0.25, "y": 0.75, "scale": 1.5},
+            },
+        })
+
+        self.assertTrue(response["ok"])
+        updated = json.loads(self.plan.read_text(encoding="utf-8"))
+        self.assertEqual(
+            {"x": 0.25, "y": 0.75, "scale": 1.5},
+            updated["cues"][0]["editor_transform"],
+        )
+        project = json.loads(self.project_path.read_text(encoding="utf-8"))
+        self.assertEqual("draft", project["render"]["status"])
+        self.assertFalse((self.root / "final" / "final-video.mp4").exists())
+
+    def test_transform_only_update_preserves_operation_renderability(self):
+        plan = {
+            "schema_version": 1,
+            "target": "overlay",
+            "timeline_id": "main",
+            "timebase": "program",
+            "program_duration_s": 1.0,
+            "style": {"status": "approved", "preset": "clean"},
+            "review": {"status": "approved", "evidence": ["old"]},
+            "cues": [{
+                "id": "cue-001", "index": 1, "start": 0.0, "end": 0.4,
+                "text": "First", "lines": ["First"],
+                "program_range": {"start_s": 0.0, "end_s": 0.4},
+            }],
+        }
+        operation = {
+            "id": "captions", "revision": 4, "status": "approved",
+            "render": {"kind": "overlay", "asset": "cache/captions/overlay-frames"},
+            "outputs": ["cache/captions/overlay-frames"],
+        }
+        project = {
+            "operations": [copy.deepcopy(operation)],
+            "reviews": [],
+            "render": {"status": "verified"},
+        }
+        context = (
+            self.root, {"resources": []}, project, operation,
+            self.plan, plan, {"project": "p", "operation": "o", "plan": "a"},
+        )
+        captured = {}
+
+        def capture(_root, _plan_path, updated_plan, updated_project, *_args):
+            captured["plan"] = updated_plan
+            captured["project"] = updated_project
+            return {"ok": True}
+
+        with (
+            mock.patch.object(self.service, "_validate_caption_plan", side_effect=AssertionError("full validation must not run")),
+            mock.patch.object(self.service, "_commit", side_effect=capture),
+        ):
+            response = self.service._apply_plan_update(context, {
+                "schema_version": 1,
+                "cue_id": "cue-001",
+                "editor_transform": {"x": 0.3, "y": 0.7, "scale": 1.2},
+            })
+
+        self.assertTrue(response["ok"])
+        self.assertEqual("First", captured["plan"]["cues"][0]["text"])
+        changed = captured["project"]["operations"][0]
+        self.assertEqual((5, "approved"), (changed["revision"], changed["status"]))
+        self.assertEqual(operation["render"], changed["render"])
+        self.assertEqual(operation["outputs"], changed["outputs"])
+        self.assertEqual("draft", captured["project"]["render"]["status"])
+
+    def test_graphic_motion_transform_only_update_does_not_revalidate_unchanged_recipe_metadata(self):
+        plan = {
+            "schema_version": 3,
+            "cues": [{"id": "gm-001", "status": "verified"}],
+            "delivery_bindings": [],
+        }
+        operation = {
+            "id": "graphic-motion", "revision": 2, "status": "verified",
+            "render": {"kind": "overlay", "asset": "cache/graphic-motion/gm-001"},
+            "outputs": ["cache/graphic-motion/gm-001"],
+        }
+        project = {
+            "operations": [copy.deepcopy(operation)],
+            "reviews": [],
+            "render": {"status": "verified"},
+        }
+        context = (
+            self.root, {"resources": []}, project, operation,
+            self.plan, plan, {"project": "p", "operation": "o", "plan": "a"},
+        )
+        captured = {}
+
+        def capture(_root, _plan_path, updated_plan, updated_project, *_args):
+            captured["plan"] = updated_plan
+            captured["project"] = updated_project
+            return {"ok": True}
+
+        with (
+            mock.patch.object(protocol_service.graphic_motion_plan, "_input_bindings", return_value=[]),
+            mock.patch.object(protocol_service.graphic_motion_plan, "_cue_bindings", return_value=[]),
+            mock.patch.object(self.service, "_validate_graphic_motion_plan", side_effect=AssertionError("full validation must not run")),
+            mock.patch.object(self.service, "_commit", side_effect=capture),
+        ):
+            response = self.service._apply_plan_update(context, {
+                "schema_version": 1,
+                "cue_id": "gm-001",
+                "editor_transform": {"x": 0.3, "y": 0.7, "scale": 1.2},
+            })
+
+        self.assertTrue(response["ok"])
+        self.assertEqual(
+            {"x": 0.3, "y": 0.7, "scale": 1.2},
+            captured["plan"]["cues"][0]["editor_transform"],
+        )
+        changed = captured["project"]["operations"][0]
+        self.assertEqual((3, "verified"), (changed["revision"], changed["status"]))
+        self.assertEqual("draft", captured["project"]["render"]["status"])
+
+    def test_frozen_graphic_motion_recipe_uses_materialized_hashes_without_current_catalog_entry(self):
+        target = self.root / "work/cache/graphic-motion/hyperframes/gm-001"
+        target.mkdir(parents=True)
+        manifest_path = target / "recipe.motion.yaml"
+        conversion_path = target / "conversion.json"
+        manifest_path.write_text("id: legacy-recipe\n", encoding="utf-8")
+        conversion_path.write_text(json.dumps({
+            "schema_version": 1,
+            "project_id": "LegacyRecipe",
+            "variants": [{"composition_id": "legacy-recipe"}],
+        }), encoding="utf-8")
+
+        def binding(path):
+            return {
+                "path": path.relative_to(self.root).as_posix(),
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            }
+
+        manifest = binding(manifest_path)
+        conversion = binding(conversion_path)
+        cue = {
+            "recipe": {
+                "id": "legacy-recipe",
+                "composition_id": "legacy-recipe",
+                "manifest": manifest,
+                "conversion_receipt": conversion,
+                "files": [manifest, conversion],
+            },
+        }
+
+        errors = protocol_service.graphic_motion_plan._recipe_errors(
+            "gm-001", cue, self.root, verify_files=True, library={},
+            require_library_match=False,
+        )
+
+        self.assertEqual([], errors)
+
+    def test_frozen_graphic_motion_selection_allows_historical_matched_field_names(self):
+        cue = {
+            "intent": {"recipe_queries": ["legacy query"]},
+            "selection": {
+                "query": "legacy query",
+                "shortlist": [{
+                    "recipe_id": "legacy-recipe",
+                    "score": 10,
+                    "matched_fields": ["name", "structural_roles"],
+                }],
+                "chosen_recipe_id": "legacy-recipe",
+                "agent_rationale": "The frozen candidate matches the cue.",
+                "avoid_when_review": "No frozen warning applies.",
+                "field_evidence": {
+                    field: f"Evidence for {field}"
+                    for field in protocol_service.graphic_motion_plan.SELECTION_FIELDS
+                },
+            },
+        }
+
+        errors = protocol_service.graphic_motion_plan._selection_errors(
+            "gm-001", cue, {"legacy-recipe"}, require_known_fields=False,
+        )
+
+        self.assertEqual([], errors)
+
+    def test_editor_transform_rejects_out_of_range_values_and_unknown_fields(self):
+        for transform in (
+            {"x": -0.01, "y": 0.5, "scale": 1.0},
+            {"x": 0.5, "y": 1.01, "scale": 1.0},
+            {"x": 0.5, "y": 0.5, "scale": 0.09},
+            {"x": 0.5, "y": 0.5, "scale": 4.01},
+            {"x": 0.5, "y": 0.5, "scale": 1.0, "rotation": 10},
+        ):
+            with self.subTest(transform=transform):
+                with self.assertRaises(ValueError):
+                    self.service._validate_editor_transform(transform)
+
+    def test_content_cards_update_persists_transform_on_the_target_card(self):
+        self._configure_content_cards_project()
+        opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+        review = self._cards_review(copy="Original copy", placement="bottom")
+        review["editor_transform"] = {
+            "cue_id": "card-001", "x": 0.7, "y": 0.35, "scale": 0.8,
+        }
+
+        response = self.service.handle_request({
+            "verb": "plan.update", "project_id": opened["project_id"], "operation": "content-cards",
+            "read_set": self._read_set(opened["snapshot"], "content-cards"), "review": review,
+        })
+
+        self.assertTrue(response["ok"])
+        updated = json.loads(self.plan.read_text(encoding="utf-8"))
+        self.assertEqual(
+            {"x": 0.7, "y": 0.35, "scale": 0.8},
+            updated["cards"][0]["editor_transform"],
+        )
 
     def test_get_resource_accepts_only_server_issued_resource_ids(self):
         opened = self.service.handle_request(

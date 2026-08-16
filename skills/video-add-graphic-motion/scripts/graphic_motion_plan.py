@@ -414,7 +414,7 @@ def _recipe_library():
     return recipes
 
 
-def _selection_errors(cue_id, cue, recipe_ids):
+def _selection_errors(cue_id, cue, recipe_ids, require_known_fields=True):
     intent = cue.get("intent") if isinstance(cue.get("intent"), dict) else {}
     selection = cue.get("selection")
     if not isinstance(selection, dict):
@@ -446,7 +446,10 @@ def _selection_errors(cue_id, cue, recipe_ids):
             or score is None
             or score < 0
             or not isinstance(matched, list)
-            or any(field not in SELECTION_FIELDS for field in matched)
+            or any(
+                not _nonblank(field) or (require_known_fields and field not in SELECTION_FIELDS)
+                for field in matched
+            )
             or len(matched) != len(set(matched))
         ):
             errors.append(f"{cue_id} recipe shortlist is invalid")
@@ -472,13 +475,34 @@ def _selection_errors(cue_id, cue, recipe_ids):
     return list(dict.fromkeys(errors))
 
 
-def _recipe_errors(cue_id, cue, project_root=None, verify_files=False, library=None):
-    library = library or _recipe_library()
+def _conversion_receipt_matches(receipt, recipe_id):
+    if not isinstance(receipt, dict):
+        return False
+    if receipt.get("recipe_id") == recipe_id:
+        return True
+    variants = receipt.get("variants")
+    return (
+        receipt.get("schema_version") == 1
+        and _nonblank(receipt.get("project_id"))
+        and isinstance(variants, list)
+        and any(
+            isinstance(variant, dict) and variant.get("composition_id") == recipe_id
+            for variant in variants
+        )
+    )
+
+
+def _recipe_errors(
+    cue_id, cue, project_root=None, verify_files=False, library=None,
+    require_library_match=True,
+):
+    if library is None:
+        library = _recipe_library()
     recipe = cue.get("recipe")
     if not isinstance(recipe, dict):
         return [f"{cue_id} recipe is required"]
     recipe_id = recipe.get("id")
-    if not _nonblank(recipe_id) or recipe_id not in library:
+    if not _nonblank(recipe_id) or (require_library_match and recipe_id not in library):
         return [f"{cue_id} recipe is not in the local motion-anything library"]
     errors = []
     if recipe.get("composition_id") != recipe_id:
@@ -508,26 +532,27 @@ def _recipe_errors(cue_id, cue, project_root=None, verify_files=False, library=N
     if actual != declared:
         errors.append(f"{cue_id} materialized recipe file set is incomplete")
 
-    source = library[recipe_id]
-    expected = {"recipe.motion.yaml": sha256_file(source["manifest"])}
-    if source["hyperframes"].is_dir():
-        expected.update({
-            path.relative_to(source["hyperframes"]).as_posix(): sha256_file(path)
-            for path in source["hyperframes"].rglob("*")
-            if path.is_file()
-        })
-    actual_bindings = {
-        Path(binding["path"]).relative_to(Path(expected_prefix)).as_posix(): binding.get("sha256")
-        for binding in files
-        if isinstance(binding, dict) and str(binding.get("path", "")).startswith(expected_prefix)
-    }
-    if actual_bindings != expected:
-        errors.append(f"{cue_id} materialized recipe does not match the preconverted library")
+    if require_library_match:
+        source = library[recipe_id]
+        expected = {"recipe.motion.yaml": sha256_file(source["manifest"])}
+        if source["hyperframes"].is_dir():
+            expected.update({
+                path.relative_to(source["hyperframes"]).as_posix(): sha256_file(path)
+                for path in source["hyperframes"].rglob("*")
+                if path.is_file()
+            })
+        actual_bindings = {
+            Path(binding["path"]).relative_to(Path(expected_prefix)).as_posix(): binding.get("sha256")
+            for binding in files
+            if isinstance(binding, dict) and str(binding.get("path", "")).startswith(expected_prefix)
+        }
+        if actual_bindings != expected:
+            errors.append(f"{cue_id} materialized recipe does not match the preconverted library")
     try:
         receipt = projectlib.load_json(_bound_path(conversion, root))
     except (AttributeError, OSError, ValueError, TypeError, json.JSONDecodeError):
         receipt = None
-    if not isinstance(receipt, dict) or receipt.get("recipe_id") != recipe_id:
+    if not _conversion_receipt_matches(receipt, recipe_id):
         errors.append(f"{cue_id} conversion receipt is invalid")
     return list(dict.fromkeys(errors))
 
@@ -755,7 +780,10 @@ def _review_evidence_errors(
     return list(dict.fromkeys(errors))
 
 
-def validate_plan(plan, timeline, project=None, project_root=None, verify_files=False):
+def validate_plan(
+    plan, timeline, project=None, project_root=None, verify_files=False,
+    require_library_match=True,
+):
     """Return deterministic plan, provenance, timing, and file-binding errors."""
     errors = []
     if not isinstance(plan, dict):
@@ -890,9 +918,20 @@ def validate_plan(plan, timeline, project=None, project_root=None, verify_files=
             hashes.get("contact_sheet_sha256"),
             transcript,
         ))
-        errors.extend(_selection_errors(cue_id, cue, set(recipe_library)))
+        selection = cue.get("selection") if isinstance(cue.get("selection"), dict) else {}
+        shortlist = selection.get("shortlist") if isinstance(selection.get("shortlist"), list) else []
+        selection_recipe_ids = set(recipe_library) if require_library_match else {
+            candidate.get("recipe_id")
+            for candidate in shortlist
+            if isinstance(candidate, dict) and _nonblank(candidate.get("recipe_id"))
+        }
+        errors.extend(_selection_errors(
+            cue_id, cue, selection_recipe_ids,
+            require_known_fields=require_library_match,
+        ))
         errors.extend(_recipe_errors(
             cue_id, cue, project_root, verify_files, recipe_library,
+            require_library_match=require_library_match,
         ))
         recipe = cue.get("recipe") if isinstance(cue.get("recipe"), dict) else {}
         errors.extend(_adaptation_errors(

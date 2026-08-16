@@ -36,7 +36,7 @@ import { ViewerPanel } from './ViewerPanel'
 import { ProjectReviewPanel, ProtocolResourceInspector } from './ProjectReviewPanel'
 import { createEditorStore } from './editor-store'
 import { getScenario } from './scenarios'
-import type { ContentCardsReview, RuntimeReadSet, RuntimeSnapshot } from '../runtime/types'
+import type { ContentCardsReview, RuntimeExportJob, RuntimeReadSet, RuntimeSnapshot } from '../runtime/types'
 import { RuntimeApiClient, RuntimeConflictError } from '../runtime/api-client'
 import type { ContentCardsDraftChange } from './editor-store'
 import type { EditorProjectView } from './editor-model'
@@ -103,6 +103,8 @@ function Workspace({
   runtime?: RuntimeProjectStatus
   showDiagnostics?: boolean
 }) {
+  const [exportJob, setExportJob] = useState<RuntimeExportJob>({ status: 'idle' })
+  const [exportError, setExportError] = useState<string | null>(null)
   const activeOperation = useStore(store, (state) => {
     const selectedOperationId = state.selection?.kind === 'card' ? 'content-cards'
       : state.selection?.kind === 'caption' ? 'captions'
@@ -117,10 +119,64 @@ function Workspace({
       ? state.project?.operations?.find((operation) => operation.id === operationId)
       : undefined
   })
+  useEffect(() => {
+    if (!runtime || exportJob.status !== 'running') return
+    let active = true
+    const timer = window.setTimeout(async () => {
+      try {
+        const next = await runtime.client.getExportStatus()
+        if (active) setExportJob(next)
+      } catch (error) {
+        if (!active) return
+        setExportError(error instanceof Error ? error.message : 'Video export failed')
+        setExportJob({ status: 'failed' })
+      }
+    }, 100)
+    return () => {
+      active = false
+      window.clearTimeout(timer)
+    }
+  }, [exportJob, runtime])
+
+  const startExport = async () => {
+    if (!runtime || exportJob.status === 'running') return
+    setExportError(null)
+    try {
+      setExportJob(await runtime.client.startExport())
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : 'Video export failed')
+      setExportJob({ status: 'failed' })
+    }
+  }
+
+  const exportMessage = exportError
+    ?? (exportJob.status === 'running' ? 'Rendering final video'
+      : exportJob.status === 'succeeded' ? 'Export complete'
+        : exportJob.status === 'failed' ? exportJob.error ?? 'Export failed'
+          : '')
   return (
     <>
       <header className="workspace-operation-bar">
-        {runtime ? <RuntimeStatus status={runtime} /> : (
+        {runtime ? (
+          <>
+            <RuntimeStatus status={runtime} />
+            <div className="workspace-export-controls">
+              {exportMessage ? (
+                <span role="status" aria-label="Export status" className={`workspace-export-status workspace-export-status--${exportJob.status}`}>
+                  {exportMessage}
+                </span>
+              ) : null}
+              <button
+                type="button"
+                onClick={startExport}
+                disabled={runtime.snapshot.read_only || exportJob.status === 'running'}
+                title={runtime.snapshot.read_only ? 'This project is read only' : 'Render the saved project to its final delivery'}
+              >
+                {exportJob.status === 'running' ? 'Rendering video' : 'Export Video'}
+              </button>
+            </div>
+          </>
+        ) : (
           <>
             <strong>Cut as code</strong>
             <button type="button" disabled title="Export is not connected in this verification surface">Export</button>
@@ -279,7 +335,13 @@ function runtimeAdapter(client: RuntimeApiClient, initial: RuntimeSnapshot) {
         if (!template) throw new Error('Content Cards review template is unavailable')
         const targetId = draft.cueId ?? template.cards[0]?.id
         if (!targetId || !template.cards.some((card) => card.id === targetId)) throw new Error('Content Card cue is unavailable')
-        review = {
+        const transformOnly = draft.transform !== undefined
+          && draft.copy === undefined && draft.layout === undefined
+          && draft.placement === undefined && draft.enabled === undefined
+        review = transformOnly ? {
+          schema_version: 1,
+          editor_transform: { cue_id: targetId, ...draft.transform },
+        } : {
           schema_version: 1,
           cards: template.cards.map((card) => card.id === targetId ? {
             ...card,
@@ -288,13 +350,28 @@ function runtimeAdapter(client: RuntimeApiClient, initial: RuntimeSnapshot) {
             ...(draft.placement !== undefined ? { placement: draft.placement } : {}),
             ...(draft.enabled !== undefined ? { selected: draft.enabled } : {}),
           } : card),
+          ...(draft.transform ? {
+            editor_transform: { cue_id: targetId, ...draft.transform },
+          } : {}),
         } satisfies ContentCardsReview
       } else if (operationId === 'captions') {
-        if (!draft.cueId || draft.text === undefined) throw new Error('Caption cue and text are required')
-        review = { schema_version: 1, cue_id: draft.cueId, text: draft.text }
+        const cue = snapshot.view.captions_edit?.cues.find((item) => item.id === draft.cueId)
+        if (!draft.cueId || !cue) throw new Error('Caption cue is required')
+        review = {
+          schema_version: 1,
+          cue_id: draft.cueId,
+          ...(draft.text !== undefined ? { text: draft.text } : {}),
+          ...(draft.transform ? { editor_transform: draft.transform } : {}),
+        }
       } else if (operationId === 'graphic-motion') {
-        if (!draft.cueId || draft.enabled === undefined) throw new Error('Graphic Motion cue and enabled state are required')
-        review = { schema_version: 1, cue_id: draft.cueId, enabled: draft.enabled }
+        const cue = snapshot.view.graphic_motion_edit?.cues.find((item) => item.id === draft.cueId)
+        if (!draft.cueId || !cue) throw new Error('Graphic Motion cue is required')
+        review = {
+          schema_version: 1,
+          cue_id: draft.cueId,
+          ...(draft.enabled !== undefined ? { enabled: draft.enabled } : {}),
+          ...(draft.transform ? { editor_transform: draft.transform } : {}),
+        }
       } else {
         throw new Error('Operation is not editable')
       }
@@ -413,6 +490,34 @@ export function projectFromSnapshot(base: EditorProjectView | null, snapshot: Ru
     ...(edit?.cues ? [{ id: 'track-content-cards', name: 'Cards', kind: 'card' as const, clips: cardClips }] : []),
     ...(graphicMotionEdit ? [{ id: 'track-graphic-motion', name: 'Graphic Motion', kind: 'graphic-motion' as const, clips: motionClips }] : []),
   ]
+  const layers = snapshot.view.layers?.map((layer) => ({
+    id: layer.id,
+    operationId: layer.operation_id,
+    cueId: layer.cue_id,
+    kind: layer.kind,
+    mediaType: layer.media_type,
+    zIndex: layer.z_index,
+    programRange: {
+      startS: layer.program_range.start_s,
+      endS: layer.program_range.end_s,
+    },
+    transform: { ...layer.transform },
+    content: { ...layer.content },
+    ...(layer.image_sequence ? {
+      imageSequence: {
+        pattern: layer.image_sequence.pattern,
+        startNumber: layer.image_sequence.start_number,
+        fps: {
+          numerator: layer.image_sequence.fps.num,
+          denominator: layer.image_sequence.fps.den,
+        },
+        frameCount: layer.image_sequence.frame_count,
+        ...(layer.image_sequence.frame_url_template ? {
+          frameUrlTemplate: layer.image_sequence.frame_url_template,
+        } : {}),
+      },
+    } : {}),
+  })) ?? []
 
   return {
     id: snapshot.view.project_id,
@@ -427,6 +532,7 @@ export function projectFromSnapshot(base: EditorProjectView | null, snapshot: Ru
       ? snapshot.view.source_media_id
       : undefined,
     tracks,
+    layers,
     operations: runtimeOperations.map((operation) => operationFromSnapshot(
       operation.id,
       operation.revision,
@@ -523,7 +629,7 @@ function RuntimeStatus({ status }: { status: RuntimeProjectStatus }) {
       aria-label="Runtime project status"
     >
       <strong>Cut as Code</strong>
-      <span>{snapshot.view.project_id ?? projectId}</span>
+      <span>{projectId}</span>
       <span>{snapshot.view.active_sequence ?? 'No active sequence'}</span>
       <span className="runtime-status-chip">{snapshot.read_only ? 'Read only' : 'Writable'}</span>
       <span className="runtime-status-secondary">{snapshot.resources.length} resources</span>

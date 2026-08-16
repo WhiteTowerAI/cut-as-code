@@ -17,8 +17,11 @@ const HTTP_ROUTE_ALLOWLIST = Object.freeze([
   Object.freeze({ id: 'snapshot', methods: Object.freeze(['GET']), pattern: /^\/v1\/projects\/([^/]+)\/snapshot$/ }),
   Object.freeze({ id: 'transaction', methods: Object.freeze(['POST']), pattern: /^\/v1\/projects\/([^/]+)\/transactions$/ }),
   Object.freeze({ id: 'review', methods: Object.freeze(['POST']), pattern: /^\/v1\/projects\/([^/]+)\/reviews\/decision$/ }),
+  Object.freeze({ id: 'export-start', methods: Object.freeze(['POST']), pattern: /^\/v1\/projects\/([^/]+)\/exports$/ }),
+  Object.freeze({ id: 'export-status', methods: Object.freeze(['GET']), pattern: /^\/v1\/projects\/([^/]+)\/exports\/status$/ }),
   Object.freeze({ id: 'resource', methods: Object.freeze(['GET']), pattern: /^\/v1\/projects\/([^/]+)\/resources\/(res_[a-f0-9]+)$/ }),
   Object.freeze({ id: 'file', methods: Object.freeze(['GET']), pattern: /^\/v1\/projects\/([^/]+)\/(media|artifacts)\/((?:asset|artifact)_[a-f0-9]+)$/ }),
+  Object.freeze({ id: 'layer-frame', methods: Object.freeze(['GET', 'HEAD']), pattern: /^\/v1\/projects\/([^/]+)\/layers\/(layer_[a-f0-9]+)\/frames\/(\d+)$/ }),
   Object.freeze({ id: 'events', methods: Object.freeze(['GET']), pattern: /^\/v1\/projects\/([^/]+)\/events$/ }),
   Object.freeze({ id: 'static', methods: Object.freeze(['GET', 'HEAD']), pattern: /^(?!\/v1(?:\/|$)).+$/ }),
 ])
@@ -42,6 +45,9 @@ async function main() {
     clients: new Set(),
     media: new Map(),
     artifacts: new Map(),
+    layers: new Map(),
+    exportJob: { status: 'idle' },
+    exportProcess: null,
   }
   await refreshFiles(state)
 
@@ -77,6 +83,7 @@ async function main() {
     if (closing) return
     closing = true
     state.watcher?.close()
+    state.exportProcess?.kill()
     for (const client of state.clients) client.end()
     await protocol.close()
     server.close(() => process.exit(0))
@@ -161,6 +168,21 @@ async function handleRequest(state, request, response) {
       attachPublicFiles(state, result)
       return json(response, result.status || (result.ok ? 200 : 400), result)
     }
+    if (route.id === 'export-start' && match[1] === state.projectId) {
+      if (request.headers.origin !== state.origin) return json(response, 403, { ok: false, error: 'invalid origin' })
+      const body = await readJson(request)
+      if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length !== 0) {
+        return json(response, 400, { ok: false, error: 'export accepts no parameters' })
+      }
+      if (state.exportJob.status === 'running') {
+        return json(response, 409, { ok: false, error: 'export is already running', job: publicExportJob(state.exportJob) })
+      }
+      const job = startExport(state)
+      return json(response, 202, { ok: true, job: publicExportJob(job) })
+    }
+    if (route.id === 'export-status' && match[1] === state.projectId) {
+      return json(response, 200, { ok: true, job: publicExportJob(state.exportJob) })
+    }
     if (route.id === 'resource' && match[1] === state.projectId) {
       const result = await state.protocol.call({
         verb: 'get_resource', project_id: state.projectId, resource_id: match[2],
@@ -170,6 +192,13 @@ async function handleRequest(state, request, response) {
     if (route.id === 'file' && match[1] === state.projectId) {
       const registry = match[2] === 'media' ? state.media : state.artifacts
       const item = registry.get(match[3])
+      if (!item) return json(response, 404, { ok: false, error: 'unknown resource' })
+      return streamFile(state, request, response, item)
+    }
+    if (route.id === 'layer-frame' && match[1] === state.projectId) {
+      const layer = state.layers.get(match[2])
+      const frameNumber = Number(match[3])
+      const item = Number.isSafeInteger(frameNumber) ? layer?.frames.get(frameNumber) : null
       if (!item) return json(response, 404, { ok: false, error: 'unknown resource' })
       return streamFile(state, request, response, item)
     }
@@ -189,6 +218,71 @@ async function handleRequest(state, request, response) {
 
   if (!authorized(state, request)) return json(response, 401, { ok: false, error: 'unauthorized' })
   return serveStatic(state.uiRoot, url.pathname, request.method, response)
+}
+
+function startExport(state) {
+  const job = {
+    id: `export_${crypto.randomBytes(12).toString('hex')}`,
+    status: 'running',
+    startedAt: new Date().toISOString(),
+  }
+  state.exportJob = job
+  const executable = process.env.CAC_PYTHON || 'python'
+  const script = path.join(__dirname, 'export_project.py')
+  const child = spawn(executable, [script, state.root], {
+    cwd: __dirname,
+    env: process.env,
+    windowsHide: true,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  state.exportProcess = child
+  let stdout = ''
+  let stderr = ''
+  const append = (current, chunk) => (current + chunk.toString()).slice(-65_536)
+  child.stdout.on('data', (chunk) => { stdout = append(stdout, chunk) })
+  child.stderr.on('data', (chunk) => { stderr = append(stderr, chunk) })
+  child.once('error', () => {
+    if (state.exportJob.id !== job.id) return
+    state.exportProcess = null
+    state.exportJob = {
+      ...job,
+      status: 'failed',
+      finishedAt: new Date().toISOString(),
+      error: 'Export worker could not start',
+    }
+  })
+  child.once('exit', (code) => {
+    if (state.exportJob.id !== job.id) return
+    state.exportProcess = null
+    const line = stdout.trim().split(/\r?\n/).filter(Boolean).at(-1)
+    let result
+    try { result = line ? JSON.parse(line) : null } catch { result = null }
+    if (!(code === 0 && result?.ok)) {
+      const detail = stderr.trim() || stdout.trim() || `export worker exited with code ${code}`
+      process.stderr.write(`[${job.id}] ${detail}\n`)
+    }
+    state.exportJob = code === 0 && result?.ok
+      ? {
+          ...job,
+          status: 'succeeded',
+          finishedAt: new Date().toISOString(),
+          output: result.output,
+          size: result.size,
+        }
+      : {
+          ...job,
+          status: 'failed',
+          finishedAt: new Date().toISOString(),
+          error: 'Export failed. Review the project render state and local sidecar log.',
+          _log: stderr,
+        }
+  })
+  return job
+}
+
+function publicExportJob(job) {
+  if (!job || job.status === 'idle') return { status: 'idle' }
+  return Object.fromEntries(Object.entries(job).filter(([key]) => !key.startsWith('_')))
 }
 
 function routeForRequest(method, pathname) {
@@ -233,6 +327,91 @@ function watchProject(state) {
 async function refreshFiles(state) {
   state.media = await collectFiles(state.root, ['input'], 'asset')
   state.artifacts = await collectFiles(state.root, ['review'], 'artifact')
+  state.layers = await collectLayerSequences(state.root)
+}
+
+async function collectLayerSequences(root) {
+  const result = new Map()
+  const projectPath = path.join(root, 'work', 'project.json')
+  let project
+  try {
+    project = await readBoundJson(root, projectPath)
+  } catch {
+    return result
+  }
+  const operations = Array.isArray(project.operations) ? project.operations : []
+  for (const operation of operations) {
+    if (!operation || operation.id !== 'graphic-motion' || typeof operation.plan !== 'string') continue
+    let plan
+    try {
+      plan = await readBoundJson(root, path.resolve(root, 'work', operation.plan))
+    } catch {
+      continue
+    }
+    for (const cue of Array.isArray(plan.cues) ? plan.cues : []) {
+      const render = cue?.render
+      if (!cue || cue.status !== 'verified' || typeof cue.id !== 'string' || render?.asset_type !== 'image-sequence') continue
+      const layerId = layerIdFor(operation.id, cue.id)
+      const sequence = await collectLayerSequence(root, render)
+      if (sequence) result.set(layerId, sequence)
+    }
+  }
+  return result
+}
+
+async function collectLayerSequence(root, render) {
+  if (typeof render.asset !== 'string' || typeof render.pattern !== 'string'
+      || !Number.isInteger(render.start_number) || render.start_number < 0
+      || !Array.isArray(render.frames) || !render.frames.length) return null
+  const assetRoot = path.resolve(root, 'work', render.asset)
+  if (!isContained(root, assetRoot)) return null
+  const frames = new Map()
+  for (let index = 0; index < render.frames.length; index += 1) {
+    const binding = render.frames[index]
+    const frameNumber = render.start_number + index
+    const name = printfFrameName(render.pattern, frameNumber)
+    if (!name || !binding || typeof binding.path !== 'string' || !/^[a-f0-9]{64}$/.test(binding.sha256 ?? '')) return null
+    const expected = path.resolve(assetRoot, name)
+    const declared = path.resolve(root, binding.path)
+    if (expected !== declared || !isContained(assetRoot, declared) || !isContained(root, declared)) return null
+    try {
+      const real = await fsp.realpath(declared)
+      if (real !== declared || !isContained(assetRoot, real) || (await fsp.lstat(declared)).isSymbolicLink()) return null
+      const stat = await fsp.stat(real)
+      if (!stat.isFile() || await hashFile(real) !== binding.sha256) return null
+      frames.set(frameNumber, {
+        id: `${frameNumber}`,
+        name,
+        size: stat.size,
+        path: real,
+        sha256: binding.sha256,
+        mediaType: 'image/png',
+      })
+    } catch {
+      return null
+    }
+  }
+  return { frames }
+}
+
+async function readBoundJson(root, file) {
+  const resolved = path.resolve(file)
+  if (!isContained(root, resolved)) throw new Error('outside project')
+  const real = await fsp.realpath(resolved)
+  if (real !== resolved || !isContained(root, real) || (await fsp.lstat(resolved)).isSymbolicLink()) {
+    throw new Error('linked project JSON')
+  }
+  return JSON.parse(await fsp.readFile(real, 'utf8'))
+}
+
+function layerIdFor(operationId, cueId) {
+  return `layer_${crypto.createHash('sha256').update(`${operationId}:${cueId}`).digest('hex').slice(0, 24)}`
+}
+
+function printfFrameName(pattern, frameNumber) {
+  const match = /^([A-Za-z0-9._-]*)%0?([1-9][0-9]*)d([A-Za-z0-9._-]*)$/.exec(pattern)
+  if (!match || path.basename(pattern) !== pattern) return null
+  return `${match[1]}${String(frameNumber).padStart(Number(match[2]), '0')}${match[3]}`
 }
 
 async function collectFiles(root, directories, prefix) {
@@ -285,6 +464,20 @@ function attachPublicFiles(state, result) {
   result.snapshot.artifacts = publicFiles(state.artifacts, state.projectId, 'artifacts')
   if (result.snapshot.view?.source_media_id && !state.media.has(result.snapshot.view.source_media_id)) {
     delete result.snapshot.view.source_media_id
+  }
+  if (Array.isArray(result.snapshot.view?.layers)) {
+    result.snapshot.view.layers = result.snapshot.view.layers.map((layer) => {
+      if (layer?.media_type !== 'image-sequence' || !layer.image_sequence) return layer
+      const sequence = state.layers.get(layer.id)
+      if (!sequence || sequence.frames.size !== layer.image_sequence.frame_count) return layer
+      return {
+        ...layer,
+        image_sequence: {
+          ...layer.image_sequence,
+          frame_url_template: `/v1/projects/${encodeURIComponent(state.projectId)}/layers/${encodeURIComponent(layer.id)}/frames/%d`,
+        },
+      }
+    })
   }
   return result
 }

@@ -167,6 +167,7 @@ def build_snapshot(project_root):
             ],
         }
     cards = next((node for node in operations if isinstance(node, dict) and node.get("id") == "content-cards"), None)
+    layers = []
     if cards and isinstance(cards.get("plan"), str):
         try:
             cards_plan = json.loads(_contained_path(root, cards["plan"]).read_text(encoding="utf-8"))
@@ -175,6 +176,7 @@ def build_snapshot(project_root):
             edit_model = None
         if edit_model:
             view["content_cards_edit"] = edit_model
+            layers.extend(_content_card_layers(edit_model))
     captions = next((node for node in operations if isinstance(node, dict) and node.get("id") == "captions"), None)
     if captions and isinstance(captions.get("plan"), str):
         try:
@@ -184,6 +186,7 @@ def build_snapshot(project_root):
             edit_model = None
         if edit_model:
             view["captions_edit"] = edit_model
+            layers = [*_caption_layers(edit_model), *layers]
     graphic_motion = next((node for node in operations if isinstance(node, dict) and node.get("id") == "graphic-motion"), None)
     if graphic_motion and isinstance(graphic_motion.get("plan"), str):
         try:
@@ -193,6 +196,9 @@ def build_snapshot(project_root):
             edit_model = None
         if edit_model:
             view["graphic_motion_edit"] = edit_model
+            layers.extend(_graphic_motion_layers(edit_model))
+    if layers:
+        view["layers"] = layers
     snapshot = _snapshot(resources, _unique(errors), view)
     snapshot["snapshot_etag"] = _snapshot_binding(project, snapshot["resources"])
     return snapshot
@@ -372,6 +378,7 @@ def _content_cards_edit_model(plan):
             "visual_treatment": treatment.get("layout") or "default",
             "card_type": card.get("card_type"),
             "enabled": True,
+            "transform": _editor_transform(card.get("editor_transform")),
             "program_range": {
                 "start_s": card.get("program_start_s", 0),
                 "end_s": card.get("program_start_s", 0) + card.get("duration_s", 0),
@@ -394,6 +401,7 @@ def _content_cards_edit_model(plan):
                 "placement": entry["placement"],
                 "enabled": entry["enabled"],
                 "program_range": entry["program_range"],
+                "transform": entry["transform"],
                 **({"data": entry["data"]} if "data" in entry else {}),
             }
             for entry in entries
@@ -423,6 +431,7 @@ def _captions_edit_model(plan):
             "text": cue.get("text", ""),
             "program_range": program_range,
             "source_ranges": cue.get("source_ranges", []),
+            "transform": _editor_transform(cue.get("editor_transform")),
         })
     return {"style": copy_json(plan.get("style", {})), "cues": entries}
 
@@ -441,6 +450,8 @@ def _graphic_motion_edit_model(plan):
         selection = cue.get("selection") if isinstance(cue.get("selection"), dict) else {}
         recipe = cue.get("recipe") if isinstance(cue.get("recipe"), dict) else {}
         review = cue.get("review") if isinstance(cue.get("review"), dict) else {}
+        render = cue.get("render") if isinstance(cue.get("render"), dict) else {}
+        frames = render.get("frames") if isinstance(render.get("frames"), list) else []
         entries.append({
             "id": cue["id"],
             "status": cue.get("status"),
@@ -452,8 +463,95 @@ def _graphic_motion_edit_model(plan):
             "review_mode": review.get("mode"),
             "source_status": "bound" if recipe.get("manifest") and recipe.get("files") else "missing",
             "license_status": "unknown" if recipe.get("manifest") and recipe.get("files") else "missing",
+            "transform": _editor_transform(cue.get("editor_transform")),
+            "image_sequence": {
+                "pattern": render.get("pattern"),
+                "start_number": render.get("start_number"),
+                "fps": copy_json(render.get("fps")),
+                "frame_count": len(frames),
+            } if render.get("asset_type") == "image-sequence" else None,
         })
     return {"cues": entries}
+
+
+def _editor_transform(value):
+    default = {"x": 0.5, "y": 0.5, "scale": 1.0}
+    if not isinstance(value, dict) or set(value) != {"x", "y", "scale"}:
+        return default
+    x, y, scale = value.get("x"), value.get("y"), value.get("scale")
+    if any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in (x, y, scale)):
+        return default
+    if not (0 <= x <= 1 and 0 <= y <= 1 and 0.1 <= scale <= 4):
+        return default
+    return {"x": float(x), "y": float(y), "scale": float(scale)}
+
+
+def _layer_id(operation_id, cue_id):
+    value = f"{operation_id}:{cue_id}".encode("utf-8")
+    return "layer_" + hashlib.sha256(value).hexdigest()[:24]
+
+
+def _caption_layers(edit_model):
+    style = copy_json(edit_model.get("style", {}))
+    return [
+        {
+            "id": _layer_id("captions", cue["id"]),
+            "operation_id": "captions",
+            "cue_id": cue["id"],
+            "kind": "caption",
+            "media_type": "dom",
+            "z_index": 100,
+            "program_range": copy_json(cue["program_range"]),
+            "transform": copy_json(cue["transform"]),
+            "content": {"text": cue["text"], "style": style},
+        }
+        for cue in edit_model.get("cues", [])
+    ]
+
+
+def _content_card_layers(edit_model):
+    return [
+        {
+            "id": _layer_id("content-cards", cue["id"]),
+            "operation_id": "content-cards",
+            "cue_id": cue["id"],
+            "kind": "card",
+            "media_type": "dom",
+            "z_index": 200,
+            "program_range": copy_json(cue["program_range"]),
+            "transform": copy_json(cue["transform"]),
+            "content": {
+                "text": cue["copy"],
+                "layout": cue["layout"],
+                "placement": cue["placement"],
+                **({"data": copy_json(cue["data"])} if "data" in cue else {}),
+            },
+        }
+        for cue in edit_model.get("cues", []) if cue.get("enabled")
+    ]
+
+
+def _graphic_motion_layers(edit_model):
+    layers = []
+    for cue in edit_model.get("cues", []):
+        if not cue.get("enabled"):
+            continue
+        image_sequence = cue.get("image_sequence")
+        entry = {
+            "id": _layer_id("graphic-motion", cue["id"]),
+            "operation_id": "graphic-motion",
+            "cue_id": cue["id"],
+            "kind": "graphic-motion",
+            "media_type": "image-sequence" if image_sequence else "dom",
+            "z_index": 300,
+            "program_range": copy_json(cue["program_range"]),
+            "transform": copy_json(cue["transform"]),
+            "content": {"text": cue.get("content", ""), "recipe_id": cue.get("recipe_id")},
+        }
+        if image_sequence:
+            entry["image_sequence"] = copy_json(image_sequence)
+        layers.append(entry)
+    return layers
 
 
 def copy_json(value):
