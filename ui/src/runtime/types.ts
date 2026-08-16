@@ -35,9 +35,19 @@ export type RuntimeSnapshot = Readonly<{
   errors: readonly string[]
   view: Readonly<{
     schema_version?: number
+    project_id?: string
     project_revision?: number
     active_sequence?: string
     source_media_id?: string
+    sequence_geometry?: Readonly<{ width: number; height: number }>
+    source_media?: Readonly<{
+      name: string
+      duration_s: number
+      width: number
+      height: number
+      has_video: boolean
+      has_audio: boolean
+    }>
     operation_count?: number
     review_count?: number
     operations?: readonly RuntimeOperation[]
@@ -46,6 +56,14 @@ export type RuntimeSnapshot = Readonly<{
     content_cards_edit?: Readonly<{
       fields: Readonly<Record<string, unknown>>
       review_template: ContentCardsReview
+      cues?: readonly RuntimeCardCue[]
+    }>
+    captions_edit?: Readonly<{
+      style: Readonly<Record<string, unknown>>
+      cues: readonly RuntimeCaptionCue[]
+    }>
+    graphic_motion_edit?: Readonly<{
+      cues: readonly RuntimeGraphicMotionCue[]
     }>
   }>
   resources: readonly RuntimeResource[]
@@ -60,7 +78,40 @@ export type RuntimeTimeline = Readonly<{
     id: string
     source_range: Readonly<{ start_s: number; end_s: number }>
     program_range: Readonly<{ start_s: number; end_s: number }>
+    speed?: number
   }>[]
+}>
+
+export type RuntimeCaptionCue = Readonly<{
+  id: string
+  index?: number
+  text: string
+  program_range: Readonly<{ start_s: number; end_s: number }>
+  source_ranges?: readonly Readonly<{ start_s: number; end_s: number }>[]
+}>
+
+export type RuntimeCardCue = Readonly<{
+  id: string
+  card_type?: string
+  copy: string
+  layout: string
+  placement: string
+  enabled: boolean
+  program_range: Readonly<{ start_s: number; end_s: number }>
+  data?: Readonly<Record<string, unknown>>
+}>
+
+export type RuntimeGraphicMotionCue = Readonly<{
+  id: string
+  status?: string
+  enabled: boolean
+  content: string
+  recipe_id?: string
+  review_status?: string
+  review_mode?: string
+  source_status?: string
+  license_status?: string
+  program_range: Readonly<{ start_s: number; end_s: number }>
 }>
 
 export type RuntimeOperation = Readonly<{

@@ -67,7 +67,7 @@ test('Timeline ruler draws every second across the canonical twenty-second domai
   await expect(ticks.nth(0).locator('span')).toHaveCSS('font-style', 'normal')
 })
 
-test('Timeline keeps terminal ruler drawing and representative media drawing visible', async ({ page }) => {
+test('Timeline keeps terminal ruler and protocol clips visible without synthetic media drawings', async ({ page }) => {
   await page.setViewportSize({ width: 1008, height: 444 })
   await page.goto('/?scenario=1-324')
 
@@ -98,27 +98,13 @@ test('Timeline keeps terminal ruler drawing and representative media drawing vis
   await expect(terminalLabel).toHaveText('00:20')
   await expect(terminalLabel).toHaveCSS('font-style', 'normal')
 
-  const thumbnails = page.locator('[data-timeline-clip="video-1"] .timeline-thumbnails i')
-  const [firstThumbnail, secondThumbnail] = await Promise.all([thumbnails.nth(0).boundingBox(), thumbnails.nth(1).boundingBox()])
-  expect(firstThumbnail).toMatchObject({ width: 52, height: 48 })
-  expect(secondThumbnail).toMatchObject({ width: 52, height: 48 })
-  expect(secondThumbnail!.x - (firstThumbnail!.x + firstThumbnail!.width)).toBeCloseTo(4, 1)
-  await expect(thumbnails.nth(0)).toHaveCSS('background-color', 'rgb(93, 104, 117)')
-  await expect(thumbnails.nth(1)).toHaveCSS('background-color', 'rgb(107, 94, 99)')
-  const thumbnailStrip = page.locator('[data-timeline-clip="video-1"] .timeline-thumbnails')
-  await expect(thumbnailStrip).toHaveCSS('height', '48px')
-  const highlight = await thumbnailStrip.evaluate((element) => {
-    const style = getComputedStyle(element, '::after')
-    return { height: style.height, backgroundColor: style.backgroundColor }
-  })
-  expect(highlight).toEqual({ height: '12px', backgroundColor: 'rgba(255, 255, 255, 0.06)' })
-
-  const waveformBars = page.locator('.timeline-waveform i')
-  const [firstBar, secondBar, thirdBar] = await Promise.all([waveformBars.nth(0).boundingBox(), waveformBars.nth(1).boundingBox(), waveformBars.nth(2).boundingBox()])
-  expect(firstBar).toMatchObject({ width: 2, height: 10 })
-  expect(secondBar).toMatchObject({ width: 2, height: 18 })
-  expect(thirdBar).toMatchObject({ width: 2, height: 7 })
-  expect(secondBar!.x - (firstBar!.x + firstBar!.width)).toBeCloseTo(8, 1)
+  const firstVideo = page.locator('[data-timeline-clip="video-1"]')
+  const firstVideoBox = await firstVideo.boundingBox()
+  expect(firstVideoBox).not.toBeNull()
+  expect(firstVideoBox!.width).toBeGreaterThan(0)
+  await expect(firstVideo.locator('.timeline-clip-label')).toContainText('Unknown media')
+  await expect(page.locator('.timeline-thumbnails')).toHaveCount(0)
+  await expect(page.locator('.timeline-waveform')).toHaveCount(0)
 
   await page.goto('/?scenario=1-754')
   const selectedVideo = page.locator('[data-timeline-clip="video-2"]')
@@ -127,7 +113,7 @@ test('Timeline keeps terminal ruler drawing and representative media drawing vis
   await expect(selectedVideo).toHaveCSS('border-color', 'rgb(167, 139, 250)')
   await expect(selectedVideo.locator('.timeline-clip-label')).toHaveCSS('background-color', 'rgb(43, 39, 56)')
   await expect(selectedVideo.locator('.timeline-clip-label')).toHaveCSS('height', '17px')
-  await expect(selectedVideo.locator('.timeline-clip-speed')).toHaveText('1.0x')
+  await expect(selectedVideo.locator('.timeline-clip-speed')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Speed' }).first()).toBeDisabled()
 
   await page.goto('/?scenario=123-167')
@@ -307,14 +293,15 @@ test('caption timeline renders its lane before video without reordering project 
   expect(captionBox!.y).toBeLessThan(videoBox!.y)
 })
 
-test('an unselected caption track keeps its reserved lane before video', async ({ page }) => {
+test('an unselected caption track keeps its real lane and cues before video', async ({ page }) => {
   await page.setViewportSize({ width: 1008, height: 444 })
   await page.goto('/?scenario=1-324')
 
-  await expect(page.getByText('C1', { exact: true })).toHaveCount(0)
+  const captionBox = await page.getByText('C1', { exact: true }).boundingBox()
   const videoBox = await page.getByText('V1', { exact: true }).boundingBox()
+  expect(captionBox).not.toBeNull()
   expect(videoBox).not.toBeNull()
-  expect(videoBox!.y).toBeGreaterThanOrEqual(160)
+  expect(captionBox!.y).toBeLessThan(videoBox!.y)
 })
 
 test('an empty timeline omits the ruler and uses its narrow media gutter', async ({ page }) => {

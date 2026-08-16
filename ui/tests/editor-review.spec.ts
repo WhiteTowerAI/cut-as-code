@@ -14,7 +14,8 @@ test('content cards review keeps edits local until explicit save and invalidates
   await page.getByRole('button', { name: 'Save Changes' }).click()
 
   await expect(page.getByRole('status', { name: 'Content Cards review status' })).toContainText('Preview stale')
-  await expect(page.getByRole('button', { name: 'Approve preview' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Approve preview' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Reject preview' })).toHaveCount(0)
 })
 
 test('review rejection requires an explicit rationale and editor exposes no execution controls', async ({ page }) => {
@@ -36,6 +37,7 @@ test('conflicted card drafts cannot be saved or approved', async ({ page }) => {
 
   await expect(page.getByRole('status', { name: 'Content Cards review status' })).toContainText('Conflict')
   await expect(page.getByRole('button', { name: 'Save Changes' })).toBeDisabled()
-  await expect(page.getByRole('button', { name: 'Approve preview' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Approve preview' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Reject preview' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Discard changes' })).toBeEnabled()
 })

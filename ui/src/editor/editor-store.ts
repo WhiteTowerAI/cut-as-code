@@ -1,6 +1,5 @@
 import { createStore } from 'zustand/vanilla'
 import type {
-  ContentCardEditableField,
   ContentCardLayout,
   ContentCardPlacement,
   EditorOperationView,
@@ -11,10 +10,12 @@ import type {
 } from './editor-model'
 
 export type ContentCardsDraftChange = Readonly<{
+  cueId?: string
   copy?: string
   layout?: ContentCardLayout
   placement?: ContentCardPlacement
   enabled?: boolean
+  text?: string
 }>
 
 export type OperationDraft = Readonly<{
@@ -26,13 +27,6 @@ export type OperationDraft = Readonly<{
   requestId?: number
   error?: string
 }>
-
-const contentCardFields: readonly ContentCardEditableField[] = [
-  'copy',
-  'layout',
-  'placement',
-  'enabled',
-]
 
 const contentCardLayouts: readonly ContentCardLayout[] = ['lower-third', 'quote', 'statistic', 'default', 'metric-spotlight', 'bar-chart', 'pie-chart', 'line-chart', 'side-by-side', 'parallel-columns']
 const contentCardPlacements: readonly ContentCardPlacement[] = [
@@ -54,15 +48,21 @@ function getOperation(project: EditorProjectView | null, operationId: string) {
 function isSupportedOperation(
   operation: EditorOperationView | undefined,
 ): operation is EditorOperationView {
-  return operation?.kind === 'content-cards' && operation.editable
+  return Boolean(operation?.editable && ['content-cards', 'captions', 'graphic-motion'].includes(operation.kind))
 }
 
-function isContentCardsDraftChange(value: unknown): value is ContentCardsDraftChange {
+function isOperationDraftChange(operation: EditorOperationView, value: unknown): value is ContentCardsDraftChange {
   if (!value || typeof value !== 'object') return false
+  const allowed = operation.kind === 'content-cards'
+    ? ['cueId', 'copy', 'layout', 'placement', 'enabled']
+    : operation.kind === 'captions'
+      ? ['cueId', 'text']
+      : ['cueId', 'enabled']
   return Object.entries(value).every(([field, fieldValue]) => {
-    if (!contentCardFields.includes(field as ContentCardEditableField)) return false
+    if (!allowed.includes(field)) return false
+    if (field === 'cueId') return typeof fieldValue === 'string' && Boolean(fieldValue.trim())
     if (field === 'enabled') return typeof fieldValue === 'boolean'
-    if (field === 'copy') return typeof fieldValue === 'string'
+    if (field === 'copy' || field === 'text') return typeof fieldValue === 'string'
     if (field === 'layout') return contentCardLayouts.includes(fieldValue as ContentCardLayout)
     return contentCardPlacements.includes(fieldValue as ContentCardPlacement)
   })
@@ -72,7 +72,15 @@ function fieldsMatch(
   authority: Readonly<Record<string, unknown>>,
   draft: ContentCardsDraftChange,
 ) {
-  return Object.entries(draft).every(([field, value]) => authority[field] === value)
+  const cueId = draft.cueId
+  const cues = Array.isArray(authority.cues) ? authority.cues : []
+  const cue = cueId
+    ? cues.find((item) => item && typeof item === 'object' && (item as { id?: string }).id === cueId) as Readonly<Record<string, unknown>> | undefined
+    : undefined
+  return Object.entries(draft).every(([field, value]) => {
+    if (field === 'cueId') return Boolean(cue)
+    return (cue ?? authority)[field] === value
+  })
 }
 
 function hasReviewEvidence(operation: EditorOperationView) {
@@ -192,7 +200,7 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
     setOpenMenu: (openMenu) => set({ openMenu }),
     editOperationDraft: (operationId, change) => {
       const operation = getOperation(get().project, operationId)
-      if (!isSupportedOperation(operation) || !isContentCardsDraftChange(change)) return
+      if (!isSupportedOperation(operation) || !isOperationDraftChange(operation, change)) return
 
       const current = get().operationDrafts[operationId]
       if (current?.conflict) return
@@ -231,9 +239,12 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
           const project = await runtime.save(operationId, submittedFields)
           const current = get().operationDrafts[operationId]
           if (current?.requestId !== requestId) return
-          const newerFields = Object.fromEntries(Object.entries(current.fields).filter(
+          const changedFields = Object.fromEntries(Object.entries(current.fields).filter(
             ([field, value]) => submittedFields[field as keyof ContentCardsDraftChange] !== value,
           )) as ContentCardsDraftChange
+          const newerFields: ContentCardsDraftChange = Object.keys(changedFields).length && current.fields.cueId && !changedFields.cueId
+            ? { ...changedFields, cueId: current.fields.cueId }
+            : changedFields
           if (Object.keys(newerFields).length) {
             set({ project, operationDrafts: {
               ...get().operationDrafts,

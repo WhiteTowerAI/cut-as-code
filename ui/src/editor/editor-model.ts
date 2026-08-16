@@ -15,6 +15,9 @@ export type AssetView = Readonly<{
   kind: 'video' | 'audio'
   mediaType?: string
   url?: string
+  durationS?: number
+  width?: number
+  height?: number
 }>
 
 export type RuntimeResourceView = Readonly<{
@@ -37,12 +40,18 @@ export type ReviewArtifactView = Readonly<{
 export type TrackView = Readonly<{
   id: string
   name: string
-  kind: 'video' | 'audio' | 'caption'
+  kind: 'video' | 'audio' | 'caption' | 'card' | 'graphic-motion'
   clips?: readonly ClipView[]
 }>
 
 export type ClipView = Readonly<{
   id: string
+  trackId?: string
+  sourceAssetId?: string
+  displayName?: string
+  summary?: string
+  speed?: number
+  enabled?: boolean
   sourceRange: Readonly<{ startS: number; endS: number }>
   programRange: Readonly<{ startS: number; endS: number }>
 }>
@@ -82,9 +91,13 @@ export type EditorOperationView = Readonly<{
 }>
 
 export type EditorProjectView = Readonly<{
+  id?: string
+  runtime?: boolean
+  activeSequence?: string
   revision: number
   durationS: number
   fps: Readonly<{ numerator: number; denominator: number }>
+  sequenceGeometry?: Readonly<{ width: number; height: number }>
   assets: readonly AssetView[]
   sourceAssetId?: string
   tracks: readonly TrackView[]

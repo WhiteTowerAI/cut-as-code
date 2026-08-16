@@ -7,6 +7,137 @@ import {
 } from '../src/editor/ViewerPanel'
 import type { ClipView } from '../src/editor/editor-model'
 
+const runtimeSnapshot = (overrides: Record<string, unknown> = {}) => ({
+  read_only: false,
+  errors: [],
+  view: {
+    project_id: 'viewer-project',
+    project_revision: 1,
+    active_sequence: 'main',
+    source_media_id: 'asset_source',
+    sequence_geometry: { width: 1280, height: 720 },
+    source_media: {
+      name: 'landscape.mp4', duration_s: 10, width: 1280, height: 720,
+      has_video: true, has_audio: true,
+    },
+    operations: [],
+    reviews: [],
+    timeline: {
+      duration_s: 10,
+      fps: { num: 30, den: 1 },
+      clips: [{
+        id: 'clip-1',
+        source_range: { start_s: 0, end_s: 10 },
+        program_range: { start_s: 0, end_s: 10 },
+      }],
+    },
+  },
+  resources: [],
+  media: [{
+    id: 'asset_source', name: 'landscape.mp4', size: 1024,
+    media_type: 'video/mp4', url: '/fixtures/landscape.mp4',
+  }],
+  artifacts: [],
+  ...overrides,
+})
+
+test('production runtime shows explicit loading and error surfaces without fixture fallback', async ({ page }) => {
+  let releaseSnapshot: (() => void) | undefined
+  await page.route('**/v1/projects/project_loading/snapshot', async (route) => {
+    await new Promise<void>((resolve) => { releaseSnapshot = resolve })
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, snapshot: runtimeSnapshot() }) })
+  })
+
+  await page.goto('/?project=project_loading')
+  await expect(page.getByRole('status', { name: 'Loading project' })).toBeVisible()
+  await expect(page.locator('[data-editor-shell]')).toHaveCount(0)
+  await expect(page.getByText('City Walk', { exact: true })).toHaveCount(0)
+  await expect.poll(() => Boolean(releaseSnapshot)).toBe(true)
+  releaseSnapshot?.()
+  await expect(page.locator('[data-editor-shell]')).toBeVisible()
+
+  await page.route('**/v1/projects/project_error/snapshot', (route) => route.abort('failed'))
+  await page.goto('/?project=project_error')
+  await expect(page.getByRole('alert', { name: 'Project unavailable' })).toBeVisible()
+  await expect(page.locator('[data-editor-shell]')).toHaveCount(0)
+  await expect(page.getByText('City Walk', { exact: true })).toHaveCount(0)
+})
+
+test('runtime workspace exactly fills common desktop viewports without document scrolling', async ({ page }) => {
+  await page.route('**/v1/projects/project_viewport/snapshot', (route) => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ ok: true, snapshot: runtimeSnapshot() }),
+  }))
+
+  for (const viewport of [
+    { width: 1366, height: 768 },
+    { width: 1440, height: 900 },
+    { width: 1920, height: 1080 },
+    { width: 2560, height: 1440 },
+  ]) {
+    await page.setViewportSize(viewport)
+    await page.goto('/?project=project_viewport')
+    await expect(page.locator('[data-editor-shell]')).toBeVisible()
+    const geometry = await page.evaluate(() => ({
+      innerWidth: window.innerWidth,
+      innerHeight: window.innerHeight,
+      scrollWidth: document.documentElement.scrollWidth,
+      scrollHeight: document.documentElement.scrollHeight,
+      bodyScrollWidth: document.body.scrollWidth,
+      bodyScrollHeight: document.body.scrollHeight,
+      shell: (() => {
+        const rect = document.querySelector('[data-editor-shell]')!.getBoundingClientRect()
+        return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+      })(),
+    }))
+    expect(geometry.scrollWidth).toBe(viewport.width)
+    expect(geometry.scrollHeight).toBe(viewport.height)
+    expect(geometry.bodyScrollWidth).toBe(viewport.width)
+    expect(geometry.bodyScrollHeight).toBe(viewport.height)
+    expect(geometry.shell).toEqual({ x: 0, y: 0, width: viewport.width, height: viewport.height })
+  }
+})
+
+test('runtime Viewer uses real sequence geometry, contain fit, read-only aspect, and fullscreen', async ({ page }) => {
+  await page.route('**/v1/projects/project_geometry/snapshot', (route) => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ ok: true, snapshot: runtimeSnapshot() }),
+  }))
+  await page.addInitScript(() => {
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
+      configurable: true,
+      value() {
+        document.documentElement.dataset.fullscreenTarget = (this as HTMLElement).className
+        return Promise.resolve()
+      },
+    })
+  })
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/?project=project_geometry')
+
+  const canvas = page.locator('.viewer-canvas')
+  await expect(canvas).toHaveAttribute('data-sequence-width', '1280')
+  await expect(canvas).toHaveAttribute('data-sequence-height', '720')
+  const canvasBox = await canvas.boundingBox()
+  const stageBox = await page.locator('.viewer-stage').boundingBox()
+  expect(canvasBox).not.toBeNull()
+  expect(stageBox).not.toBeNull()
+  expect(canvasBox!.width / canvasBox!.height).toBeCloseTo(16 / 9, 2)
+  expect(canvasBox!.width).toBeLessThanOrEqual(stageBox!.width)
+  expect(canvasBox!.height).toBeLessThanOrEqual(stageBox!.height)
+  await expect(canvas.locator('video')).toHaveCSS('object-fit', 'contain')
+
+  await page.getByRole('button', { name: 'Aspect ratio' }).click()
+  await expect(page.getByRole('menuitemradio', { name: /16:9/ })).toBeChecked()
+  await expect(page.getByRole('menuitemradio', { name: /9:16/ })).not.toBeChecked()
+  await expect(page.getByRole('menuitemradio', { name: /16:9/ })).toBeDisabled()
+
+  await page.getByRole('button', { name: 'Fit preview' }).click()
+  await expect(canvas).toHaveAttribute('data-fit-mode', 'fit')
+  await page.getByRole('button', { name: 'Fullscreen' }).click()
+  await expect(page.locator('html')).toHaveAttribute('data-fullscreen-target', /viewer-stage/)
+})
+
 test('Viewer playback is unavailable without an authoritative project video', async ({ page }) => {
   await page.setViewportSize({ width: 680, height: 688 })
   await page.goto('/?scenario=1-282')
@@ -234,6 +365,9 @@ test('the populated fixture explicitly reports unavailable project video', async
   const viewer = page.getByRole('region', { name: 'Viewer', exact: true })
   await expect(viewer.getByText('Project video unavailable', { exact: true })).toBeVisible()
   await expect(viewer.locator('img[src="/assets/editor/viewer-poster.png"]')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Aspect ratio' }).click()
+  await expect(page.getByRole('menuitemradio', { name: /Original/ })).toBeChecked()
+  await expect(page.getByRole('menuitemradio', { name: /9:16/ })).not.toBeChecked()
 })
 
 test('the standalone Viewer frame uses its canonical five-second project clock', async ({ page }) => {

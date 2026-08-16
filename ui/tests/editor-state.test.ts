@@ -41,8 +41,13 @@ const project: EditorProjectView = {
       id: 'captions',
       kind: 'captions',
       revision: 2,
-      editable: false,
-      fields: {},
+      editable: true,
+      fields: {
+        cues: [
+          { id: 'cue-001', text: 'First caption' },
+          { id: 'cue-002', text: 'Second caption' },
+        ],
+      },
       preview: {
         status: 'current',
         revision: 2,
@@ -286,14 +291,56 @@ test('a rejected preview cannot be replaced by an approval without a new review'
   expect(store.getState().canApproveOperation('content-cards')).toBe(false)
 })
 
-test('read-only captions cannot record an approval or rejection despite a current preview', () => {
+test('editable captions can reject a current preview with an explicit rationale', () => {
   const store = createStateStore()
-  const before = store.getState().project?.operations?.[1]?.approval
 
   store.getState().recordReviewDecision('captions', 'approved')
-  store.getState().recordReviewDecision('captions', 'rejected', 'No rationale should be stored')
+  store.getState().recordReviewDecision('captions', 'rejected', 'Timing needs another pass')
 
-  expect(store.getState().project?.operations?.[1]?.approval).toEqual(before)
+  expect(store.getState().project?.operations?.[1]?.approval).toMatchObject({
+    status: 'rejected',
+    revision: 2,
+    rationale: 'Timing needs another pass',
+    reviewId: 'review-captions-r2',
+  })
+})
+
+test('a newer caption edit keeps its second-cue binding after an in-flight save completes', async () => {
+  let resolveSave!: (project: EditorProjectView) => void
+  const store = createEditorStore({
+    project, activeTab: 'captions', selection: { kind: 'caption', id: 'cue-002' }, currentTimeS: 0,
+    isPlaying: false, timelineZoom: 1, snapEnabled: true, openMenu: null,
+  }, {
+    save: async () => new Promise((resolve) => { resolveSave = resolve }),
+    review: async () => project,
+  })
+
+  store.getState().editOperationDraft('captions', { cueId: 'cue-002', text: 'Submitted caption' })
+  const saving = store.getState().saveOperationDraft('captions')
+  store.getState().editOperationDraft('captions', { cueId: 'cue-002', text: 'Newer caption' })
+  resolveSave({
+    ...project,
+    revision: 8,
+    operations: project.operations?.map((operation) => operation.id === 'captions'
+      ? {
+          ...operation,
+          revision: 3,
+          fields: {
+            cues: [
+              { id: 'cue-001', text: 'First caption' },
+              { id: 'cue-002', text: 'Submitted caption' },
+            ],
+          },
+        }
+      : operation),
+  })
+  await saving
+
+  expect(store.getState().getOperationDraft('captions')).toMatchObject({
+    dirty: true,
+    pending: false,
+    fields: { cueId: 'cue-002', text: 'Newer caption' },
+  })
 })
 
 test('discard restores the authoritative operation values', () => {
@@ -663,6 +710,53 @@ test('runtime snapshot maps terminal status only when it binds the exact preview
   expect(reviewStatusText(rejected, false)).toBe('Preview rejected')
 })
 
+test('runtime snapshot keeps prior-revision evidence visible as stale and non-approvable', () => {
+  const snapshot: RuntimeSnapshot = {
+    read_only: false,
+    errors: [],
+    resources: [
+      { id: 'res_project', kind: 'project', etag: 'project-etag', size: 10 },
+      { id: 'res_cards', kind: 'plan', etag: 'cards-plan-r4', size: 20, operation_id: 'content-cards' },
+    ],
+    media: [],
+    artifacts: [{
+      id: 'artifact_old', name: 'cards-r3.png', size: 1, sha256: 'cards-r3',
+      media_type: 'image/png', url: '/v1/projects/p/artifacts/artifact_old',
+    }],
+    snapshot_etag: 'snapshot-r4',
+    view: {
+      project_revision: 8,
+      active_sequence: 'main',
+      operations: [{ id: 'content-cards', revision: 4, status: 'approved', etag: 'cards-operation-r4' }],
+      reviews: [{
+        id: 'review-content-cards-r3', revision: 1, status: 'approved', rationale: 'Previous preview was correct',
+        based_on: { 'content-cards': 3 }, snapshot_etag: 'snapshot-r3', evidence_hashes: ['sha256:cards-r3'],
+      }],
+      content_cards_edit: {
+        fields: {},
+        review_template: { schema_version: 1, cards: [] },
+        cues: [],
+      },
+    },
+  }
+
+  const mapped = projectFromSnapshot(null, snapshot)
+  const operation = mapped?.operations?.[0]
+  expect(operation?.preview).toEqual({
+    status: 'stale',
+    revision: 3,
+    reviewId: 'review-content-cards-r3',
+    snapshotEtag: 'snapshot-r3',
+    evidenceHashes: ['sha256:cards-r3'],
+    artifacts: [{
+      id: 'artifact_old', name: 'cards-r3.png', size: 1, sha256: 'cards-r3',
+      mediaType: 'image/png', url: '/v1/projects/p/artifacts/artifact_old',
+    }],
+  })
+  expect(operation?.approval).toMatchObject({ status: 'invalidated', revision: 3 })
+  expect(operation && reviewStatusText(operation, false)).toBe('Preview stale')
+})
+
 test('captions-only runtime project is projected solely from the authoritative snapshot', () => {
   const snapshot: RuntimeSnapshot = {
     read_only: false,
@@ -685,6 +779,13 @@ test('captions-only runtime project is projected solely from the authoritative s
       },
       operations: [{ id: 'captions', revision: 7, status: 'approved', etag: 'caption-operation' }],
       reviews: [],
+      captions_edit: {
+        style: { preset: 'clean' },
+        cues: [
+          { id: 'cue-001', text: 'First real caption', program_range: { start_s: 1, end_s: 2 } },
+          { id: 'cue-002', text: 'Second real caption', program_range: { start_s: 3, end_s: 4 } },
+        ],
+      },
     },
   }
 
@@ -695,16 +796,64 @@ test('captions-only runtime project is projected solely from the authoritative s
     durationS: 9,
     fps: { numerator: 24, denominator: 1 },
     assets: [{ id: 'asset_source', name: 'actual-source.mp4', kind: 'video' }],
-    operations: [{ id: 'captions', kind: 'captions', revision: 7, editable: false }],
+    operations: [{ id: 'captions', kind: 'captions', revision: 7, editable: true }],
   })
   expect(mapped?.tracks.map((track) => [track.id, track.kind])).toEqual([
     ['track-video', 'video'], ['track-audio', 'audio'], ['track-captions', 'caption'],
   ])
-  expect(mapped?.tracks[0].clips).toEqual([{
+  expect(mapped?.tracks[0].clips).toEqual([expect.objectContaining({
     id: 'clip-real', sourceRange: { startS: 2, endS: 11 }, programRange: { startS: 0, endS: 9 },
-  }])
+    trackId: 'track-video',
+  })])
   expect(mapped?.assets.map((asset) => asset.name)).not.toContain('Product teaser.mov')
   expect(mapped?.durationS).not.toBe(127)
+  expect(mapped?.tracks[2].clips).toEqual([
+    expect.objectContaining({ id: 'cue-001', summary: 'First real caption', programRange: { startS: 1, endS: 2 } }),
+    expect.objectContaining({ id: 'cue-002', summary: 'Second real caption', programRange: { startS: 3, endS: 4 } }),
+  ])
+})
+
+test('runtime projection creates independent real card and motion lanes without synthetic media', () => {
+  const snapshot: RuntimeSnapshot = {
+    read_only: false, errors: [], resources: [], artifacts: [],
+    media: [{ id: 'asset_source', name: 'interview.mp4', size: 1, media_type: 'video/mp4', url: '/media/source' }],
+    view: {
+      source_media_id: 'asset_source', project_revision: 1, active_sequence: 'main',
+      timeline: {
+        duration_s: 12, fps: { num: 30, den: 1 },
+        clips: [{ id: 'clip-main', source_range: { start_s: 0, end_s: 12 }, program_range: { start_s: 0, end_s: 12 } }],
+      },
+      operations: [
+        { id: 'content-cards', revision: 2, status: 'approved', etag: 'cards' },
+        { id: 'graphic-motion', revision: 3, status: 'approved', etag: 'motion' },
+      ],
+      reviews: [],
+      content_cards_edit: {
+        fields: {}, review_template: { schema_version: 1, cards: [] },
+        cues: [{
+          id: 'card-002', card_type: 'quote', copy: 'Actual quote', enabled: true,
+          layout: 'quote', placement: 'bottom', program_range: { start_s: 6, end_s: 8 },
+        }],
+      },
+      graphic_motion_edit: {
+        cues: [{
+          id: 'motion-001', content: 'Actual motion', enabled: true, recipe_id: 'recipe-real',
+          status: 'verified', review_status: 'approved', program_range: { start_s: 0, end_s: 5 },
+        }],
+      },
+    },
+  }
+
+  const mapped = projectFromSnapshot(null, snapshot)!
+
+  expect(mapped.tracks.map((track) => [track.id, track.kind])).toEqual([
+    ['track-video', 'video'], ['track-audio', 'audio'], ['track-content-cards', 'card'], ['track-graphic-motion', 'graphic-motion'],
+  ])
+  expect(mapped.tracks[0].clips?.[0]).toMatchObject({ displayName: 'interview.mp4', trackId: 'track-video' })
+  expect(mapped.tracks[1].clips).toEqual([])
+  expect(mapped.tracks[2].clips?.[0]).toMatchObject({ id: 'card-002', summary: 'Actual quote', programRange: { startS: 6, endS: 8 } })
+  expect(mapped.tracks[3].clips?.[0]).toMatchObject({ id: 'motion-001', summary: 'Actual motion', programRange: { startS: 0, endS: 5 } })
+  expect(JSON.stringify(mapped)).not.toContain('City Walk')
 })
 
 test('graphic-motion runtime projection preserves every authoritative operation and resource', () => {

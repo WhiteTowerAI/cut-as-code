@@ -22,6 +22,12 @@ export function reviewStatusText(operation: EditorOperationView, conflict: boole
             : 'Preview current'
 }
 
+function operationLabel(kind: EditorOperationView['kind']) {
+  if (kind === 'content-cards') return 'Content Cards'
+  if (kind === 'graphic-motion') return 'Graphic Motion'
+  return 'Captions'
+}
+
 export function ReviewStatusBar({ operation, store }: ReviewStatusBarProps) {
   const draft = useStore(store, (state) => state.getOperationDraft(operation.id))
   const canSave = useStore(store, (state) => state.canSaveOperation(operation.id))
@@ -32,18 +38,18 @@ export function ReviewStatusBar({ operation, store }: ReviewStatusBarProps) {
   return (
     <section
       data-review-status={operation.preview?.status}
-      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid #30333b', color: '#e8ebf0', background: '#1c1e24', fontSize: 12 }}
+      className="review-status-bar"
     >
-      <output role="status" aria-label="Content Cards review status" aria-live="polite">
+      <output className="review-status-copy" role="status" aria-label={`${operationLabel(operation.kind)} review status`} aria-live="polite">
         <strong>{previewStatus}</strong>
         {draft?.dirty ? <span> Unsaved changes</span> : null}
         {draft?.conflict ? <span> External update detected</span> : null}
         {draft?.pending ? <span> Saving</span> : null}
         {draft?.error ? <span role="alert"> {draft.error}</span> : null}
       </output>
-      <span style={{ marginLeft: 'auto' }}>Revision {operation.revision}</span>
-      <button type="button" disabled={!canSave} onClick={() => save(operation.id)}>Save Changes</button>
-      <button type="button" disabled={!draft || draft.pending} onClick={() => discard(operation.id)}>Discard changes</button>
+      <span className="review-revision">Revision {operation.revision}</span>
+      <button className="review-action-button review-action-button--primary" type="button" disabled={!canSave} onClick={() => save(operation.id)}>Save Changes</button>
+      <button className="review-action-button" type="button" disabled={!draft || draft.pending} onClick={() => discard(operation.id)}>Discard changes</button>
     </section>
   )
 }

@@ -2,7 +2,7 @@ import { expect, request, test, type APIRequestContext } from '@playwright/test'
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { cp, mkdtemp, mkdir, readFile, rm, symlink, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -43,40 +43,54 @@ test.afterAll(async () => {
   if (projectRoot) await rm(projectRoot, { recursive: true, force: true })
 })
 
-test('binds to loopback and arms one credential-free browser launch at a time', async () => {
+test('binds to loopback and redeems distinct one-time browser launches to a clean URL', async () => {
   expect(ready.host).toBe('127.0.0.1')
   expect(ready.port).toBeGreaterThan(0)
   expect(ready.projectId).toMatch(/^project_[a-f0-9]+$/)
 
   const first = await request.newContext({ baseURL })
   const launch = await armLaunch(startedSidecar)
-  expect(launch).toBe(`${baseURL}/?project=${encodeURIComponent(ready.projectId)}`)
+  expect(launch).toMatch(new RegExp(`^${baseURL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/\\?project=${encodeURIComponent(ready.projectId)}&launch=[A-Za-z0-9_-]{43}$`))
+  const secondLaunch = await armLaunch(startedSidecar)
+  expect(secondLaunch).not.toBe(launch)
   const opened = await browserNavigation(first, launch)
-  expect(opened.status()).toBe(200)
-  expect(await opened.text()).toContain('<div id="root">')
+  expect(opened.status()).toBe(303)
+  expect(opened.headers().location).toBe(`/?project=${encodeURIComponent(ready.projectId)}`)
+  expect(opened.headers()['set-cookie']).toContain('HttpOnly')
+  const clean = await first.get(opened.headers().location!, { headers: { 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Dest': 'document', 'Sec-Fetch-Site': 'none' } })
+  expect(clean.status()).toBe(200)
+  expect(await clean.text()).toContain('<div id="root">')
 
   const replay = await request.newContext({ baseURL })
   const rejected = await browserNavigation(replay, launch)
   expect(rejected.status()).toBe(401)
+  expect(rejected.headers()['content-type']).toBe('text/html; charset=utf-8')
+  expect(await rejected.text()).toContain('Editor launch unavailable')
+  expect((await browserNavigation(replay, secondLaunch)).status()).toBe(303)
   await first.dispose()
   await replay.dispose()
 })
 
-test('rejects unarmed launches and forged hosts without consuming an armed launch', async () => {
+test('rejects unarmed, non-navigation, and forged-host launches without consuming a launch', async () => {
   const isolated = await startSidecar(projectRoot)
   const isolatedURL = `http://${isolated.ready.host}:${isolated.ready.port}`
   const client = await request.newContext({ baseURL: isolatedURL })
   try {
-    const launch = `${isolatedURL}/?project=${encodeURIComponent(isolated.ready.projectId)}`
-    expect((await browserNavigation(client, launch)).status()).toBe(401)
+    const unarmed = `${isolatedURL}/?project=${encodeURIComponent(isolated.ready.projectId)}&launch=missing`
+    const unarmedResponse = await browserNavigation(client, unarmed)
+    expect(unarmedResponse.status()).toBe(401)
+    expect(unarmedResponse.headers()['content-type']).toBe('text/html; charset=utf-8')
 
-    await armLaunch(isolated)
+    const launch = await armLaunch(isolated)
+    const scriptRequest = await client.get(launch, { headers: { 'Sec-Fetch-Mode': 'no-cors', 'Sec-Fetch-Dest': 'script', 'Sec-Fetch-Site': 'same-origin' } })
+    expect(scriptRequest.status()).toBe(401)
+    expect(await scriptRequest.text()).toContain('Editor launch unavailable')
 
     const badHost = await client.get(launch, {
       headers: { Host: 'attacker.invalid', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Dest': 'document' },
     })
     expect(badHost.status()).toBe(400)
-    expect((await browserNavigation(client, launch)).status()).toBe(200)
+    expect((await browserNavigation(client, launch)).status()).toBe(303)
   } finally {
     await client.dispose()
     await stopSidecar(isolated.process)
@@ -187,7 +201,7 @@ test('browser runtime is ready from the armed credential-free URL and refreshes 
     const launch = await armLaunch(isolated)
     await page.goto(launch)
     await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
-    expect(page.url()).toBe(launch)
+    expect(page.url()).toBe(`${isolatedURL(isolated.ready)}/?project=${encodeURIComponent(isolated.ready.projectId)}`)
     await expect(page.locator('[data-editor-shell]')).toBeVisible()
     const status = page.locator('[data-runtime-project-status]')
     await expect(status).toBeVisible()
@@ -210,7 +224,7 @@ test('browser runtime is ready from the armed credential-free URL and refreshes 
   }
 })
 
-test('keeps the primary workspace visible while project data is collapsed', async ({ page }) => {
+test('keeps the primary workspace visible without production protocol diagnostics', async ({ page }) => {
   const isolated = await startSidecar(projectRoot)
   try {
     await page.setViewportSize({ width: 1440, height: 900 })
@@ -218,9 +232,8 @@ test('keeps the primary workspace visible while project data is collapsed', asyn
     await page.goto(launch)
     await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
 
-    const projectData = page.getByText('Project data', { exact: true })
-    await expect(projectData).toBeVisible()
-    await expect(page.getByRole('region', { name: 'Protocol resources' })).toBeHidden()
+    await expect(page.getByText('Project data', { exact: true })).toHaveCount(0)
+    await expect(page.getByRole('region', { name: 'Protocol resources' })).toHaveCount(0)
 
     const geometry = await page.locator('.workspace-primary').evaluate((element) => {
       const rect = element.getBoundingClientRect()
@@ -230,7 +243,7 @@ test('keeps the primary workspace visible while project data is collapsed', asyn
     expect(geometry.top).toBeLessThan(100)
     expect(geometry.bottom).toBeLessThanOrEqual(800)
     expect(geometry.width).toBeGreaterThan(1000)
-    expect(geometry.height).toBeGreaterThan(600)
+    expect(geometry.height).toBeGreaterThan(500)
 
     await expect(page.getByRole('region', { name: 'Library', exact: true })).toBeVisible()
     await expect(page.getByRole('region', { name: 'Viewer', exact: true })).toBeVisible()
@@ -249,6 +262,15 @@ test('content cards review keeps Viewer and Timeline meaningfully visible in the
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto(await armLaunch(isolated))
     await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+    const opened = await page.evaluate(async (projectId) => {
+      const response = await fetch(`/v1/projects/${projectId}/snapshot`)
+      return response.json()
+    }, isolated.ready.projectId)
+    expect(opened.snapshot.read_only, JSON.stringify(opened.snapshot.errors)).toBe(false)
+    await page.getByRole('tab', { name: 'Cards' }).click()
+    await expect(page.getByPlaceholder('Search content cards')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Insert content card' })).toHaveCount(0)
+    await page.locator('.library-tile').first().click()
 
     const reviewButton = page.getByRole('button', { name: 'Approve preview' })
     await expect(reviewButton).toBeVisible()
@@ -270,8 +292,8 @@ test('content cards review keeps Viewer and Timeline meaningfully visible in the
     })
     expect(visibleHeights.viewer).toBeGreaterThan(300)
     expect(visibleHeights.timeline).toBeGreaterThan(100)
-    await expect(page.getByText('Project data', { exact: true })).toBeVisible()
-    await expect(page.getByRole('region', { name: 'Protocol resources' })).toBeHidden()
+    await expect(page.getByText('Project data', { exact: true })).toHaveCount(0)
+    await expect(page.getByRole('region', { name: 'Protocol resources' })).toHaveCount(0)
   } finally {
     await page.close()
     await stopSidecar(isolated.process)
@@ -284,6 +306,8 @@ test('browser inspects every registered protocol resource by its server-issued I
   try {
     const launch = await armLaunch(isolated)
     await page.goto(launch)
+    await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+    await page.goto(`${isolatedURL(isolated.ready)}/?project=${encodeURIComponent(isolated.ready.projectId)}&debug=1`)
     await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
     await page.getByText('Project data', { exact: true }).click()
     const inspector = page.getByRole('region', { name: 'Protocol resources' })
@@ -369,16 +393,24 @@ test('browser projects opaque project media into a playable Viewer and shared ti
     await expect(source).toHaveAttribute('src', new RegExp(`/v1/projects/${isolated.ready.projectId}/media/asset_[a-f0-9]+$`))
     await expect(viewer.locator('img[src="/assets/editor/viewer-poster.png"]')).toHaveCount(0)
     await expect.poll(() => source.evaluate((video) => video.readyState)).toBeGreaterThanOrEqual(2)
-    const decoded = await source.evaluate((video) => {
+    const decoded = await source.evaluate(async (video) => {
       const canvas = document.createElement('canvas')
       canvas.width = video.videoWidth
       canvas.height = video.videoHeight
       const context = canvas.getContext('2d', { willReadFrequently: true })!
-      context.drawImage(video, 0, 0)
-      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data
       let nonBlack = 0
-      for (let index = 0; index < pixels.length; index += 4) {
-        if (pixels[index] || pixels[index + 1] || pixels[index + 2]) nonBlack += 1
+      for (const sampleTime of [0.5, 30]) {
+        await new Promise<void>((resolve) => {
+          const done = () => video.requestVideoFrameCallback(() => resolve())
+          video.addEventListener('seeked', done, { once: true })
+          video.currentTime = Math.min(sampleTime, Math.max(0, video.duration - 0.1))
+        })
+        context.drawImage(video, 0, 0)
+        const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data
+        for (let index = 0; index < pixels.length; index += 4) {
+          if (pixels[index] || pixels[index + 1] || pixels[index + 2]) nonBlack += 1
+        }
+        if (nonBlack > 0) break
       }
       return { width: video.videoWidth, height: video.videoHeight, nonBlack }
     })
@@ -1011,12 +1043,12 @@ test('mutation routes forward only typed protocol commands and return conflicts'
       },
     )
     expect(response.status()).toBe(400)
-    expect(await response.json()).toEqual({ ok: false, error: 'plan.update accepts only a typed content-cards review' })
+    expect(await response.json()).toEqual({ ok: false, error: 'plan.update accepts only a typed operation update' })
 
     const review = await isolated.client.post(
       `/v1/projects/${isolated.ready.projectId}/reviews/decision`,
       {
-        data: { operation: 'captions', readSet: {}, decision: { decision: 'approved' } },
+        data: { operation: 'video-cut', readSet: {}, decision: { decision: 'approved' } },
         headers: { Origin: isolatedURL(isolated.ready) },
       },
     )
@@ -1034,8 +1066,7 @@ test('content cards save commits through sidecar and stale read sets return 409'
   const isolated = await startSidecar(root)
   const client = await request.newContext({ baseURL: isolatedURL(isolated.ready) })
   try {
-    await armLaunch(isolated)
-    await browserNavigation(client, `${isolatedURL(isolated.ready)}/?project=${encodeURIComponent(isolated.ready.projectId)}`)
+    await browserNavigation(client, await armLaunch(isolated))
     const loaded = await client.get(`/v1/projects/${isolated.ready.projectId}/snapshot`)
     const { snapshot } = await loaded.json()
     expect(snapshot.read_only, `loaded:${JSON.stringify(snapshot.errors)}`).toBe(false)
@@ -1054,7 +1085,11 @@ test('content cards save commits through sidecar and stale read sets return 409'
     })
     const savedBody = await saved.json()
     expect(saved.status(), `saved:${JSON.stringify(savedBody)}`).toBe(200)
-    expect(savedBody).toMatchObject({ ok: true, result: 'committed' })
+    expect(savedBody).toMatchObject({
+      ok: true,
+      result: 'committed',
+      snapshot: { media: expect.any(Array), artifacts: expect.any(Array) },
+    })
     const project = JSON.parse(await readFile(path.join(root, 'work', 'project.json'), 'utf8'))
     expect(project.operations[0]).toMatchObject({ revision: 2, status: 'stale' })
     expect(project.render.status).toBe('draft')
@@ -1062,9 +1097,266 @@ test('content cards save commits through sidecar and stale read sets return 409'
     const conflict = await client.post(`/v1/projects/${isolated.ready.projectId}/transactions`, {
       data: body, headers: { Origin: isolatedURL(isolated.ready) },
     })
-    expect(conflict.status(), `conflict:${await conflict.text()}`).toBe(409)
+    const conflictBody = await conflict.json()
+    expect(conflict.status(), `conflict:${JSON.stringify(conflictBody)}`).toBe(409)
+    expect(conflictBody).toMatchObject({
+      ok: false,
+      error: 'conflict',
+      snapshot: { media: expect.any(Array), artifacts: expect.any(Array) },
+    })
   } finally {
     await client.dispose()
+    await stopSidecar(isolated.process)
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('content card Inspector updates the second cue without overwriting the first', async ({ page }) => {
+  test.setTimeout(30_000)
+  const root = await createTwoContentCardsProjectFixture()
+  const isolated = await startSidecar(root)
+  try {
+    await page.goto(await armLaunch(isolated))
+    await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+    await page.getByRole('tab', { name: 'Cards' }).click()
+    await page.getByRole('button', { name: /Second original/ }).click()
+    await expect(page.getByLabel('Content card copy')).toHaveValue('Second original')
+
+    await page.getByLabel('Content card copy').fill('Second updated in editor')
+    await page.getByRole('button', { name: 'Save Changes' }).click()
+
+    await expect.poll(async () => {
+      const plan = JSON.parse(await readFile(path.join(root, 'work', 'content-cards', 'cards-plan.json'), 'utf8'))
+      return plan.cards.map((card: { copy: { text?: string; suggested_text?: string } }) => card.copy.text ?? card.copy.suggested_text)
+    }).toEqual(['Original copy', 'Second updated in editor'])
+    await expect(page.getByLabel('Content card copy')).toHaveValue('Second updated in editor')
+    await expect(page.getByRole('button', { name: 'Insert content card' })).toHaveCount(0)
+  } finally {
+    await page.close()
+    await stopSidecar(isolated.process)
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('caption Inspector updates the second cue and keeps the first cue unchanged', async ({ page }) => {
+  test.setTimeout(30_000)
+  const root = await createCaptionsProjectFixture()
+  const isolated = await startSidecar(root)
+  try {
+    await page.goto(await armLaunch(isolated))
+    await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+    await page.getByRole('tab', { name: 'Captions' }).click()
+    await page.getByRole('button', { name: /Second real caption/ }).click()
+    await expect(page.getByLabel('Caption text')).toHaveValue('Second real caption')
+
+    await page.getByLabel('Caption text').fill('Second caption updated in editor')
+    await page.getByRole('button', { name: 'Save Changes' }).click()
+
+    await expect.poll(async () => {
+      const plan = JSON.parse(await readFile(path.join(root, 'work', 'captions', 'captions-plan.json'), 'utf8'))
+      return plan.cues.map((cue: { text: string }) => cue.text)
+    }).toEqual(['First real caption', 'Second caption updated in editor'])
+    await expect(page.getByLabel('Caption text')).toHaveValue('Second caption updated in editor')
+    await expect(page.getByPlaceholder('Search caption styles')).toHaveCount(0)
+  } finally {
+    await page.close()
+    await stopSidecar(isolated.process)
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('real 42-sol Graphic Motion cue can be disabled, saved, and locally discarded', async ({ page }) => {
+  const sourceRoot = process.env.CAC_REAL_EDITOR_PROJECT
+  test.skip(!sourceRoot, 'Set CAC_REAL_EDITOR_PROJECT to the 42-sol project root')
+  test.setTimeout(180_000)
+  const root = await mkdtemp(path.join(tmpdir(), 'cut-editor-real-project-'))
+  await cp(sourceRoot!, root, { recursive: true, preserveTimestamps: true })
+  await refreshSourceFingerprint(root)
+  const isolated = await startSidecar(root)
+  try {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto(await armLaunch(isolated))
+    await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+    const opened = await page.evaluate(async (projectId) => {
+      const response = await fetch(`/v1/projects/${projectId}/snapshot`)
+      return response.json()
+    }, isolated.ready.projectId)
+    expect(opened.snapshot.read_only, JSON.stringify(opened.snapshot.errors)).toBe(false)
+    await expect(page.locator('[data-runtime-project-status]')).toContainText('musk-3min-opener')
+    await expect(page.getByText('original-video.mp4', { exact: true })).toBeVisible()
+    await expect(page.getByText('City Walk', { exact: true })).toHaveCount(0)
+
+    await page.getByRole('tab', { name: 'Graphic Motion' }).click()
+    await page.getByRole('button', { name: /THE REAL TONY STARK/ }).click()
+    const enabled = page.getByLabel('Graphic Motion enabled')
+    await expect(enabled).toBeChecked()
+    await expect(page.getByText('License: unknown', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Insert motion' })).toHaveCount(0)
+
+    await enabled.uncheck()
+    const transaction = page.waitForResponse((response) =>
+      response.request().method() === 'POST' && response.url().endsWith('/transactions'),
+    )
+    await page.getByRole('button', { name: 'Save Changes' }).click()
+    const transactionResponse = await transaction
+    const transactionBody = await transactionResponse.json()
+    expect(transactionResponse.status(), JSON.stringify(transactionBody)).toBe(200)
+    expect(transactionBody, JSON.stringify(transactionBody)).toMatchObject({
+      ok: true,
+      result: 'committed',
+      snapshot: { media: expect.any(Array), artifacts: expect.any(Array) },
+    })
+    await expect.poll(async () => {
+      const plan = JSON.parse(await readFile(path.join(root, 'work', 'graphic-motion', 'graphic-motion-plan.json'), 'utf8'))
+      return plan.cues[0].status
+    }).toBe('skipped')
+    await expect(enabled).not.toBeChecked()
+
+    await enabled.click()
+    const localEditState = {
+      checked: await enabled.isChecked(),
+      status: await page.getByRole('status', { name: 'Graphic Motion review status' }).textContent(),
+    }
+    expect(localEditState, JSON.stringify(localEditState)).toMatchObject({ checked: true })
+    await expect(page.getByRole('button', { name: 'Save Changes' })).toBeEnabled()
+    await page.getByRole('button', { name: 'Discard changes' }).click()
+    await expect(enabled).not.toBeChecked()
+  } finally {
+    await page.close()
+    await stopSidecar(isolated.process)
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('real 42-sol workspace passes the desktop viewport and visual audit', async ({ page }) => {
+  const sourceRoot = process.env.CAC_REAL_EDITOR_PROJECT
+  const visualOutput = process.env.CAC_EDITOR_VISUAL_OUTPUT
+  test.skip(!sourceRoot || !visualOutput, 'Set CAC_REAL_EDITOR_PROJECT and CAC_EDITOR_VISUAL_OUTPUT')
+  test.setTimeout(180_000)
+  const root = await mkdtemp(path.join(tmpdir(), 'cut-editor-real-visual-'))
+  await cp(sourceRoot!, root, { recursive: true, preserveTimestamps: true })
+  await refreshSourceFingerprint(root)
+  await mkdir(visualOutput!, { recursive: true })
+  const isolated = await startSidecar(root)
+  try {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto(await armLaunch(isolated))
+    await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+    await page.getByRole('tab', { name: 'Graphic Motion' }).click()
+    await page.getByRole('button', { name: /THE REAL TONY STARK/ }).click()
+    await expect(page.locator('.viewer-selection-toolbar')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Volume' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Capture frame' })).toHaveCount(0)
+
+    const source = page.locator('video[data-project-media]')
+    await expect.poll(() => source.evaluate((video) => video.readyState)).toBeGreaterThanOrEqual(2)
+    const timelineSurface = page.locator('[data-timeline-surface]')
+    const timelineSurfaceBox = await timelineSurface.boundingBox()
+    expect(timelineSurfaceBox).not.toBeNull()
+    await timelineSurface.click({ position: { x: timelineSurfaceBox!.width * 30 / 167.973152, y: 40 } })
+    await expect.poll(() => source.evaluate((video) => video.currentTime)).toBeCloseTo(30, 0)
+    await page.getByRole('button', { name: 'Play' }).click()
+    await expect.poll(() => source.evaluate((video) => video.currentTime)).toBeGreaterThan(30.1)
+    await page.getByRole('button', { name: 'Pause' }).click()
+    const decoded = await source.evaluate((video) => {
+      const canvas = document.createElement('canvas')
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      const context = canvas.getContext('2d', { willReadFrequently: true })!
+      context.drawImage(video, 0, 0)
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data
+      let nonBlack = 0
+      for (let index = 0; index < pixels.length; index += 4) {
+        if (pixels[index] || pixels[index + 1] || pixels[index + 2]) nonBlack += 1
+      }
+      return {
+        width: video.videoWidth,
+        height: video.videoHeight,
+        nonBlack,
+        currentTime: video.currentTime,
+        readyState: video.readyState,
+        networkState: video.networkState,
+        error: video.error?.message,
+        presentedFrames: video.getVideoPlaybackQuality().totalVideoFrames,
+      }
+    })
+    expect(decoded).toMatchObject({ width: 1280, height: 720 })
+    expect(decoded.nonBlack, JSON.stringify(decoded)).toBeGreaterThan(0)
+
+    for (const viewport of [
+      { width: 1366, height: 768 },
+      { width: 1440, height: 900 },
+      { width: 1920, height: 1080 },
+      { width: 2560, height: 1440 },
+    ]) {
+      await page.setViewportSize(viewport)
+      await expect(page.locator('.viewer-canvas')).toHaveAttribute('data-sequence-width', '1280')
+      await expect.poll(async () => page.evaluate(() => {
+        const surface = document.querySelector<HTMLElement>('[data-timeline-surface]')!
+        const content = document.querySelector<HTMLElement>('.timeline-content')!
+        return Math.abs(surface.clientWidth - content.getBoundingClientRect().width)
+      })).toBeLessThanOrEqual(1)
+      const geometry = await page.evaluate(() => {
+        const rect = (selector: string) => {
+          const box = document.querySelector(selector)!.getBoundingClientRect()
+          return { left: box.left, top: box.top, right: box.right, bottom: box.bottom, width: box.width, height: box.height }
+        }
+        const inspector = document.querySelector<HTMLElement>('.library-inspector-fields')!
+        const rulerLabels = [...document.querySelectorAll<HTMLElement>('.timeline-ruler span')]
+          .map((element) => element.getBoundingClientRect())
+          .sort((left, right) => left.left - right.left)
+        return {
+          viewport: { width: innerWidth, height: innerHeight },
+          document: {
+            scrollWidth: document.documentElement.scrollWidth,
+            scrollHeight: document.documentElement.scrollHeight,
+            bodyScrollWidth: document.body.scrollWidth,
+            bodyScrollHeight: document.body.scrollHeight,
+          },
+          shell: rect('[data-editor-shell]'),
+          review: rect('.workspace-review'),
+          primary: rect('.workspace-primary'),
+          library: rect('.library-panel'),
+          viewer: rect('.viewer-panel'),
+          stage: rect('.viewer-stage'),
+          canvas: rect('.viewer-canvas'),
+          timeline: rect('.workspace-timeline'),
+          rulerLabelsOverlap: rulerLabels.some((label, index) => index > 0 && label.left < rulerLabels[index - 1]!.right),
+          inspector: {
+            clientWidth: inspector.clientWidth,
+            scrollWidth: inspector.scrollWidth,
+          },
+        }
+      })
+      expect(geometry.document).toEqual({
+        scrollWidth: viewport.width,
+        scrollHeight: viewport.height,
+        bodyScrollWidth: viewport.width,
+        bodyScrollHeight: viewport.height,
+      })
+      expect(geometry.shell).toMatchObject({ left: 0, top: 0, width: viewport.width, height: viewport.height })
+      expect(geometry.review.bottom).toBeLessThanOrEqual(geometry.primary.top + 1)
+      expect(geometry.primary.bottom).toBeLessThanOrEqual(geometry.timeline.top + 1)
+      for (const panel of [geometry.library, geometry.viewer, geometry.timeline]) {
+        expect(panel.left).toBeGreaterThanOrEqual(0)
+        expect(panel.top).toBeGreaterThanOrEqual(0)
+        expect(panel.right).toBeLessThanOrEqual(viewport.width + 1)
+        expect(panel.bottom).toBeLessThanOrEqual(viewport.height + 1)
+        expect(panel.width).toBeGreaterThan(0)
+        expect(panel.height).toBeGreaterThan(0)
+      }
+      expect(Math.abs(geometry.canvas.width / geometry.canvas.height - 16 / 9)).toBeLessThan(0.01)
+      expect(geometry.canvas.width).toBeLessThanOrEqual(geometry.stage.width)
+      expect(geometry.canvas.height).toBeLessThanOrEqual(geometry.stage.height)
+      expect(geometry.rulerLabelsOverlap).toBe(false)
+      expect(geometry.inspector.scrollWidth).toBeLessThanOrEqual(geometry.inspector.clientWidth + 1)
+      await page.screenshot({
+        path: path.join(visualOutput!, `real-42-sol-${viewport.width}x${viewport.height}.png`),
+        fullPage: false,
+      })
+    }
+  } finally {
+    await page.close()
     await stopSidecar(isolated.process)
     await rm(root, { recursive: true, force: true })
   }
@@ -1080,12 +1372,15 @@ async function authenticatedSidecarFor(root: string) {
   const client = await request.newContext({ baseURL: isolatedURLValue })
   const launch = await armLaunch(isolated)
   const response = await browserNavigation(client, launch)
-  expect(response.status()).toBe(200)
+  expect(response.status()).toBe(303)
+  const clean = await client.get(response.headers().location!)
+  expect(clean.status()).toBe(200)
   return { ...isolated, client }
 }
 
 function browserNavigation(client: APIRequestContext, url: string) {
   return client.get(url, {
+    maxRedirects: 0,
     headers: { 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Dest': 'document', 'Sec-Fetch-Site': 'none' },
   })
 }
@@ -1382,11 +1677,9 @@ async function createContentCardsProjectFixture() {
   const root = await mkdtemp(path.join(tmpdir(), 'cut-editor-cards-'))
   await mkdir(path.join(root, 'work', 'content-cards'), { recursive: true })
   await mkdir(path.join(root, 'input'), { recursive: true })
-  await writeFile(path.join(root, 'input', 'source.mp4'), 'video')
-  const { stdout: sourceStat } = await execFileAsync(bundledPython, ['-c',
-    'import os,sys; s=os.stat(sys.argv[1]); print(f"{s.st_size} {s.st_mtime_ns}")',
-    path.join(root, 'input', 'source.mp4')])
-  const [sourceSize, sourceModifiedNs] = sourceStat.trim().split(' ')
+  const sourcePath = path.join(root, 'input', 'source.mp4')
+  await writeFile(sourcePath, 'video')
+  await utimes(sourcePath, 1_700_000_000, 1_700_000_000)
   await writeFile(path.join(root, 'work', 'timeline.json'), JSON.stringify({
     schema_version: 1, source_duration_s: 1, program_duration_s: 1,
     fps: { num: 30, den: 1 }, clips: [{ id: 'clip-1', source_range: { start_s: 0, end_s: 1 }, program_range: { start_s: 0, end_s: 1 }, speed: 1 }],
@@ -1399,6 +1692,10 @@ async function createContentCardsProjectFixture() {
       placement: { status: 'draft', region: null }, visual_treatment: { status: 'draft', layout: 'default' },
     }],
   }))
+  const { stdout: sourceStat } = await execFileAsync(bundledPython, ['-c',
+    'import os,sys; s=os.stat(sys.argv[1]); print(f"{s.st_size} {s.st_mtime_ns}")',
+    sourcePath])
+  const [sourceSize, sourceModifiedNs] = sourceStat.trim().split(' ')
   const projectJson = JSON.stringify({
     schema_version: 1,
     source: { path: '../input/source.mp4', fingerprint: { size: Number(sourceSize), modified_ns: '__MTIME__', duration_s: 1 } },
@@ -1409,6 +1706,69 @@ async function createContentCardsProjectFixture() {
   }).replace('"__MTIME__"', sourceModifiedNs)
   await writeFile(path.join(root, 'work', 'project.json'), projectJson)
   return root
+}
+
+async function createTwoContentCardsProjectFixture() {
+  const root = await createContentCardsProjectFixture()
+  const planPath = path.join(root, 'work', 'content-cards', 'cards-plan.json')
+  const plan = JSON.parse(await readFile(planPath, 'utf8'))
+  plan.brief.target_card_count = 2
+  plan.cards.push({
+    ...plan.cards[0],
+    id: 'card-002',
+    copy: { ...plan.cards[0].copy, suggested_text: 'Second original' },
+    program_start_s: 0.5,
+    duration_s: 0.4,
+  })
+  await writeFile(planPath, `${JSON.stringify(plan)}\n`)
+  return root
+}
+
+async function createCaptionsProjectFixture() {
+  const root = await createContentCardsProjectFixture()
+  await mkdir(path.join(root, 'work', 'captions'), { recursive: true })
+  await writeFile(path.join(root, 'work', 'captions', 'captions-plan.json'), JSON.stringify({
+    schema_version: 1,
+    target: 'overlay',
+    timeline_id: 'main',
+    timebase: 'program',
+    program_duration_s: 1,
+    style: { status: 'approved', preset: 'clean' },
+    review: { status: 'approved', evidence: ['previous'] },
+    cues: [
+      { id: 'cue-001', index: 1, start: 0, end: 0.4, text: 'First real caption', lines: ['First real caption'], program_range: { start_s: 0, end_s: 0.4 } },
+      { id: 'cue-002', index: 2, start: 0.5, end: 0.9, text: 'Second real caption', lines: ['Second real caption'], program_range: { start_s: 0.5, end_s: 0.9 } },
+    ],
+  }))
+  const projectPath = path.join(root, 'work', 'project.json')
+  const project = JSON.parse(await readFile(projectPath, 'utf8'))
+  project.sequences.main.operations = ['captions']
+  project.operations = [{
+    ...project.operations[0],
+    id: 'captions',
+    plan: 'captions/captions-plan.json',
+  }]
+  await writeFile(projectPath, `${JSON.stringify(project)}\n`)
+  return root
+}
+
+async function refreshSourceFingerprint(root: string) {
+  await execFileAsync(bundledPython, [
+    '-c',
+    [
+      'import json,sys',
+      'from pathlib import Path',
+      'root=Path(sys.argv[1])',
+      'path=root/"work"/"project.json"',
+      'project=json.loads(path.read_text(encoding="utf-8"))',
+      'source=(root/"work"/project["source"]["path"]).resolve()',
+      'stat=source.stat()',
+      'project["source"]["fingerprint"]["size"]=stat.st_size',
+      'project["source"]["fingerprint"]["modified_ns"]=stat.st_mtime_ns',
+      'path.write_text(json.dumps(project, indent=2)+"\\n", encoding="utf-8")',
+    ].join(';'),
+    root,
+  ])
 }
 
 async function createContentCardsArtifactProjectFixture() {

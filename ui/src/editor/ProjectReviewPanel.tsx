@@ -17,18 +17,28 @@ export function ProjectReviewPanel({ operation, store }: ProjectReviewPanelProps
   const [rationale, setRationale] = useState('')
   const recordDecision = useStore(store, (state) => state.recordReviewDecision)
   const canApprove = useStore(store, (state) => state.canApproveOperation(operation.id))
+  const hasCurrentPreview = operation.preview?.status === 'current'
+    && operation.preview.revision === operation.revision
+
+  useEffect(() => {
+    if (hasCurrentPreview) return
+    setDecision(null)
+    setRationale('')
+  }, [hasCurrentPreview])
 
   return (
     <>
       <ReviewStatusBar operation={operation} store={store} />
-      <div style={{ display: 'flex', gap: 8, padding: '8px 12px', borderBottom: '1px solid #30333b', background: '#17191e' }}>
-        <button type="button" disabled={!canApprove} onClick={() => setDecision('approved')}>Approve preview</button>
-        <button type="button" disabled={!canApprove} onClick={() => setDecision('rejected')}>Reject preview</button>
-      </div>
-      {decision ? (
+      {hasCurrentPreview ? (
+        <div className="review-action-row">
+          <button className="review-action-button review-action-button--primary" type="button" disabled={!canApprove} onClick={() => setDecision('approved')}>Approve preview</button>
+          <button className="review-action-button review-action-button--danger" type="button" disabled={!canApprove} onClick={() => setDecision('rejected')}>Reject preview</button>
+        </div>
+      ) : null}
+      {hasCurrentPreview && decision ? (
         <form
           aria-label={`${decision === 'approved' ? 'Approve' : 'Reject'} preview form`}
-          style={{ display: 'flex', gap: 8, padding: 12, borderBottom: '1px solid #30333b', background: '#17191e' }}
+          className="review-decision-form"
           onSubmit={async (event) => {
             event.preventDefault()
             if (!rationale.trim()) return
@@ -41,7 +51,7 @@ export function ProjectReviewPanel({ operation, store }: ProjectReviewPanelProps
             <span className="sr-only">Decision rationale</span>
             <input aria-label="Decision rationale" value={rationale} onChange={(event) => setRationale(event.target.value)} />
           </label>
-          <button type="submit" disabled={!canApprove || !rationale.trim()}>Confirm {decision === 'approved' ? 'approval' : 'rejection'}</button>
+          <button className="review-action-button review-action-button--primary" type="submit" disabled={!canApprove || !rationale.trim()}>Confirm {decision === 'approved' ? 'approval' : 'rejection'}</button>
         </form>
       ) : null}
     </>

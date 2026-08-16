@@ -37,14 +37,22 @@ export class RuntimeApiClient {
   }
 
   async updateContentCards(readSet: RuntimeReadSet, review: ContentCardsReview) {
+    return this.updatePlan('content-cards', readSet, review)
+  }
+
+  async updatePlan(operation: string, readSet: RuntimeReadSet, review: Readonly<Record<string, unknown>>) {
     return this.mutate(`/v1/projects/${encodeURIComponent(this.projectId)}/transactions`, {
-      operation: 'content-cards', readSet, review,
+      operation, readSet, review,
     })
   }
 
   async recordContentCardsReview(readSet: RuntimeReadSet, decision: Readonly<Record<string, unknown>>) {
+    return this.recordReview('content-cards', readSet, decision)
+  }
+
+  async recordReview(operation: string, readSet: RuntimeReadSet, decision: Readonly<Record<string, unknown>>) {
     return this.mutate(`/v1/projects/${encodeURIComponent(this.projectId)}/reviews/decision`, {
-      operation: 'content-cards', readSet, decision,
+      operation, readSet, decision,
     })
   }
 

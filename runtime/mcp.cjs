@@ -19,7 +19,10 @@ const TOOL = Object.freeze({
     type: 'object',
     additionalProperties: false,
     required: ['project_root'],
-    properties: { project_root: { type: 'string', minLength: 1 } },
+    properties: {
+      project_root: { type: 'string', minLength: 1 },
+      open_browser: { type: 'boolean' },
+    },
   },
 })
 
@@ -46,12 +49,16 @@ async function handleLine(line) {
 
 async function callTool(id, params) {
   if (!params || !MCP_TOOL_ALLOWLIST.includes(params.name)) return respondError(id, -32602, 'unknown tool')
+  let openBrowser
+  try { openBrowser = shouldOpenBrowser(params.arguments?.open_browser) } catch (error) {
+    return respondError(id, -32602, error.message)
+  }
   const root = await canonicalProjectRoot(params.arguments?.project_root)
-  const details = await openEditor(root)
+  const details = await openEditor(root, openBrowser)
   return respond(id, { content: [{ type: 'text', text: JSON.stringify(details) }] })
 }
 
-async function openEditor(projectRoot) {
+async function openEditor(projectRoot, openInBrowser) {
   let owned = sidecars.get(projectRoot)
   if (!owned || owned.child.exitCode !== null || owned.child.killed) {
     if (owned) sidecars.delete(projectRoot)
@@ -67,12 +74,32 @@ async function openEditor(projectRoot) {
   }
   const armed = await owned.call('arm_launch')
   if (!armed.ok || typeof armed.url !== 'string') throw new Error(armed.error || 'could not arm editor launch')
+  if (openInBrowser) openBrowser(armed.url)
   return {
     pid: owned.child.pid,
     projectRoot,
     url: armed.url,
     projectId: owned.projectId,
   }
+}
+
+function shouldOpenBrowser(value) {
+  if (value === undefined) return true
+  if (typeof value !== 'boolean') throw new Error('open_browser must be a boolean')
+  return value
+}
+
+function browserLaunchSpec(platform = process.platform) {
+  if (platform === 'win32') return { command: 'rundll32.exe', args: ['url.dll,FileProtocolHandler'], options: { detached: true, stdio: 'ignore', windowsHide: true } }
+  if (platform === 'darwin') return { command: 'open', args: [], options: { detached: true, stdio: 'ignore' } }
+  return { command: 'xdg-open', args: [], options: { detached: true, stdio: 'ignore' } }
+}
+
+function openBrowser(url, spawnProcess = spawn, platform = process.platform) {
+  const { command, args, options } = browserLaunchSpec(platform)
+  const child = spawnProcess(command, [...args, url], options)
+  child.once('error', () => {})
+  child.unref()
 }
 
 async function startSidecar(projectRoot) {
@@ -183,7 +210,11 @@ async function isFile(value) {
 function respond(id, result) { process.stdout.write(`${JSON.stringify({ jsonrpc: '2.0', id, result })}\n`) }
 function respondError(id, code, message) { process.stdout.write(`${JSON.stringify({ jsonrpc: '2.0', id, error: { code, message } })}\n`) }
 
-main().catch((error) => {
-  process.stderr.write(`${error.message}\n`)
-  process.exitCode = 1
-})
+if (require.main === module) {
+  main().catch((error) => {
+    process.stderr.write(`${error.message}\n`)
+    process.exitCode = 1
+  })
+}
+
+module.exports = { TOOL, browserLaunchSpec, openBrowser, shouldOpenBrowser }

@@ -118,6 +118,65 @@ class ProtocolServiceTests(unittest.TestCase):
         self.assertNotEqual(plan_before["etag"], plan_after["etag"])
         self.assertEqual(plan_before["id"], plan_after["id"])
 
+    def test_content_cards_update_targets_the_second_card_by_id(self):
+        self._configure_content_cards_project()
+        plan = json.loads(self.plan.read_text(encoding="utf-8"))
+        plan["brief"]["target_card_count"] = 2
+        second = copy.deepcopy(plan["cards"][0])
+        second["id"] = "card-002"
+        second["copy"]["suggested_text"] = "Second original"
+        plan["cards"].append(second)
+        self.plan.write_text(json.dumps(plan, indent=2) + "\n", encoding="utf-8")
+        opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+        review = {
+            "schema_version": 1,
+            "cards": [
+                {"id": "card-001", "selected": True, "copy": "Original copy", "placement": "bottom", "visual_treatment": "default"},
+                {"id": "card-002", "selected": True, "copy": "Second updated", "placement": "top", "visual_treatment": "default"},
+            ],
+        }
+
+        response = self.service.handle_request({
+            "verb": "plan.update", "project_id": opened["project_id"], "operation": "content-cards",
+            "read_set": self._read_set(opened["snapshot"], "content-cards"), "review": review,
+        })
+
+        self.assertTrue(response["ok"])
+        updated = json.loads(self.plan.read_text(encoding="utf-8"))
+        self.assertEqual(["Original copy", "Second updated"], [card["copy"]["text"] for card in updated["cards"]])
+        self.assertEqual(["bottom", "top"], [card["placement"]["region"] for card in updated["cards"]])
+
+    def test_caption_update_targets_a_non_first_cue_and_invalidates_preview_state(self):
+        self.plan.write_text(json.dumps({
+            "schema_version": 1,
+            "target": "overlay",
+            "timeline_id": "main",
+            "timebase": "program",
+            "program_duration_s": 1.0,
+            "style": {"status": "approved", "preset": "clean"},
+            "review": {"status": "approved", "evidence": ["old"]},
+            "cues": [
+                {"id": "cue-001", "index": 1, "start": 0.0, "end": 0.4, "text": "First", "lines": ["First"], "program_range": {"start_s": 0.0, "end_s": 0.4}},
+                {"id": "cue-002", "index": 2, "start": 0.5, "end": 0.9, "text": "Second", "lines": ["Second"], "program_range": {"start_s": 0.5, "end_s": 0.9}},
+            ],
+        }, indent=2) + "\n", encoding="utf-8")
+        opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+
+        response = self.service.handle_request({
+            "verb": "plan.update", "project_id": opened["project_id"], "operation": "captions",
+            "read_set": self._read_set(opened["snapshot"], "captions"),
+            "review": {"schema_version": 1, "cue_id": "cue-002", "text": "Second updated"},
+        })
+
+        self.assertTrue(response["ok"])
+        updated = json.loads(self.plan.read_text(encoding="utf-8"))
+        self.assertEqual(["First", "Second updated"], [cue["text"] for cue in updated["cues"]])
+        self.assertEqual(["First"], updated["cues"][0]["lines"])
+        self.assertEqual(["Second updated"], updated["cues"][1]["lines"])
+        self.assertEqual({"status": "pending", "evidence": []}, updated["review"])
+        project = json.loads(self.project_path.read_text(encoding="utf-8"))
+        self.assertEqual((2, "stale"), (project["operations"][0]["revision"], project["operations"][0]["status"]))
+
     def test_get_resource_accepts_only_server_issued_resource_ids(self):
         opened = self.service.handle_request(
             {"verb": "open_project", "project_root": str(self.root)}

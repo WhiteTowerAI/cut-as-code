@@ -81,6 +81,24 @@ const emptyProject: EditorProjectView = {
 
 const reviewProject: EditorProjectView = {
   ...populatedProject,
+  runtime: true,
+  tracks: [
+    ...populatedProject.tracks,
+    {
+      id: 'track-content-cards',
+      name: 'Cards',
+      kind: 'card',
+      clips: [{
+        id: 'card-review-1',
+        trackId: 'track-content-cards',
+        displayName: 'Card: lower-third',
+        summary: 'Meet the product team',
+        enabled: true,
+        sourceRange: { startS: 4, endS: 8 },
+        programRange: { startS: 4, endS: 8 },
+      }],
+    },
+  ],
   operations: [
     {
       id: 'content-cards',
@@ -88,10 +106,15 @@ const reviewProject: EditorProjectView = {
       revision: 3,
       editable: true,
       fields: {
-        copy: 'Meet the product team',
-        layout: 'lower-third',
-        placement: 'bottom-left',
-        enabled: true,
+        cues: [{
+          id: 'card-review-1',
+          card_type: 'lower-third',
+          copy: 'Meet the product team',
+          layout: 'lower-third',
+          placement: 'bottom-left',
+          enabled: true,
+          program_range: { start_s: 4, end_s: 8 },
+        }],
       },
       preview: {
         status: 'current',

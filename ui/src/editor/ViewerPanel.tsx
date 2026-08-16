@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   ArrowDownToLine,
   ArrowUpToLine,
@@ -311,30 +311,45 @@ function MoreMenu() {
 }
 
 const aspectOptions = [
-  { ratio: 'Original', note: 'Keep source', shape: 'original', selected: false },
-  { ratio: '16:9', note: 'YouTube / landscape', shape: 'wide', selected: false },
-  { ratio: '9:16', note: 'TikTok / Reels / Shorts', shape: 'portrait', selected: true },
-  { ratio: '1:1', note: 'Instagram / social', shape: 'square', selected: false },
-  { ratio: '4:5', note: 'Instagram Feed', shape: 'feed', selected: false },
-  { ratio: '4:3', note: 'Standard / presentations', shape: 'classic', selected: false },
+  { ratio: 'Original', note: 'Keep source', shape: 'original' },
+  { ratio: '16:9', note: 'YouTube / landscape', shape: 'wide' },
+  { ratio: '9:16', note: 'TikTok / Reels / Shorts', shape: 'portrait' },
+  { ratio: '1:1', note: 'Instagram / social', shape: 'square' },
+  { ratio: '4:5', note: 'Instagram Feed', shape: 'feed' },
+  { ratio: '4:3', note: 'Standard / presentations', shape: 'classic' },
 ] as const
 
-function AspectRatioMenu() {
+function displayAspectRatio(width?: number, height?: number) {
+  if (!width || !height) return 'Original'
+  const ratio = width / height
+  const candidates = [
+    ['16:9', 16 / 9],
+    ['9:16', 9 / 16],
+    ['1:1', 1],
+    ['4:5', 4 / 5],
+    ['4:3', 4 / 3],
+  ] as const
+  return candidates.find(([, value]) => Math.abs(ratio - value) < 0.01)?.[0] ?? 'Original'
+}
+
+function AspectRatioMenu({ width, height, readOnly }: { width?: number; height?: number; readOnly?: boolean }) {
+  const selectedRatio = displayAspectRatio(width, height)
   return (
     <div className="viewer-menu viewer-aspect-menu" role="menu" aria-label="Aspect ratio">
       {aspectOptions.map((option, index) => (
-        <div
+        <button
           className="viewer-aspect-option"
-          data-selected={option.selected || undefined}
+          data-selected={option.ratio === selectedRatio || undefined}
           role="menuitemradio"
-          aria-checked={option.selected ?? false}
-          aria-disabled="true"
+          aria-checked={option.ratio === selectedRatio}
+          type="button"
+          disabled={readOnly}
           key={option.ratio}
         >
-          <span className="viewer-aspect-check">{option.selected && <Check aria-hidden size={16} />}</span>
+          <span className="viewer-aspect-check">{option.ratio === selectedRatio && <Check aria-hidden size={16} />}</span>
           <span className="viewer-aspect-copy"><strong>{option.ratio}</strong><small>{option.note}</small></span>
           {index > 0 && <span className={`viewer-ratio-shape viewer-ratio-shape--${option.shape}`} />}
-        </div>
+        </button>
       ))}
     </div>
   )
@@ -370,6 +385,8 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     : undefined
   const videoClips = project?.tracks.find((track) => track.kind === 'video')?.clips ?? []
   const projectVideoRef = useRef<HTMLVideoElement>(null)
+  const stageRef = useRef<HTMLDivElement>(null)
+  const [fitSize, setFitSize] = useState<Readonly<{ width: number; height: number }>>()
   const finalFrameStateRef = useRef<FinalFrameState | null>(null)
   const nativeProgramTimeRef = useRef<number | null>(null)
   const activeClipRef = useRef<ClipView | null>(null)
@@ -380,10 +397,42 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     .find((playbackRate) => playbackRate !== null && !supportsNativePlaybackRate(playbackRate))
   const canPlay = Boolean(projectVideo && !primaryArtifact && videoClips.length && unsupportedPlaybackRate === undefined)
   const hasTimeline = Boolean(project && project.durationS > 0)
+  const runtime = Boolean(project?.runtime)
   const fps = project ? project.fps.numerator / project.fps.denominator : 30
   const sourceFrameDurationS = project && project.fps.numerator > 0
     ? project.fps.denominator / project.fps.numerator
     : 1 / 30
+  const sequenceGeometry = project?.sequenceGeometry
+
+  const fitPreview = useCallback(() => {
+    const stage = stageRef.current
+    if (!stage || !sequenceGeometry) return
+    const availableWidth = Math.max(1, stage.clientWidth - 48)
+    const availableHeight = Math.max(1, stage.clientHeight - 48)
+    const scale = Math.min(
+      availableWidth / sequenceGeometry.width,
+      availableHeight / sequenceGeometry.height,
+    )
+    setFitSize({
+      width: Math.max(1, Math.floor(sequenceGeometry.width * scale)),
+      height: Math.max(1, Math.floor(sequenceGeometry.height * scale)),
+    })
+  }, [sequenceGeometry])
+
+  useEffect(() => {
+    fitPreview()
+    const stage = stageRef.current
+    if (!stage || !sequenceGeometry || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(fitPreview)
+    observer.observe(stage)
+    return () => observer.disconnect()
+  }, [fitPreview, sequenceGeometry])
+
+  function enterFullscreen() {
+    const stage = stageRef.current
+    if (!stage?.requestFullscreen) return
+    void stage.requestFullscreen().then(fitPreview).catch(() => undefined)
+  }
 
   function retireBoundaryHold() {
     const retired = cancelBoundaryHoldRef.current?.() ?? false
@@ -654,7 +703,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [setOpenMenu])
 
-  const selectionKind = selection?.kind === 'caption' ? 'caption' : selection ? 'video' : null
+  const selectionKind = runtime ? null : selection?.kind === 'caption' ? 'caption' : selection ? 'video' : null
   const toggleMenu = (menu: 'viewer-more' | 'aspect-ratio') => setOpenMenu(openMenu === menu ? null : menu)
 
   return (
@@ -665,10 +714,16 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
           Existing preview artifact: {contentCardsOperation.preview.status} (revision {contentCardsOperation.preview.revision})
         </output>
       ) : null}
-      <div className="viewer-stage">
+      <div className="viewer-stage" ref={stageRef}>
         {hasTimeline ? (
           <>
-            <div className="viewer-canvas">
+            <div
+              className={sequenceGeometry ? 'viewer-canvas viewer-canvas--fitted' : 'viewer-canvas'}
+              data-sequence-width={sequenceGeometry?.width}
+              data-sequence-height={sequenceGeometry?.height}
+              data-fit-mode={sequenceGeometry ? 'fit' : undefined}
+              style={fitSize ? { width: fitSize.width, height: fitSize.height } : undefined}
+            >
               {primaryArtifact?.mediaType.startsWith('video/') ? (
                 <video data-preview-media src={primaryArtifact.url} controls aria-label={primaryArtifact.name} />
               ) : primaryArtifact?.mediaType.startsWith('image/') ? (
@@ -711,7 +766,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
           <output aria-label="Playhead time">
             {formatTimecode(currentTimeS, fps)} / {formatTimecode(project?.durationS ?? 0, fps)}
           </output>
-          <button type="button" aria-label="Volume" disabled title="Audio monitoring is not available in project protocol V1."><Volume2 aria-hidden size={22} /></button>
+          {!runtime && <button type="button" aria-label="Volume" disabled title="Audio monitoring is not available in project protocol V1."><Volume2 aria-hidden size={22} /></button>}
         </div>
         <button
           className="viewer-play-button"
@@ -726,8 +781,8 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
           {isPlaying ? <Pause aria-hidden size={20} fill="currentColor" /> : <Play aria-hidden size={20} fill="currentColor" />}
         </button>
         <div className="viewer-playback-right">
-          <button type="button" aria-label="Capture frame" disabled title="Frame capture is not available in project protocol V1."><ScanLine aria-hidden size={21} /></button>
-          <button type="button" aria-label="Fit preview" onClick={() => seek(currentTimeS)}><Focus aria-hidden size={21} /></button>
+          {!runtime && <button type="button" aria-label="Capture frame" disabled title="Frame capture is not available in project protocol V1."><ScanLine aria-hidden size={21} /></button>}
+          <button type="button" aria-label="Fit preview" onClick={fitPreview} disabled={!sequenceGeometry}><Focus aria-hidden size={21} /></button>
           <button
             className="viewer-aspect-trigger"
             type="button"
@@ -736,11 +791,17 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
             aria-expanded={openMenu === 'aspect-ratio'}
             onClick={() => toggleMenu('aspect-ratio')}
           ><Ratio aria-hidden size={22} /></button>
-          <button type="button" aria-label="Fullscreen" disabled title="Fullscreen preview is not available in this fixture."><Maximize2 aria-hidden size={21} /></button>
+          <button type="button" aria-label="Fullscreen" onClick={enterFullscreen} disabled={!hasTimeline}><Maximize2 aria-hidden size={21} /></button>
         </div>
       </footer>
       {openMenu === 'viewer-more' && <MoreMenu />}
-      {openMenu === 'aspect-ratio' && <AspectRatioMenu />}
+      {openMenu === 'aspect-ratio' && (
+        <AspectRatioMenu
+          width={sequenceGeometry?.width}
+          height={sequenceGeometry?.height}
+          readOnly={Boolean(sequenceGeometry)}
+        />
+      )}
     </section>
   )
 }

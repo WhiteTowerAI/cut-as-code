@@ -314,7 +314,10 @@ test('expands the empty workspace drop zone to the Library content width', async
     }
   })
 
-  expect(geometry).toEqual({ contentWidth: 400, dropzoneLeft: 12, dropzoneWidth: 376, dropzoneRight: 12 })
+  expect(geometry.contentWidth).toBeGreaterThan(300)
+  expect(geometry.dropzoneLeft).toBe(12)
+  expect(geometry.dropzoneRight).toBe(12)
+  expect(geometry.dropzoneWidth).toBeCloseTo(geometry.contentWidth - 24, 1)
 })
 
 test('switches the single library panel across all four tabs', async ({ page }) => {

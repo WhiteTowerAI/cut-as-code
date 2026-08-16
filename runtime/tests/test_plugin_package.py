@@ -133,6 +133,64 @@ class PluginPackageTests(unittest.TestCase):
             },
         )
 
+    def test_browser_opener_defaults_and_keeps_url_as_single_argv(self) -> None:
+        script = r"""
+const { TOOL, openBrowser, shouldOpenBrowser } = require(process.argv[1]);
+const url = 'http://127.0.0.1:43123/?project=project_a&launch=token-value';
+const calls = [];
+openBrowser(url, (command, args, options) => {
+  const child = { unref() {}, once(event) { calls.push({ event }); return child; } };
+  calls.push({ command, args, options });
+  return child;
+}, 'win32');
+process.stdout.write(JSON.stringify({
+  defaultValue: shouldOpenBrowser(undefined),
+  falseValue: shouldOpenBrowser(false),
+  trueValue: shouldOpenBrowser(true),
+  invalidValue: (() => { try { shouldOpenBrowser('false'); return null; } catch (error) { return error.message; } })(),
+  inputSchema: TOOL.inputSchema,
+  calls,
+}));
+"""
+        result = subprocess.run(
+            ["node", "-e", script, str(REPOSITORY_ROOT / "runtime" / "mcp.cjs")],
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=20,
+        )
+        audit = json.loads(result.stdout)
+        self.assertTrue(audit["defaultValue"])
+        self.assertFalse(audit["falseValue"])
+        self.assertTrue(audit["trueValue"])
+        self.assertEqual(audit["invalidValue"], "open_browser must be a boolean")
+        self.assertEqual(audit["inputSchema"]["properties"]["open_browser"], {"type": "boolean"})
+        self.assertEqual(audit["calls"], [{
+            "command": "rundll32.exe",
+            "args": ["url.dll,FileProtocolHandler", "http://127.0.0.1:43123/?project=project_a&launch=token-value"],
+            "options": {"detached": True, "stdio": "ignore", "windowsHide": True},
+        }, {"event": "error"}])
+
+    def test_invalid_open_browser_is_a_correlated_invalid_params_error(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="cut invalid browser flag ") as temporary:
+            project_root = Path(temporary) / "project"
+            self._create_project(project_root)
+            process = self._start_mcp(REPOSITORY_ROOT, {**os.environ, "CAC_PYTHON": str(BUNDLED_PYTHON)})
+            try:
+                response = self._rpc(process, {
+                    "jsonrpc": "2.0", "id": 71, "method": "tools/call",
+                    "params": {"name": "open_editor", "arguments": {
+                        "project_root": str(project_root), "open_browser": "false",
+                    }},
+                })
+                self.assertEqual(response["id"], 71)
+                self.assertEqual(response["error"], {
+                    "code": -32602, "message": "open_browser must be a boolean",
+                })
+            finally:
+                self._stop_mcp(process)
+
     def test_package_is_portable_deterministic_and_launches_after_extraction(self) -> None:
         with tempfile.TemporaryDirectory(prefix="cut as code package ") as temporary:
             root = Path(temporary)
@@ -387,6 +445,10 @@ class PluginPackageTests(unittest.TestCase):
             self.assertEqual(mcp.count("spawn("), 1)
             self.assertIn("startProtocolService", sidecar)
             self.assertIn("sidecar.cjs", mcp)
+            self.assertIn("function browserLaunchSpec", mcp)
+            self.assertIn("function openBrowser", mcp)
+            self.assertIn("spawnProcess(command, [...args, url], options)", mcp)
+            self.assertIn("child.once('error', () => {})", mcp)
             self.assertNotIn("ready-file", sidecar)
             self.assertNotIn("readyFile", mcp)
             self.assertNotIn("bootstrapToken", sidecar)
@@ -563,37 +625,33 @@ process.stdout.write(JSON.stringify({
                 "jsonrpc": "2.0",
                 "id": 2,
                 "method": "tools/call",
-                "params": {"name": "open_editor", "arguments": {"project_root": str(project_root)}},
+                "params": {"name": "open_editor", "arguments": {"project_root": str(project_root), "open_browser": False}},
             })
             details = json.loads(opened["result"]["content"][0]["text"])
             self.assertTrue(details["url"].startswith("http://127.0.0.1:"))
-            self.assertNotIn("bootstrap", details["url"])
+            self.assertIn("launch=", details["url"])
             self.assertEqual(set(details), {"pid", "projectRoot", "url", "projectId"})
             first_pid = details["pid"]
             self._assert_real_browser_ready(details["url"], details["projectId"])
-            self.assertEqual(self._navigate(details["url"]), 401)
+            self._assert_launch_error(details["url"])
 
             reopened = self._rpc(process, {
                 "jsonrpc": "2.0",
                 "id": 3,
                 "method": "tools/call",
-                "params": {"name": "open_editor", "arguments": {"project_root": str(project_root)}},
+                "params": {"name": "open_editor", "arguments": {"project_root": str(project_root), "open_browser": False}},
             })
             reconnected = json.loads(reopened["result"]["content"][0]["text"])
-            self.assertEqual(reconnected["url"], details["url"])
+            self.assertNotEqual(reconnected["url"], details["url"])
             self.assertEqual(reconnected["pid"], details["pid"])
             self._assert_adversarial_launch_rejections(reconnected["url"], reconnected["projectId"])
             self._assert_real_browser_ready(reconnected["url"], reconnected["projectId"])
-            self.assertEqual(self._navigate(reconnected["url"]), 401)
+            self._assert_launch_error(reconnected["url"])
 
-            expiring = self._open_editor(process, 4, project_root)
-            time.sleep(10.2)
-            self.assertEqual(self._navigate(expiring["url"]), 401)
-
-            final = self._open_editor(process, 5, project_root)
+            final = self._open_editor(process, 4, project_root)
             self._assert_real_browser_ready(final["url"], final["projectId"])
             self._assert_no_secret_persistence(temporary_root, process)
-            self._rpc(process, {"jsonrpc": "2.0", "id": 6, "method": "shutdown"})
+            self._rpc(process, {"jsonrpc": "2.0", "id": 5, "method": "shutdown"})
         finally:
             self._stop_mcp(process)
         if first_pid is not None:
@@ -615,17 +673,60 @@ process.stdout.write(JSON.stringify({
     def _assert_adversarial_launch_rejections(self, url: str, project_id: str) -> None:
         parsed = urllib.parse.urlsplit(url)
         base = f"{parsed.scheme}://{parsed.netloc}"
-        self.assertEqual(self._navigate(f"{base}/?project=wrong-{project_id}"), 401)
-        self.assertEqual(self._navigate(f"{url}&extra=1"), 401)
+        self._assert_launch_error(f"{base}/?project=wrong-{project_id}&launch={urllib.parse.parse_qs(parsed.query)['launch'][0]}")
+        self._assert_launch_error(f"{url}&extra=1")
         self.assertEqual(self._navigate(url, method="POST"), 404)
-        self.assertEqual(self._navigate(url, destination="script"), 401)
-        self.assertEqual(self._navigate(url, site="same-origin"), 401)
-        self.assertEqual(self._navigate(url, site="cross-site"), 401)
+        self._assert_launch_error(url, destination="script")
+        self._assert_launch_error(url, site="same-origin")
+        self._assert_launch_error(url, site="cross-site")
+
+    def _assert_launch_error(
+        self, url: str, destination: str = "document", site: str = "none"
+    ) -> None:
+        status, headers, body = self._request(url, destination=destination, site=site)
+        self.assertEqual(status, 401)
+        self.assertEqual(headers.get("content-type"), "text/html; charset=utf-8")
+        self.assertNotIn("set-cookie", headers)
+        self.assertIn("Editor launch unavailable", body.decode("utf-8"))
+
+    def test_launch_token_ttl_is_sixty_seconds(self) -> None:
+        script = r"""
+const { LAUNCH_TTL_MS, launchIsExpired } = require(process.argv[1]);
+process.stdout.write(JSON.stringify({
+  ttl: LAUNCH_TTL_MS,
+  atDeadline: launchIsExpired({ expiresAt: 60000 }, 60000),
+  beforeDeadline: launchIsExpired({ expiresAt: 60000 }, 59999),
+}));
+"""
+        result = subprocess.run(
+            ["node", "-e", script, str(REPOSITORY_ROOT / "runtime" / "sidecar.cjs")],
+            check=True, capture_output=True, text=True, encoding="utf-8", timeout=20,
+        )
+        self.assertEqual(json.loads(result.stdout), {
+            "ttl": 60_000, "atDeadline": True, "beforeDeadline": False,
+        })
+
+    def test_protocol_call_timeout_allows_full_project_validation(self) -> None:
+        script = r"""
+const { PROTOCOL_CALL_TIMEOUT_MS } = require(process.argv[1]);
+process.stdout.write(JSON.stringify(PROTOCOL_CALL_TIMEOUT_MS));
+"""
+        result = subprocess.run(
+            ["node", "-e", script, str(REPOSITORY_ROOT / "runtime" / "sidecar.cjs")],
+            check=True, capture_output=True, text=True, encoding="utf-8", timeout=20,
+        )
+        self.assertEqual(json.loads(result.stdout), 30_000)
 
     @staticmethod
     def _navigate(
         url: str, method: str = "GET", destination: str = "document", site: str = "none"
     ) -> int:
+        return PluginPackageTests._request(url, method, destination, site)[0]
+
+    @staticmethod
+    def _request(
+        url: str, method: str = "GET", destination: str = "document", site: str = "none"
+    ) -> tuple[int, dict[str, str], bytes]:
         parsed = urllib.parse.urlsplit(url)
         connection = http.client.HTTPConnection(parsed.hostname, parsed.port, timeout=5)
         try:
@@ -636,8 +737,7 @@ process.stdout.write(JSON.stringify({
                 "Sec-Fetch-Site": site,
             })
             response = connection.getresponse()
-            response.read()
-            return response.status
+            return response.status, {key.lower(): value for key, value in response.getheaders()}, response.read()
         finally:
             connection.close()
 
@@ -683,7 +783,7 @@ process.stdout.write(JSON.stringify({
     ) -> dict:
         opened = self._rpc(process, {
             "jsonrpc": "2.0", "id": request_id, "method": "tools/call",
-            "params": {"name": "open_editor", "arguments": {"project_root": str(project_root)}},
+            "params": {"name": "open_editor", "arguments": {"project_root": str(project_root), "open_browser": False}},
         })
         return json.loads(opened["result"]["content"][0]["text"])
 
@@ -723,7 +823,9 @@ const { chromium } = require(process.argv[1]);
             timeout=30,
         )
         evidence = json.loads(result.stdout)
-        self.assertEqual(evidence["url"], url)
+        parsed = urllib.parse.urlsplit(url)
+        expected_url = f"{parsed.scheme}://{parsed.netloc}/?project={urllib.parse.quote(project_id, safe='')}"
+        self.assertEqual(evidence["url"], expected_url)
         self.assertTrue(evidence["shellVisible"])
         self.assertTrue(evidence["projectVisible"])
         self.assertTrue(evidence["cookie"]["httpOnly"])

@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test'
 
-test('renders the editor application shell', async ({ page }) => {
+test('shows an explicit project error instead of a fixture shell without runtime identity', async ({ page }) => {
   await page.goto('/')
 
-  await expect(page.locator('[data-editor-shell]')).toBeVisible()
+  await expect(page.getByRole('alert', { name: 'Project unavailable' })).toContainText('No Protocol V1 project was selected.')
+  await expect(page.locator('[data-editor-shell]')).toHaveCount(0)
 })

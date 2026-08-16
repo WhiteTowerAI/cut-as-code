@@ -9,7 +9,8 @@ const { spawn } = require('node:child_process')
 const readline = require('node:readline')
 
 const LOOPBACK = '127.0.0.1'
-const LAUNCH_TTL_MS = 10_000
+const LAUNCH_TTL_MS = 60_000
+const PROTOCOL_CALL_TIMEOUT_MS = 30_000
 const HTTP_ROUTE_ALLOWLIST = Object.freeze([
   Object.freeze({ id: 'launch', methods: Object.freeze(['GET']), pattern: /^\/$/ }),
   Object.freeze({ id: 'meta', methods: Object.freeze(['GET']), pattern: /^\/v1\/meta$/ }),
@@ -36,7 +37,7 @@ async function main() {
     uiRoot,
     protocol,
     projectId: opened.project_id,
-    launches: [],
+    launches: new Map(),
     sessions: new Set(),
     clients: new Set(),
     media: new Map(),
@@ -45,7 +46,10 @@ async function main() {
   await refreshFiles(state)
 
   const server = http.createServer((request, response) => {
-    handleRequest(state, request, response).catch(() => json(response, 500, { ok: false, error: 'internal error' }))
+    handleRequest(state, request, response).catch((error) => {
+      process.stderr.write(`${error instanceof Error ? error.stack || error.message : String(error)}\n`)
+      json(response, 500, { ok: false, error: 'internal error' })
+    })
   })
   await new Promise((resolve, reject) => {
     server.once('error', reject)
@@ -90,20 +94,38 @@ async function handleRequest(state, request, response) {
   if (!route) return json(response, 404, { ok: false, error: 'not found' })
 
   if (route.id === 'launch') {
-    if (authorized(state, request)) return serveStatic(state.uiRoot, url.pathname, request.method, response)
+    if (url.searchParams.size === 0) {
+      if (authorized(state, request)) return serveStatic(state.uiRoot, url.pathname, request.method, response)
+      return launchError(response)
+    }
+    const authorizedProjectNavigation = authorized(state, request)
+      && url.searchParams.get('project') === state.projectId
+      && (
+        url.searchParams.size === 1
+        || (url.searchParams.size === 2 && url.searchParams.get('debug') === '1')
+      )
+      && [...url.searchParams.keys()].every((key) => key === 'project' || key === 'debug')
+    if (authorizedProjectNavigation) {
+      return serveStatic(state.uiRoot, url.pathname, request.method, response)
+    }
+    const projectId = url.searchParams.get('project')
+    const token = url.searchParams.get('launch')
+    const now = Date.now()
+    const launch = typeof token === 'string' ? state.launches.get(token) : null
     const directNavigation = request.headers['sec-fetch-mode'] === 'navigate'
       && request.headers['sec-fetch-dest'] === 'document'
       && request.headers['sec-fetch-site'] === 'none'
-    const correctProject = url.searchParams.size === 1 && url.searchParams.get('project') === state.projectId
-    state.launches = state.launches.filter((expiresAt) => expiresAt >= Date.now())
-    if (!directNavigation || !correctProject || state.launches.length === 0) {
-      return json(response, 401, { ok: false, error: 'editor launch is not armed' })
+    for (const [launchToken, value] of state.launches) {
+      if (launchIsExpired(value, now)) state.launches.delete(launchToken)
     }
-    state.launches.shift()
+    if (!directNavigation || url.searchParams.size !== 2 || projectId !== state.projectId || !launch || launch.projectId !== projectId || launchIsExpired(launch, now)) {
+      return launchError(response)
+    }
+    state.launches.delete(token)
     const session = crypto.randomBytes(32).toString('base64url')
     state.sessions.add(session)
     response.setHeader('Set-Cookie', `cut_session=${session}; HttpOnly; SameSite=Strict; Path=/`)
-    response.writeHead(303, { Location: request.url, 'Cache-Control': 'no-store' })
+    response.writeHead(303, { Location: `/?project=${encodeURIComponent(state.projectId)}`, 'Cache-Control': 'no-store' })
     return response.end()
   }
 
@@ -116,13 +138,7 @@ async function handleRequest(state, request, response) {
     if (route.id === 'snapshot' && match[1] === state.projectId) {
       await refreshFiles(state)
       const result = await state.protocol.call({ verb: 'get_snapshot', project_id: state.projectId })
-      if (result.ok) {
-        result.snapshot.media = publicFiles(state.media, state.projectId, 'media')
-        result.snapshot.artifacts = publicFiles(state.artifacts, state.projectId, 'artifacts')
-        if (result.snapshot.view?.source_media_id && !state.media.has(result.snapshot.view.source_media_id)) {
-          delete result.snapshot.view.source_media_id
-        }
-      }
+      attachPublicFiles(state, result)
       return json(response, result.ok ? 200 : 400, result)
     }
     if (route.id === 'transaction' && match[1] === state.projectId) {
@@ -132,6 +148,7 @@ async function handleRequest(state, request, response) {
         verb: 'plan.update', project_id: state.projectId, operation: body.operation,
         read_set: body.readSet, review: body.review,
       })
+      attachPublicFiles(state, result)
       return json(response, result.status || (result.ok ? 200 : 400), result)
     }
     if (route.id === 'review' && match[1] === state.projectId) {
@@ -141,6 +158,7 @@ async function handleRequest(state, request, response) {
         verb: 'review.record', project_id: state.projectId, operation: body.operation,
         read_set: body.readSet, decision: body.decision,
       })
+      attachPublicFiles(state, result)
       return json(response, result.status || (result.ok ? 200 : 400), result)
     }
     if (route.id === 'resource' && match[1] === state.projectId) {
@@ -188,8 +206,9 @@ function handleControl(state, line) {
   if (!Number.isInteger(request.id) || request.command !== 'arm_launch') {
     return process.stdout.write(`${JSON.stringify({ id: request.id ?? null, ok: false, error: 'unsupported control command' })}\n`)
   }
-  state.launches.push(Date.now() + LAUNCH_TTL_MS)
-  const url = `${state.origin}/?project=${encodeURIComponent(state.projectId)}`
+  const token = crypto.randomBytes(32).toString('base64url')
+  state.launches.set(token, { projectId: state.projectId, expiresAt: Date.now() + LAUNCH_TTL_MS })
+  const url = `${state.origin}/?project=${encodeURIComponent(state.projectId)}&launch=${token}`
   process.stdout.write(`${JSON.stringify({ id: request.id, ok: true, url })}\n`)
 }
 
@@ -258,6 +277,16 @@ function publicFiles(registry, projectId, collection) {
     media_type: mediaType,
     url: `/v1/projects/${encodeURIComponent(projectId)}/${collection}/${encodeURIComponent(id)}`,
   }))
+}
+
+function attachPublicFiles(state, result) {
+  if (!result?.snapshot) return result
+  result.snapshot.media = publicFiles(state.media, state.projectId, 'media')
+  result.snapshot.artifacts = publicFiles(state.artifacts, state.projectId, 'artifacts')
+  if (result.snapshot.view?.source_media_id && !state.media.has(result.snapshot.view.source_media_id)) {
+    delete result.snapshot.view.source_media_id
+  }
+  return result
 }
 
 function mediaType(file) {
@@ -427,6 +456,16 @@ function json(response, status, value) {
   response.end(body)
 }
 
+function launchError(response) {
+  const body = '<!doctype html><title>Editor launch unavailable</title><h1>Editor launch unavailable</h1><p>This editor launch link is invalid, expired, or has already been used. Return to Cut as Code and open the editor again.</p>'
+  response.writeHead(401, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': Buffer.byteLength(body), 'Cache-Control': 'no-store' })
+  response.end(body)
+}
+
+function launchIsExpired(launch, now = Date.now()) {
+  return launch.expiresAt <= now
+}
+
 function isContained(root, target) {
   const relative = path.relative(root, target)
   return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative))
@@ -469,7 +508,7 @@ async function startProtocolService(runtimeRoot) {
   }
   if (!child) throw new Error('Python runtime unavailable')
   const lines = readline.createInterface({ input: child.stdout })
-  child.stderr.resume()
+  child.stderr.pipe(process.stderr)
   const pending = []
   lines.on('line', (line) => {
     const request = pending.shift()
@@ -492,7 +531,7 @@ async function startProtocolService(runtimeRoot) {
         request.timer = setTimeout(() => {
           reject(new Error('protocol service timed out'))
           child.kill()
-        }, 10_000)
+        }, PROTOCOL_CALL_TIMEOUT_MS)
         pending.push(request)
         child.stdin.write(JSON.stringify(value) + '\n')
       })
@@ -511,7 +550,7 @@ async function startProtocolService(runtimeRoot) {
   }
 }
 
-module.exports = { HTTP_ROUTE_ALLOWLIST, routeForRequest }
+module.exports = { HTTP_ROUTE_ALLOWLIST, LAUNCH_TTL_MS, PROTOCOL_CALL_TIMEOUT_MS, launchIsExpired, routeForRequest }
 
 if (require.main === module) {
   main().catch((error) => {
