@@ -37,11 +37,10 @@ export type ReviewArtifactView = Readonly<{
   url: string
 }>
 
-export type LayerTransform = Readonly<{
-  x: number
-  y: number
-  scale: number
-}>
+export type LayerTransform = Readonly<
+  { x: number; y: number; scale: number; scale_x?: never; scale_y?: never }
+  | { x: number; y: number; scale?: never; scale_x: number; scale_y: number }
+>
 
 export type EditorLayerView = Readonly<{
   id: string
@@ -59,6 +58,7 @@ export type EditorLayerView = Readonly<{
     fps: Readonly<{ numerator: number; denominator: number }>
     frameCount: number
     frameUrlTemplate?: string
+    contentBounds?: Readonly<{ x: number; y: number; width: number; height: number }>
   }>
 }>
 

@@ -74,16 +74,27 @@ function isOperationDraftChange(operation: EditorOperationView, value: unknown):
 function isLayerTransform(value: unknown): value is LayerTransform {
   if (!value || typeof value !== 'object') return false
   const transform = value as Record<string, unknown>
-  if (Object.keys(transform).length !== 3 || !['x', 'y', 'scale'].every((field) => field in transform)) return false
-  const { x, y, scale } = transform
+  const fields = Object.keys(transform)
+  const legacy = fields.length === 3 && ['x', 'y', 'scale'].every((field) => field in transform)
+  const axis = fields.length === 4 && ['x', 'y', 'scale_x', 'scale_y'].every((field) => field in transform)
+  if (!legacy && !axis) return false
+  const { x, y } = transform
+  const scaleX = legacy ? transform.scale : transform.scale_x
+  const scaleY = legacy ? transform.scale : transform.scale_y
   return typeof x === 'number' && Number.isFinite(x) && x >= 0 && x <= 1
     && typeof y === 'number' && Number.isFinite(y) && y >= 0 && y <= 1
-    && typeof scale === 'number' && Number.isFinite(scale) && scale >= 0.1 && scale <= 4
+    && typeof scaleX === 'number' && Number.isFinite(scaleX) && scaleX >= 0.1 && scaleX <= 4
+    && typeof scaleY === 'number' && Number.isFinite(scaleY) && scaleY >= 0.1 && scaleY <= 4
 }
 
 function fieldValueMatches(authority: unknown, draft: unknown) {
   if (isLayerTransform(authority) && isLayerTransform(draft)) {
-    return authority.x === draft.x && authority.y === draft.y && authority.scale === draft.scale
+    const authorityX = typeof authority.scale === 'number' ? authority.scale : authority.scale_x
+    const authorityY = typeof authority.scale === 'number' ? authority.scale : authority.scale_y
+    const draftX = typeof draft.scale === 'number' ? draft.scale : draft.scale_x
+    const draftY = typeof draft.scale === 'number' ? draft.scale : draft.scale_y
+    return authority.x === draft.x && authority.y === draft.y
+      && authorityX === draftX && authorityY === draftY
   }
   return authority === draft
 }

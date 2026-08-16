@@ -14,6 +14,8 @@ from datetime import datetime
 from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
 
+from PIL import Image
+
 if os.name == "nt":
     import msvcrt
 else:
@@ -1344,19 +1346,78 @@ def _validate_graphic_motion_plan(
 
 
 _DEFAULT_EDITOR_TRANSFORM = {"x": 0.5, "y": 0.5, "scale": 1.0}
+_GRAPHIC_MOTION_BOUNDS_CACHE = {}
 
 
 def _editor_transform(value):
     if value is None:
         return dict(_DEFAULT_EDITOR_TRANSFORM)
-    if not isinstance(value, dict) or set(value) != {"x", "y", "scale"}:
-        raise ValueError("editor_transform must contain x, y, and scale")
-    x, y, scale = value["x"], value["y"], value["scale"]
-    if any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in (x, y, scale)):
+    if not isinstance(value, dict) or set(value) not in (
+        {"x", "y", "scale"}, {"x", "y", "scale_x", "scale_y"},
+    ):
+        raise ValueError("editor_transform must contain x, y, and scale or scale_x and scale_y")
+    x, y = value["x"], value["y"]
+    scale_x = value.get("scale_x", value.get("scale"))
+    scale_y = value.get("scale_y", value.get("scale"))
+    if any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in (x, y, scale_x, scale_y)):
         raise ValueError("editor_transform values must be numbers")
-    if not 0 <= x <= 1 or not 0 <= y <= 1 or not 0.1 <= scale <= 4:
+    if not 0 <= x <= 1 or not 0 <= y <= 1 or not 0.1 <= scale_x <= 4 or not 0.1 <= scale_y <= 4:
         raise ValueError("editor_transform is out of range")
-    return {"x": float(x), "y": float(y), "scale": float(scale)}
+    if "scale" in value:
+        return {"x": float(x), "y": float(y), "scale": float(scale_x)}
+    return {"x": float(x), "y": float(y), "scale_x": float(scale_x), "scale_y": float(scale_y)}
+
+
+def graphic_motion_content_bounds(cue, project_root):
+    render = cue.get("render") if isinstance(cue, dict) else None
+    frames = render.get("frames") if isinstance(render, dict) else None
+    if not isinstance(frames, list) or not frames:
+        return {"x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0}
+    resolved_frames = []
+    for frame in frames:
+        value = frame.get("path") if isinstance(frame, dict) else None
+        value_path = Path(value) if isinstance(value, str) else Path()
+        path = (
+            (Path(project_root).resolve() / value_path).resolve()
+            if value_path.parts[:1] == ("work",)
+            else resolve_project_path(project_root, value)
+        )
+        if os.path.commonpath((str(Path(project_root).resolve()), str(path))) != str(Path(project_root).resolve()):
+            raise ValueError("graphic-motion frame path escapes project root")
+        stat = path.stat()
+        resolved_frames.append((path, frame.get("sha256"), stat.st_size, stat.st_mtime_ns))
+    cache_key = tuple((str(path), sha256, size, mtime) for path, sha256, size, mtime in resolved_frames)
+    cached = _GRAPHIC_MOTION_BOUNDS_CACHE.get(cache_key)
+    if cached is not None:
+        return dict(cached)
+    union = None
+    size = None
+    for path, _sha256, _file_size, _mtime in resolved_frames:
+        with Image.open(path) as image:
+            if size is None:
+                size = image.size
+            elif image.size != size:
+                raise ValueError("graphic-motion frames must share one canvas size")
+            alpha = image.getchannel("A") if "A" in image.getbands() else None
+            bounds = alpha.getbbox() if alpha is not None else image.getbbox()
+        if bounds is not None:
+            union = bounds if union is None else (
+                min(union[0], bounds[0]), min(union[1], bounds[1]),
+                max(union[2], bounds[2]), max(union[3], bounds[3]),
+            )
+    if size is None or union is None:
+        bounds = {"x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0}
+        _GRAPHIC_MOTION_BOUNDS_CACHE[cache_key] = bounds
+        return dict(bounds)
+    width, height = size
+    bounds = {
+        "x": union[0] / width,
+        "y": union[1] / height,
+        "width": (union[2] - union[0]) / width,
+        "height": (union[3] - union[1]) / height,
+    }
+    _GRAPHIC_MOTION_BOUNDS_CACHE[cache_key] = bounds
+    return dict(bounds)
 
 
 def _editor_transforms_for_contributions(operation_id, plan, contribution_count):
@@ -1583,6 +1644,7 @@ def build_render_plan(project, project_root):
             if len(errors) != before:
                 continue
         editor_transforms = None
+        editor_content_bounds = None
         if operation_id in {"captions", "content-cards", "graphic-motion"} and operation.get("plan"):
             try:
                 editor_plan = load_json(resolve_project_path(project_root, operation["plan"]))
@@ -1596,6 +1658,16 @@ def build_render_plan(project, project_root):
                 editor_transforms = iter(
                     _editor_transforms_for_contributions(operation_id, editor_plan, overlay_count)
                 )
+                if operation_id == "graphic-motion":
+                    verified_cues = [
+                        cue for cue in editor_plan.get("cues", [])
+                        if isinstance(cue, dict) and cue.get("status") == "verified"
+                    ]
+                    if len(verified_cues) != overlay_count:
+                        raise ValueError("graphic-motion content bounds require per-cue overlay assets")
+                    editor_content_bounds = iter(
+                        graphic_motion_content_bounds(cue, project_root) for cue in verified_cues
+                    )
             except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
                 errors.append(f"{operation_id} invalid editor transform mapping: {exc}")
         for contribution in contributions:
@@ -1624,6 +1696,8 @@ def build_render_plan(project, project_root):
             item = {"operation": operation_id, **contribution}
             if kind == "overlay" and editor_transforms is not None:
                 item["editor_transform"] = next(editor_transforms)
+                if editor_content_bounds is not None:
+                    item["content_bounds"] = next(editor_content_bounds)
 
             required_path = {
                 "timeline-transform": "input",

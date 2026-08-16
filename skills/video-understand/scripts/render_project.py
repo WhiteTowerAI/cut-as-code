@@ -87,24 +87,40 @@ def _grade_filter(contribution, project_root, plan_dir):
     return chain or "null", cwd
 
 
-def _overlay_transform_filters(value):
+def _overlay_transform_filters(value, content_bounds=None):
     if value is None:
         return None, None
-    if not isinstance(value, dict) or set(value) != {"x", "y", "scale"}:
-        raise ValueError("overlay editor_transform must contain x, y, and scale")
-    x, y, scale = value["x"], value["y"], value["scale"]
-    if any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in (x, y, scale)):
+    if not isinstance(value, dict) or set(value) not in (
+        {"x", "y", "scale"}, {"x", "y", "scale_x", "scale_y"},
+    ):
+        raise ValueError("overlay editor_transform has invalid fields")
+    x, y = value["x"], value["y"]
+    scale_x = value.get("scale_x", value.get("scale"))
+    scale_y = value.get("scale_y", value.get("scale"))
+    if any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in (x, y, scale_x, scale_y)):
         raise ValueError("overlay editor_transform values must be numbers")
-    if not 0 <= x <= 1 or not 0 <= y <= 1 or not 0.1 <= scale <= 4:
+    if not 0 <= x <= 1 or not 0 <= y <= 1 or not 0.1 <= scale_x <= 4 or not 0.1 <= scale_y <= 4:
         raise ValueError("overlay editor_transform is out of range")
-    if float(x) == 0.5 and float(y) == 0.5 and float(scale) == 1.0:
+    if content_bounds is None and float(x) == 0.5 and float(y) == 0.5 and float(scale_x) == 1.0 and float(scale_y) == 1.0:
         return None, None
-    scale_filter = None if float(scale) == 1.0 else f"scale=iw*{float(scale):g}:ih*{float(scale):g}"
-    position = (
-        f"x='main_w*{float(x):g}-overlay_w/2':"
-        f"y='main_h*{float(y):g}-overlay_h/2'"
+    if content_bounds is None:
+        scale_filter = None if float(scale_x) == 1.0 and float(scale_y) == 1.0 else f"scale=iw*{float(scale_x):g}:ih*{float(scale_y):g}"
+        return scale_filter, (
+            f"x='main_w*{float(x):g}-overlay_w/2':"
+            f"y='main_h*{float(y):g}-overlay_h/2'"
+        )
+    if not isinstance(content_bounds, dict) or set(content_bounds) != {"x", "y", "width", "height"}:
+        raise ValueError("overlay content_bounds is invalid")
+    bx, by, bw, bh = (float(content_bounds[key]) for key in ("x", "y", "width", "height"))
+    if bx < 0 or by < 0 or bw <= 0 or bh <= 0 or bx + bw > 1 or by + bh > 1:
+        raise ValueError("overlay content_bounds is out of range")
+    filters = f"crop=iw*{bw:g}:ih*{bh:g}:iw*{bx:g}:ih*{by:g}"
+    if float(scale_x) != 1.0 or float(scale_y) != 1.0:
+        filters += f",scale=iw*{float(scale_x):g}:ih*{float(scale_y):g}"
+    return filters, (
+        f"x='main_w*{float(x):g}+({bx:g}-0.5)*main_w*{float(scale_x):g}':"
+        f"y='main_h*{float(y):g}+({by:g}-0.5)*main_h*{float(scale_y):g}'"
     )
-    return scale_filter, position
 
 
 def _build(plan, project_root, plan_dir):
@@ -201,6 +217,7 @@ def _build(plan, project_root, plan_dir):
                     "start_number": contribution.get("start_number", 1),
                     "fps": contribution.get("fps"),
                     "editor_transform": contribution.get("editor_transform"),
+                    "content_bounds": contribution.get("content_bounds"),
                     "start_frame": start_frame,
                     "end_frame": end_frame,
                 }
@@ -277,7 +294,7 @@ def _build(plan, project_root, plan_dir):
         if end_frame is not None:
             duration_filter = f"trim=end_frame={end_frame - start_frame},"
         scale_filter, overlay_position = _overlay_transform_filters(
-            overlay_spec.get("editor_transform")
+            overlay_spec.get("editor_transform"), overlay_spec.get("content_bounds")
         )
         transform_filter = f"{scale_filter}," if scale_filter else ""
         graph.append(

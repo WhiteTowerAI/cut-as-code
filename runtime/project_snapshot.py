@@ -191,7 +191,7 @@ def build_snapshot(project_root):
     if graphic_motion and isinstance(graphic_motion.get("plan"), str):
         try:
             motion_plan = json.loads(_contained_path(root, graphic_motion["plan"]).read_text(encoding="utf-8"))
-            edit_model = _graphic_motion_edit_model(motion_plan)
+            edit_model = _graphic_motion_edit_model(motion_plan, root)
         except (OSError, UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
             edit_model = None
         if edit_model:
@@ -436,7 +436,7 @@ def _captions_edit_model(plan):
     return {"style": copy_json(plan.get("style", {})), "cues": entries}
 
 
-def _graphic_motion_edit_model(plan):
+def _graphic_motion_edit_model(plan, project_root):
     if not isinstance(plan, dict):
         return None
     cues = plan.get("cues")
@@ -469,6 +469,7 @@ def _graphic_motion_edit_model(plan):
                 "start_number": render.get("start_number"),
                 "fps": copy_json(render.get("fps")),
                 "frame_count": len(frames),
+                "content_bounds": projectlib.graphic_motion_content_bounds(cue, project_root),
             } if render.get("asset_type") == "image-sequence" else None,
         })
     return {"cues": entries}
@@ -476,14 +477,20 @@ def _graphic_motion_edit_model(plan):
 
 def _editor_transform(value):
     default = {"x": 0.5, "y": 0.5, "scale": 1.0}
-    if not isinstance(value, dict) or set(value) != {"x", "y", "scale"}:
+    if not isinstance(value, dict) or set(value) not in (
+        {"x", "y", "scale"}, {"x", "y", "scale_x", "scale_y"},
+    ):
         return default
-    x, y, scale = value.get("x"), value.get("y"), value.get("scale")
-    if any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in (x, y, scale)):
+    x, y = value.get("x"), value.get("y")
+    scale_x = value.get("scale_x", value.get("scale"))
+    scale_y = value.get("scale_y", value.get("scale"))
+    if any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in (x, y, scale_x, scale_y)):
         return default
-    if not (0 <= x <= 1 and 0 <= y <= 1 and 0.1 <= scale <= 4):
+    if not (0 <= x <= 1 and 0 <= y <= 1 and 0.1 <= scale_x <= 4 and 0.1 <= scale_y <= 4):
         return default
-    return {"x": float(x), "y": float(y), "scale": float(scale)}
+    if "scale" in value:
+        return {"x": float(x), "y": float(y), "scale": float(scale_x)}
+    return {"x": float(x), "y": float(y), "scale_x": float(scale_x), "scale_y": float(scale_y)}
 
 
 def _layer_id(operation_id, cue_id):

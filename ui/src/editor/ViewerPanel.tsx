@@ -85,6 +85,14 @@ export function graphicMotionFrameNumber(layer: EditorLayerView, programTimeS: n
 }
 
 function clampTransform(transform: LayerTransform): LayerTransform {
+  if (typeof transform.scale_x === 'number' && typeof transform.scale_y === 'number') {
+    return {
+      x: Math.min(1, Math.max(0, transform.x)),
+      y: Math.min(1, Math.max(0, transform.y)),
+      scale_x: Math.min(4, Math.max(0.1, transform.scale_x)),
+      scale_y: Math.min(4, Math.max(0.1, transform.scale_y)),
+    }
+  }
   return {
     x: Math.min(1, Math.max(0, transform.x)),
     y: Math.min(1, Math.max(0, transform.y)),
@@ -110,14 +118,60 @@ function layerFrameUrl(layer: EditorLayerView, programTimeS: number) {
 
 type LayerPointerState = Readonly<{
   pointerId: number
-  mode: 'move' | 'scale'
+  mode: 'move' | 'scale' | ResizeDirection
   layer: EditorLayerView
   transform: LayerTransform
   startClientX: number
   startClientY: number
   canvasWidth: number
   canvasHeight: number
+  bounds?: Readonly<{ x: number; y: number; width: number; height: number }>
 }>
+
+type ResizeDirection = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'
+
+const resizeHandleNames: Readonly<Record<ResizeDirection, string>> = {
+  nw: 'north west', n: 'north', ne: 'north east', e: 'east',
+  se: 'south east', s: 'south', sw: 'south west', w: 'west',
+}
+
+function axisScales(transform: LayerTransform) {
+  return typeof transform.scale_x === 'number' && typeof transform.scale_y === 'number'
+    ? { scaleX: transform.scale_x, scaleY: transform.scale_y }
+    : { scaleX: transform.scale, scaleY: transform.scale }
+}
+
+function graphicMotionRect(layer: EditorLayerView, transform = layer.transform) {
+  const bounds = layer.imageSequence?.contentBounds ?? { x: 0, y: 0, width: 1, height: 1 }
+  const { scaleX, scaleY } = axisScales(transform)
+  return {
+    left: transform.x + (bounds.x - 0.5) * scaleX,
+    top: transform.y + (bounds.y - 0.5) * scaleY,
+    width: bounds.width * scaleX,
+    height: bounds.height * scaleY,
+  }
+}
+
+function clampGraphicMotionTransform(
+  transform: LayerTransform,
+  bounds: Readonly<{ x: number; y: number; width: number; height: number }>,
+  canvasWidth: number,
+  canvasHeight: number,
+): LayerTransform {
+  const { scaleX, scaleY } = axisScales(clampTransform(transform))
+  const reachableX = Math.min(12 / canvasWidth, bounds.width * scaleX / 2)
+  const reachableY = Math.min(12 / canvasHeight, bounds.height * scaleY / 2)
+  const minX = reachableX - (bounds.x - 0.5) * scaleX - bounds.width * scaleX
+  const maxX = 1 - reachableX - (bounds.x - 0.5) * scaleX
+  const minY = reachableY - (bounds.y - 0.5) * scaleY - bounds.height * scaleY
+  const maxY = 1 - reachableY - (bounds.y - 0.5) * scaleY
+  return {
+    x: Math.min(1, Math.max(0, Math.min(maxX, Math.max(minX, transform.x)))),
+    y: Math.min(1, Math.max(0, Math.min(maxY, Math.max(minY, transform.y)))),
+    scale_x: scaleX,
+    scale_y: scaleY,
+  }
+}
 
 function sourceTimeToProgramTimeInClip(sourceTimeS: number, clip: ClipView) {
   const programDuration = clip.programRange.endS - clip.programRange.startS
@@ -775,7 +829,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
   function beginLayerPointer(
     event: ReactPointerEvent<HTMLElement>,
     layer: EditorLayerView,
-    mode: 'move' | 'scale',
+    mode: 'move' | 'scale' | ResizeDirection,
   ) {
     if (event.button !== 0) return
     const canvas = event.currentTarget.closest('.viewer-canvas')
@@ -794,6 +848,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
       startClientY: event.clientY,
       canvasWidth: rect.width,
       canvasHeight: rect.height,
+      bounds: layer.imageSequence?.contentBounds,
     }
   }
 
@@ -803,16 +858,61 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     event.preventDefault()
     const deltaX = event.clientX - state.startClientX
     const deltaY = event.clientY - state.startClientY
-    const transform = state.mode === 'move'
-      ? clampTransform({
+    let transform: LayerTransform
+    if (state.mode === 'move') {
+      const moved = {
           ...state.transform,
           x: state.transform.x + deltaX / state.canvasWidth,
           y: state.transform.y + deltaY / state.canvasHeight,
+        } as LayerTransform
+      transform = state.layer.kind === 'graphic-motion' && state.bounds
+        ? clampGraphicMotionTransform(moved, state.bounds, state.canvasWidth, state.canvasHeight)
+        : clampTransform(moved)
+    } else if (state.mode === 'scale') {
+      const scale = typeof state.transform.scale === 'number'
+        ? state.transform.scale
+        : state.transform.scale_x
+      transform = clampTransform({
+          x: state.transform.x,
+          y: state.transform.y,
+          scale: scale + (deltaX + deltaY) / Math.min(state.canvasWidth, state.canvasHeight),
         })
-      : clampTransform({
-          ...state.transform,
-          scale: state.transform.scale + (deltaX + deltaY) / Math.min(state.canvasWidth, state.canvasHeight),
-        })
+    } else {
+      const bounds = state.bounds ?? { x: 0, y: 0, width: 1, height: 1 }
+      const initial = graphicMotionRect(state.layer, state.transform)
+      const dx = deltaX / state.canvasWidth
+      const dy = deltaY / state.canvasHeight
+      let left = initial.left
+      let top = initial.top
+      let right = initial.left + initial.width
+      let bottom = initial.top + initial.height
+      if (state.mode.includes('w')) left = Math.min(right - bounds.width * 0.1, left + dx)
+      if (state.mode.includes('e')) right = Math.max(left + bounds.width * 0.1, right + dx)
+      if (state.mode.includes('n')) top = Math.min(bottom - bounds.height * 0.1, top + dy)
+      if (state.mode.includes('s')) bottom = Math.max(top + bounds.height * 0.1, bottom + dy)
+      if (['nw', 'ne', 'se', 'sw'].includes(state.mode)) {
+        const initialAspect = initial.width / initial.height
+        const horizontalWidth = right - left
+        const verticalWidth = (bottom - top) * initialAspect
+        if (Math.abs(horizontalWidth - initial.width) >= Math.abs(verticalWidth - initial.width)) {
+          const height = horizontalWidth / initialAspect
+          if (state.mode.includes('n')) top = bottom - height
+          else bottom = top + height
+        } else {
+          const width = verticalWidth
+          if (state.mode.includes('w')) left = right - width
+          else right = left + width
+        }
+      }
+      const scaleX = (right - left) / bounds.width
+      const scaleY = (bottom - top) / bounds.height
+      transform = clampGraphicMotionTransform({
+        x: left - (bounds.x - 0.5) * scaleX,
+        y: top - (bounds.y - 0.5) * scaleY,
+        scale_x: scaleX,
+        scale_y: scaleY,
+      }, bounds, state.canvasWidth, state.canvasHeight)
+    }
     editOperationDraft(state.layer.operationId, { cueId: state.layer.cueId, transform })
   }
 
@@ -828,7 +928,9 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     select({ kind: layerSelectionKind(layer), id: layer.cueId })
     editOperationDraft(layer.operationId, {
       cueId: layer.cueId,
-      transform: { x: 0.5, y: 0.5, scale: 1 },
+      transform: layer.kind === 'graphic-motion'
+        ? { x: 0.5, y: 0.5, scale_x: 1, scale_y: 1 }
+        : { x: 0.5, y: 0.5, scale: 1 },
     })
   }
 
@@ -878,10 +980,14 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
               {activeLayers.map((layer) => {
                 const selected = selection?.id === layer.cueId && selection.kind === layerSelectionKind(layer)
                 const frameUrl = layerFrameUrl(layer, currentTimeS)
+                const graphicRect = layer.kind === 'graphic-motion' ? graphicMotionRect(layer) : undefined
+                const { scaleX, scaleY } = axisScales(layer.transform)
                 const style = {
-                  '--layer-x': layer.transform.x,
-                  '--layer-y': layer.transform.y,
-                  '--layer-scale': layer.transform.scale,
+                  '--layer-x': graphicRect?.left ?? layer.transform.x,
+                  '--layer-y': graphicRect?.top ?? layer.transform.y,
+                  '--layer-scale': typeof layer.transform.scale === 'number' ? layer.transform.scale : 1,
+                  '--layer-width': graphicRect?.width,
+                  '--layer-height': graphicRect?.height,
                   zIndex: layer.zIndex,
                 } as CSSProperties
                 return (
@@ -891,7 +997,9 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
                     data-layer-id={layer.id}
                     data-layer-x={layer.transform.x}
                     data-layer-y={layer.transform.y}
-                    data-layer-scale={layer.transform.scale}
+                    data-layer-scale={typeof layer.transform.scale === 'number' ? layer.transform.scale : undefined}
+                    data-layer-scale-x={scaleX}
+                    data-layer-scale-y={scaleY}
                     data-layer-selected={selected || undefined}
                     style={style}
                     key={layer.id}
@@ -901,7 +1009,40 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
                     onPointerCancel={endLayerPointer}
                   >
                     {layer.kind === 'graphic-motion' ? (
-                      frameUrl ? <img src={frameUrl} alt="" draggable={false} /> : null
+                      <>
+                        {frameUrl ? <img
+                          src={frameUrl}
+                          alt=""
+                          draggable={false}
+                          style={{
+                            width: `${100 / (layer.imageSequence?.contentBounds?.width ?? 1)}%`,
+                            height: `${100 / (layer.imageSequence?.contentBounds?.height ?? 1)}%`,
+                            left: `${-100 * (layer.imageSequence?.contentBounds?.x ?? 0) / (layer.imageSequence?.contentBounds?.width ?? 1)}%`,
+                            top: `${-100 * (layer.imageSequence?.contentBounds?.y ?? 0) / (layer.imageSequence?.contentBounds?.height ?? 1)}%`,
+                          }}
+                        /> : null}
+                        {selected ? (Object.keys(resizeHandleNames) as ResizeDirection[]).map((direction) => (
+                          <button
+                            className={`viewer-layer-resize-handle viewer-layer-resize-handle--${direction}`}
+                            type="button"
+                            aria-label={`Resize ${resizeHandleNames[direction]}`}
+                            title={`Resize ${resizeHandleNames[direction]}`}
+                            key={direction}
+                            onPointerDown={(event) => beginLayerPointer(event, layer, direction)}
+                            onPointerMove={moveLayerPointer}
+                            onPointerUp={endLayerPointer}
+                            onPointerCancel={endLayerPointer}
+                          />
+                        )) : null}
+                        {selected ? <button
+                          className="viewer-layer-reset viewer-layer-reset--object"
+                          type="button"
+                          aria-label="Reset layer transform"
+                          title="Reset layer transform"
+                          onPointerDown={(event) => event.stopPropagation()}
+                          onClick={() => resetLayerTransform(layer)}
+                        ><RotateCw aria-hidden size={14} /></button> : null}
+                      </>
                     ) : layer.kind === 'caption' ? (
                       <span className="viewer-layer-caption-text">{layerText(layer)}</span>
                     ) : (
@@ -910,7 +1051,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
                   </div>
                 )
               })}
-              {selectedLayer ? (
+              {selectedLayer && selectedLayer.kind !== 'graphic-motion' ? (
                 <div className="viewer-layer-controls" aria-label="Layer transform controls">
                   <button
                     className="viewer-layer-reset"

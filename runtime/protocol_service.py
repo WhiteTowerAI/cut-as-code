@@ -301,16 +301,22 @@ class ProtocolService:
 
     @staticmethod
     def _validate_editor_transform(transform):
-        if not isinstance(transform, dict) or set(transform) != {"x", "y", "scale"}:
-            raise ValueError("editor_transform must contain x, y, and scale")
-        x, y, scale = transform["x"], transform["y"], transform["scale"]
-        if any(isinstance(value, bool) or not isinstance(value, (int, float)) for value in (x, y, scale)):
+        if not isinstance(transform, dict) or set(transform) not in (
+            {"x", "y", "scale"}, {"x", "y", "scale_x", "scale_y"},
+        ):
+            raise ValueError("editor_transform must contain x, y, and scale or scale_x and scale_y")
+        x, y = transform["x"], transform["y"]
+        scale_x = transform.get("scale_x", transform.get("scale"))
+        scale_y = transform.get("scale_y", transform.get("scale"))
+        if any(isinstance(value, bool) or not isinstance(value, (int, float)) for value in (x, y, scale_x, scale_y)):
             raise ValueError("editor_transform values must be numbers")
         if not 0 <= x <= 1 or not 0 <= y <= 1:
             raise ValueError("editor_transform position must be normalized")
-        if not 0.1 <= scale <= 4:
+        if not 0.1 <= scale_x <= 4 or not 0.1 <= scale_y <= 4:
             raise ValueError("editor_transform scale is out of range")
-        return {"x": float(x), "y": float(y), "scale": float(scale)}
+        if "scale" in transform:
+            return {"x": float(x), "y": float(y), "scale": float(scale_x)}
+        return {"x": float(x), "y": float(y), "scale_x": float(scale_x), "scale_y": float(scale_y)}
 
     @staticmethod
     def _apply_editor_transform(plan, operation_id, cue_id, transform):
@@ -323,7 +329,10 @@ class ProtocolService:
                     if isinstance(item, dict) and item.get("id") == cue_id), None)
         if cue is None:
             raise ValueError("editor_transform cue does not exist")
-        if transform == {"x": 0.5, "y": 0.5, "scale": 1.0}:
+        if transform in (
+            {"x": 0.5, "y": 0.5, "scale": 1.0},
+            {"x": 0.5, "y": 0.5, "scale_x": 1.0, "scale_y": 1.0},
+        ):
             cue.pop("editor_transform", None)
         else:
             cue["editor_transform"] = transform

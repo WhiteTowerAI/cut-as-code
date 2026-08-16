@@ -8,6 +8,8 @@ import unittest
 from unittest import mock
 from pathlib import Path
 
+from PIL import Image
+
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
@@ -197,6 +199,34 @@ class EditorProtocolFreshnessTests(unittest.TestCase):
             {"x": 0.5, "y": 0.8, "scale": 1.0},
             {"x": 0.5, "y": 0.5, "scale": 1.0},
         ], projectlib._editor_transforms_for_contributions("captions", caption_plan, len(expanded)))
+
+    def test_graphic_motion_render_contribution_includes_union_alpha_bounds(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            frames = root / "work" / "frames"
+            frames.mkdir(parents=True)
+            first = Image.new("RGBA", (100, 80), (0, 0, 0, 0))
+            first.paste((255, 255, 255, 255), (20, 10, 50, 30))
+            first.save(frames / "frame_000001.png")
+            second = Image.new("RGBA", (100, 80), (0, 0, 0, 0))
+            second.paste((255, 255, 255, 255), (10, 20, 70, 60))
+            second.save(frames / "frame_000002.png")
+            cue = {
+                "render": {
+                    "asset_type": "image-sequence",
+                    "pattern": "frame_%06d.png",
+                    "start_number": 1,
+                    "frames": [
+                        {"path": "frames/frame_000001.png"},
+                        {"path": "frames/frame_000002.png"},
+                    ],
+                },
+            }
+
+            self.assertEqual(
+                {"x": 0.1, "y": 0.125, "width": 0.6, "height": 0.625},
+                projectlib.graphic_motion_content_bounds(cue, root),
+            )
 
     def test_validate_project_rejects_stale_dependency_by_default(self):
         project = self._project_with_stale_dependency()

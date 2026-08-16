@@ -1319,13 +1319,26 @@ test('real 42-sol Graphic Motion cue can be disabled, saved, and locally discard
   }
 })
 
-test('real 42-sol saves a transformed Graphic Motion layer without rendering and exports only on demand', async ({ page }) => {
+test('real project saves a transformed Graphic Motion layer without rendering and exports only on demand', async ({ page }) => {
   const sourceRoot = process.env.CAC_REAL_EDITOR_PROJECT
   test.skip(!sourceRoot || process.env.CAC_REAL_EXPORT_E2E !== '1', 'Set CAC_REAL_EDITOR_PROJECT and CAC_REAL_EXPORT_E2E=1')
   test.setTimeout(600_000)
-  const root = await mkdtemp(path.join(tmpdir(), 'cut-editor-real-export-'))
-  await cp(sourceRoot!, root, { recursive: true, preserveTimestamps: true })
+  const preisolated = process.env.CAC_REAL_EDITOR_PROJECT_ISOLATED === '1'
+  const root = preisolated ? sourceRoot! : await mkdtemp(path.join(tmpdir(), 'cut-editor-real-export-'))
+  const skippedCaches = new Set(['faster-whisper-medium-local', 'npm', 'python-deps'])
+  if (!preisolated) await cp(sourceRoot!, root, {
+    recursive: true,
+    preserveTimestamps: true,
+    filter: (source) => {
+      const relative = path.relative(sourceRoot!, source)
+      const parts = relative.split(path.sep)
+      return !(parts[0] === 'work' && parts[1] === 'cache' && skippedCaches.has(parts[2]))
+    },
+  })
   await refreshSourceFingerprint(root)
+  const motionPlan = JSON.parse(await readFile(path.join(root, 'work', 'graphic-motion', 'graphic-motion-plan.json'), 'utf8'))
+  const motionCue = motionPlan.cues.find((cue: { status?: string }) => cue.status === 'verified')
+  expect(motionCue).toBeTruthy()
   const finalPath = path.join(root, 'final', 'final-video.mp4')
   const beforeSave = {
     hash: await sha256File(finalPath),
@@ -1344,16 +1357,25 @@ test('real 42-sol saves a transformed Graphic Motion layer without rendering and
     const timelineSurface = page.locator('[data-timeline-surface]')
     const timelineSurfaceBox = await timelineSurface.boundingBox()
     expect(timelineSurfaceBox).not.toBeNull()
-    await timelineSurface.click({ position: { x: timelineSurfaceBox!.width * 2 / 167.973152, y: 40 } })
+    const projectManifest = JSON.parse(await readFile(path.join(root, 'work', 'project.json'), 'utf8'))
+    const timeline = JSON.parse(await readFile(path.join(root, 'work', 'timeline.json'), 'utf8'))
+    expect(projectManifest.project_id).toBeTruthy()
+    await timelineSurface.click({
+      position: {
+        x: timelineSurfaceBox!.width * (motionCue.program_range.start_s + 0.1) / timeline.program_duration_s,
+        y: 40,
+      },
+    })
     await page.getByRole('tab', { name: 'Graphic Motion' }).click()
-    await page.getByRole('button', { name: /THE REAL TONY STARK/ }).click()
+    await page.getByRole('button', { name: new RegExp(motionCue.intent.content.slice(0, 24), 'i') }).click()
 
     const layer = page.locator('[data-viewer-layer="graphic-motion"]')
     await expect(layer).toBeVisible()
     const initialTransform = await layer.evaluate((element) => ({
       x: Number(element.getAttribute('data-layer-x')),
       y: Number(element.getAttribute('data-layer-y')),
-      scale: Number(element.getAttribute('data-layer-scale')),
+      scale_x: Number(element.getAttribute('data-layer-scale-x')),
+      scale_y: Number(element.getAttribute('data-layer-scale-y')),
     }))
     const layerBox = await layer.boundingBox()
     expect(layerBox).not.toBeNull()
@@ -1362,7 +1384,7 @@ test('real 42-sol saves a transformed Graphic Motion layer without rendering and
     await page.mouse.move(layerBox!.x + layerBox!.width / 2 + 72, layerBox!.y + layerBox!.height / 2 + 36)
     await page.mouse.up()
 
-    const scaleHandle = page.getByRole('button', { name: 'Scale layer' })
+    const scaleHandle = layer.getByRole('button', { name: 'Resize east', exact: true })
     const scaleBox = await scaleHandle.boundingBox()
     expect(scaleBox).not.toBeNull()
     await page.mouse.move(scaleBox!.x + scaleBox!.width / 2, scaleBox!.y + scaleBox!.height / 2)
@@ -1373,11 +1395,13 @@ test('real 42-sol saves a transformed Graphic Motion layer without rendering and
     const editedTransform = await layer.evaluate((element) => ({
       x: Number(element.getAttribute('data-layer-x')),
       y: Number(element.getAttribute('data-layer-y')),
-      scale: Number(element.getAttribute('data-layer-scale')),
+      scale_x: Number(element.getAttribute('data-layer-scale-x')),
+      scale_y: Number(element.getAttribute('data-layer-scale-y')),
     }))
     expect(editedTransform.x).not.toBe(initialTransform.x)
     expect(editedTransform.y).not.toBe(initialTransform.y)
-    expect(editedTransform.scale).not.toBe(initialTransform.scale)
+    expect(editedTransform.scale_x).not.toBe(initialTransform.scale_x)
+    expect(editedTransform.scale_y).toBe(initialTransform.scale_y)
     expect(exportRequests).toBe(0)
 
     const transaction = page.waitForResponse((response) =>
@@ -1389,7 +1413,7 @@ test('real 42-sol saves a transformed Graphic Motion layer without rendering and
     expect(transactionResponse.status(), JSON.stringify({ transactionBody, editedTransform })).toBe(200)
     await expect.poll(async () => {
       const plan = JSON.parse(await readFile(path.join(root, 'work', 'graphic-motion', 'graphic-motion-plan.json'), 'utf8'))
-      return plan.cues[0].editor_transform
+      return plan.cues.find((cue: { id: string }) => cue.id === motionCue.id)?.editor_transform
     }).toEqual(editedTransform)
 
     const afterSaveStat = await stat(finalPath)
@@ -1431,7 +1455,7 @@ test('real 42-sol saves a transformed Graphic Motion layer without rendering and
   } finally {
     await page.close()
     await stopSidecar(isolated.process)
-    await rm(root, { recursive: true, force: true })
+    if (!preisolated) await rm(root, { recursive: true, force: true })
   }
 })
 

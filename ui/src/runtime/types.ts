@@ -72,11 +72,10 @@ export type RuntimeSnapshot = Readonly<{
   artifacts: readonly RuntimeFile[]
 }>
 
-export type RuntimeLayerTransform = Readonly<{
-  x: number
-  y: number
-  scale: number
-}>
+export type RuntimeLayerTransform = Readonly<
+  { x: number; y: number; scale: number; scale_x?: never; scale_y?: never }
+  | { x: number; y: number; scale?: never; scale_x: number; scale_y: number }
+>
 
 export type RuntimeLayer = Readonly<{
   id: string
@@ -94,6 +93,7 @@ export type RuntimeLayer = Readonly<{
     fps: Readonly<{ num: number; den: number }>
     frame_count: number
     frame_url_template?: string
+    content_bounds?: Readonly<{ x: number; y: number; width: number; height: number }>
   }>
 }>
 

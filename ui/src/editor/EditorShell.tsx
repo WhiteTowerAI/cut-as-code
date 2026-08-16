@@ -515,6 +515,9 @@ export function projectFromSnapshot(base: EditorProjectView | null, snapshot: Ru
         ...(layer.image_sequence.frame_url_template ? {
           frameUrlTemplate: layer.image_sequence.frame_url_template,
         } : {}),
+        ...(layer.image_sequence.content_bounds ? {
+          contentBounds: { ...layer.image_sequence.content_bounds },
+        } : {}),
       },
     } : {}),
   })) ?? []

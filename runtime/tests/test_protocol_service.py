@@ -316,6 +316,11 @@ class ProtocolServiceTests(unittest.TestCase):
         self.assertEqual((3, "verified"), (changed["revision"], changed["status"]))
         self.assertEqual("draft", captured["project"]["render"]["status"])
 
+    def test_graphic_motion_transform_supports_independent_axis_scaling(self):
+        transform = {"x": 0.3, "y": 0.7, "scale_x": 1.25, "scale_y": 0.75}
+
+        self.assertEqual(transform, self.service._validate_editor_transform(transform))
+
     def test_frozen_graphic_motion_recipe_uses_materialized_hashes_without_current_catalog_entry(self):
         target = self.root / "work/cache/graphic-motion/hyperframes/gm-001"
         target.mkdir(parents=True)

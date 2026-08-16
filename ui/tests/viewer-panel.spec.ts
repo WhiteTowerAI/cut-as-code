@@ -214,6 +214,7 @@ test('runtime Viewer composites source video, evidence, captions, cards, and Gra
           image_sequence: {
             pattern: 'frame_%06d.png', start_number: 1, fps: { num: 30, den: 1 }, frame_count: 90,
             frame_url_template: '/v1/projects/viewer-project/layers/layer_motion/frames/%d',
+            content_bounds: { x: 0.1, y: 0.2, width: 0.25, height: 0.3 },
           },
         },
       ],
@@ -244,6 +245,106 @@ test('runtime Viewer composites source video, evidence, captions, cards, and Gra
   )
   await expect(page.getByRole('region', { name: 'Current review artifacts' })).toBeVisible()
   await expect(canvas.locator('img[alt="gm-review.png"]')).toHaveCount(0)
+})
+
+test('Graphic Motion uses a content-fitted PowerPoint selection box with eight resize handles', async ({ page }) => {
+  const base = runtimeSnapshot()
+  const snapshot = runtimeSnapshot({
+    view: {
+      ...base.view,
+      operations: [{ id: 'graphic-motion', revision: 1, status: 'verified', etag: 'gm-r1' }],
+      graphic_motion_edit: {
+        cues: [{
+          id: 'gm-001', status: 'verified', enabled: true, content: 'Motion',
+          program_range: { start_s: 0, end_s: 3 }, transform: { x: 0.5, y: 0.5, scale: 1 },
+        }],
+      },
+      layers: [{
+        id: 'layer_motion', operation_id: 'graphic-motion', cue_id: 'gm-001',
+        kind: 'graphic-motion', media_type: 'image-sequence', z_index: 300,
+        program_range: { start_s: 0, end_s: 3 },
+        transform: { x: 0.5, y: 0.5, scale: 1 },
+        content: { text: 'Motion' },
+        image_sequence: {
+          pattern: 'frame_%06d.png', start_number: 1, fps: { num: 30, den: 1 }, frame_count: 90,
+          frame_url_template: '/v1/projects/viewer-project/layers/layer_motion/frames/%d',
+          content_bounds: { x: 0.1, y: 0.2, width: 0.25, height: 0.3 },
+        },
+      }],
+    },
+    resources: [
+      { id: 'res_project', kind: 'project', etag: 'project-r1', size: 1 },
+      { id: 'res_gm', kind: 'plan', etag: 'gm-plan-r1', size: 1, operation_id: 'graphic-motion' },
+    ],
+  })
+  await page.route('**/v1/projects/project_motion_handles/snapshot', (route) => route.fulfill({
+    contentType: 'application/json', body: JSON.stringify({ ok: true, snapshot }),
+  }))
+  await page.route('**/layers/layer_motion/frames/1', (route) => route.fulfill({
+    contentType: 'image/png', body: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAE/wH+Q6m9WQAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  }))
+  let transactionBody: Record<string, unknown> | undefined
+  await page.route('**/v1/projects/project_motion_handles/transactions', (route) => {
+    transactionBody = route.request().postDataJSON() as Record<string, unknown>
+    const savedSnapshot = {
+      ...snapshot,
+      snapshot_etag: 'snapshot-motion-saved',
+      view: {
+        ...snapshot.view,
+        project_revision: (snapshot.view.project_revision ?? 1) + 1,
+        operations: [{ id: 'graphic-motion', revision: 2, status: 'verified', etag: 'gm-r2' }],
+      },
+      resources: snapshot.resources.map((resource) => resource.operation_id === 'graphic-motion'
+        ? { ...resource, etag: 'gm-plan-r2' }
+        : resource),
+    }
+    return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, result: 'committed', snapshot: savedSnapshot }) })
+  })
+
+  await page.goto('/?project=project_motion_handles')
+
+  const layer = page.locator('[data-layer-id="layer_motion"]')
+  const canvas = page.locator('.viewer-canvas')
+  const [layerBox, canvasBox] = await Promise.all([layer.boundingBox(), canvas.boundingBox()])
+  expect(layerBox).not.toBeNull()
+  expect(canvasBox).not.toBeNull()
+  expect(layerBox!.width / canvasBox!.width).toBeCloseTo(0.25, 2)
+  expect(layerBox!.height / canvasBox!.height).toBeCloseTo(0.3, 2)
+
+  await layer.click({ position: { x: layerBox!.width / 2, y: layerBox!.height / 2 } })
+  await expect(layer).toHaveAttribute('data-layer-selected', 'true')
+  await expect(layer.getByRole('button', { name: /^Resize / })).toHaveCount(8)
+  for (const direction of ['north west', 'north', 'north east', 'east', 'south east', 'south', 'south west', 'west']) {
+    await expect(layer.getByRole('button', { name: `Resize ${direction}`, exact: true })).toBeVisible()
+  }
+  await expect(page.getByRole('button', { name: 'Scale layer' })).toHaveCount(0)
+
+  const east = layer.getByRole('button', { name: 'Resize east', exact: true })
+  const eastBox = await east.boundingBox()
+  expect(eastBox).not.toBeNull()
+  await page.mouse.move(eastBox!.x + eastBox!.width / 2, eastBox!.y + eastBox!.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(eastBox!.x + eastBox!.width / 2 + 40, eastBox!.y + eastBox!.height / 2)
+  await page.mouse.up()
+  await expect(layer).not.toHaveAttribute('data-layer-scale-x', '1')
+  await expect(layer).toHaveAttribute('data-layer-scale-y', '1')
+
+  await page.getByRole('button', { name: 'Save Changes' }).click()
+  await expect.poll(() => transactionBody).toBeTruthy()
+  expect(transactionBody).toMatchObject({
+    operation: 'graphic-motion',
+    review: {
+      schema_version: 1,
+      cue_id: 'gm-001',
+      editor_transform: {
+        x: expect.any(Number), y: expect.any(Number),
+        scale_x: expect.any(Number), scale_y: 1,
+      },
+    },
+  })
 })
 
 test('layer timing is half-open and Graphic Motion frame selection follows the program clock', () => {

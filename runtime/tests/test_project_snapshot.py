@@ -5,6 +5,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from PIL import Image
+
 
 RUNTIME_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RUNTIME_ROOT))
@@ -112,6 +114,18 @@ class ProjectSnapshotTests(unittest.TestCase):
             (root / "input").mkdir()
             for directory in ("captions", "content-cards", "graphic-motion"):
                 (root / "work" / directory).mkdir(parents=True, exist_ok=True)
+            motion_frames = root / "work" / "cache" / "graphic-motion" / "rendered" / "motion-001"
+            motion_frames.mkdir(parents=True)
+            first_frame = Image.new("RGBA", (1280, 720), (0, 0, 0, 0))
+            first_frame.paste((255, 255, 255, 255), (100, 200, 300, 400))
+            first_frame.save(motion_frames / "frame_000001.png")
+            second_frame = Image.new("RGBA", (1280, 720), (0, 0, 0, 0))
+            second_frame.paste((255, 255, 255, 255), (80, 180, 350, 420))
+            second_frame.save(motion_frames / "frame_000002.png")
+            frame_hashes = [
+                hashlib.sha256((motion_frames / name).read_bytes()).hexdigest()
+                for name in ("frame_000001.png", "frame_000002.png")
+            ]
             (root / "input" / "source.mp4").write_bytes(b"fixture")
             (root / "work" / "timeline.json").write_text(json.dumps({
                 "schema_version": 1,
@@ -165,8 +179,8 @@ class ProjectSnapshotTests(unittest.TestCase):
                         "start_s": 0,
                         "duration_s": 5,
                         "frames": [
-                            {"path": "work/cache/graphic-motion/rendered/motion-001/frame_000001.png", "sha256": "c" * 64},
-                            {"path": "work/cache/graphic-motion/rendered/motion-001/frame_000002.png", "sha256": "d" * 64},
+                            {"path": "work/cache/graphic-motion/rendered/motion-001/frame_000001.png", "sha256": frame_hashes[0]},
+                            {"path": "work/cache/graphic-motion/rendered/motion-001/frame_000002.png", "sha256": frame_hashes[1]},
                         ],
                     },
                     "editor_transform": {"x": 0.55, "y": 0.5, "scale": 1.1},
@@ -228,6 +242,12 @@ class ProjectSnapshotTests(unittest.TestCase):
                 "start_number": 1,
                 "fps": {"num": 30, "den": 1},
                 "frame_count": 2,
+                "content_bounds": {
+                    "x": 80 / 1280,
+                    "y": 180 / 720,
+                    "width": 270 / 1280,
+                    "height": 240 / 720,
+                },
             },
             motion["image_sequence"],
         )

@@ -80,6 +80,35 @@ class OverlayFrameBoundaryTests(unittest.TestCase):
         overlay = {"x": 0.5, "y": 0.5, "scale": 1.0}
         self.assertEqual((None, None), render_project._overlay_transform_filters(overlay))
 
+    def test_graphic_motion_crops_visible_bounds_before_nonuniform_scaling(self):
+        transform = {"x": 0.6, "y": 0.4, "scale_x": 1.5, "scale_y": 0.75}
+        bounds = {"x": 0.1, "y": 0.2, "width": 0.25, "height": 0.3}
+
+        filters, position = render_project._overlay_transform_filters(transform, bounds)
+
+        self.assertEqual(
+            "crop=iw*0.25:ih*0.3:iw*0.1:ih*0.2,scale=iw*1.5:ih*0.75",
+            filters,
+        )
+        self.assertEqual(
+            "x='main_w*0.6+(0.1-0.5)*main_w*1.5':"
+            "y='main_h*0.4+(0.2-0.5)*main_h*0.75'",
+            position,
+        )
+
+    def test_default_content_bound_transform_preserves_original_visible_position(self):
+        transform = {"x": 0.5, "y": 0.5, "scale_x": 1.0, "scale_y": 1.0}
+        bounds = {"x": 0.1, "y": 0.2, "width": 0.25, "height": 0.3}
+
+        self.assertEqual(
+            (
+                "crop=iw*0.25:ih*0.3:iw*0.1:ih*0.2",
+                "x='main_w*0.5+(0.1-0.5)*main_w*1':"
+                "y='main_h*0.5+(0.2-0.5)*main_h*1'",
+            ),
+            render_project._overlay_transform_filters(transform, bounds),
+        )
+
     def test_overlay_uses_exact_first_and_last_frame_on_rational_boundaries(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
