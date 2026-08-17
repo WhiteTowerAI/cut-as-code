@@ -937,6 +937,145 @@ def _inset_size(frame_size, style, anchor):
     return width, height
 
 
+def _pixel_risk(max_scale_factor):
+    if max_scale_factor <= 1.5:
+        return "low"
+    if max_scale_factor <= 3.0:
+        return "medium"
+    return "high"
+
+
+def _find_shot(document, shot_id):
+    return next((
+        item for item in document.get("shots", [])
+        if isinstance(item, dict) and item.get("shot_id") == shot_id
+    ), None)
+
+
+def _find_subshot(shot, subshot_id):
+    if not isinstance(shot, dict):
+        return None
+    return next((
+        item for item in shot.get("subshots", [])
+        if isinstance(item, dict) and item.get("id") == subshot_id
+    ), None)
+
+
+def _checkpoint_times(program_range, frame_duration, motion_risk_time_s=None):
+    start, end = _range(program_range) or (None, None)
+    if start is None:
+        raise ValueError("speaker pixel budget subshot range is invalid")
+    start_frame = _frame_index(start, frame_duration)
+    end_frame = _frame_index(end, frame_duration)
+    if start_frame is None or end_frame is None or end_frame <= start_frame:
+        raise ValueError("speaker pixel budget subshot range must align to timeline frames")
+    times = [
+        ("entry", _frame_time(start_frame, frame_duration)),
+        ("middle", _frame_time(start_frame + (end_frame - start_frame) // 2, frame_duration)),
+        ("exit", _frame_time(end_frame - 1, frame_duration)),
+    ]
+    if motion_risk_time_s is not None:
+        motion_frame = _frame_index(motion_risk_time_s, frame_duration)
+        if motion_frame is None:
+            raise ValueError("speaker pixel budget motion-risk time must align to timeline frames")
+        if not start_frame <= motion_frame < end_frame:
+            raise ValueError("speaker pixel budget motion-risk time must remain inside its subshot")
+        times.append(("motion_risk", _frame_time(motion_frame, frame_duration)))
+    return times
+
+
+def _cover_crop_facts(source_size, roi, output_size):
+    source_width, source_height = source_size
+    left = max(0, min(source_width - 1, math.floor(float(roi["x"]) * source_width)))
+    top = max(0, min(source_height - 1, math.floor(float(roi["y"]) * source_height)))
+    right = max(left + 1, min(
+        source_width, math.ceil((float(roi["x"]) + float(roi["width"])) * source_width),
+    ))
+    bottom = max(top + 1, min(
+        source_height, math.ceil((float(roi["y"]) + float(roi["height"])) * source_height),
+    ))
+    roi_width, roi_height = right - left, bottom - top
+    output_width, output_height = output_size
+    output_aspect = output_width / output_height
+    if roi_width / roi_height >= output_aspect:
+        crop_width, crop_height = roi_height * output_aspect, roi_height
+    else:
+        crop_width, crop_height = roi_width, roi_width / output_aspect
+    scale = output_width / crop_width
+    return {
+        "input_crop_px": {
+            "width": round(crop_width, 6),
+            "height": round(crop_height, 6),
+        },
+        "output_content_px": {"width": output_width, "height": output_height},
+        "scale_factor": round(scale, 6),
+    }
+
+
+def build_pixel_budget(plan, analysis, agent_input, preview, shot_id, subshot_id,
+                       *, motion_risk_time_s=None):
+    """Return final-size crop and scaling facts without making a display decision."""
+    analysis_shot = _find_shot(analysis, shot_id)
+    agent_shot = _find_shot(agent_input, shot_id)
+    preview_shot = _find_shot(preview, shot_id)
+    analysis_subshot = _find_subshot(analysis_shot, subshot_id)
+    agent_subshot = _find_subshot(agent_shot, subshot_id)
+    if not all(isinstance(value, dict) for value in (
+            analysis_shot, agent_shot, preview_shot, analysis_subshot, agent_subshot)):
+        raise ValueError("speaker pixel budget shot or subshot is missing")
+    if agent_subshot.get("speaker_status") != "confirmed":
+        raise ValueError("speaker pixel budget requires a confirmed speaker")
+    keyframes = agent_subshot.get("keyframes")
+    if not isinstance(keyframes, list) or not keyframes:
+        raise ValueError("speaker pixel budget requires ROI keyframes")
+    source_probe = analysis.get("review_video_probe")
+    output_probe = preview_shot.get("preview", {}).get("probe")
+    source_size = (
+        source_probe.get("width"), source_probe.get("height")
+    ) if isinstance(source_probe, dict) else (None, None)
+    frame_size = (
+        output_probe.get("width"), output_probe.get("height")
+    ) if isinstance(output_probe, dict) else (None, None)
+    if any(not isinstance(value, int) or isinstance(value, bool) or value <= 0
+           for value in (*source_size, *frame_size)):
+        raise ValueError("speaker pixel budget requires positive source and preview dimensions")
+    style = plan.get("speaker_inset_style")
+    anchor = agent_subshot.get("anchor")
+    if style_errors(style) or anchor not in ALLOWED_ANCHORS:
+        raise ValueError("speaker pixel budget style or anchor is invalid")
+    fps = analysis.get("timeline_fps")
+    num, den = _fps({"fps": fps})
+    frame_duration = den / num
+    inset_size = _inset_size(frame_size, style, anchor)
+    checkpoints = []
+    for role, time_s in _checkpoint_times(
+            analysis_subshot.get("program_range"), frame_duration,
+            motion_risk_time_s):
+        roi = interpolate_roi(
+            keyframes, time_s, analysis_subshot["program_range"],
+        )
+        facts = _cover_crop_facts(source_size, roi, inset_size)
+        checkpoints.append({
+            "role": role,
+            "program_time_s": time_s,
+            **facts,
+        })
+    maximum = max(item["scale_factor"] for item in checkpoints)
+    return {
+        "analysis_sha256": plan.get("speaker_inset", {}).get("analysis", {}).get("sha256"),
+        "agent_input_sha256": plan.get("speaker_inset", {}).get("agent_input", {}).get("sha256"),
+        "preview_sha256": plan.get("speaker_inset", {}).get("preview", {}).get("sha256"),
+        "selection_sha256": plan.get("selection", {}).get("sha256"),
+        "style_sha256": _canonical_sha256(style),
+        "review_video_sha256": plan.get("input_hashes", {}).get("review_video_sha256"),
+        "source_frame_px": {"width": source_size[0], "height": source_size[1]},
+        "output_inset_px": {"width": inset_size[0], "height": inset_size[1]},
+        "checkpoints": checkpoints,
+        "max_scale_factor": maximum,
+        "pixel_risk": _pixel_risk(maximum),
+    }
+
+
 def _apply_broll_treatment(base, preset):
     base = base.convert("RGB")
     if preset == "corner-pip":
@@ -1180,9 +1319,23 @@ def _close_process(process):
             stream.close()
 
 
+def _composite_encoder_command(width, height, num, den, part, *, encoder_args=None):
+    profile_args = encoder_args or [
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+    ]
+    return [
+        "ffmpeg", "-y", "-v", "error", "-f", "rawvideo", "-pix_fmt", "rgb24",
+        "-s", f"{width}x{height}", "-r", f"{num}/{den}", "-i", "-",
+        "-vf", "setsar=1",
+        "-an", "-sn", "-dn", "-map_metadata", "-1", "-write_tmcd", "0",
+        *profile_args, str(part),
+    ]
+
+
 def _render_composite_video(base_video, review_video, shot, analysis_shot, agent_input,
                             timeline, style, destination, *, preset,
-                            anchor_override=None, display_choices=None):
+                            anchor_override=None, display_choices=None,
+                            encoder_args=None):
     width, height = timeline["width"], timeline["height"]
     num, den = _fps(timeline)
     frame_duration = den / num
@@ -1208,14 +1361,12 @@ def _render_composite_video(base_video, review_video, shot, analysis_shot, agent
             "ffmpeg", "-v", "error", "-i", str(review_video),
             "-vf", speaker_filter, "-an", "-f", "rawvideo", "-pix_fmt", "rgb24", "-",
         ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        encoder = subprocess.Popen([
-            "ffmpeg", "-y", "-v", "error", "-f", "rawvideo", "-pix_fmt", "rgb24",
-            "-s", f"{width}x{height}", "-r", f"{num}/{den}", "-i", "-",
-            "-vf", "setsar=1",
-            "-an", "-sn", "-dn", "-map_metadata", "-1", "-write_tmcd", "0",
-            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-            str(part),
-        ], stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        encoder = subprocess.Popen(
+            _composite_encoder_command(
+                width, height, num, den, part, encoder_args=encoder_args,
+            ),
+            stdin=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
         agent_choices = _agent_subshots(agent_input)
         effective_choices = display_choices or agent_choices
         for index in range(frame_count):
@@ -1301,10 +1452,13 @@ def validate_review_video(plan, timeline, review_video, project_root):
 
 def render_delivery_composite(*, plan, shot, analysis, agent_input, preview, clearance,
                               timeline, style, base_video, review_video, destination,
-                              project_root):
+                              project_root, delivery_encoder_args=None):
     """Render one clearance-effective speaker composite for normalized delivery."""
     import broll_plan
     import normalize_broll
+
+    if delivery_encoder_args is None:
+        delivery_encoder_args = normalize_broll.delivery_encoder_args()
 
     root = Path(project_root).resolve()
     if not isinstance(plan, dict) or not isinstance(shot, dict):
@@ -1361,6 +1515,7 @@ def render_delivery_composite(*, plan, shot, analysis, agent_input, preview, cle
         base, video, shot, analysis_shot, agent_input,
         media_timeline, style, destination,
         preset=recommendation.get("preset"), display_choices=choices,
+        encoder_args=delivery_encoder_args,
     )
     output = Path(rendered["path"])
     probe = normalize_broll._probe(output)
@@ -1616,6 +1771,85 @@ def _continuity_expectation(analysis_subshots, clearance_subshots):
     return ("short_flash" if short_flash else "mode_change"), "intentional_transition"
 
 
+def _legibility_evidence_errors(item, analysis_subshot, plan, analysis,
+                                 agent_input, preview, shot_id):
+    label = item.get("id")
+    errors = []
+    rationale = item.get("legibility_rationale")
+    if not isinstance(rationale, str) or not rationale.strip():
+        errors.append(f"{label} legibility rationale is required")
+    checks = item.get("legibility_checks")
+    if not isinstance(checks, list):
+        return errors + [f"{label} legibility_checks must be a list"]
+    roles = [check.get("role") for check in checks if isinstance(check, dict)]
+    if roles != ["entry", "middle", "exit", "motion_risk"]:
+        errors.append(
+            f"{label} legibility_checks must contain entry, middle, exit, and motion_risk in order"
+        )
+        return errors
+    try:
+        num, den = _fps({"fps": analysis.get("timeline_fps")})
+        frame_duration = den / num
+        expected_times = dict(_checkpoint_times(
+            analysis_subshot.get("program_range"), frame_duration,
+        ))
+    except ValueError as exc:
+        return errors + [f"{label} {exc}"]
+    preview_sha256 = plan.get("speaker_inset", {}).get("preview", {}).get("sha256")
+    subshot_range = _range(analysis_subshot.get("program_range"))
+    motion_risk_time_s = None
+    for check in checks:
+        role = check["role"]
+        if check.get("preview_sha256") != preview_sha256:
+            errors.append(f"{label} {role} must bind the exact preview SHA-256")
+        if role != "motion_risk":
+            time_s = check.get("program_time_s")
+            if _frame_index(time_s, frame_duration) is None:
+                errors.append(f"{label} {role} program_time_s must align to timeline frames")
+            elif abs(float(time_s) - expected_times[role]) > RANGE_EPSILON:
+                errors.append(f"{label} {role} program_time_s must use the canonical checkpoint frame")
+            if (not isinstance(check.get("observation"), str)
+                    or not check["observation"].strip()):
+                errors.append(f"{label} {role} observation is required")
+            continue
+        status = check.get("status")
+        reason = check.get("reason")
+        if not isinstance(reason, str) or not reason.strip():
+            errors.append(f"{label} motion-risk reason is required")
+        if status == "not_applicable":
+            if "program_time_s" in check or "observation" in check:
+                errors.append(
+                    f"{label} not_applicable motion-risk must not include a time or observation"
+                )
+        elif status == "checked":
+            motion_risk_time_s = check.get("program_time_s")
+            motion_frame = _frame_index(motion_risk_time_s, frame_duration)
+            if motion_frame is None:
+                errors.append(
+                    f"{label} motion-risk program_time_s must align to timeline frames"
+                )
+            elif not subshot_range[0] <= float(motion_risk_time_s) < subshot_range[1]:
+                errors.append(
+                    f"{label} motion-risk program_time_s must remain inside its subshot"
+                )
+            if (not isinstance(check.get("observation"), str)
+                    or not check["observation"].strip()):
+                errors.append(f"{label} motion-risk observation is required")
+        else:
+            errors.append(f"{label} motion-risk status must be checked or not_applicable")
+    try:
+        expected_budget = build_pixel_budget(
+            plan, analysis, agent_input, preview, shot_id, label,
+            motion_risk_time_s=motion_risk_time_s,
+        )
+    except ValueError as exc:
+        errors.append(f"{label} pixel budget cannot be computed: {exc}")
+    else:
+        if item.get("pixel_budget") != expected_budget:
+            errors.append(f"{label} pixel_budget does not match final-size crop facts")
+    return errors
+
+
 def clearance_errors(clearance, preview, agent_input, analysis, plan):
     """Validate Agent clearance against exact composited anchor previews."""
     if not isinstance(clearance, dict):
@@ -1712,13 +1946,6 @@ def clearance_errors(clearance, preview, agent_input, analysis, plan):
             rationale = item.get("rationale")
             if not isinstance(rationale, str) or not rationale.strip():
                 errors.append(f"{label} clearance rationale is required")
-            expected_legibility = (
-                "pass" if item.get("display_mode") == "enabled" else "not_applicable"
-            )
-            if item.get("subject_legibility") != expected_legibility:
-                errors.append(
-                    f"{label} subject_legibility must be {expected_legibility}"
-                )
             checked = item.get("checked_anchors")
             if (not isinstance(checked, list) or len(checked) != len(set(checked))
                     or any(anchor not in allowed for anchor in checked)):
@@ -1731,7 +1958,18 @@ def clearance_errors(clearance, preview, agent_input, analysis, plan):
                         or item.get("clearance_status") != "pass"
                         or checked != []):
                     errors.append(f"{label} non-confirmed speaker clearance must remain pure_broll")
+                if item.get("subject_legibility") != "not_applicable":
+                    errors.append(
+                        f"{label} non-confirmed speaker subject_legibility must be not_applicable"
+                    )
+                for field in ("pixel_budget", "legibility_checks", "legibility_rationale"):
+                    if field in item:
+                        errors.append(f"{label} non-confirmed speaker must not include {field}")
                 continue
+            errors.extend(_legibility_evidence_errors(
+                item, analysis_subshots[label], plan, analysis,
+                agent_input, preview, shot_id,
+            ))
             status = item.get("clearance_status")
             if status == "pass":
                 anchor = item.get("anchor")
@@ -1741,14 +1979,41 @@ def clearance_errors(clearance, preview, agent_input, analysis, plan):
                         or anchor not in checked
                         or anchor not in available):
                     errors.append(f"{label} passing clearance must bind the enabled checked anchor")
+                if item.get("subject_legibility") != "pass":
+                    errors.append(
+                        f"{label} enabled speaker must pass subject legibility; "
+                        "subject_legibility must be pass"
+                    )
             elif status == "no_safe_position":
                 if (item.get("display_mode") != "pure_broll"
                         or item.get("anchor") is not None
                         or checked != allowed
                         or any(anchor not in available for anchor in allowed)):
                     errors.append(f"{label} no_safe_position must check all allowed anchors and use pure_broll")
+                if item.get("subject_legibility") != "not_applicable":
+                    errors.append(
+                        f"{label} no_safe_position subject_legibility must be not_applicable"
+                    )
+            elif status == "subject_illegible":
+                recommended = recommendation.get("anchor")
+                if (item.get("display_mode") != "pure_broll"
+                        or item.get("anchor") is not None
+                        or item.get("subject_legibility") != "fail"
+                        or recommended not in checked
+                        or recommended not in available):
+                    errors.append(
+                        f"{label} subject_illegible must use pure_broll, fail legibility, "
+                        "and bind the checked recommended preview"
+                    )
             else:
-                errors.append(f"{label} clearance_status must be pass or no_safe_position")
+                errors.append(
+                    f"{label} clearance_status must be pass, no_safe_position, or subject_illegible"
+                )
+            if (item.get("subject_legibility") == "fail"
+                    and status != "subject_illegible"):
+                errors.append(
+                    f"{label} subject_legibility fail requires subject_illegible"
+                )
     return errors
 
 
@@ -1827,7 +2092,11 @@ def normalized_composition_errors(plan, shot, *, agent_input=None):
             errors.append("speaker inset normalized composition layout_preset is stale")
         if composition.get("project_primary_preset") != strategy.get("primary_preset"):
             errors.append("speaker inset normalized composition project_primary_preset is stale")
-    if not isinstance(base, dict) or set(base) != {"path", "sha256", "probe"}:
+    valid_base_fields = (
+        {"path", "sha256", "probe"},
+        {"path", "sha256", "probe", "intermediate_profile"},
+    )
+    if not isinstance(base, dict) or set(base) not in valid_base_fields:
         errors.append("speaker inset normalized composition B-roll base is invalid")
     else:
         path = base.get("path")
@@ -1838,6 +2107,9 @@ def normalized_composition_errors(plan, shot, *, agent_input=None):
             errors.append("speaker inset normalized composition B-roll base SHA-256 is invalid")
         if not isinstance(base.get("probe"), dict):
             errors.append("speaker inset normalized composition B-roll base probe is invalid")
+        if ("intermediate_profile" in base
+                and not isinstance(base.get("intermediate_profile"), dict)):
+            errors.append("speaker inset normalized composition B-roll base profile is invalid")
     return errors
 
 

@@ -221,10 +221,25 @@
   three distinct documented shot needs and approval of the exact previews. Keep one preset and one
   anchor for the complete shot; never switch corners inside a shot.
 - Require `confirmed`, `ambiguous`, `absent`, or `occluded` for every subshot and a specific
-  rationale. Only confirmed tracks may enable the window. Every other status must use
-  `pure_broll`, no anchor, and no keyframes.
-- Keep confirmed ROI values finite, positive, inside the A-roll frame, strictly ordered, frame
-  aligned, and covering the complete subshot. Interpolate only within that subshot.
+  evidence-based rationale. A distant, full-body, side, back, or briefly turning speaker is not
+  automatically `occluded`. Use continuous frames, stage or lectern position, clothing outline,
+  motion continuity, and transcript timing to confirm identity. Use `occluded` only when the
+  person disappears or is fully blocked, `ambiguous` when identity remains uncertain after dense
+  supplemental evidence, and `absent` when no speaker is present. Never guess identity to increase
+  inset coverage.
+- Only confirmed tracks may enable the Agent-input window. Every other status must use
+  `pure_broll`, no anchor, and no keyframes. A confirmed Agent-input track must remain `enabled`
+  until exact previews exist; final-size quality fallback belongs to clearance, not identity
+  classification.
+- For every confirmed subshot, first create stable ROI keyframes that cover its full frame-aligned
+  range. The hard constraint at every keyframe and after cover crop, border, and rounded mask is a
+  complete head outline: top of head, visible forehead, chin or lower edge, and reasonable
+  headroom. Preserve a necessary gesture, upper body, lectern, or stage relationship only after
+  satisfying that constraint. If a tight crop cannot do both, expand to a stable speaking-region
+  ROI. Never crop the head to gain apparent sharpness or a larger subject.
+- Keep ROI values finite, positive, inside the A-roll frame, strictly ordered, frame aligned, and
+  covering the complete subshot. Interpolate only within that subshot and never across a scene or
+  timeline cut.
 - Fit each speaker ROI into the configured window with an aspect-preserving cover crop, centered
   horizontally and anchored to the top. Never resize speaker pixels non-uniformly. Preserve the
   complete head, forehead, face, chin, and visible headroom before lower-body coverage. If that
@@ -237,24 +252,48 @@
   speaker pixels toggle. Freeze the exact recommended composite, every supported anchor preview for
   that preset, and the single required low-confidence alternate. Agent clearance must inspect these
   composited pixels, not isolated A-roll and B-roll sources.
-- Record `subject_legibility: pass` for every enabled subshot only when its final-size pixels keep
-  the complete face and head inside the border and rounded mask with visible headroom. Tighten the
-  ROI and rebuild when the subject occupies too little of the window. Use
-  `not_applicable` for pure B-roll. When the user asks for a larger or smaller speaker, translate the
-  request into one explicit numeric `width_ratio`, state it, and invalidate every style-bound
-  artifact and approval before rebuilding. Do not silently change one shot.
+- For every confirmed subshot, call `build_pixel_budget()` against the current analysis, Agent
+  input, and exact preview. Preserve source crop pixels, output inset pixels, each scale factor,
+  maximum scale, and the selection, analysis, Agent-input, preview, style, and review-video hashes.
+  Label the maximum scale `low` at `<=1.5x`, `medium` above `1.5x` through `3.0x`, and `high` above
+  `3.0x`. This label is a warning that increases scrutiny; it never changes `display_mode`.
+- Inspect final-size pixels at the canonical entry, middle, and exit frames. Also choose the
+  frame-aligned in-subshot point where subject motion, turning, gesture, or camera motion presents
+  the greatest extra risk, with a non-empty selection reason and observation. If no extra point
+  exists, record `motion_risk: not_applicable` with a reason. Bind every legibility check directly
+  to the current exact preview SHA-256. Do not substitute original A-roll stills.
+- Record `subject_legibility: pass` only when a normal viewer can immediately recognize an active
+  speaker at final size: the complete head survives border and mask, the silhouette separates from
+  the background, at least one of gesture/lectern/stage relationship is readable, tracking remains
+  stable, and scaling does not cause sustained severe blocking, smear, or silhouette fusion. Facial
+  detail is not required and distance alone is not failure.
+- Use the clearance matrix strictly: confirmed + enabled + pass requires `clearance_status: pass`;
+  confirmed + pure B-roll + `not_applicable` requires `no_safe_position` and every allowed anchor;
+  confirmed + pure B-roll + fail requires `subject_illegible`, no final anchor, a specific
+  legibility rationale, retained ROI/keyframes, pixel budget, and preview-bound checks. A
+  non-confirmed speaker remains pure B-roll with `not_applicable` and clearance `pass`. Reject
+  enabled+fail and any fail disguised as `pass` or `no_safe_position`.
+- Treat one or two blurred turning/motion frames as observations, not automatic failure. When only
+  a sustained later portion is unreadable, split at a legal frame boundary and fall back only for
+  that subshot. Use `subject_illegible` only when the complete subshot remains unreadable after the
+  stable-region ROI attempt.
+- When the user asks for a larger or smaller speaker, translate the request into one explicit
+  numeric `width_ratio`, state it, and invalidate every style-bound artifact and approval before
+  rebuilding. Do not silently change one shot.
 - Record one continuity assessment per shot. Derive `short_flash` when an enabled run is shorter
   than 1.5 seconds and is followed by a longer pure-B-roll run. Resolve it by independently
   confirming and extending the later subshot, disabling the whole shot inset, or explicitly
   justifying an intentional transition. Do not use a fade or a guessed identity to mask it.
 - `pass` binds the recommended enabled anchor actually checked. `no_safe_position` must list every
-  anchor and resolve the subshot to `pure_broll`; never shrink the project style, cover focal B-roll
-  content, replace the selected B-roll, or invent a fallback speaker image.
+  anchor and resolve the subshot to `pure_broll`; `subject_illegible` must bind the checked
+  recommended final-size preview. Never shrink the project style, cover focal B-roll content,
+  replace the selected B-roll, crop a complete head, or invent a fallback speaker image.
 - The second immutable page must show temporal evidence, ROI keyframes, project strategy,
   recommendation rationale, three assessments, exact recommended composite, supported anchor
-  previews, optional alternate, common style, and clearance reasoning. Keep the locked B-roll as
-  read-only, default-collapsed context. Do not expose candidate selection, skip, timing, segment,
-  or speed controls, and do not emit candidate `shots` in the composite receipt. Approval requires
+  previews, optional alternate, common style, merged speaker/final display status, pixel budget and
+  risk, all four legibility checks, and clearance reasoning. Keep the locked B-roll as read-only,
+  default-collapsed context. Do not expose candidate selection, skip, timing, segment, or speed
+  controls, and do not emit candidate `shots` in the composite receipt. Approval requires
   `approval_scope: "speaker-inset-composite"`, `review_stage: composite`, and current selection,
   analysis, Agent input, preview, clearance, and style hashes. It approves only ROI, layout,
   clearance, continuity, style, and exact composite pixels.
@@ -262,8 +301,10 @@
   speaker artifacts are rebuilt while preserving the first ordinary or speaker-inset route. A
   composite-only revision creates a new composite UUID page while
   preserving `selection_sha256`; it cannot change candidate IDs, order, timing, source ranges, or
-  speed. Derive the durable candidate decision manifest from the approved selection after composite
-  approval.
+  speed. Rebuild preview, clearance, and the composite page; rebuild analysis or Agent input only
+  when requested evidence or ROI judgment actually changes. If the request changes a candidate,
+  timing, segment order, or speed, return to the candidate-revision flow. Derive the durable
+  candidate decision manifest from the approved selection after composite approval.
 - After composite approval, normalize a reusable pure B-roll base and precompose the preset
   treatment plus clearance-effective speaker pixels into the one existing per-shot overlay. Bind
   selection, analysis, Agent input, preview, clearance, style, review video, and composite review
@@ -307,14 +348,28 @@
   `effective_duration = source_duration / playback_rate`, and
   `program_duration = program_end - program_start` to differ by no more than one frame derived from
   `timeline.fps.den / timeline.fps.num` for every segment.
-- Normalize each source range independently with its reviewed rate, probe and fully decode it, and
-  bind its source hash, exact parameters, output hash, probe, and three durations. Hard-cut the
-  validated silent segments in program order, then probe and fully decode the concat before atomically
-  publishing the shot overlay. Do not add transitions, loop, repeat, silently truncate, auto-change
-  speed, delete a segment, or select fallback media.
-- On rerun, reuse a component only when its sidecar, source hash, parameters, normalized hash, probe,
-  and full decode still match. Keep an existing published shot overlay when a later component or
-  concat fails and remove only incomplete `.part` outputs.
+- Render every canonical one-to-three-segment video selection directly from its frozen original
+  candidates in one FFmpeg filtergraph and one encoder call. Apply each segment's reviewed source
+  trim, playback rate, scale/crop, SAR, rational FPS, exact program-frame allocation, and optional
+  LUT in its own chain, then hard-concat two or three chains in program order; map a single chain
+  directly. Bind each candidate ID, source path and SHA-256, source/program range, playback rate,
+  optional grade hashes, final asset hash, and probe. Never create, read, or recover per-segment
+  normalized MP4 files or sidecars. Do not add transitions, loop, repeat, silently truncate,
+  auto-change speed, delete a segment, or select fallback media.
+- Encode every new ordinary overlay, speaker B-roll base, and delivery speaker composite with the
+  exact versioned profile: MP4, libx264/H.264, CRF 18, preset medium, yuv420p, `+faststart`, and no
+  audio. Command tests and the durable profile prove CRF and preset; FFprobe proves only the
+  observable container, codec, pixel format, streams, geometry, FPS, and duration. Keep candidate,
+  context, and anchor previews, boundary reels, and the shared final renderer on their existing
+  encoding paths.
+- Write each current-shot asset to a same-directory `.part.mp4`; publish it with `os.replace` only
+  after probe, full decode, geometry, FPS, duration, silence, and SHA-256 checks. Write the canonical
+  plan through its own `.part.json` and do not describe the two files as one transaction. On any
+  failure, keep the current shot `selected`, remove this attempt's parts and newly generated assets
+  not referenced by the canonical plan, and preserve every previously completed shot, record,
+  asset byte, and hash. Retry the entire current shot from the original candidates.
+- Validate existing component-based records against their recorded component facts as legacy
+  read-only evidence. Do not add the new profile to them or report them as source-direct.
 - Read legacy `selected.candidate_id + source_trim` without rewriting the file. Record both a long
   legacy requested trim and its effective source range so old normalized output remains recoverable;
   reject a legacy trim that cannot cover the program duration. Never emit an ambiguous legacy trim

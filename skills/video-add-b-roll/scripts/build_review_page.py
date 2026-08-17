@@ -281,6 +281,11 @@ def _composite_payload(plan, root, assets_dir):
                 "clearance_status": clearance_subshot["clearance_status"],
                 "checked_anchors": copy.deepcopy(clearance_subshot["checked_anchors"]),
                 "subject_legibility": clearance_subshot["subject_legibility"],
+                "legibility_rationale": clearance_subshot.get("legibility_rationale"),
+                "pixel_budget": copy.deepcopy(clearance_subshot.get("pixel_budget")),
+                "legibility_checks": copy.deepcopy(
+                    clearance_subshot.get("legibility_checks", [])
+                ),
                 "clearance_rationale": clearance_subshot["rationale"],
                 "evidence_frames": evidence_frames,
             })
