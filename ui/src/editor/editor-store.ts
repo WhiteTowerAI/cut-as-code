@@ -32,6 +32,31 @@ export type OperationDraft = Readonly<{
   error?: string
 }>
 
+export type ActivityLogEntry = Readonly<{
+  id: number
+  timestamp: string
+  category: 'save' | 'export'
+  status: 'running' | 'succeeded' | 'failed'
+  message: string
+  operationId?: string
+  detail?: string
+}>
+
+export type ExportBlocker = Readonly<{
+  operationId: string
+  state: 'unsaved' | 'saving' | 'conflict' | 'error'
+}>
+
+function sanitizeActivityDetail(detail: string | undefined) {
+  const summary = detail?.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).at(-1)
+  if (!summary) return undefined
+  return summary
+    .replace(/[A-Za-z]:(?:\\\\|\\)[^'"\r\n]+/g, '[local path]')
+    .replace(/[A-Za-z]:\\(?:[^\\\s:]+\\)*[^\\\s:]*/g, '[local path]')
+    .replace(/\/(?:[^/\s:]+\/)+[^/\s:]*/g, '[local path]')
+    .slice(0, 500)
+}
+
 const contentCardLayouts: readonly ContentCardLayout[] = ['lower-third', 'quote', 'statistic', 'default', 'metric-spotlight', 'bar-chart', 'pie-chart', 'line-chart', 'side-by-side', 'parallel-columns']
 const contentCardPlacements: readonly ContentCardPlacement[] = [
   'top-left',
@@ -170,6 +195,7 @@ export type EditorState = {
   snapEnabled: boolean
   openMenu: MenuId
   operationDrafts: Readonly<Record<string, OperationDraft | undefined>>
+  activityLog: readonly ActivityLogEntry[]
   setProject: (project: EditorProjectView | null) => void
   seek: (timeS: number) => void
   setPlaying: (isPlaying: boolean) => void
@@ -185,6 +211,9 @@ export type EditorState = {
   getOperationDraft: (operationId: string) => OperationDraft | null
   canSaveOperation: (operationId: string) => boolean
   hasUnsavedChanges: () => boolean
+  exportBlockers: () => readonly ExportBlocker[]
+  addActivity: (entry: Omit<ActivityLogEntry, 'id' | 'timestamp'>) => void
+  clearActivityLog: () => void
   canApproveOperation: (operationId: string) => boolean
 }
 
@@ -214,14 +243,29 @@ export type EditorInitialState = Omit<
   | 'getOperationDraft'
   | 'canSaveOperation'
   | 'hasUnsavedChanges'
+  | 'exportBlockers'
+  | 'addActivity'
+  | 'clearActivityLog'
   | 'canApproveOperation'
   | 'operationDrafts'
+  | 'activityLog'
 >
 
 export function createEditorStore(initialState: EditorInitialState, runtime?: EditorRuntimeAdapter) {
+  let nextActivityId = 1
   return createStore<EditorState>()((set, get) => ({
     ...initialState,
     operationDrafts: {},
+    activityLog: [],
+    addActivity: (entry) => set((state) => ({
+      activityLog: [...state.activityLog, {
+        ...entry,
+        detail: sanitizeActivityDetail(entry.detail),
+        id: nextActivityId++,
+        timestamp: new Date().toISOString(),
+      }].slice(-100),
+    })),
+    clearActivityLog: () => set({ activityLog: [] }),
     setProject: (project) => {
       const operationDrafts = { ...get().operationDrafts }
       for (const [operationId, draft] of Object.entries(operationDrafts)) {
@@ -291,6 +335,7 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
       if (runtime) {
         const requestId = (draft.requestId ?? 0) + 1
         const submittedChanges = [...draft.changes]
+        get().addActivity({ category: 'save', status: 'running', operationId, message: 'Save started' })
         set({ operationDrafts: {
           ...get().operationDrafts,
           [operationId]: { ...draft, requestId, pending: true, error: undefined },
@@ -316,6 +361,7 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
             const { [operationId]: _saved, ...operationDrafts } = get().operationDrafts
             set({ project, operationDrafts })
           }
+          get().addActivity({ category: 'save', status: 'succeeded', operationId, message: 'Save completed' })
         } catch (error) {
           const current = get().operationDrafts[operationId]
           if (current?.requestId !== requestId) return
@@ -330,6 +376,10 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
               [operationId]: { ...current, pending: false, error: error instanceof Error ? error.message : 'Save failed' },
             } })
           }
+          get().addActivity({
+            category: 'save', status: 'failed', operationId, message: 'Save failed',
+            detail: error instanceof Error ? error.message : 'Unknown save error',
+          })
         }
         return
       }
@@ -412,6 +462,14 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
       return Boolean(draft?.dirty && !draft.conflict && !draft.pending)
     },
     hasUnsavedChanges: () => Object.values(get().operationDrafts).some((draft) => draft?.dirty || draft?.pending),
+    exportBlockers: () => Object.entries(get().operationDrafts).flatMap(([operationId, draft]) => {
+      if (!draft || (!draft.dirty && !draft.pending)) return []
+      const state: ExportBlocker['state'] = draft.pending ? 'saving'
+        : draft.conflict ? 'conflict'
+          : draft.error ? 'error'
+            : 'unsaved'
+      return [{ operationId, state }]
+    }),
     canApproveOperation: (operationId) => {
       const state = get()
       return canRecordReviewDecision(state.project, operationId, state.operationDrafts[operationId])

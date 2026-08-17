@@ -206,6 +206,50 @@ test('one save preserves and submits edits for multiple cues in the same operati
   expect(store.getState().hasUnsavedChanges()).toBe(false)
 })
 
+test('activity log records save lifecycle without draft content', async () => {
+  let resolveSave!: (project: EditorProjectView) => void
+  const store = createEditorStore({
+    project, activeTab: 'captions', selection: { kind: 'caption', id: 'cue-001' }, currentTimeS: 0,
+    isPlaying: false, timelineZoom: 1, snapEnabled: true, openMenu: null,
+  }, {
+    save: async () => await new Promise((resolve) => { resolveSave = resolve }),
+    review: async () => project,
+  })
+  store.getState().editOperationDraft('captions', { cueId: 'cue-001', text: 'private caption text' })
+
+  const saving = store.getState().saveOperationDraft('captions')
+  expect(store.getState().activityLog.at(-1)).toMatchObject({ category: 'save', status: 'running', operationId: 'captions' })
+  expect(JSON.stringify(store.getState().activityLog)).not.toContain('private caption text')
+  resolveSave(project)
+  await saving
+
+  expect(store.getState().activityLog.at(-1)).toMatchObject({ category: 'save', status: 'succeeded', operationId: 'captions' })
+})
+
+test('activity log sanitizes local paths and multiline private content', () => {
+  const store = createStateStore()
+
+  store.getState().addActivity({
+    category: 'save', status: 'failed', operationId: 'captions', message: 'Save failed',
+    detail: "Traceback\nPermissionError: 'D:\\\\Projects\\\\46-sol\\\\work\\\\captions.json'",
+  })
+
+  expect(store.getState().activityLog.at(-1)?.detail).toContain('PermissionError')
+  expect(JSON.stringify(store.getState().activityLog)).not.toContain('Projects')
+  expect(JSON.stringify(store.getState().activityLog)).not.toContain('46-sol')
+})
+
+test('export blocker names every operation and blocking draft state', () => {
+  const store = createStateStore()
+  store.getState().editOperationDraft('captions', { cueId: 'cue-001', text: 'Changed' })
+  store.getState().editOperationDraft('content-cards', { cueId: 'card-001', copy: 'Changed' })
+
+  expect(store.getState().exportBlockers()).toEqual([
+    { operationId: 'captions', state: 'unsaved' },
+    { operationId: 'content-cards', state: 'unsaved' },
+  ])
+})
+
 test('layer transform drafts use value equality and reject out-of-range values', () => {
   const store = createStateStore()
   store.getState().setProject({

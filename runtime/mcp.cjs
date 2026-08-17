@@ -14,14 +14,18 @@ const startingSidecars = new Map()
 
 const TOOL = Object.freeze({
   name: 'open_editor',
-  description: 'Open one explicit local Cut as Code project in the localhost editor.',
+  description: 'Open one explicit local Cut as Code project in the system default browser.',
   inputSchema: {
     type: 'object',
     additionalProperties: false,
     required: ['project_root'],
     properties: {
       project_root: { type: 'string', minLength: 1 },
-      open_browser: { type: 'boolean' },
+      open_browser: {
+        type: 'boolean',
+        default: true,
+        description: 'Open the editor in the system default browser. Set false only for automation.',
+      },
     },
   },
 })

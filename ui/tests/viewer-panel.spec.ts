@@ -232,6 +232,42 @@ test('export status restores completed output details and exposes file actions',
   expect(actions).toEqual(['open', 'reveal'])
 })
 
+test('activity log explains export blockers and records export failure details', async ({ page }) => {
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+  await page.route('**/v1/projects/project_activity/snapshot', (route) => route.fulfill({
+    contentType: 'application/json', body: JSON.stringify({ ok: true, snapshot: runtimeSnapshot() }),
+  }))
+  await page.route('**/v1/projects/project_activity/exports', (route) => route.fulfill({
+    status: 202, contentType: 'application/json', body: JSON.stringify({
+      ok: true, job: { id: 'export_activity', status: 'running', startedAt: '2026-08-17T06:00:00.000Z' },
+    }),
+  }))
+  let statusPolls = 0
+  await page.route('**/v1/projects/project_activity/exports/status', (route) => {
+    statusPolls += 1
+    return route.fulfill({ contentType: 'application/json', body: JSON.stringify({
+      ok: true,
+      job: statusPolls === 1 ? { status: 'idle' } : {
+        id: 'export_activity', status: 'failed', startedAt: '2026-08-17T06:00:00.000Z',
+        finishedAt: '2026-08-17T06:00:01.000Z', error: 'ffmpeg exited with code 1',
+      },
+    }) })
+  })
+
+  await page.goto('/?project=project_activity')
+  await page.getByRole('button', { name: 'Export Video' }).click()
+  await expect(page.getByRole('button', { name: 'Retry Export' })).toBeVisible()
+  await page.getByRole('button', { name: 'Activity Log' }).click()
+  const log = page.getByRole('region', { name: 'Activity Log' })
+  await expect(log).toContainText('Export started')
+  await expect(log).toContainText('ffmpeg exited with code 1')
+  await expect(log).not.toContainText('D:\\')
+  const copyLog = log.getByRole('button', { name: 'Copy log' })
+  await expect(copyLog).toBeVisible()
+  await copyLog.click()
+  await expect(copyLog).toHaveText('Copied')
+})
+
 test('runtime Viewer uses real sequence geometry, contain fit, read-only aspect, and fullscreen', async ({ page }) => {
   await page.route('**/v1/projects/project_geometry/snapshot', (route) => route.fulfill({
     contentType: 'application/json',
@@ -608,7 +644,8 @@ test('dragging and scaling a Viewer layer stays local until Save Changes and nev
   await expect(layer).toHaveAttribute('data-layer-selected', 'true')
   await expect(layer).not.toHaveAttribute('data-layer-x', '0.25')
   await expect(page.getByRole('button', { name: 'Export Video' })).toBeDisabled()
-  await expect(page.getByRole('button', { name: 'Export Video' })).toHaveAttribute('title', 'Save all changes before exporting')
+  await expect(page.getByRole('status', { name: 'Export blockers' })).toHaveText('Export blocked: content-cards: unsaved')
+  await expect(page.getByRole('button', { name: 'Export Video' })).toHaveAttribute('title', 'Export blocked — content-cards: unsaved')
 
   const scaleHandle = page.getByRole('button', { name: 'Scale layer' })
   const scaleBox = await scaleHandle.boundingBox()

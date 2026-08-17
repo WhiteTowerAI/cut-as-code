@@ -148,6 +148,7 @@ process.stdout.write(JSON.stringify({
   falseValue: shouldOpenBrowser(false),
   trueValue: shouldOpenBrowser(true),
   invalidValue: (() => { try { shouldOpenBrowser('false'); return null; } catch (error) { return error.message; } })(),
+  description: TOOL.description,
   inputSchema: TOOL.inputSchema,
   calls,
 }));
@@ -165,7 +166,15 @@ process.stdout.write(JSON.stringify({
         self.assertFalse(audit["falseValue"])
         self.assertTrue(audit["trueValue"])
         self.assertEqual(audit["invalidValue"], "open_browser must be a boolean")
-        self.assertEqual(audit["inputSchema"]["properties"]["open_browser"], {"type": "boolean"})
+        self.assertEqual(
+            audit["description"],
+            "Open one explicit local Cut as Code project in the system default browser.",
+        )
+        self.assertEqual(audit["inputSchema"]["properties"]["open_browser"], {
+            "type": "boolean",
+            "default": True,
+            "description": "Open the editor in the system default browser. Set false only for automation.",
+        })
         self.assertEqual(audit["calls"], [{
             "command": "rundll32.exe",
             "args": ["url.dll,FileProtocolHandler", "http://127.0.0.1:43123/?project=project_a&launch=token-value"],
@@ -239,6 +248,22 @@ openExportPath('D:\\Projects\\46-sol\\final\\final-video.mp4', 'open', spawnProc
             timeout=20,
         )
         self.assertEqual(result.stdout, "explorer unavailable")
+
+    def test_export_failure_summary_removes_absolute_paths(self) -> None:
+        script = r"""
+const { summarizeExportFailure } = require(process.argv[1]);
+process.stdout.write(summarizeExportFailure(
+  "Traceback\nPermissionError: [WinError 5]: 'D:\\\\Projects\\\\46-sol\\\\final\\\\staging.mp4' -> 'D:\\\\Projects\\\\46-sol\\\\final\\\\final.mp4'",
+  'D:\\Projects\\46-sol'
+));
+"""
+        result = subprocess.run(
+            ["node", "-e", script, str(REPOSITORY_ROOT / "runtime" / "sidecar.cjs")],
+            check=True, capture_output=True, text=True, encoding="utf-8", timeout=20,
+        )
+        self.assertIn("PermissionError: [WinError 5]", result.stdout)
+        self.assertNotIn("Projects", result.stdout)
+        self.assertNotIn("46-sol", result.stdout)
 
     def test_invalid_open_browser_is_a_correlated_invalid_params_error(self) -> None:
         with tempfile.TemporaryDirectory(prefix="cut invalid browser flag ") as temporary:

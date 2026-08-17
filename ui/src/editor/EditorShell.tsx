@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentType } from 'react'
+import { useEffect, useMemo, useState, type ComponentType } from 'react'
 import { useStore } from 'zustand'
 import {
   ArrowDownToLine,
@@ -110,7 +110,20 @@ function Workspace({
   const [exportError, setExportError] = useState<string | null>(null)
   const [exportConnectionError, setExportConnectionError] = useState<string | null>(null)
   const [exportNow, setExportNow] = useState(() => Date.now())
-  const hasUnsavedChanges = useStore(store, (state) => state.hasUnsavedChanges())
+  const [activityOpen, setActivityOpen] = useState(false)
+  const [activityCopied, setActivityCopied] = useState(false)
+  const activityLog = useStore(store, (state) => state.activityLog)
+  const operationDrafts = useStore(store, (state) => state.operationDrafts)
+  const exportBlockers = useMemo(() => Object.entries(operationDrafts).flatMap(([operationId, draft]) => {
+    if (!draft || (!draft.dirty && !draft.pending)) return []
+    return [{
+      operationId,
+      state: draft.pending ? 'saving' : draft.conflict ? 'conflict' : draft.error ? 'error' : 'unsaved',
+    } as const]
+  }), [operationDrafts])
+  const clearActivityLog = useStore(store, (state) => state.clearActivityLog)
+  const addActivity = useStore(store, (state) => state.addActivity)
+  const hasUnsavedChanges = exportBlockers.length > 0
   const activeOperation = useStore(store, (state) => {
     const selectedOperationId = state.selection?.kind === 'card' ? 'content-cards'
       : state.selection?.kind === 'caption' ? 'captions'
@@ -150,6 +163,11 @@ function Workspace({
         if (active) {
           setExportConnectionError(null)
           setExportJob(next)
+          if (next.status === 'succeeded') {
+            addActivity({ category: 'export', status: 'succeeded', message: 'Export completed' })
+          } else if (next.status === 'failed') {
+            addActivity({ category: 'export', status: 'failed', message: 'Export failed', detail: next.error })
+          }
         }
       } catch (error) {
         if (!active) return
@@ -160,18 +178,35 @@ function Workspace({
       active = false
       window.clearTimeout(timer)
     }
-  }, [exportJob, runtime])
+  }, [addActivity, exportJob, runtime])
 
   const startExport = async () => {
     if (!runtime || exportJob.status === 'running') return
     setExportError(null)
     setExportConnectionError(null)
+    addActivity({ category: 'export', status: 'running', message: 'Export started' })
     try {
       setExportJob(await runtime.client.startExport())
     } catch (error) {
-      setExportError(error instanceof Error ? error.message : 'Video export failed')
+      const detail = error instanceof Error ? error.message : 'Video export failed'
+      setExportError(detail)
       setExportJob({ status: 'failed' })
+      addActivity({ category: 'export', status: 'failed', message: 'Export failed', detail })
     }
+  }
+
+  const blockerText = exportBlockers.map(({ operationId, state }) => `${operationId}: ${state}`).join(', ')
+  const copyActivityLog = async () => {
+    const text = activityLog.map((entry) => [
+      entry.timestamp,
+      entry.status.toUpperCase(),
+      entry.operationId ? `[${entry.operationId}]` : '',
+      entry.message,
+      entry.detail ?? '',
+    ].filter(Boolean).join(' ')).join('\n')
+    await navigator.clipboard.writeText(text)
+    setActivityCopied(true)
+    window.setTimeout(() => setActivityCopied(false), 1_500)
   }
 
   const exportAction = async (action: 'open' | 'reveal') => {
@@ -207,6 +242,7 @@ function Workspace({
           <>
             <RuntimeStatus status={runtime} />
             <div className="workspace-export-controls">
+              {hasUnsavedChanges ? <span className="workspace-export-blocked" role="status" aria-label="Export blockers">Export blocked: {blockerText}</span> : null}
               {exportMessage ? (
                 <div role="status" aria-label="Export status" className={`workspace-export-status workspace-export-status--${exportJob.status}`}>
                   <span className="workspace-export-summary">
@@ -226,10 +262,16 @@ function Workspace({
                 </div>
               ) : null}
               <button
+                className="workspace-activity-button"
+                type="button"
+                aria-expanded={activityOpen}
+                onClick={() => setActivityOpen((open) => !open)}
+              >Activity Log{activityLog.length ? ` (${activityLog.length})` : ''}</button>
+              <button
                 type="button"
                 onClick={startExport}
                 disabled={runtime.snapshot.read_only || exportJob.status === 'running' || hasUnsavedChanges}
-                title={runtime.snapshot.read_only ? 'This project is read only' : hasUnsavedChanges ? 'Save all changes before exporting' : 'Render the saved project to its final delivery'}
+                title={runtime.snapshot.read_only ? 'This project is read only' : hasUnsavedChanges ? `Export blocked — ${blockerText}` : 'Render the saved project to its final delivery'}
               >
                 {exportJob.status === 'running' ? 'Rendering video' : exportJob.status === 'failed' ? 'Retry Export' : 'Export Video'}
               </button>
@@ -242,6 +284,28 @@ function Workspace({
           </>
         )}
       </header>
+      {activityOpen ? (
+        <section className="workspace-activity-log" role="region" aria-label="Activity Log">
+          <header>
+            <strong>Activity Log</strong>
+            <span>Current browser session</span>
+            <button type="button" aria-label="Copy log" disabled={!activityLog.length} onClick={copyActivityLog}>{activityCopied ? 'Copied' : 'Copy log'}</button>
+            <button type="button" disabled={!activityLog.length} onClick={clearActivityLog}>Clear</button>
+          </header>
+          {activityLog.length ? (
+            <ol>
+              {[...activityLog].reverse().map((entry) => (
+                <li key={entry.id} data-activity-status={entry.status}>
+                  <time dateTime={entry.timestamp}>{new Date(entry.timestamp).toLocaleTimeString()}</time>
+                  <strong>{entry.message}</strong>
+                  {entry.operationId ? <span>{entry.operationId}</span> : null}
+                  {entry.detail ? <code>{entry.detail}</code> : null}
+                </li>
+              ))}
+            </ol>
+          ) : <p>No activity yet.</p>}
+        </section>
+      ) : null}
       {activeOperation?.editable ? (
         <div className="workspace-review">
           <ProjectReviewPanel operation={activeOperation} store={store} />

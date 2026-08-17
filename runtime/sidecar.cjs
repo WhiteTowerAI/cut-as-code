@@ -297,11 +297,24 @@ function startExport(state) {
           ...job,
           status: 'failed',
           finishedAt: new Date().toISOString(),
-          error: 'Export failed. Review the project render state and local sidecar log.',
+          error: summarizeExportFailure(stderr || stdout, state.root),
           _log: stderr,
         }
   })
   return job
+}
+
+function summarizeExportFailure(output, projectRoot) {
+  const lines = String(output || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+  const fallback = 'Export failed. Review the project render state.'
+  const summary = lines.at(-1) || fallback
+  const escapedRoot = String(projectRoot || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return summary
+    .replace(escapedRoot ? new RegExp(escapedRoot, 'gi') : /$^/, '[project]')
+    .replace(/[A-Za-z]:(?:\\\\|\\)[^'"\r\n]+/g, '[local path]')
+    .replace(/[A-Za-z]:\\(?:[^\\\s:]+\\)*[^\\\s:]*/g, '[local path]')
+    .replace(/\/(?:[^/\s:]+\/)+[^/\s:]*/g, '[local path]')
+    .slice(0, 500)
 }
 
 function openExportPath(output, action, spawnProcess = spawn, platform = process.platform) {
@@ -894,7 +907,7 @@ async function startProtocolService(runtimeRoot) {
   }
 }
 
-module.exports = { HTTP_ROUTE_ALLOWLIST, LAUNCH_TTL_MS, PROTOCOL_CALL_TIMEOUT_MS, launchIsExpired, routeForRequest, openExportPath, cueIdFor }
+module.exports = { HTTP_ROUTE_ALLOWLIST, LAUNCH_TTL_MS, PROTOCOL_CALL_TIMEOUT_MS, launchIsExpired, routeForRequest, openExportPath, summarizeExportFailure, cueIdFor }
 
 if (require.main === module) {
   main().catch((error) => {

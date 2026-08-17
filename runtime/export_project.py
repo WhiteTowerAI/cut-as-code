@@ -39,14 +39,22 @@ def run_export(project_root, *, projectlib=None, renderer=None):
         rendered = Path(renderer.render(render_plan, root, plan_path.parent)).resolve()
         if rendered != staging.resolve():
             raise ValueError("renderer returned an unexpected export path")
-        staging.replace(output)
+        try:
+            staging.replace(output)
+        except PermissionError:
+            output = output.with_name(f"{output.stem}-{uuid.uuid4().hex[:12]}{output.suffix}")
+            staging.replace(output)
     finally:
         staging.unlink(missing_ok=True)
+    plan["output"] = Path(os.path.relpath(output, plan_path.parent)).as_posix()
+    projectlib.write_json(plan_path, plan)
     if hasattr(renderer, "_write_delivery_report"):
         renderer._write_delivery_report(output, root)
 
     current = projectlib.load_json(project_path)
-    current.setdefault("render", {})["status"] = "verified"
+    current_render = current.setdefault("render", {})
+    current_render["output"] = Path(os.path.relpath(output, project_path.parent)).as_posix()
+    current_render["status"] = "verified"
     projectlib.write_json(project_path, current)
     if hasattr(projectlib, "write_start_here"):
         projectlib.write_start_here(current, root)
