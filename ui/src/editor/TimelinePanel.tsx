@@ -211,6 +211,7 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
   const setTimelineZoom = useStore(store, (state) => state.setTimelineZoom)
   const setSnapEnabled = useStore(store, (state) => state.setSnapEnabled)
   const surfaceRef = useRef<HTMLDivElement>(null)
+  const gutterRef = useRef<HTMLDivElement>(null)
   const rulerScrollRef = useRef<HTMLDivElement>(null)
   const [runtimeTimelineWidthPx, setRuntimeTimelineWidthPx] = useState(TIMELINE_WIDTH_PX)
   const durationS = project?.durationS ?? 0
@@ -332,7 +333,15 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
             </div>
           </>
         )}
-        <div className={`timeline-gutter${showCaptionTrack ? ' timeline-gutter--with-captions' : ''}`}>
+        <div
+          className={`timeline-gutter${showCaptionTrack ? ' timeline-gutter--with-captions' : ''}`}
+          ref={gutterRef}
+          onScroll={(event) => {
+            if (surfaceRef.current && surfaceRef.current.scrollTop !== event.currentTarget.scrollTop) {
+              surfaceRef.current.scrollTop = event.currentTarget.scrollTop
+            }
+          }}
+        >
           {reserveCaptionTrack && <div className="timeline-track-reserved" aria-hidden="true" />}
           {visibleTracks.map((track) => <TrackHeader key={track.id} track={track} runtime={runtime} />)}
         </div>
@@ -346,6 +355,9 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
           onPointerCancel={(event) => event.currentTarget.releasePointerCapture(event.pointerId)}
           onScroll={(event) => {
             if (rulerScrollRef.current) rulerScrollRef.current.scrollLeft = event.currentTarget.scrollLeft
+            if (gutterRef.current && gutterRef.current.scrollTop !== event.currentTarget.scrollTop) {
+              gutterRef.current.scrollTop = event.currentTarget.scrollTop
+            }
           }}
         >
           <div

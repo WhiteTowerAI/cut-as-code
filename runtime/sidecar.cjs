@@ -19,6 +19,7 @@ const HTTP_ROUTE_ALLOWLIST = Object.freeze([
   Object.freeze({ id: 'review', methods: Object.freeze(['POST']), pattern: /^\/v1\/projects\/([^/]+)\/reviews\/decision$/ }),
   Object.freeze({ id: 'export-start', methods: Object.freeze(['POST']), pattern: /^\/v1\/projects\/([^/]+)\/exports$/ }),
   Object.freeze({ id: 'export-status', methods: Object.freeze(['GET']), pattern: /^\/v1\/projects\/([^/]+)\/exports\/status$/ }),
+  Object.freeze({ id: 'export-action', methods: Object.freeze(['POST']), pattern: /^\/v1\/projects\/([^/]+)\/exports\/(open|reveal)$/ }),
   Object.freeze({ id: 'resource', methods: Object.freeze(['GET']), pattern: /^\/v1\/projects\/([^/]+)\/resources\/(res_[a-f0-9]+)$/ }),
   Object.freeze({ id: 'file', methods: Object.freeze(['GET']), pattern: /^\/v1\/projects\/([^/]+)\/(media|artifacts)\/((?:asset|artifact)_[a-f0-9]+)$/ }),
   Object.freeze({ id: 'layer-frame', methods: Object.freeze(['GET', 'HEAD']), pattern: /^\/v1\/projects\/([^/]+)\/layers\/(layer_[a-f0-9]+)\/frames\/(\d+)$/ }),
@@ -49,7 +50,7 @@ async function main() {
     exportJob: { status: 'idle' },
     exportProcess: null,
   }
-  await refreshFiles(state)
+  await refreshFiles(state, false)
 
   const server = http.createServer((request, response) => {
     handleRequest(state, request, response).catch((error) => {
@@ -74,6 +75,7 @@ async function main() {
     projectId: state.projectId,
   }
   process.stdout.write(JSON.stringify(ready) + '\n')
+  void refreshLayerSequences(state)
 
   const control = readline.createInterface({ input: process.stdin, crlfDelay: Infinity })
   control.on('line', (line) => handleControl(state, line))
@@ -143,7 +145,7 @@ async function handleRequest(state, request, response) {
     }
     const match = route.match
     if (route.id === 'snapshot' && match[1] === state.projectId) {
-      await refreshFiles(state)
+      await refreshFiles(state, false)
       const result = await state.protocol.call({ verb: 'get_snapshot', project_id: state.projectId })
       attachPublicFiles(state, result)
       return json(response, result.ok ? 200 : 400, result)
@@ -182,6 +184,26 @@ async function handleRequest(state, request, response) {
     }
     if (route.id === 'export-status' && match[1] === state.projectId) {
       return json(response, 200, { ok: true, job: publicExportJob(state.exportJob) })
+    }
+    if (route.id === 'export-action' && match[1] === state.projectId) {
+      if (request.headers.origin !== state.origin) return json(response, 403, { ok: false, error: 'invalid origin' })
+      const body = await readJson(request)
+      if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length !== 0) {
+        return json(response, 400, { ok: false, error: 'export action accepts no parameters' })
+      }
+      if (state.exportJob.status !== 'succeeded' || typeof state.exportJob.output !== 'string') {
+        return json(response, 409, { ok: false, error: 'no completed export is available' })
+      }
+      const output = await fsp.realpath(path.resolve(state.exportJob.output)).catch(() => null)
+      if (!output || !isContained(state.root, output) || !(await isFile(output))) {
+        return json(response, 409, { ok: false, error: 'the exported video is unavailable' })
+      }
+      try {
+        await openExportPath(output, match[2])
+        return json(response, 200, { ok: true })
+      } catch {
+        return json(response, 503, { ok: false, error: 'the system could not open the exported video' })
+      }
     }
     if (route.id === 'resource' && match[1] === state.projectId) {
       const result = await state.protocol.call({
@@ -224,6 +246,7 @@ function startExport(state) {
   const job = {
     id: `export_${crypto.randomBytes(12).toString('hex')}`,
     status: 'running',
+    stage: 'rendering',
     startedAt: new Date().toISOString(),
   }
   state.exportJob = job
@@ -265,6 +288,7 @@ function startExport(state) {
       ? {
           ...job,
           status: 'succeeded',
+          stage: 'complete',
           finishedAt: new Date().toISOString(),
           output: result.output,
           size: result.size,
@@ -278,6 +302,29 @@ function startExport(state) {
         }
   })
   return job
+}
+
+function openExportPath(output, action, spawnProcess = spawn, platform = process.platform) {
+  let command
+  let args
+  if (platform === 'win32') {
+    command = 'explorer.exe'
+    args = action === 'reveal' ? ['/select,', output] : [output]
+  } else if (platform === 'darwin') {
+    command = 'open'
+    args = action === 'reveal' ? ['-R', output] : [output]
+  } else {
+    command = action === 'reveal' ? 'xdg-open' : 'xdg-open'
+    args = [action === 'reveal' ? path.dirname(output) : output]
+  }
+  return new Promise((resolve, reject) => {
+    const child = spawnProcess(command, args, { detached: true, stdio: 'ignore', windowsHide: true })
+    child.once('spawn', () => {
+      child.unref()
+      resolve()
+    })
+    child.once('error', reject)
+  })
 }
 
 function publicExportJob(job) {
@@ -324,10 +371,21 @@ function watchProject(state) {
   return { close: () => { clearTimeout(timer); for (const watcher of watchers) watcher.close() } }
 }
 
-async function refreshFiles(state) {
+async function refreshFiles(state, refreshLayers = true) {
   state.media = await collectFiles(state.root, ['input'], 'asset')
   state.artifacts = await collectFiles(state.root, ['review'], 'artifact')
-  state.layers = await collectLayerSequences(state.root)
+  if (refreshLayers) state.layers = await collectLayerSequences(state.root)
+}
+
+async function refreshLayerSequences(state) {
+  try {
+    state.layers = await collectLayerSequences(state.root)
+  } catch {
+    return
+  }
+  for (const client of state.clients) {
+    client.write(`event: project-change\ndata: ${JSON.stringify({ projectId: state.projectId })}\n\n`)
+  }
 }
 
 async function collectLayerSequences(root) {
@@ -341,22 +399,106 @@ async function collectLayerSequences(root) {
   }
   const operations = Array.isArray(project.operations) ? project.operations : []
   for (const operation of operations) {
-    if (!operation || operation.id !== 'graphic-motion' || typeof operation.plan !== 'string') continue
+    if (!operation || !['captions', 'content-cards', 'graphic-motion'].includes(operation.id) || typeof operation.plan !== 'string') continue
     let plan
     try {
       plan = await readBoundJson(root, path.resolve(root, 'work', operation.plan))
     } catch {
       continue
     }
-    for (const cue of Array.isArray(plan.cues) ? plan.cues : []) {
-      const render = cue?.render
-      if (!cue || cue.status !== 'verified' || typeof cue.id !== 'string' || render?.asset_type !== 'image-sequence') continue
-      const layerId = layerIdFor(operation.id, cue.id)
-      const sequence = await collectLayerSequence(root, render)
-      if (sequence) result.set(layerId, sequence)
+    if (operation.id === 'graphic-motion') {
+      for (const cue of Array.isArray(plan.cues) ? plan.cues : []) {
+        const render = cue?.render
+        if (!cue || cue.status !== 'verified' || typeof cue.id !== 'string' || render?.asset_type !== 'image-sequence') continue
+        const sequence = await collectLayerSequence(root, render)
+        if (sequence) result.set(layerIdFor(operation.id, cue.id), sequence)
+      }
+      continue
+    }
+    const cues = operation.id === 'captions' ? plan.cues : plan.cards
+    for (let index = 0; index < (Array.isArray(cues) ? cues.length : 0); index += 1) {
+      const cue = cues[index]
+      const cueId = cueIdFor(operation.id, cue, index)
+      if (!cue || !cueId) continue
+      const programRange = operation.id === 'captions'
+        ? cue.program_range ?? { start_s: cue.start, end_s: cue.end }
+        : { start_s: cue.program_start_s, end_s: cue.program_start_s + cue.duration_s }
+      let render = Array.isArray(operation.render) ? operation.render[index] : operation.render
+      if (operation.id === 'content-cards' && render?.asset_type !== 'image-sequence') {
+        render = await materializeCardSequence(root, plan, cue, render)
+      }
+      const sequence = await collectCueSequence(root, render, programRange, operation.id === 'captions')
+      if (sequence) result.set(layerIdFor(operation.id, cueId), sequence)
     }
   }
+  await addSequenceBounds(result)
   return result
+}
+
+async function collectCueSequence(root, render, programRange, fullProgram) {
+  if (!render || render.asset_type !== 'image-sequence' || typeof render.asset !== 'string'
+      || typeof render.pattern !== 'string' || !render.fps || !programRange) return null
+  const fps = Number(render.fps.num) / Number(render.fps.den)
+  if (!(fps > 0) || !Number.isFinite(programRange.start_s) || !Number.isFinite(programRange.end_s)) return null
+  const count = Math.max(1, Math.ceil((programRange.end_s - programRange.start_s) * fps))
+  const sourceStart = Number.isInteger(render.start_number) ? render.start_number : 1
+  const first = fullProgram ? sourceStart + Math.floor(programRange.start_s * fps) : sourceStart
+  const assetRoot = path.resolve(root, 'work', render.asset)
+  if (!isContained(root, assetRoot)) return null
+  const frames = new Map()
+  for (let index = 0; index < count; index += 1) {
+    const sourceNumber = first + index
+    const name = printfFrameName(render.pattern, sourceNumber)
+    if (!name) return null
+    const file = path.resolve(assetRoot, name)
+    if (!isContained(assetRoot, file)) return null
+    try {
+      const real = await fsp.realpath(file)
+      if (real !== file || (await fsp.lstat(file)).isSymbolicLink()) return null
+      const stat = await fsp.stat(real)
+      if (!stat.isFile()) return null
+      frames.set(sourceStart + index, { id: `${sourceStart + index}`, name, size: stat.size, path: real, sha256: await hashFile(real), mediaType: 'image/png' })
+    } catch { return null }
+  }
+  return { frames, pattern: render.pattern, startNumber: sourceStart, fps: render.fps, frameCount: frames.size }
+}
+
+async function materializeCardSequence(root, plan, cue, contribution) {
+  if (!contribution || typeof contribution.asset !== 'string') return null
+  const source = path.resolve(root, 'work', contribution.asset)
+  if (!isContained(root, source) || !(await isFile(source))) return null
+  const fps = cue.renderer?.fps ?? plan.renderer_recipe?.fps ?? { num: 30000, den: 1001 }
+  const output = path.join(root, 'work', 'cache', 'editor-preview', 'content-cards', cue.id)
+  await fsp.mkdir(output, { recursive: true })
+  const pattern = 'frame_%06d.png'
+  const expected = Math.max(1, Math.ceil(Number(cue.duration_s) * Number(fps.num) / Number(fps.den)))
+  const existing = (await fsp.readdir(output).catch(() => [])).filter((name) => /^frame_\d{6}\.png$/.test(name))
+  if (existing.length < expected) {
+    await runProcess('ffmpeg', ['-y', '-i', source, '-vf', `fps=${fps.num}/${fps.den}`, '-frames:v', `${expected}`, path.join(output, pattern)])
+  }
+  return { asset_type: 'image-sequence', asset: path.relative(path.join(root, 'work'), output), pattern, start_number: 1, fps }
+}
+
+async function addSequenceBounds(sequences) {
+  if (!sequences.size) return
+  const groups = Object.fromEntries([...sequences].map(([id, sequence]) => [id, [...sequence.frames.values()].map((frame) => frame.path)]))
+  const executable = process.env.CAC_PYTHON || 'python'
+  const output = await runProcess(executable, [path.join(__dirname, 'sequence_bounds.py')], JSON.stringify(groups))
+  const bounds = JSON.parse(output.stdout)
+  for (const [id, sequence] of sequences) sequence.contentBounds = bounds[id]
+}
+
+function runProcess(command, args, input) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] })
+    let stdout = ''
+    let stderr = ''
+    child.stdout.on('data', (chunk) => { stdout += chunk })
+    child.stderr.on('data', (chunk) => { stderr += chunk })
+    child.once('error', reject)
+    child.once('exit', (code) => code === 0 ? resolve({ stdout, stderr }) : reject(new Error(stderr || `${command} exited ${code}`)))
+    child.stdin.end(input ?? '')
+  })
 }
 
 async function collectLayerSequence(root, render) {
@@ -406,6 +548,11 @@ async function readBoundJson(root, file) {
 
 function layerIdFor(operationId, cueId) {
   return `layer_${crypto.createHash('sha256').update(`${operationId}:${cueId}`).digest('hex').slice(0, 24)}`
+}
+
+function cueIdFor(operationId, cue, index) {
+  if (typeof cue?.id === 'string' && cue.id) return cue.id
+  return operationId === 'captions' ? `cue-${String(index + 1).padStart(3, '0')}` : null
 }
 
 function printfFrameName(pattern, frameNumber) {
@@ -467,13 +614,17 @@ function attachPublicFiles(state, result) {
   }
   if (Array.isArray(result.snapshot.view?.layers)) {
     result.snapshot.view.layers = result.snapshot.view.layers.map((layer) => {
-      if (layer?.media_type !== 'image-sequence' || !layer.image_sequence) return layer
       const sequence = state.layers.get(layer.id)
-      if (!sequence || sequence.frames.size !== layer.image_sequence.frame_count) return layer
+      if (!sequence) return layer
       return {
         ...layer,
+        media_type: 'image-sequence',
         image_sequence: {
-          ...layer.image_sequence,
+          pattern: sequence.pattern ?? layer.image_sequence?.pattern,
+          start_number: sequence.startNumber ?? layer.image_sequence?.start_number,
+          fps: sequence.fps ?? layer.image_sequence?.fps,
+          frame_count: sequence.frameCount ?? layer.image_sequence?.frame_count,
+          content_bounds: sequence.contentBounds ?? layer.image_sequence?.content_bounds,
           frame_url_template: `/v1/projects/${encodeURIComponent(state.projectId)}/layers/${encodeURIComponent(layer.id)}/frames/%d`,
         },
       }
@@ -743,7 +894,7 @@ async function startProtocolService(runtimeRoot) {
   }
 }
 
-module.exports = { HTTP_ROUTE_ALLOWLIST, LAUNCH_TTL_MS, PROTOCOL_CALL_TIMEOUT_MS, launchIsExpired, routeForRequest }
+module.exports = { HTTP_ROUTE_ALLOWLIST, LAUNCH_TTL_MS, PROTOCOL_CALL_TIMEOUT_MS, launchIsExpired, routeForRequest, openExportPath, cueIdFor }
 
 if (require.main === module) {
   main().catch((error) => {

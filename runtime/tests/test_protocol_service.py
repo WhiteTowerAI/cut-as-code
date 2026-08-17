@@ -201,6 +201,7 @@ class ProtocolServiceTests(unittest.TestCase):
             "review": {
                 "schema_version": 1, "cue_id": "cue-001", "text": "First",
                 "editor_transform": {"x": 0.25, "y": 0.75, "scale": 1.5},
+                "editor_content_bounds": {"x": 0.1, "y": 0.7, "width": 0.8, "height": 0.2},
             },
         })
 
@@ -210,9 +211,134 @@ class ProtocolServiceTests(unittest.TestCase):
             {"x": 0.25, "y": 0.75, "scale": 1.5},
             updated["cues"][0]["editor_transform"],
         )
+        self.assertEqual(
+            {"x": 0.1, "y": 0.7, "width": 0.8, "height": 0.2},
+            updated["cues"][0]["editor_content_bounds"],
+        )
         project = json.loads(self.project_path.read_text(encoding="utf-8"))
         self.assertEqual("draft", project["render"]["status"])
         self.assertFalse((self.root / "final" / "final-video.mp4").exists())
+
+    def test_caption_transform_resolves_the_snapshot_id_for_an_idless_cue(self):
+        self.plan.write_text(json.dumps({
+            "schema_version": 1,
+            "target": "overlay",
+            "timeline_id": "main",
+            "timebase": "program",
+            "program_duration_s": 1.0,
+            "style": {"status": "approved", "preset": "clean"},
+            "review": {"status": "approved", "evidence": ["old"]},
+            "cues": [
+                {
+                    "index": 1, "start": 0.0, "end": 0.4,
+                    "text": "First", "lines": ["First"],
+                    "program_range": {"start_s": 0.0, "end_s": 0.4},
+                },
+                {
+                    "index": 2, "start": 0.5, "end": 0.9,
+                    "text": "Second", "lines": ["Second"],
+                    "program_range": {"start_s": 0.5, "end_s": 0.9},
+                },
+            ],
+        }, indent=2) + "\n", encoding="utf-8")
+        opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+
+        response = self.service.handle_request({
+            "verb": "plan.update", "project_id": opened["project_id"], "operation": "captions",
+            "read_set": self._read_set(opened["snapshot"], "captions"),
+            "review": {
+                "schema_version": 1,
+                "cue_id": "cue-002",
+                "editor_transform": {"x": 0.25, "y": 0.75, "scale": 1.5},
+                "editor_content_bounds": {"x": 0.1, "y": 0.7, "width": 0.8, "height": 0.2},
+            },
+        })
+
+        self.assertTrue(response["ok"], response.get("error"))
+        updated = json.loads(self.plan.read_text(encoding="utf-8"))
+        self.assertNotIn("id", updated["cues"][1])
+        self.assertNotIn("editor_transform", updated["cues"][0])
+        self.assertEqual(
+            {"x": 0.25, "y": 0.75, "scale": 1.5},
+            updated["cues"][1]["editor_transform"],
+        )
+        self.assertEqual(
+            {"x": 0.1, "y": 0.7, "width": 0.8, "height": 0.2},
+            updated["cues"][1]["editor_content_bounds"],
+        )
+
+    def test_caption_transform_advances_the_downstream_graphic_motion_plan_atomically(self):
+        self.plan.write_text(json.dumps({
+            "schema_version": 1,
+            "target": "overlay",
+            "timeline_id": "main",
+            "timebase": "program",
+            "program_duration_s": 1.0,
+            "style": {"status": "approved", "preset": "clean"},
+            "review": {"status": "approved", "evidence": ["old"]},
+            "cues": [{
+                "index": 1, "start": 0.0, "end": 0.4,
+                "text": "First", "lines": ["First"],
+                "program_range": {"start_s": 0.0, "end_s": 0.4},
+            }],
+        }, indent=2) + "\n", encoding="utf-8")
+        graphic_plan_path = self.root / "work" / "graphic-motion" / "graphic-motion-plan.json"
+        graphic_plan_path.parent.mkdir()
+        graphic_plan = {
+            "schema_version": 3,
+            "dependencies": ["captions"],
+            "based_on": {"captions": 1},
+            "cues": [],
+        }
+        graphic_plan_path.write_text(json.dumps(graphic_plan, indent=2) + "\n", encoding="utf-8")
+        project = json.loads(self.project_path.read_text(encoding="utf-8"))
+        graphic_operation = copy.deepcopy(project["operations"][0])
+        graphic_operation.update({
+            "id": "graphic-motion",
+            "revision": 3,
+            "status": "verified",
+            "depends_on": ["captions"],
+            "based_on": {"captions": 1},
+            "plan": "graphic-motion/graphic-motion-plan.json",
+            "plan_sha256": protocol_service.graphic_motion_plan.canonical_sha256(graphic_plan),
+        })
+        project["operations"].append(graphic_operation)
+        project["sequences"]["main"]["operations"].append("graphic-motion")
+        self.project_path.write_text(json.dumps(project, indent=2) + "\n", encoding="utf-8")
+        opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+
+        with mock.patch.object(self.service, "_validate_graphic_motion_plan"):
+            response = self.service.handle_request({
+                "verb": "plan.update", "project_id": opened["project_id"], "operation": "captions",
+                "read_set": self._read_set(opened["snapshot"], "captions"),
+                "review": {
+                    "schema_version": 1,
+                    "cue_id": "cue-001",
+                    "editor_transform": {"x": 0.25, "y": 0.75, "scale": 1.5},
+                },
+            })
+
+        self.assertTrue(response["ok"], response.get("error"))
+        saved_project = json.loads(self.project_path.read_text(encoding="utf-8"))
+        saved_operation = next(
+            item for item in saved_project["operations"] if item["id"] == "graphic-motion"
+        )
+        saved_plan = json.loads(graphic_plan_path.read_text(encoding="utf-8"))
+        self.assertEqual(2, saved_operation["based_on"]["captions"])
+        self.assertEqual(2, saved_plan["based_on"]["captions"])
+        self.assertEqual(
+            protocol_service.graphic_motion_plan.canonical_sha256(saved_plan),
+            saved_operation["plan_sha256"],
+        )
+
+    def test_caption_plan_validation_accepts_snapshot_compatible_idless_cues(self):
+        self.service._validate_caption_plan({
+            "schema_version": 1,
+            "cues": [
+                {"text": "First", "program_range": {"start_s": 0.0, "end_s": 0.4}},
+                {"text": "Second", "program_range": {"start_s": 0.5, "end_s": 0.9}},
+            ],
+        })
 
     def test_transform_only_update_preserves_operation_renderability(self):
         plan = {

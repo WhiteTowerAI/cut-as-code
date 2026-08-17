@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react'
 import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand/vanilla'
 import type { AssetView, EditorOperationView, EditorSelection, LibraryTab } from './editor-model'
-import type { EditorState } from './editor-store'
+import { draftFieldsForCue, type EditorState } from './editor-store'
 
 type LibraryPanelProps = {
   store: StoreApi<EditorState>
@@ -255,10 +255,10 @@ function ReviewCardFields({ operation, store }: { operation: EditorOperationView
   const draft = useStore(store, (state) => state.getOperationDraft(operation.id))
   const edit = useStore(store, (state) => state.editOperationDraft)
   const cues = Array.isArray(operation.fields.cues) ? operation.fields.cues as readonly Readonly<Record<string, unknown>>[] : []
-  const selectedId = draft?.fields.cueId ?? (selection?.kind === 'card' ? selection.id : cues[0]?.id)
+  const selectedId = selection?.kind === 'card' ? selection.id : draft?.fields.cueId ?? cues[0]?.id
   const cue = cues.find((item) => item.id === selectedId)
   if (!cue || typeof selectedId !== 'string') return null
-  const fields = { ...cue, ...(draft?.fields.cueId === selectedId ? draft.fields : {}) }
+  const fields = { ...cue, ...draftFieldsForCue(draft, selectedId) }
   return (
     <fieldset aria-label="Content Card fields" className="library-inspector-fields">
       <legend>{String(cue.card_type ?? 'Content card')}</legend>
@@ -304,10 +304,10 @@ function CaptionFields({ operation, store }: { operation: EditorOperationView; s
   const draft = useStore(store, (state) => state.getOperationDraft(operation.id))
   const edit = useStore(store, (state) => state.editOperationDraft)
   const cues = Array.isArray(operation.fields.cues) ? operation.fields.cues as readonly Readonly<Record<string, unknown>>[] : []
-  const selectedId = draft?.fields.cueId ?? (selection?.kind === 'caption' ? selection.id : cues[0]?.id)
+  const selectedId = selection?.kind === 'caption' ? selection.id : draft?.fields.cueId ?? cues[0]?.id
   const cue = cues.find((item) => item.id === selectedId)
   if (!cue || typeof selectedId !== 'string') return null
-  const text = draft?.fields.cueId === selectedId && draft.fields.text !== undefined ? draft.fields.text : cue.text
+  const text = draftFieldsForCue(draft, selectedId)?.text ?? cue.text
   return (
     <fieldset aria-label="Caption fields" className="library-inspector-fields">
       <legend>{String(cue.id)}</legend>
@@ -325,10 +325,10 @@ function MotionFields({ operation, store }: { operation: EditorOperationView; st
   const draft = useStore(store, (state) => state.getOperationDraft(operation.id))
   const edit = useStore(store, (state) => state.editOperationDraft)
   const cues = Array.isArray(operation.fields.cues) ? operation.fields.cues as readonly Readonly<Record<string, unknown>>[] : []
-  const selectedId = draft?.fields.cueId ?? (selection?.kind === 'graphic-motion' ? selection.id : cues[0]?.id)
+  const selectedId = selection?.kind === 'graphic-motion' ? selection.id : draft?.fields.cueId ?? cues[0]?.id
   const cue = cues.find((item) => item.id === selectedId)
   if (!cue || typeof selectedId !== 'string') return null
-  const enabled = draft?.fields.cueId === selectedId && draft.fields.enabled !== undefined ? draft.fields.enabled : cue.enabled
+  const enabled = draftFieldsForCue(draft, selectedId)?.enabled ?? cue.enabled
   return (
     <fieldset aria-label="Graphic Motion fields" className="library-inspector-fields">
       <legend>{String(cue.id)}</legend>

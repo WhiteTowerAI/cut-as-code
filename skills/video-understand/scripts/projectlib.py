@@ -1440,6 +1440,40 @@ def _editor_transforms_for_contributions(operation_id, plan, contribution_count)
     raise ValueError(f"{operation_id} editor transforms require per-cue overlay assets")
 
 
+def _editor_content_bounds_for_contributions(operation_id, plan, contribution_count, project_root):
+    if operation_id == "graphic-motion":
+        cues = [
+            cue for cue in plan.get("cues", [])
+            if isinstance(cue, dict) and cue.get("status") == "verified"
+        ]
+    elif operation_id == "captions":
+        cues = [cue for cue in plan.get("cues", []) if isinstance(cue, dict)]
+    elif operation_id == "content-cards":
+        cues = [cue for cue in plan.get("cards", []) if isinstance(cue, dict)]
+    else:
+        return []
+    if len(cues) != contribution_count:
+        transforms = [_editor_transform(cue.get("editor_transform")) for cue in cues]
+        if contribution_count == 1 and all(transform == _DEFAULT_EDITOR_TRANSFORM for transform in transforms):
+            return [{"x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0}]
+        raise ValueError(f"{operation_id} content bounds require per-cue overlay assets")
+    bounds = []
+    for cue in cues:
+        value = cue.get("editor_content_bounds")
+        if value is None and operation_id == "graphic-motion":
+            value = graphic_motion_content_bounds(cue, project_root)
+        if value is None:
+            value = {"x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0}
+        if (not isinstance(value, dict) or set(value) != {"x", "y", "width", "height"}):
+            raise ValueError(f"{operation_id} editor content bounds are invalid")
+        x, y, width, height = (value[key] for key in ("x", "y", "width", "height"))
+        if (any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in (x, y, width, height))
+                or x < 0 or y < 0 or width <= 0 or height <= 0 or x + width > 1 or y + height > 1):
+            raise ValueError(f"{operation_id} editor content bounds are invalid")
+        bounds.append({"x": float(x), "y": float(y), "width": float(width), "height": float(height)})
+    return bounds
+
+
 def _expand_editor_overlay_contributions(operation_id, plan, contributions, fps):
     """Slice one full-program image sequence into cue-scoped overlay inputs."""
     if operation_id == "captions":
@@ -1658,16 +1692,11 @@ def build_render_plan(project, project_root):
                 editor_transforms = iter(
                     _editor_transforms_for_contributions(operation_id, editor_plan, overlay_count)
                 )
-                if operation_id == "graphic-motion":
-                    verified_cues = [
-                        cue for cue in editor_plan.get("cues", [])
-                        if isinstance(cue, dict) and cue.get("status") == "verified"
-                    ]
-                    if len(verified_cues) != overlay_count:
-                        raise ValueError("graphic-motion content bounds require per-cue overlay assets")
-                    editor_content_bounds = iter(
-                        graphic_motion_content_bounds(cue, project_root) for cue in verified_cues
+                editor_content_bounds = iter(
+                    _editor_content_bounds_for_contributions(
+                        operation_id, editor_plan, overlay_count, project_root
                     )
+                )
             except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
                 errors.append(f"{operation_id} invalid editor transform mapping: {exc}")
         for contribution in contributions:

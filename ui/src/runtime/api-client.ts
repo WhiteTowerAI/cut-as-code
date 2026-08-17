@@ -51,6 +51,15 @@ export class RuntimeApiClient {
     })
   }
 
+  async openExport(action: 'open' | 'reveal'): Promise<void> {
+    const response = await fetch(`/v1/projects/${encodeURIComponent(this.projectId)}/exports/${action}`, {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+    })
+    const value = await response.json() as { ok?: boolean; error?: string }
+    if (!response.ok || !value.ok) throw new Error(value.error ?? 'Could not open the exported video')
+  }
+
   async updateContentCards(readSet: RuntimeReadSet, review: ContentCardsReview) {
     return this.updatePlan('content-cards', readSet, review)
   }

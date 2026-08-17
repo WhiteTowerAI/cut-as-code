@@ -190,6 +190,7 @@ export type RuntimeMutationResponse = Readonly<{
 export type RuntimeExportJob = Readonly<{
   id?: string
   status: 'idle' | 'running' | 'succeeded' | 'failed'
+  stage?: 'preparing' | 'rendering' | 'finalizing' | 'complete'
   startedAt?: string
   finishedAt?: string
   output?: string

@@ -161,6 +161,51 @@ test('layer transform changes stay local until Save Changes submits the typed dr
   })
 })
 
+test('one save preserves and submits edits for multiple cues in the same operation', async () => {
+  const submitted: ContentCardsDraftChange[] = []
+  let authoritative = project
+  const store = createEditorStore({
+    project, activeTab: 'captions', selection: { kind: 'caption', id: 'cue-001' }, currentTimeS: 0,
+    isPlaying: false, timelineZoom: 1, snapEnabled: true, openMenu: null,
+  }, {
+    save: async (operationId, change) => {
+      expect(operationId).toBe('captions')
+      submitted.push(change)
+      authoritative = {
+        ...authoritative,
+        revision: authoritative.revision + 1,
+        operations: authoritative.operations?.map((operation) => operation.id === 'captions'
+          ? {
+              ...operation,
+              revision: operation.revision + 1,
+              fields: {
+                cues: (operation.fields.cues as readonly Readonly<Record<string, unknown>>[]).map((cue) => {
+                  return change.cueId === cue.id ? { ...cue, ...change } : cue
+                }),
+              },
+            }
+          : operation),
+      }
+      return authoritative
+    },
+    review: async () => authoritative,
+  })
+
+  store.getState().editOperationDraft('captions', { cueId: 'cue-001', text: 'First revised' })
+  store.getState().editOperationDraft('captions', { cueId: 'cue-002', text: 'Second revised' })
+
+  expect(store.getState().getOperationDraft('captions')).toMatchObject({ dirty: true })
+  expect(store.getState().hasUnsavedChanges()).toBe(true)
+  await store.getState().saveOperationDraft('captions')
+
+  expect(submitted).toEqual([
+    { cueId: 'cue-001', text: 'First revised' },
+    { cueId: 'cue-002', text: 'Second revised' },
+  ])
+  expect(store.getState().getOperationDraft('captions')).toBeNull()
+  expect(store.getState().hasUnsavedChanges()).toBe(false)
+})
+
 test('layer transform drafts use value equality and reject out-of-range values', () => {
   const store = createStateStore()
   store.getState().setProject({

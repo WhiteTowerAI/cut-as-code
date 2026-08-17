@@ -172,6 +172,74 @@ process.stdout.write(JSON.stringify({
             "options": {"detached": True, "stdio": "ignore", "windowsHide": True},
         }, {"event": "error"}])
 
+    def test_windows_export_actions_wait_for_system_process_start(self) -> None:
+        script = r"""
+const { openExportPath } = require(process.argv[1]);
+const calls = [];
+const spawnProcess = (command, args, options) => {
+  calls.push({ command, args, options });
+  const handlers = {};
+  const child = {
+    once(event, handler) { handlers[event] = handler; return child; },
+    unref() { calls.push({ event: 'unref' }); },
+  };
+  queueMicrotask(() => handlers.spawn());
+  return child;
+};
+Promise.all([
+  openExportPath('D:\\Projects\\46-sol\\final\\final-video.mp4', 'open', spawnProcess, 'win32'),
+  openExportPath('D:\\Projects\\46-sol\\final\\final-video.mp4', 'reveal', spawnProcess, 'win32'),
+]).then(() => process.stdout.write(JSON.stringify(calls)));
+"""
+        result = subprocess.run(
+            ["node", "-e", script, str(REPOSITORY_ROOT / "runtime" / "sidecar.cjs")],
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=20,
+        )
+        self.assertEqual(json.loads(result.stdout), [
+            {
+                "command": "explorer.exe",
+                "args": [r"D:\Projects\46-sol\final\final-video.mp4"],
+                "options": {"detached": True, "stdio": "ignore", "windowsHide": True},
+            },
+            {
+                "command": "explorer.exe",
+                "args": ["/select,", r"D:\Projects\46-sol\final\final-video.mp4"],
+                "options": {"detached": True, "stdio": "ignore", "windowsHide": True},
+            },
+            {"event": "unref"},
+            {"event": "unref"},
+        ])
+
+    def test_export_action_rejects_when_system_process_cannot_start(self) -> None:
+        script = r"""
+const { openExportPath } = require(process.argv[1]);
+const spawnProcess = () => {
+  const handlers = {};
+  const child = {
+    once(event, handler) { handlers[event] = handler; return child; },
+    unref() {},
+  };
+  queueMicrotask(() => handlers.error(new Error('explorer unavailable')));
+  return child;
+};
+openExportPath('D:\\Projects\\46-sol\\final\\final-video.mp4', 'open', spawnProcess, 'win32')
+  .then(() => { process.exitCode = 1; })
+  .catch((error) => process.stdout.write(error.message));
+"""
+        result = subprocess.run(
+            ["node", "-e", script, str(REPOSITORY_ROOT / "runtime" / "sidecar.cjs")],
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=20,
+        )
+        self.assertEqual(result.stdout, "explorer unavailable")
+
     def test_invalid_open_browser_is_a_correlated_invalid_params_error(self) -> None:
         with tempfile.TemporaryDirectory(prefix="cut invalid browser flag ") as temporary:
             project_root = Path(temporary) / "project"
@@ -339,6 +407,7 @@ process.stdout.write(JSON.stringify({
                 "runtime/mcp.cjs",
                 "runtime/project_snapshot.py",
                 "runtime/protocol_service.py",
+                "runtime/sequence_bounds.py",
                 "runtime/sidecar.cjs",
                 "ui/dist/index.html",
             }
@@ -431,6 +500,7 @@ process.stdout.write(JSON.stringify({
                 "runtime/mcp.cjs",
                 "runtime/project_snapshot.py",
                 "runtime/protocol_service.py",
+                "runtime/sequence_bounds.py",
                 "runtime/sidecar.cjs",
             })
             sidecar = executable_sources["runtime/sidecar.cjs"]
@@ -442,7 +512,9 @@ process.stdout.write(JSON.stringify({
             for source in executable_sources.values():
                 for forbidden in ("execFile", "spawnSync", "shell: true", "codex exec", "/v1/render", "/v1/preview", "/v1/jobs", "/v1/shell", "/v1/exec", "/v1/files"):
                     self.assertNotIn(forbidden, source)
-            self.assertEqual(sidecar.count("spawn("), 2)
+            self.assertEqual(sidecar.count("spawn("), 4)
+            self.assertIn("runProcess('ffmpeg',", sidecar)
+            self.assertIn("path.join(__dirname, 'sequence_bounds.py')", sidecar)
             self.assertEqual(mcp.count("spawn("), 1)
             self.assertIn("startProtocolService", sidecar)
             self.assertIn("sidecar.cjs", mcp)
@@ -474,6 +546,7 @@ process.stdout.write(JSON.stringify({
             ["POST", "/v1/projects/project_a/reviews/decision"],
             ["POST", "/v1/projects/project_a/exports"],
             ["GET", "/v1/projects/project_a/exports/status"],
+            ["POST", "/v1/projects/project_a/exports/open"],
             ["GET", "/v1/projects/project_a/resources/res_a1"],
             ["GET", "/v1/projects/project_a/media/asset_a1"],
             ["GET", "/v1/projects/project_a/artifacts/artifact_a1"],
@@ -503,11 +576,11 @@ process.stdout.write(JSON.stringify({
         audit = json.loads(result.stdout)
         self.assertEqual(
             audit["declared"],
-            ["launch", "meta", "snapshot", "transaction", "review", "export-start", "export-status", "resource", "file", "layer-frame", "events", "static"],
+            ["launch", "meta", "snapshot", "transaction", "review", "export-start", "export-status", "export-action", "resource", "file", "layer-frame", "events", "static"],
         )
         self.assertEqual(
             audit["actual"],
-            ["launch", "meta", "snapshot", "transaction", "review", "export-start", "export-status", "resource", "file", "file", "layer-frame", "events", "static", "static", None, None, None, None],
+            ["launch", "meta", "snapshot", "transaction", "review", "export-start", "export-status", "export-action", "resource", "file", "file", "layer-frame", "events", "static", "static", None, None, None, None],
         )
 
     def _assert_unknown_third_party_asset_is_rejected(
@@ -709,6 +782,32 @@ process.stdout.write(JSON.stringify({
         self.assertEqual(json.loads(result.stdout), {
             "ttl": 60_000, "atDeadline": True, "beforeDeadline": False,
         })
+
+    def test_sidecar_uses_snapshot_compatible_generated_caption_cue_ids(self) -> None:
+        script = r"""
+const { cueIdFor } = require(process.argv[1]);
+process.stdout.write(JSON.stringify([
+  cueIdFor('captions', {}, 0),
+  cueIdFor('captions', { id: 'named' }, 1),
+  cueIdFor('content-cards', {}, 0),
+]));
+"""
+        result = subprocess.run(
+            ["node", "-e", script, str(REPOSITORY_ROOT / "runtime" / "sidecar.cjs")],
+            check=True, capture_output=True, text=True, encoding="utf-8", timeout=20,
+        )
+        self.assertEqual(["cue-001", "named", None], json.loads(result.stdout))
+
+    def test_sidecar_reports_ready_before_indexing_heavy_layer_sequences(self) -> None:
+        source = (REPOSITORY_ROOT / "runtime" / "sidecar.cjs").read_text(encoding="utf-8")
+        initial_files = source.index("await refreshFiles(state, false)")
+        listen = source.index("server.listen(0, LOOPBACK, resolve)")
+        ready = source.index("process.stdout.write(JSON.stringify(ready) + '\\n')")
+        layers = source.index("void refreshLayerSequences(state)")
+
+        self.assertLess(initial_files, listen)
+        self.assertLess(listen, ready)
+        self.assertLess(ready, layers)
 
     def test_protocol_call_timeout_allows_full_project_validation(self) -> None:
         script = r"""

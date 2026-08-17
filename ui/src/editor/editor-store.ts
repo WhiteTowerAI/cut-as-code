@@ -18,11 +18,13 @@ export type ContentCardsDraftChange = Readonly<{
   enabled?: boolean
   text?: string
   transform?: LayerTransform
+  contentBounds?: Readonly<{ x: number; y: number; width: number; height: number }>
 }>
 
 export type OperationDraft = Readonly<{
   baseRevision: number
   fields: ContentCardsDraftChange
+  changes: readonly ContentCardsDraftChange[]
   dirty: boolean
   conflict: boolean
   pending?: boolean
@@ -56,19 +58,32 @@ function isSupportedOperation(
 function isOperationDraftChange(operation: EditorOperationView, value: unknown): value is ContentCardsDraftChange {
   if (!value || typeof value !== 'object') return false
   const allowed = operation.kind === 'content-cards'
-    ? ['cueId', 'copy', 'layout', 'placement', 'enabled', 'transform']
+    ? ['cueId', 'copy', 'layout', 'placement', 'enabled', 'transform', 'contentBounds']
     : operation.kind === 'captions'
-      ? ['cueId', 'text', 'transform']
-      : ['cueId', 'enabled', 'transform']
+      ? ['cueId', 'text', 'transform', 'contentBounds']
+      : ['cueId', 'enabled', 'transform', 'contentBounds']
   return Object.entries(value).every(([field, fieldValue]) => {
     if (!allowed.includes(field)) return false
     if (field === 'cueId') return typeof fieldValue === 'string' && Boolean(fieldValue.trim())
     if (field === 'enabled') return typeof fieldValue === 'boolean'
     if (field === 'copy' || field === 'text') return typeof fieldValue === 'string'
     if (field === 'transform') return isLayerTransform(fieldValue)
+    if (field === 'contentBounds') return isContentBounds(fieldValue)
     if (field === 'layout') return contentCardLayouts.includes(fieldValue as ContentCardLayout)
     return contentCardPlacements.includes(fieldValue as ContentCardPlacement)
   })
+}
+
+function isContentBounds(value: unknown) {
+  if (!value || typeof value !== 'object') return false
+  const bounds = value as Record<string, unknown>
+  if (Object.keys(bounds).length !== 4 || !['x', 'y', 'width', 'height'].every((field) => field in bounds)) return false
+  const { x, y, width, height } = bounds
+  return [x, y, width, height].every((item) => typeof item === 'number' && Number.isFinite(item))
+    && (x as number) >= 0 && (y as number) >= 0
+    && (width as number) > 0 && (height as number) > 0
+    && (x as number) + (width as number) <= 1
+    && (y as number) + (height as number) <= 1
 }
 
 function isLayerTransform(value: unknown): value is LayerTransform {
@@ -169,6 +184,7 @@ export type EditorState = {
   recordReviewDecision: (operationId: string, decision: 'approved' | 'rejected', rationale?: string) => Promise<void>
   getOperationDraft: (operationId: string) => OperationDraft | null
   canSaveOperation: (operationId: string) => boolean
+  hasUnsavedChanges: () => boolean
   canApproveOperation: (operationId: string) => boolean
 }
 
@@ -176,6 +192,10 @@ export type EditorRuntimeAdapter = Readonly<{
   save: (operationId: string, draft: ContentCardsDraftChange) => Promise<EditorProjectView>
   review: (operationId: string, decision: 'approved' | 'rejected', rationale?: string) => Promise<EditorProjectView>
 }>
+
+export function draftFieldsForCue(draft: OperationDraft | null | undefined, cueId: string) {
+  return draft?.changes.find((change) => change.cueId === cueId)
+}
 
 export type EditorInitialState = Omit<
   EditorState,
@@ -193,6 +213,7 @@ export type EditorInitialState = Omit<
   | 'recordReviewDecision'
   | 'getOperationDraft'
   | 'canSaveOperation'
+  | 'hasUnsavedChanges'
   | 'canApproveOperation'
   | 'operationDrafts'
 >
@@ -235,11 +256,19 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
 
       const current = get().operationDrafts[operationId]
       if (current?.conflict) return
-      const nextFields = { ...(current?.fields ?? {}), ...change }
+      const currentCueFields = change.cueId
+        ? current?.changes.find((candidate) => candidate.cueId === change.cueId)
+        : current?.changes.find((candidate) => !candidate.cueId)
+      const nextFields = { ...(currentCueFields ?? {}), ...change }
+      const changes = [
+        ...(current?.changes.filter((candidate) => change.cueId ? candidate.cueId !== change.cueId : candidate.cueId) ?? []),
+        nextFields,
+      ].filter((candidate) => !fieldsMatch(operation.fields, candidate))
       const draft: OperationDraft = {
         baseRevision: current?.baseRevision ?? operation.revision,
         fields: nextFields,
-        dirty: !fieldsMatch(operation.fields, nextFields),
+        changes,
+        dirty: changes.length > 0,
         conflict: false,
         pending: current?.pending ?? false,
         requestId: current?.requestId,
@@ -261,27 +290,25 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
       }
       if (runtime) {
         const requestId = (draft.requestId ?? 0) + 1
-        const submittedFields = { ...draft.fields }
+        const submittedChanges = [...draft.changes]
         set({ operationDrafts: {
           ...get().operationDrafts,
           [operationId]: { ...draft, requestId, pending: true, error: undefined },
         } })
         try {
-          const project = await runtime.save(operationId, submittedFields)
+          let project = state.project!
+          for (const change of submittedChanges) project = await runtime.save(operationId, change)
           const current = get().operationDrafts[operationId]
           if (current?.requestId !== requestId) return
-          const changedFields = Object.fromEntries(Object.entries(current.fields).filter(
-            ([field, value]) => submittedFields[field as keyof ContentCardsDraftChange] !== value,
-          )) as ContentCardsDraftChange
-          const newerFields: ContentCardsDraftChange = Object.keys(changedFields).length && current.fields.cueId && !changedFields.cueId
-            ? { ...changedFields, cueId: current.fields.cueId }
-            : changedFields
-          if (Object.keys(newerFields).length) {
+          const submittedCueIds = new Set(submittedChanges.map((change) => change.cueId ?? ''))
+          const newerChanges = current.changes.filter((change) => !submittedCueIds.has(change.cueId ?? '') ||
+            !submittedChanges.some((submitted) => JSON.stringify(submitted) === JSON.stringify(change)))
+          if (newerChanges.length) {
             set({ project, operationDrafts: {
               ...get().operationDrafts,
               [operationId]: {
                 baseRevision: getOperation(project, operationId)?.revision ?? current.baseRevision,
-                fields: newerFields, dirty: true, conflict: false, pending: false,
+                fields: newerChanges.at(-1)!, changes: newerChanges, dirty: true, conflict: false, pending: false,
                 requestId,
               },
             } })
@@ -337,7 +364,7 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
         const requestId = (currentDraft?.requestId ?? 0) + 1
         const pendingDraft: OperationDraft = currentDraft
           ? { ...currentDraft, requestId, pending: true, error: undefined }
-          : { baseRevision: operation.revision, fields: {}, dirty: false, conflict: false, requestId, pending: true }
+          : { baseRevision: operation.revision, fields: {}, changes: [], dirty: false, conflict: false, requestId, pending: true }
         set({ operationDrafts: { ...get().operationDrafts, [operationId]: pendingDraft } })
         try {
           const project = await runtime.review(operationId, decision, cleanRationale)
@@ -384,6 +411,7 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
       const draft = get().operationDrafts[operationId]
       return Boolean(draft?.dirty && !draft.conflict && !draft.pending)
     },
+    hasUnsavedChanges: () => Object.values(get().operationDrafts).some((draft) => draft?.dirty || draft?.pending),
     canApproveOperation: (operationId) => {
       const state = get()
       return canRecordReviewDecision(state.project, operationId, state.operationDrafts[operationId])

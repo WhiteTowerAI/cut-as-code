@@ -100,6 +100,67 @@ test('runtime workspace exactly fills common desktop viewports without document 
   }
 })
 
+test('timeline track headers align row-for-row and share vertical wheel scrolling', async ({ page }) => {
+  const base = runtimeSnapshot()
+  await page.route('**/v1/projects/project_timeline_rows/snapshot', (route) => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({
+      ok: true,
+      snapshot: runtimeSnapshot({
+        view: {
+          ...base.view,
+          captions_edit: {
+            style: {},
+            cues: [{ id: 'caption-1', index: 1, text: 'Caption', program_range: { start_s: 0, end_s: 2 } }],
+          },
+          content_cards_edit: {
+            fields: {}, review_template: { schema_version: 1, cards: [] },
+            cues: [{ id: 'card-1', copy: 'Card', layout: 'default', placement: 'right', enabled: true, program_range: { start_s: 2, end_s: 4 } }],
+          },
+          graphic_motion_edit: {
+            cues: [{ id: 'motion-1', content: 'Motion', enabled: true, program_range: { start_s: 4, end_s: 6 } }],
+          },
+        },
+      }),
+    }),
+  }))
+
+  await page.setViewportSize({ width: 1366, height: 768 })
+  await page.goto('/?project=project_timeline_rows')
+
+  const headers = page.locator('.timeline-track-header')
+  const lanes = page.locator('.timeline-lane')
+  await expect(headers).toHaveCount(5)
+  await expect(lanes).toHaveCount(5)
+  const rows = await page.evaluate(() => {
+    const geometry = (element: Element) => {
+      const rect = element.getBoundingClientRect()
+      return { top: rect.top, height: rect.height }
+    }
+    return {
+      headers: [...document.querySelectorAll('.timeline-track-header')].map(geometry),
+      lanes: [...document.querySelectorAll('.timeline-lane')].map(geometry),
+    }
+  })
+  expect(rows.headers).toEqual(rows.lanes)
+
+  const gutter = page.locator('.timeline-gutter')
+  const surface = page.locator('.timeline-surface')
+  await page.addStyleTag({ content: '.timeline-gutter, .timeline-surface { max-height: 180px; }' })
+  await gutter.hover()
+  await page.mouse.wheel(0, 120)
+  await expect.poll(async () => await gutter.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
+  await expect.poll(async () => await surface.evaluate((element) => element.scrollTop))
+    .toBe(await gutter.evaluate((element) => element.scrollTop))
+
+  await surface.hover()
+  await page.mouse.wheel(0, -120)
+  await expect.poll(async () => ({
+    gutter: await gutter.evaluate((element) => element.scrollTop),
+    surface: await surface.evaluate((element) => element.scrollTop),
+  })).toEqual({ gutter: 0, surface: 0 })
+})
+
 test('Export Video is the only UI action that starts rendering and reports completion', async ({ page }) => {
   let starts = 0
   let polls = 0
@@ -138,6 +199,37 @@ test('Export Video is the only UI action that starts rendering and reports compl
   await expect(page.getByRole('status', { name: 'Export status' })).toContainText('Export complete')
   expect(starts).toBe(1)
   expect(polls).toBeGreaterThanOrEqual(2)
+})
+
+test('export status restores completed output details and exposes file actions', async ({ page }) => {
+  const actions: string[] = []
+  await page.route('**/v1/projects/project_export_restore/snapshot', (route) => route.fulfill({
+    contentType: 'application/json', body: JSON.stringify({ ok: true, snapshot: runtimeSnapshot() }),
+  }))
+  await page.route('**/v1/projects/project_export_restore/exports/status', (route) => route.fulfill({
+    contentType: 'application/json', body: JSON.stringify({
+      ok: true,
+      job: {
+        id: 'export_restored', status: 'succeeded', stage: 'complete',
+        startedAt: '2026-08-16T12:00:00.000Z', finishedAt: '2026-08-16T12:01:30.000Z',
+        output: 'D:\\Projects\\46-sol\\final\\final-video.mp4', size: 12_582_912,
+      },
+    }),
+  }))
+  await page.route(/\/v1\/projects\/project_export_restore\/exports\/(open|reveal)$/, async (route) => {
+    actions.push(new URL(route.request().url()).pathname.split('/').at(-1)!)
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true }) })
+  })
+
+  await page.goto('/?project=project_export_restore')
+  const status = page.getByRole('status', { name: 'Export status' })
+  await expect(status).toContainText('Export complete')
+  await expect(status).toContainText('final-video.mp4')
+  await expect(status).toContainText('12.0 MB')
+  await expect(status).toContainText('1m 30s')
+  await page.getByRole('button', { name: 'Open exported video' }).click()
+  await page.getByRole('button', { name: 'Show exported video in folder' }).click()
+  expect(actions).toEqual(['open', 'reveal'])
 })
 
 test('runtime Viewer uses real sequence geometry, contain fit, read-only aspect, and fullscreen', async ({ page }) => {
@@ -180,6 +272,52 @@ test('runtime Viewer uses real sequence geometry, contain fit, read-only aspect,
   await expect(page.locator('html')).toHaveAttribute('data-fullscreen-target', /viewer-stage/)
 })
 
+test('runtime Viewer keeps one maximized responsive canvas without an extra black frame', async ({ page }) => {
+  await page.route('**/v1/projects/project_responsive_canvas/snapshot', (route) => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ ok: true, snapshot: runtimeSnapshot() }),
+  }))
+  await page.goto('/?project=project_responsive_canvas')
+
+  for (const viewport of [
+    { width: 1920, height: 1080 },
+    { width: 1108, height: 1240 },
+    { width: 1366, height: 768 },
+  ]) {
+    await page.setViewportSize(viewport)
+    await expect.poll(async () => page.locator('.viewer-canvas').evaluate((canvas) => {
+      const stage = canvas.parentElement!
+      const canvasRect = canvas.getBoundingClientRect()
+      const stageRect = stage.getBoundingClientRect()
+      const scale = Math.min(
+        Math.max(1, stageRect.width - 48) / 1280,
+        Math.max(1, stageRect.height - 48) / 720,
+      )
+      const expectedWidth = Math.max(1, Math.floor(1280 * scale))
+      const expectedHeight = Math.max(1, Math.floor(720 * scale))
+      return Math.max(
+        Math.abs(canvasRect.width - expectedWidth),
+        Math.abs(canvasRect.height - expectedHeight),
+      )
+    })).toBeLessThanOrEqual(1)
+
+    const geometry = await page.locator('.viewer-canvas').evaluate((canvas) => {
+      const stage = canvas.parentElement!
+      const video = canvas.querySelector('video')!
+      const canvasRect = canvas.getBoundingClientRect()
+      const videoRect = video.getBoundingClientRect()
+      return {
+        canvas: { width: canvasRect.width, height: canvasRect.height },
+        video: { width: videoRect.width, height: videoRect.height },
+        extraFrameContent: getComputedStyle(stage, '::before').content,
+      }
+    })
+    expect(geometry.canvas.width / geometry.canvas.height).toBeCloseTo(16 / 9, 2)
+    expect(geometry.video).toEqual(geometry.canvas)
+    expect(geometry.extraFrameContent).toBe('none')
+  }
+})
+
 test('runtime Viewer composites source video, evidence, captions, cards, and Graphic Motion', async ({ page }) => {
   const base = runtimeSnapshot()
   const snapshot = runtimeSnapshot({
@@ -193,17 +331,27 @@ test('runtime Viewer composites source video, evidence, captions, cards, and Gra
       layers: [
         {
           id: 'layer_caption', operation_id: 'captions', cue_id: 'caption-001',
-          kind: 'caption', media_type: 'dom', z_index: 100,
+          kind: 'caption', media_type: 'image-sequence', z_index: 100,
           program_range: { start_s: 0, end_s: 3 },
           transform: { x: 0.5, y: 0.82, scale: 1 },
           content: { text: 'Caption layer', style: { preset: 'clean' } },
+          image_sequence: {
+            pattern: 'frame_%06d.png', start_number: 1, fps: { num: 30, den: 1 }, frame_count: 90,
+            frame_url_template: '/v1/projects/viewer-project/layers/layer_caption/frames/%d',
+            content_bounds: { x: 0.2, y: 0.7, width: 0.6, height: 0.2 },
+          },
         },
         {
           id: 'layer_card', operation_id: 'content-cards', cue_id: 'card-001',
-          kind: 'card', media_type: 'dom', z_index: 200,
+          kind: 'card', media_type: 'image-sequence', z_index: 200,
           program_range: { start_s: 0, end_s: 3 },
           transform: { x: 0.22, y: 0.2, scale: 0.9 },
           content: { text: 'Card layer', layout: 'lower-third', placement: 'top-left' },
+          image_sequence: {
+            pattern: 'frame_%06d.png', start_number: 1, fps: { num: 30, den: 1 }, frame_count: 90,
+            frame_url_template: '/v1/projects/viewer-project/layers/layer_card/frames/%d',
+            content_bounds: { x: 0.05, y: 0.08, width: 0.4, height: 0.3 },
+          },
         },
         {
           id: 'layer_motion', operation_id: 'graphic-motion', cue_id: 'gm-001',
@@ -238,11 +386,29 @@ test('runtime Viewer composites source video, evidence, captions, cards, and Gra
   const canvas = page.locator('.viewer-canvas')
   await expect(canvas.locator('video[data-project-media]')).toHaveCount(1)
   await expect(canvas.locator('[data-viewer-layer]')).toHaveCount(3)
-  await expect(canvas.getByText('Caption layer', { exact: true })).toBeVisible()
-  await expect(canvas.getByText('Card layer', { exact: true })).toBeVisible()
-  await expect(canvas.locator('[data-viewer-layer="graphic-motion"] img')).toHaveAttribute(
-    'src', /\/layers\/layer_motion\/frames\/1$/,
-  )
+  await expect(canvas.getByText('Caption layer', { exact: true })).toHaveCount(0)
+  await expect(canvas.getByText('Card layer', { exact: true })).toHaveCount(0)
+  for (const [kind, id] of [['caption', 'layer_caption'], ['card', 'layer_card'], ['graphic-motion', 'layer_motion']]) {
+    const layer = canvas.locator(`[data-viewer-layer="${kind}"]`)
+    await expect(layer.locator('img')).toHaveAttribute(
+      'src', new RegExp(`/layers/${id}/frames/1$`),
+    )
+    const chrome = await layer.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return {
+        backgroundColor: style.backgroundColor,
+        borderTopWidth: style.borderTopWidth,
+        boxShadow: style.boxShadow,
+        paddingTop: style.paddingTop,
+      }
+    })
+    expect(chrome).toEqual({
+      backgroundColor: 'rgba(0, 0, 0, 0)',
+      borderTopWidth: '0px',
+      boxShadow: 'none',
+      paddingTop: '0px',
+    })
+  }
   await expect(page.getByRole('region', { name: 'Current review artifacts' })).toBeVisible()
   await expect(canvas.locator('img[alt="gm-review.png"]')).toHaveCount(0)
 })
@@ -343,6 +509,7 @@ test('Graphic Motion uses a content-fitted PowerPoint selection box with eight r
         x: expect.any(Number), y: expect.any(Number),
         scale_x: expect.any(Number), scale_y: 1,
       },
+      editor_content_bounds: { x: 0.1, y: 0.2, width: 0.25, height: 0.3 },
     },
   })
 })
@@ -415,7 +582,7 @@ test('dragging and scaling a Viewer layer stays local until Save Changes and nev
   let transactionBody: Record<string, unknown> | undefined
   let exportRequests = 0
   page.on('request', (request) => {
-    if (/\/exports?(?:\/|$)/.test(new URL(request.url()).pathname)) exportRequests += 1
+    if (request.method() === 'POST' && /\/exports?$/.test(new URL(request.url()).pathname)) exportRequests += 1
   })
   await page.route('**/v1/projects/project_transform/snapshot', (route) => route.fulfill({
     contentType: 'application/json', body: JSON.stringify({ ok: true, snapshot }),
@@ -440,6 +607,8 @@ test('dragging and scaling a Viewer layer stays local until Save Changes and nev
   await page.mouse.up()
   await expect(layer).toHaveAttribute('data-layer-selected', 'true')
   await expect(layer).not.toHaveAttribute('data-layer-x', '0.25')
+  await expect(page.getByRole('button', { name: 'Export Video' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Export Video' })).toHaveAttribute('title', 'Save all changes before exporting')
 
   const scaleHandle = page.getByRole('button', { name: 'Scale layer' })
   const scaleBox = await scaleHandle.boundingBox()
@@ -454,6 +623,7 @@ test('dragging and scaling a Viewer layer stays local until Save Changes and nev
 
   await page.getByRole('button', { name: 'Save Changes' }).click()
   await expect.poll(() => transactionBody).toBeTruthy()
+  await expect(page.getByRole('button', { name: 'Export Video' })).toBeEnabled()
 
   expect(transactionBody).toMatchObject({
     operation: 'content-cards',

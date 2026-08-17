@@ -3,17 +3,20 @@ import { useStore } from 'zustand'
 import {
   ArrowDownToLine,
   ArrowUpToLine,
+  CheckCircle2,
   AudioWaveform,
   Copy,
   Crop,
   Filter,
   Focus,
+  FolderOpen,
   Gauge,
   Magnet,
   Maximize2,
   MoreHorizontal,
   MousePointer2,
   Play,
+  ExternalLink,
   Plus,
   Ratio,
   Redo2,
@@ -105,6 +108,9 @@ function Workspace({
 }) {
   const [exportJob, setExportJob] = useState<RuntimeExportJob>({ status: 'idle' })
   const [exportError, setExportError] = useState<string | null>(null)
+  const [exportConnectionError, setExportConnectionError] = useState<string | null>(null)
+  const [exportNow, setExportNow] = useState(() => Date.now())
+  const hasUnsavedChanges = useStore(store, (state) => state.hasUnsavedChanges())
   const activeOperation = useStore(store, (state) => {
     const selectedOperationId = state.selection?.kind === 'card' ? 'content-cards'
       : state.selection?.kind === 'caption' ? 'captions'
@@ -120,16 +126,34 @@ function Workspace({
       : undefined
   })
   useEffect(() => {
+    if (!runtime) return
+    let active = true
+    runtime.client.getExportStatus().then((job) => {
+      if (active) setExportJob(job)
+    }).catch((error) => {
+      if (active) setExportConnectionError(error instanceof Error ? error.message : 'Could not restore export status')
+    })
+    return () => { active = false }
+  }, [runtime])
+
+  useEffect(() => {
+    if (exportJob.status !== 'running') return
+    const timer = window.setInterval(() => setExportNow(Date.now()), 1_000)
+    return () => window.clearInterval(timer)
+  }, [exportJob.status])
+  useEffect(() => {
     if (!runtime || exportJob.status !== 'running') return
     let active = true
     const timer = window.setTimeout(async () => {
       try {
         const next = await runtime.client.getExportStatus()
-        if (active) setExportJob(next)
+        if (active) {
+          setExportConnectionError(null)
+          setExportJob(next)
+        }
       } catch (error) {
         if (!active) return
-        setExportError(error instanceof Error ? error.message : 'Video export failed')
-        setExportJob({ status: 'failed' })
+        setExportConnectionError(error instanceof Error ? error.message : 'Export status connection lost')
       }
     }, 100)
     return () => {
@@ -141,6 +165,7 @@ function Workspace({
   const startExport = async () => {
     if (!runtime || exportJob.status === 'running') return
     setExportError(null)
+    setExportConnectionError(null)
     try {
       setExportJob(await runtime.client.startExport())
     } catch (error) {
@@ -149,11 +174,32 @@ function Workspace({
     }
   }
 
+  const exportAction = async (action: 'open' | 'reveal') => {
+    if (!runtime) return
+    try {
+      setExportError(null)
+      await runtime.client.openExport(action)
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : 'Could not open the exported video')
+    }
+  }
+
+  const startedAt = exportJob.startedAt ? Date.parse(exportJob.startedAt) : Number.NaN
+  const finishedAt = exportJob.finishedAt ? Date.parse(exportJob.finishedAt) : Number.NaN
+  const elapsedSeconds = Number.isFinite(startedAt)
+    ? Math.max(0, Math.round(((Number.isFinite(finishedAt) ? finishedAt : exportNow) - startedAt) / 1_000))
+    : undefined
+  const formatDuration = (seconds: number) => seconds >= 60
+    ? `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, '0')}s`
+    : `${seconds}s`
+  const formatSize = (size: number) => `${(size / 1024 / 1024).toFixed(1)} MB`
+  const outputName = exportJob.output?.split(/[\\/]/).at(-1)
+  const stage = exportJob.stage ?? (exportJob.status === 'running' ? 'rendering' : exportJob.status === 'succeeded' ? 'complete' : undefined)
   const exportMessage = exportError
-    ?? (exportJob.status === 'running' ? 'Rendering final video'
+    ?? (exportJob.status === 'running' ? `${stage === 'preparing' ? 'Preparing' : stage === 'finalizing' ? 'Finalizing' : 'Rendering'} video`
       : exportJob.status === 'succeeded' ? 'Export complete'
         : exportJob.status === 'failed' ? exportJob.error ?? 'Export failed'
-          : '')
+          : exportConnectionError ?? '')
   return (
     <>
       <header className="workspace-operation-bar">
@@ -162,17 +208,30 @@ function Workspace({
             <RuntimeStatus status={runtime} />
             <div className="workspace-export-controls">
               {exportMessage ? (
-                <span role="status" aria-label="Export status" className={`workspace-export-status workspace-export-status--${exportJob.status}`}>
-                  {exportMessage}
-                </span>
+                <div role="status" aria-label="Export status" className={`workspace-export-status workspace-export-status--${exportJob.status}`}>
+                  <span className="workspace-export-summary">
+                    {exportJob.status === 'succeeded' ? <CheckCircle2 aria-hidden size={14} /> : null}
+                    <strong>{exportMessage}</strong>
+                    {elapsedSeconds !== undefined ? <span>{formatDuration(elapsedSeconds)}</span> : null}
+                    {outputName ? <span>{outputName}</span> : null}
+                    {exportJob.size !== undefined ? <span>{formatSize(exportJob.size)}</span> : null}
+                  </span>
+                  {exportJob.output ? <span className="workspace-export-path" title={exportJob.output}>{exportJob.output}</span> : null}
+                  {exportJob.finishedAt ? <time dateTime={exportJob.finishedAt}>{new Date(exportJob.finishedAt).toLocaleString()}</time> : null}
+                  {exportConnectionError && exportJob.status === 'running' ? <span className="workspace-export-connection">Connection lost — retrying</span> : null}
+                  {exportJob.status === 'succeeded' ? <span className="workspace-export-actions">
+                    <button type="button" aria-label="Open exported video" onClick={() => exportAction('open')}><ExternalLink aria-hidden size={13} />Open file</button>
+                    <button type="button" aria-label="Show exported video in folder" onClick={() => exportAction('reveal')}><FolderOpen aria-hidden size={13} />Show in folder</button>
+                  </span> : null}
+                </div>
               ) : null}
               <button
                 type="button"
                 onClick={startExport}
-                disabled={runtime.snapshot.read_only || exportJob.status === 'running'}
-                title={runtime.snapshot.read_only ? 'This project is read only' : 'Render the saved project to its final delivery'}
+                disabled={runtime.snapshot.read_only || exportJob.status === 'running' || hasUnsavedChanges}
+                title={runtime.snapshot.read_only ? 'This project is read only' : hasUnsavedChanges ? 'Save all changes before exporting' : 'Render the saved project to its final delivery'}
               >
-                {exportJob.status === 'running' ? 'Rendering video' : 'Export Video'}
+                {exportJob.status === 'running' ? 'Rendering video' : exportJob.status === 'failed' ? 'Retry Export' : 'Export Video'}
               </button>
             </div>
           </>
@@ -338,9 +397,13 @@ function runtimeAdapter(client: RuntimeApiClient, initial: RuntimeSnapshot) {
         const transformOnly = draft.transform !== undefined
           && draft.copy === undefined && draft.layout === undefined
           && draft.placement === undefined && draft.enabled === undefined
+        const editorContentBounds = draft.contentBounds
+          ? { cue_id: targetId, ...draft.contentBounds }
+          : undefined
         review = transformOnly ? {
           schema_version: 1,
           editor_transform: { cue_id: targetId, ...draft.transform },
+          ...(editorContentBounds ? { editor_content_bounds: editorContentBounds } : {}),
         } : {
           schema_version: 1,
           cards: template.cards.map((card) => card.id === targetId ? {
@@ -353,6 +416,7 @@ function runtimeAdapter(client: RuntimeApiClient, initial: RuntimeSnapshot) {
           ...(draft.transform ? {
             editor_transform: { cue_id: targetId, ...draft.transform },
           } : {}),
+          ...(editorContentBounds ? { editor_content_bounds: editorContentBounds } : {}),
         } satisfies ContentCardsReview
       } else if (operationId === 'captions') {
         const cue = snapshot.view.captions_edit?.cues.find((item) => item.id === draft.cueId)
@@ -362,6 +426,7 @@ function runtimeAdapter(client: RuntimeApiClient, initial: RuntimeSnapshot) {
           cue_id: draft.cueId,
           ...(draft.text !== undefined ? { text: draft.text } : {}),
           ...(draft.transform ? { editor_transform: draft.transform } : {}),
+          ...(draft.contentBounds ? { editor_content_bounds: draft.contentBounds } : {}),
         }
       } else if (operationId === 'graphic-motion') {
         const cue = snapshot.view.graphic_motion_edit?.cues.find((item) => item.id === draft.cueId)
@@ -371,6 +436,7 @@ function runtimeAdapter(client: RuntimeApiClient, initial: RuntimeSnapshot) {
           cue_id: draft.cueId,
           ...(draft.enabled !== undefined ? { enabled: draft.enabled } : {}),
           ...(draft.transform ? { editor_transform: draft.transform } : {}),
+          ...(draft.contentBounds ? { editor_content_bounds: draft.contentBounds } : {}),
         }
       } else {
         throw new Error('Operation is not editable')

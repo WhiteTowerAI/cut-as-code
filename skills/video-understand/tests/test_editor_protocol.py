@@ -73,6 +73,7 @@ class EditorProtocolFreshnessTests(unittest.TestCase):
                         "end": 0.8,
                         "program_range": {"start_s": 0.2, "end_s": 0.8},
                         "editor_transform": {"x": 0.5, "y": 0.8, "scale": 1.0},
+                        "editor_content_bounds": {"x": 0.2, "y": 0.7, "width": 0.6, "height": 0.2},
                         "words": [{
                             "clip_id": "clip-001",
                             "source_range": {"start_s": 0.2, "end_s": 0.8},
@@ -85,6 +86,7 @@ class EditorProtocolFreshnessTests(unittest.TestCase):
                         "end": 1.5,
                         "program_range": {"start_s": 1.0, "end_s": 1.5},
                         "editor_transform": {"x": 0.5, "y": 0.6, "scale": 1.2},
+                        "editor_content_bounds": {"x": 0.1, "y": 0.6, "width": 0.8, "height": 0.25},
                         "words": [{
                             "clip_id": "clip-001",
                             "source_range": {"start_s": 1.0, "end_s": 1.5},
@@ -147,6 +149,13 @@ class EditorProtocolFreshnessTests(unittest.TestCase):
                     for item in captions
                 ],
             )
+            self.assertEqual(
+                [
+                    {"x": 0.2, "y": 0.7, "width": 0.6, "height": 0.2},
+                    {"x": 0.1, "y": 0.6, "width": 0.8, "height": 0.25},
+                ],
+                [item["content_bounds"] for item in captions],
+            )
 
     def test_editor_transforms_map_only_when_cues_and_overlay_contributions_are_unambiguous(self):
         motion_plan = {
@@ -199,6 +208,14 @@ class EditorProtocolFreshnessTests(unittest.TestCase):
             {"x": 0.5, "y": 0.8, "scale": 1.0},
             {"x": 0.5, "y": 0.5, "scale": 1.0},
         ], projectlib._editor_transforms_for_contributions("captions", caption_plan, len(expanded)))
+
+        default_caption_plan = {"cues": [{"id": "caption-1"}, {"id": "caption-2"}]}
+        self.assertEqual(
+            [{"x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0}],
+            projectlib._editor_content_bounds_for_contributions(
+                "captions", default_caption_plan, 1, Path("."),
+            ),
+        )
 
     def test_graphic_motion_render_contribution_includes_union_alpha_bounds(self):
         with tempfile.TemporaryDirectory() as temporary:

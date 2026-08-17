@@ -33,7 +33,7 @@ import {
 } from 'lucide-react'
 import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand/vanilla'
-import type { EditorState } from './editor-store'
+import { draftFieldsForCue, type EditorState } from './editor-store'
 import type { ClipView, EditorLayerView, LayerTransform, ReviewArtifactView } from './editor-model'
 
 type ViewerPanelProps = {
@@ -517,9 +517,9 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     : 1 / 30
   const sequenceGeometry = project?.sequenceGeometry
   const layers = project?.layers?.map((layer) => {
-    const draft = operationDrafts[layer.operationId]
-    return draft?.fields.cueId === layer.cueId && draft.fields.transform
-      ? { ...layer, transform: draft.fields.transform }
+    const fields = draftFieldsForCue(operationDrafts[layer.operationId], layer.cueId)
+    return fields?.transform
+      ? { ...layer, transform: fields.transform }
       : layer
   }) ?? []
   const activeLayers = layers.filter((layer) => isLayerActive(layer, currentTimeS))
@@ -865,7 +865,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
           x: state.transform.x + deltaX / state.canvasWidth,
           y: state.transform.y + deltaY / state.canvasHeight,
         } as LayerTransform
-      transform = state.layer.kind === 'graphic-motion' && state.bounds
+      transform = state.layer.imageSequence && state.bounds
         ? clampGraphicMotionTransform(moved, state.bounds, state.canvasWidth, state.canvasHeight)
         : clampTransform(moved)
     } else if (state.mode === 'scale') {
@@ -913,7 +913,11 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
         scale_y: scaleY,
       }, bounds, state.canvasWidth, state.canvasHeight)
     }
-    editOperationDraft(state.layer.operationId, { cueId: state.layer.cueId, transform })
+    editOperationDraft(state.layer.operationId, {
+      cueId: state.layer.cueId,
+      transform,
+      ...(state.bounds ? { contentBounds: state.bounds } : {}),
+    })
   }
 
   function endLayerPointer(event: ReactPointerEvent<HTMLElement>) {
@@ -928,9 +932,10 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     select({ kind: layerSelectionKind(layer), id: layer.cueId })
     editOperationDraft(layer.operationId, {
       cueId: layer.cueId,
-      transform: layer.kind === 'graphic-motion'
+      transform: layer.imageSequence
         ? { x: 0.5, y: 0.5, scale_x: 1, scale_y: 1 }
         : { x: 0.5, y: 0.5, scale: 1 },
+      ...(layer.imageSequence?.contentBounds ? { contentBounds: layer.imageSequence.contentBounds } : {}),
     })
   }
 
@@ -980,7 +985,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
               {activeLayers.map((layer) => {
                 const selected = selection?.id === layer.cueId && selection.kind === layerSelectionKind(layer)
                 const frameUrl = layerFrameUrl(layer, currentTimeS)
-                const graphicRect = layer.kind === 'graphic-motion' ? graphicMotionRect(layer) : undefined
+                const graphicRect = layer.imageSequence ? graphicMotionRect(layer) : undefined
                 const { scaleX, scaleY } = axisScales(layer.transform)
                 const style = {
                   '--layer-x': graphicRect?.left ?? layer.transform.x,
@@ -992,7 +997,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
                 } as CSSProperties
                 return (
                   <div
-                    className={`viewer-layer viewer-layer--${layer.kind}${selected ? ' viewer-layer--selected' : ''}`}
+                    className={`viewer-layer viewer-layer--${layer.kind}${layer.imageSequence ? ' viewer-layer--pixel-sequence' : ''}${selected ? ' viewer-layer--selected' : ''}`}
                     data-viewer-layer={layer.kind}
                     data-layer-id={layer.id}
                     data-layer-x={layer.transform.x}
@@ -1008,7 +1013,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
                     onPointerUp={endLayerPointer}
                     onPointerCancel={endLayerPointer}
                   >
-                    {layer.kind === 'graphic-motion' ? (
+                    {layer.imageSequence ? (
                       <>
                         {frameUrl ? <img
                           src={frameUrl}
@@ -1051,7 +1056,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
                   </div>
                 )
               })}
-              {selectedLayer && selectedLayer.kind !== 'graphic-motion' ? (
+              {selectedLayer && !selectedLayer.imageSequence ? (
                 <div className="viewer-layer-controls" aria-label="Layer transform controls">
                   <button
                     className="viewer-layer-reset"

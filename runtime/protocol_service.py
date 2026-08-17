@@ -149,32 +149,45 @@ class ProtocolService:
                 if not isinstance(review, dict):
                     raise ValueError("content-cards review must be an object")
                 editor_transform = review.get("editor_transform")
-                transform_only = set(review) == {"schema_version", "editor_transform"}
+                editor_content_bounds = review.get("editor_content_bounds")
+                transform_only = set(review) in (
+                    {"schema_version", "editor_transform"},
+                    {"schema_version", "editor_transform", "editor_content_bounds"},
+                )
                 if transform_only and review.get("schema_version") != 1:
                     raise ValueError("content-cards transform schema_version must be 1")
                 typed_review = {
                     key: copy.deepcopy(value)
                     for key, value in review.items()
-                    if key != "editor_transform"
+                    if key not in {"editor_transform", "editor_content_bounds"}
                 }
                 updated_plan = copy.deepcopy(plan) if transform_only else apply_cards_review.apply_review(plan, typed_review)
                 if editor_transform is not None:
                     if (not isinstance(editor_transform, dict)
-                            or set(editor_transform) != {"cue_id", "x", "y", "scale"}):
+                            or set(editor_transform) not in (
+                                {"cue_id", "x", "y", "scale"},
+                                {"cue_id", "x", "y", "scale_x", "scale_y"},
+                            )):
                         raise ValueError("content-cards editor_transform is invalid")
                     cue_id = editor_transform["cue_id"]
-                    transform = {key: editor_transform[key] for key in ("x", "y", "scale")}
-                    self._validate_editor_transform(transform)
+                    transform = {key: value for key, value in editor_transform.items() if key != "cue_id"}
                     updated_plan = self._apply_editor_transform(
                         updated_plan, "content-cards", cue_id, transform
                     )
+                    if editor_content_bounds is not None:
+                        updated_plan = self._apply_editor_content_bounds(
+                            updated_plan, "content-cards", cue_id, editor_content_bounds
+                        )
             except (TypeError, ValueError) as exc:
                 return {"ok": False, "error": f"invalid content-cards review: {exc}"}
         elif operation_id == "captions":
             try:
                 transform_only = (
                     isinstance(review, dict)
-                    and set(review) == {"schema_version", "cue_id", "editor_transform"}
+                    and set(review) in (
+                        {"schema_version", "cue_id", "editor_transform"},
+                        {"schema_version", "cue_id", "editor_transform", "editor_content_bounds"},
+                    )
                 )
                 if transform_only:
                     if review.get("schema_version") != 1:
@@ -182,6 +195,10 @@ class ProtocolService:
                     updated_plan = self._apply_editor_transform(
                         plan, "captions", review.get("cue_id"), review.get("editor_transform")
                     )
+                    if "editor_content_bounds" in review:
+                        updated_plan = self._apply_editor_content_bounds(
+                            updated_plan, "captions", review.get("cue_id"), review["editor_content_bounds"]
+                        )
                 else:
                     updated_plan = self._apply_caption_update(plan, review)
                     self._validate_caption_plan(updated_plan)
@@ -191,7 +208,10 @@ class ProtocolService:
             try:
                 transform_only = (
                     isinstance(review, dict)
-                    and set(review) == {"schema_version", "cue_id", "editor_transform"}
+                    and set(review) in (
+                        {"schema_version", "cue_id", "editor_transform"},
+                        {"schema_version", "cue_id", "editor_transform", "editor_content_bounds"},
+                    )
                 )
                 if transform_only:
                     if review.get("schema_version") != 1:
@@ -199,6 +219,10 @@ class ProtocolService:
                     updated_plan = self._apply_editor_transform(
                         plan, "graphic-motion", review.get("cue_id"), review.get("editor_transform")
                     )
+                    if "editor_content_bounds" in review:
+                        updated_plan = self._apply_editor_content_bounds(
+                            updated_plan, "graphic-motion", review.get("cue_id"), review["editor_content_bounds"]
+                        )
                 else:
                     updated_plan = self._apply_graphic_motion_update(plan, review)
                     self._validate_graphic_motion_plan(root, project, updated_plan)
@@ -217,20 +241,29 @@ class ProtocolService:
                     updated_plan, sort_keys=True, separators=(",", ":"), ensure_ascii=False
                 ).encode("utf-8")
                 changed["plan_sha256"] = hashlib.sha256(payload).hexdigest()
-            self._advance_transform_dependencies(updated_project, operation_id, changed["revision"])
+            try:
+                dependent_plan_writes = self._advance_transform_dependencies(
+                    root, updated_project, operation_id, changed["revision"]
+                )
+            except (TypeError, ValueError) as exc:
+                return {"ok": False, "error": f"invalid downstream dependency update: {exc}"}
         else:
+            dependent_plan_writes = []
             changed.update({"status": "stale", "outputs": []})
             if isinstance(changed.get("check"), dict):
                 changed["check"] = {**changed["check"], "status": "pending"}
             self._invalidate_dependents(updated_project, operation_id)
         updated_project.setdefault("render", {})["status"] = "draft"
-        return self._commit(root, plan_path, updated_plan, updated_project, expected, "plan.update", operation_id)
+        return self._commit(
+            root, plan_path, updated_plan, updated_project, expected,
+            "plan.update", operation_id, dependent_plan_writes,
+        )
 
     @staticmethod
     def _apply_caption_update(plan, update):
         if (not isinstance(update, dict)
                 or not {"schema_version", "cue_id"}.issubset(update)
-                or set(update) - {"schema_version", "cue_id", "text", "editor_transform"}):
+                or set(update) - {"schema_version", "cue_id", "text", "editor_transform", "editor_content_bounds"}):
             raise ValueError("caption update must contain only typed cue fields")
         if "text" not in update and "editor_transform" not in update:
             raise ValueError("caption update must change text or editor_transform")
@@ -240,7 +273,7 @@ class ProtocolService:
         if not isinstance(cue_id, str) or not cue_id.strip():
             raise ValueError("caption cue_id must be nonblank")
         updated = copy.deepcopy(plan)
-        cue = next((item for item in updated.get("cues", []) if isinstance(item, dict) and item.get("id") == cue_id), None)
+        cue = ProtocolService._find_editor_cue(updated, "captions", cue_id)
         if cue is None:
             raise ValueError("caption cue does not exist")
         if "text" in update:
@@ -256,6 +289,10 @@ class ProtocolService:
             updated = ProtocolService._apply_editor_transform(
                 updated, "captions", cue_id, update["editor_transform"]
             )
+        if "editor_content_bounds" in update:
+            updated = ProtocolService._apply_editor_content_bounds(
+                updated, "captions", cue_id, update["editor_content_bounds"]
+            )
         if "text" in update:
             updated["review"] = {"status": "pending", "evidence": []}
         return updated
@@ -264,7 +301,7 @@ class ProtocolService:
     def _apply_graphic_motion_update(plan, update):
         if (not isinstance(update, dict)
                 or not {"schema_version", "cue_id"}.issubset(update)
-                or set(update) - {"schema_version", "cue_id", "enabled", "editor_transform"}):
+                or set(update) - {"schema_version", "cue_id", "enabled", "editor_transform", "editor_content_bounds"}):
             raise ValueError("graphic-motion update must contain only typed cue fields")
         if "enabled" not in update and "editor_transform" not in update:
             raise ValueError("graphic-motion update must change enabled or editor_transform")
@@ -291,6 +328,10 @@ class ProtocolService:
             ProtocolService._validate_editor_transform(update["editor_transform"])
             updated = ProtocolService._apply_editor_transform(
                 updated, "graphic-motion", cue_id, update["editor_transform"]
+            )
+        if "editor_content_bounds" in update:
+            updated = ProtocolService._apply_editor_content_bounds(
+                updated, "graphic-motion", cue_id, update["editor_content_bounds"]
             )
         bindings = list(graphic_motion_plan._input_bindings(updated))
         for item in updated.get("cues", []):
@@ -323,10 +364,8 @@ class ProtocolService:
         if not isinstance(cue_id, str) or not cue_id.strip():
             raise ValueError("editor_transform cue_id must be nonblank")
         transform = ProtocolService._validate_editor_transform(transform)
-        collection = "cards" if operation_id == "content-cards" else "cues"
         updated = copy.deepcopy(plan)
-        cue = next((item for item in updated.get(collection, [])
-                    if isinstance(item, dict) and item.get("id") == cue_id), None)
+        cue = ProtocolService._find_editor_cue(updated, operation_id, cue_id)
         if cue is None:
             raise ValueError("editor_transform cue does not exist")
         if transform in (
@@ -337,6 +376,47 @@ class ProtocolService:
         else:
             cue["editor_transform"] = transform
         return updated
+
+    @staticmethod
+    def _apply_editor_content_bounds(plan, operation_id, cue_id, bounds):
+        if not isinstance(cue_id, str) or not cue_id.strip():
+            raise ValueError("editor_content_bounds cue_id must be nonblank")
+        if operation_id == "content-cards":
+            if not isinstance(bounds, dict) or bounds.get("cue_id") != cue_id:
+                raise ValueError("content-cards editor_content_bounds is invalid")
+            bounds = {key: value for key, value in bounds.items() if key != "cue_id"}
+        bounds = ProtocolService._validate_editor_content_bounds(bounds)
+        updated = copy.deepcopy(plan)
+        cue = ProtocolService._find_editor_cue(updated, operation_id, cue_id)
+        if cue is None:
+            raise ValueError("editor_content_bounds cue does not exist")
+        cue["editor_content_bounds"] = bounds
+        return updated
+
+    @staticmethod
+    def _find_editor_cue(plan, operation_id, cue_id):
+        collection = "cards" if operation_id == "content-cards" else "cues"
+        for position, item in enumerate(plan.get(collection, []), 1):
+            if not isinstance(item, dict):
+                continue
+            item_id = item.get("id")
+            if operation_id == "captions" and not item_id:
+                item_id = f"cue-{position:03d}"
+            if item_id == cue_id:
+                return item
+        return None
+
+    @staticmethod
+    def _validate_editor_content_bounds(bounds):
+        if not isinstance(bounds, dict) or set(bounds) != {"x", "y", "width", "height"}:
+            raise ValueError("editor_content_bounds must contain x, y, width, and height")
+        values = tuple(bounds[key] for key in ("x", "y", "width", "height"))
+        if any(isinstance(value, bool) or not isinstance(value, (int, float)) for value in values):
+            raise ValueError("editor_content_bounds values must be numbers")
+        x, y, width, height = values
+        if x < 0 or y < 0 or width <= 0 or height <= 0 or x + width > 1 or y + height > 1:
+            raise ValueError("editor_content_bounds must fit the normalized canvas")
+        return {"x": float(x), "y": float(y), "width": float(width), "height": float(height)}
 
     def _record_review(self, request):
         if set(request) != {"verb", "project_id", "operation", "read_set", "decision"}:
@@ -438,6 +518,11 @@ class ProtocolService:
             "project": project_resource["etag"],
             "operation": operation and operation["etag"],
             "plan": plan_resource and plan_resource["etag"],
+            "dependent_plans": {
+                item.get("operation_id"): item["etag"]
+                for item in snapshot["resources"]
+                if item.get("kind") == "plan"
+            },
         }
         if read_set.get("operation") != expected["operation"] or read_set.get("plan") != expected["plan"]:
             return {"ok": False, "status": 409, "error": "conflict", "snapshot": self._public_snapshot(snapshot)}
@@ -476,8 +561,7 @@ class ProtocolService:
             if changed_id in review.get("depends_on", []):
                 review["status"] = "stale"
 
-    @staticmethod
-    def _advance_transform_dependencies(project, changed_id, revision):
+    def _advance_transform_dependencies(self, root, project, changed_id, revision):
         for operation in project.get("operations", []):
             based_on = operation.get("based_on")
             if isinstance(based_on, dict) and changed_id in based_on:
@@ -486,7 +570,32 @@ class ProtocolService:
             if changed_id in review.get("depends_on", []):
                 review["status"] = "stale"
 
-    def _commit(self, root, plan_path, plan, project, expected, verb, operation_id):
+        writes = []
+        for operation in project.get("operations", []):
+            if operation.get("id") != "graphic-motion" or operation.get("id") == changed_id:
+                continue
+            based_on = operation.get("based_on")
+            if not isinstance(based_on, dict) or changed_id not in based_on:
+                continue
+            plan_value = operation.get("plan")
+            if not isinstance(plan_value, str) or not plan_value.strip():
+                raise ValueError("graphic-motion dependency plan is missing")
+            plan_path = projectlib.resolve_project_path(root, plan_value)
+            try:
+                plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ValueError("graphic-motion dependency plan is unreadable") from exc
+            plan_based_on = plan.get("based_on")
+            if not isinstance(plan_based_on, dict) or changed_id not in plan_based_on:
+                raise ValueError("graphic-motion dependency plan does not track the changed operation")
+            plan["based_on"][changed_id] = revision
+            self._validate_graphic_motion_plan(root, project, plan)
+            if "plan_sha256" in operation:
+                operation["plan_sha256"] = graphic_motion_plan.canonical_sha256(plan)
+            writes.append((plan_path, plan, "graphic-motion"))
+        return writes
+
+    def _commit(self, root, plan_path, plan, project, expected, verb, operation_id, dependent_plan_writes=None):
         project_path = root / "work" / "project.json"
         validation_errors = projectlib.validate_project(
             project, root, check_files=True, dependency_mode="allow_stale"
@@ -499,6 +608,17 @@ class ProtocolService:
         current_operation = next(item for item in current["view"]["operations"] if item["id"] == operation_id)["etag"]
         current_plan = next(item for item in current["resources"] if item.get("operation_id") == operation_id)["etag"]
         if (current_operation, current_plan) != (expected["operation"], expected["plan"]):
+            return {"ok": False, "status": 409, "error": "conflict", "snapshot": self._public_snapshot(current)}
+        dependent_plan_writes = dependent_plan_writes or []
+        current_plan_etags = {
+            item.get("operation_id"): item["etag"]
+            for item in current["resources"]
+            if item.get("kind") == "plan"
+        }
+        if any(
+            current_plan_etags.get(dependent_id) != expected.get("dependent_plans", {}).get(dependent_id)
+            for _path, _value, dependent_id in dependent_plan_writes
+        ):
             return {"ok": False, "status": 409, "error": "conflict", "snapshot": self._public_snapshot(current)}
         if verb == "review.record":
             current_project = json.loads(project_path.read_text(encoding="utf-8"))
@@ -517,6 +637,7 @@ class ProtocolService:
         writes = []
         if plan_path is not None:
             writes.append((plan_path, self._json_bytes(plan)))
+        writes.extend((path, self._json_bytes(value)) for path, value, _operation in dependent_plan_writes)
         writes.append((project_path, self._json_bytes(project)))
         journal_dir = projectlib.editor_state_dir(root, create=True)
         journal_path = journal_dir / "transaction.json"
@@ -557,6 +678,17 @@ class ProtocolService:
             current_operation = next(item for item in current["view"]["operations"] if item["id"] == operation_id)["etag"]
             current_plan = next(item for item in current["resources"] if item.get("operation_id") == operation_id)["etag"]
             if (current_project, current_operation, current_plan) != (current_project_etag, expected["operation"], expected["plan"]):
+                journal_path.unlink()
+                return {"ok": False, "status": 409, "error": "conflict", "snapshot": self._public_snapshot(current)}
+            current_plan_etags = {
+                item.get("operation_id"): item["etag"]
+                for item in current["resources"]
+                if item.get("kind") == "plan"
+            }
+            if any(
+                current_plan_etags.get(dependent_id) != expected.get("dependent_plans", {}).get(dependent_id)
+                for _path, _value, dependent_id in dependent_plan_writes
+            ):
                 journal_path.unlink()
                 return {"ok": False, "status": 409, "error": "conflict", "snapshot": self._public_snapshot(current)}
             for path, temporary in staged:
@@ -657,8 +789,18 @@ class ProtocolService:
             if not operation or not isinstance(operation.get("plan"), str):
                 raise ValueError
             plan_path = projectlib.resolve_project_path(root, operation["plan"])
-            allowed = {project_path.resolve(), plan_path.resolve()}
-            expected_targets = {project_path.resolve()} if intent["verb"] == "review.record" else allowed
+            required_targets = {project_path.resolve()}
+            allowed = set(required_targets)
+            if intent["verb"] == "plan.update":
+                required_targets.add(plan_path.resolve())
+                allowed.add(plan_path.resolve())
+                graphic_operation = next(
+                    (item for item in current_project.get("operations", []) if item.get("id") == "graphic-motion"),
+                    None,
+                )
+                if (operation_id != "graphic-motion" and graphic_operation
+                        and isinstance(graphic_operation.get("plan"), str)):
+                    allowed.add(projectlib.resolve_project_path(root, graphic_operation["plan"]).resolve())
             states = []
             targets = []
             seen = set()
@@ -680,7 +822,7 @@ class ProtocolService:
                 else:
                     return "ambiguous transaction recovery"
                 targets.append((path, item))
-            if seen != expected_targets:
+            if not required_targets.issubset(seen):
                 raise ValueError
             if self._validate_recovered(root, targets, operation_id):
                 return "ambiguous transaction recovery"
@@ -739,6 +881,15 @@ class ProtocolService:
                 self._validate_caption_plan(plan)
             else:
                 self._validate_graphic_motion_plan(root, project, plan)
+            graphic_operation = next(
+                (item for item in project.get("operations", []) if item.get("id") == "graphic-motion"),
+                None,
+            )
+            if graphic_operation and isinstance(graphic_operation.get("plan"), str):
+                graphic_path = projectlib.resolve_project_path(root, graphic_operation["plan"]).resolve()
+                if graphic_path in proposed and graphic_path != plan_path:
+                    graphic_plan = json.loads(proposed[graphic_path])
+                    self._validate_graphic_motion_plan(root, project, graphic_plan)
             return errors
         except (OSError, TypeError, ValueError, json.JSONDecodeError):
             return ["invalid recovered JSON"]
@@ -781,7 +932,9 @@ class ProtocolService:
             if not isinstance(cue, dict):
                 raise ValueError(f"caption cue {position} must be an object")
             cue_id = cue.get("id")
-            if not isinstance(cue_id, str) or not cue_id.strip():
+            if cue_id is None:
+                cue_id = f"cue-{position:03d}"
+            elif not isinstance(cue_id, str) or not cue_id.strip():
                 raise ValueError(f"caption cue {position} id must be nonblank")
             text = cue.get("text")
             if not isinstance(text, str) or not text.strip():
