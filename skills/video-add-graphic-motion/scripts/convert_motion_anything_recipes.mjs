@@ -66,16 +66,32 @@ export async function writeLibraryAttribution({
   upstreamAttribution,
 }) {
   const target = path.join(recipesRoot, "ATTRIBUTION.md");
-  const contents = `# motion-anything recipes attribution
+  const templatePath = fileURLToPath(new URL("../recipes/ATTRIBUTION.md", import.meta.url));
+  const template = await readFile(templatePath, "utf8");
+  const revisionMatch = template.match(
+    /nexu-io\/motion-anything\/tree\/([0-9a-f]{40})\/recipes/,
+  );
+  if (!revisionMatch) {
+    throw new Error("ATTRIBUTION.md is missing the pinned motion-anything recipes URL");
+  }
+  let contents = template.replaceAll(revisionMatch[1], sourceRevision);
+  if (upstreamAttribution?.trim()) {
+    const nextSourceHeading = "\n## `canvas-confetti/`";
+    if (!contents.includes(nextSourceHeading)) {
+      throw new Error("ATTRIBUTION.md is missing the canvas-confetti source heading");
+    }
+    const upstreamRecord = `
+### Upstream attribution record
 
-The recipes in this directory were vendored from
-[nexu-io/motion-anything](https://github.com/nexu-io/motion-anything) at revision
-\`${sourceRevision}\`. Converted HyperFrames files retain credit comments found in their
-original recipe implementation files.
+The following text is preserved from motion-anything for the directories listed above.
 
-## Upstream attribution
-
-${upstreamAttribution.trim()}\n`;
+${upstreamAttribution.trim()}
+`;
+    contents = contents.replace(
+      nextSourceHeading,
+      `${upstreamRecord}${nextSourceHeading}`,
+    );
+  }
   await writeFile(target, contents, "utf8");
   return target;
 }

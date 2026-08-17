@@ -4,6 +4,8 @@ __pycache__/
 .env
 
 .superpowers/
+.plugin-validator-deps/
+.plugin-validator-wheel/
 
 work/
 docs/
