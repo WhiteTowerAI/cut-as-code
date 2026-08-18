@@ -2440,6 +2440,12 @@ def _approve_selection(plan, selection, *, mode, actor, rationale,
         raise ValueError("timeline_fps does not match canonical timeline")
 
     result = copy.deepcopy(plan)
+    presentation = result.get("presentation")
+    if isinstance(presentation, dict):
+        presentation.setdefault(
+            "carried_from_plan_sha256",
+            canonical_sha256(presentation_subject(plan)),
+        )
     result["decision"] = None
     result["review"] = None
     result.pop("review_status", None)

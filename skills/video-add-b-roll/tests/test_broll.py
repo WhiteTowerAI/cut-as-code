@@ -8,6 +8,7 @@ import inspect
 import json
 import math
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -944,7 +945,12 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         self.assertEqual([self.mapped_words[1]], shot["transcript_evidence"]["words"])
         self.assertEqual(segments, shot["selected"]["segments"])
         self.assertNotIn("review_default", shot)
-        self.assertEqual(presentation, approved["presentation"])
+        carried_presentation = copy.deepcopy(approved["presentation"])
+        carried_from = carried_presentation.pop("carried_from_plan_sha256")
+        self.assertEqual(presentation, carried_presentation)
+        self.assertEqual(
+            projectlib.load_json(presentation_path)["plan_sha256"], carried_from,
+        )
         self.assertEqual(speaker_style, approved["speaker_inset_style"])
         self.assertEqual(presentation_sha256, broll_plan.sha256_file(presentation_path))
         self.assertEqual(review_page_sha256, broll_plan.sha256_file(review_page))
@@ -1720,6 +1726,24 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
                 stale_video, project_root=self.root, required=True,
             )
         ))
+
+        stale_style = copy.deepcopy(rebuilt)
+        stale_style["speaker_inset_style"] = self._speaker_style()
+        self.assertIn(
+            "ordinary presentation must not enable speaker_inset_style",
+            broll_plan.presentation_errors(
+                stale_style, project_root=self.root, required=True,
+            ),
+        )
+
+        invalid_carry = copy.deepcopy(rebuilt)
+        invalid_carry["presentation"]["carried_from_plan_sha256"] = "invalid"
+        self.assertIn(
+            "presentation carried plan SHA-256 is invalid",
+            broll_plan.presentation_errors(
+                invalid_carry, project_root=self.root, required=True,
+            ),
+        )
 
         receipt_path = self.root / "work/b-roll/presentation-decision.json"
         original_receipt = receipt_path.read_bytes()
@@ -3269,6 +3293,133 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
     def _frame(video, time_s, output):
         Image.new("RGB", (960, 540), "white").save(output, "JPEG")
 
+    def _bind_composite_artifacts(self, plan):
+        cache = self.root / "work/cache/b-roll/speaker-inset"
+        cache.mkdir(parents=True)
+        evidence = cache / "evidence.jpg"
+        Image.new("RGB", (160, 90), "navy").save(evidence, "JPEG")
+        base = cache / "base.mp4"
+        context = cache / "context.mp4"
+        base.write_bytes(b"base-preview")
+        context.write_bytes(b"context-preview")
+        alternates = {}
+        for anchor in speaker_inset.PRESET_ANCHORS["corner-pip"]:
+            path = cache / f"context-{anchor}.mp4"
+            path.write_bytes(f"context-{anchor}".encode("ascii"))
+            alternates[anchor] = {
+                "path": path.relative_to(self.root / "work").as_posix(),
+                "sha256": broll_plan.sha256_file(path),
+            }
+        start_s = plan["shots"][0]["program_range"]["start_s"]
+        analysis = {
+            "schema_version": 1,
+            "shots": [{
+                "shot_id": "shot",
+                "subshots": [{
+                    "id": "shot-subshot-001",
+                    "program_range": copy.deepcopy(plan["shots"][0]["program_range"]),
+                    "evidence_points": [{
+                        "frames": [{
+                            "program_time_s": start_s,
+                            "path": evidence.relative_to(self.root / "work").as_posix(),
+                            "sha256": broll_plan.sha256_file(evidence),
+                        }],
+                    }],
+                }],
+            }],
+        }
+        analysis_path = self.root / "work/b-roll/speaker-inset-analysis.json"
+        projectlib.write_json(analysis_path, analysis)
+        agent_input = {
+            "schema_version": 1, "actor": "Codex",
+            "project_layout_strategy": SpeakerInsetTests._layout_strategy(),
+            "shots": [{
+                "shot_id": "shot",
+                "layout_recommendation": SpeakerInsetTests._layout_recommendation(),
+                "subshots": [{
+                    "id": "shot-subshot-001", "speaker_status": "confirmed",
+                    "display_mode": "enabled", "anchor": "top-left",
+                    "rationale": "One current speaker is visible.",
+                    "keyframes": [{
+                        "program_time_s": start_s,
+                        "roi": {"x": 0.1, "y": 0.1, "width": 0.3, "height": 0.6},
+                    }],
+                }],
+            }],
+        }
+        agent_path = self.root / "work/b-roll/speaker-inset-agent-input.json"
+        projectlib.write_json(agent_path, agent_input)
+        preview = {
+            "schema_version": 1,
+            "shots": [{
+                "shot_id": "shot",
+                "base_broll": {
+                    "path": base.relative_to(self.root / "work").as_posix(),
+                    "sha256": broll_plan.sha256_file(base),
+                },
+                "preview": {
+                    "path": context.relative_to(self.root / "work").as_posix(),
+                    "sha256": broll_plan.sha256_file(context),
+                },
+                "anchor_previews": alternates,
+            }],
+        }
+        preview_path = self.root / "work/b-roll/speaker-inset-preview.json"
+        projectlib.write_json(preview_path, preview)
+        clearance = {
+            "schema_version": 1, "actor": "Codex",
+            "shots": [{
+                "shot_id": "shot",
+                "continuity": {
+                    "risk": "none",
+                    "decision": "continuous",
+                    "rationale": "The inset remains enabled for the complete shot.",
+                },
+                "subshots": [{
+                    "id": "shot-subshot-001", "display_mode": "enabled",
+                    "anchor": "top-left", "clearance_status": "pass",
+                    "checked_anchors": ["top-left"],
+                    "subject_legibility": "pass",
+                    "legibility_rationale": "The speaker remains readable at final size.",
+                    "pixel_budget": {
+                        "pixel_risk": "medium", "max_scale_factor": 1.75,
+                        "checkpoints": [{
+                            "role": "entry", "program_time_s": start_s,
+                            "input_crop_px": {"width": 200, "height": 300},
+                            "output_content_px": {"width": 350, "height": 525},
+                            "scale_factor": 1.75,
+                        }],
+                    },
+                    "legibility_checks": [{
+                        "role": "entry", "program_time_s": start_s,
+                        "preview_sha256": "c" * 64,
+                        "observation": "The complete speaker silhouette is readable.",
+                    }],
+                    "rationale": "The inset does not cover the B-roll focal action.",
+                }],
+            }],
+        }
+        clearance_path = self.root / "work/b-roll/speaker-inset-clearance.json"
+        projectlib.write_json(clearance_path, clearance)
+        plan["speaker_inset"] = {
+            "analysis": {
+                "path": "b-roll/speaker-inset-analysis.json",
+                "sha256": broll_plan.sha256_file(analysis_path),
+            },
+            "agent_input": {
+                "path": "b-roll/speaker-inset-agent-input.json",
+                "sha256": broll_plan.sha256_file(agent_path),
+            },
+            "preview": {
+                "path": "b-roll/speaker-inset-preview.json",
+                "sha256": broll_plan.sha256_file(preview_path),
+            },
+            "clearance": {
+                "path": "b-roll/speaker-inset-clearance.json",
+                "sha256": broll_plan.sha256_file(clearance_path),
+            },
+        }
+
     def test_build_review_page_publishes_local_payload_and_immutable_assets(self):
         review_id = "123e4567-e89b-12d3-a456-426614174000"
         with mock.patch.object(build_review_page, "_extract_frame", side_effect=self._frame):
@@ -3357,6 +3508,105 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
                     payload["review_mode"],
                 )
 
+    def test_approve_selection_carries_presentation_route_into_composite_review(self):
+        plan = copy.deepcopy(self.plan)
+        plan.pop("presentation")
+        plan["shots"][0]["review_default"] = {
+            "decision": "select",
+            "segments": [{
+                "candidate_id": "asset",
+                "source_range": {"start_s": 0.0, "end_s": 1.0},
+                "program_range": {"start_s": 1.0, "end_s": 2.0},
+                "playback_rate": 1.0,
+            }],
+        }
+        plan = self.record_presentation(plan, "speaker-inset")
+        presentation_path = self.root / "work/b-roll/presentation-decision.json"
+        original_presentation = presentation_path.read_bytes()
+        original_presentation_sha256 = broll_plan.sha256_file(presentation_path)
+        original_presentation_plan_sha256 = projectlib.load_json(
+            presentation_path
+        )["plan_sha256"]
+
+        with mock.patch.object(build_review_page, "_extract_frame", side_effect=self._frame):
+            selection_result = build_review_page.build_review_page(
+                plan, self.timeline, self.transcript, self.video, self.review_dir,
+                project_root=self.root,
+                review_id="123e4567-e89b-12d3-a456-426614174030",
+            )
+        selection_payload = json.loads(base64.b64decode(
+            build_review_page.PAYLOAD_RE.search(
+                selection_result["page"].read_text(encoding="utf-8")
+            ).group(1)
+        ))
+        edited_range = {"start_s": 1.0, "end_s": 3.0}
+        segment = {
+            "candidate_id": "asset",
+            "source_range": {"start_s": 0.0, "end_s": 2.0},
+            "program_range": copy.deepcopy(edited_range),
+            "playback_rate": 1.0,
+        }
+        selection = {
+            "review_id": selection_payload["review_id"],
+            "submission_intent": "approve_selection",
+            "approval_scope": "b-roll-selection",
+            "explicit_user_action": True,
+            "revision_notes": "",
+            "plan_sha256": selection_payload["plan_sha256"],
+            "candidate_manifest_sha256": selection_payload["candidate_manifest_sha256"],
+            "review_video_sha256": selection_payload["review_video_sha256"],
+            "timeline_fps": copy.deepcopy(selection_payload["timeline"]["fps"]),
+            "timestamp": "2026-08-17T12:00:00Z",
+            "rationale": broll_plan.HUMAN_SELECTION_APPROVAL_RATIONALE,
+            "rationale_source": "review_ui_explicit_action",
+            "shots": [{
+                "id": "shot", "decision": "select",
+                "program_range": copy.deepcopy(edited_range),
+                "segments": [segment],
+            }],
+        }
+        prepared = broll_plan.approve_selection(
+            plan, selection, mode="human", actor="Actual user",
+            rationale=broll_plan.HUMAN_SELECTION_APPROVAL_RATIONALE,
+            project_root=self.root, timeline=self.timeline,
+            transcript=self.transcript,
+        )
+        self.assertEqual(original_presentation, presentation_path.read_bytes())
+        self.assertEqual(
+            original_presentation_sha256, broll_plan.sha256_file(presentation_path),
+        )
+        self._bind_composite_artifacts(prepared)
+
+        with mock.patch.object(broll_plan, "validate_plan", return_value=[]), mock.patch.object(
+                build_review_page, "_extract_frame") as extract:
+            result = build_review_page.build_review_page(
+                prepared, self.timeline, self.transcript, self.video, self.review_dir,
+                project_root=self.root,
+                review_id="123e4567-e89b-12d3-a456-426614174031",
+            )
+        extract.assert_not_called()
+        html = result["page"].read_text(encoding="utf-8")
+        payload = json.loads(base64.b64decode(
+            build_review_page.PAYLOAD_RE.search(html).group(1)
+        ))
+        self.assertEqual("composite_pending", prepared["shots"][0]["status"])
+        self.assertNotIn("review_default", prepared["shots"][0])
+        self.assertEqual(
+            original_presentation_plan_sha256,
+            prepared["presentation"]["carried_from_plan_sha256"],
+        )
+        self.assertEqual([], broll_plan.presentation_errors(
+            prepared, project_root=self.root, required=True,
+        ))
+        self.assertEqual("composite", payload["review_mode"])
+        self.assertEqual("approve", payload["approval_intent"])
+        self.assertEqual("speaker-inset-composite", payload["approval_scope"])
+        composite_receipt_source = re.search(
+            r"function buildCompositeReceipt\(commit,action\)\{(.+?)\ncopyButton",
+            html,
+        ).group(1)
+        self.assertNotIn("shots:", composite_receipt_source)
+
     def test_review_page_switches_selection_intent_and_publishes_composite_assets(self):
         selection_plan = copy.deepcopy(self.plan)
         selection_plan.pop("presentation")
@@ -3395,118 +3645,7 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
             "path": "b-roll/broll-selection.json", "sha256": "9" * 64,
             "style_sha256": broll_plan.canonical_sha256(plan["speaker_inset_style"]),
         }
-        cache = self.root / "work/cache/b-roll/speaker-inset"
-        cache.mkdir(parents=True)
-        evidence = cache / "evidence.jpg"
-        Image.new("RGB", (160, 90), "navy").save(evidence, "JPEG")
-        base = cache / "base.mp4"
-        context = cache / "context.mp4"
-        base.write_bytes(b"base-preview")
-        context.write_bytes(b"context-preview")
-        alternates = {}
-        for anchor in speaker_inset.PRESET_ANCHORS["corner-pip"]:
-            path = cache / f"context-{anchor}.mp4"
-            path.write_bytes(f"context-{anchor}".encode("ascii"))
-            alternates[anchor] = {
-                "path": path.relative_to(self.root / "work").as_posix(),
-                "sha256": broll_plan.sha256_file(path),
-            }
-        analysis = {
-            "schema_version": 1,
-            "shots": [{
-                "shot_id": "shot",
-                "subshots": [{
-                    "id": "shot-subshot-001",
-                    "program_range": copy.deepcopy(plan["shots"][0]["program_range"]),
-                    "evidence_points": [{
-                        "frames": [{
-                            "program_time_s": 1.0,
-                            "path": evidence.relative_to(self.root / "work").as_posix(),
-                            "sha256": broll_plan.sha256_file(evidence),
-                        }],
-                    }],
-                }],
-            }],
-        }
-        analysis_path = self.root / "work/b-roll/speaker-inset-analysis.json"
-        projectlib.write_json(analysis_path, analysis)
-        agent_input = {
-            "schema_version": 1, "actor": "Codex",
-            "project_layout_strategy": SpeakerInsetTests._layout_strategy(),
-            "shots": [{
-                "shot_id": "shot",
-                "layout_recommendation": SpeakerInsetTests._layout_recommendation(),
-                "subshots": [{
-                    "id": "shot-subshot-001", "speaker_status": "confirmed",
-                    "display_mode": "enabled", "anchor": "top-left",
-                    "rationale": "One current speaker is visible.",
-                    "keyframes": [{
-                        "program_time_s": 1.0,
-                        "roi": {"x": 0.1, "y": 0.1, "width": 0.3, "height": 0.6},
-                    }],
-                }],
-            }],
-        }
-        agent_path = self.root / "work/b-roll/speaker-inset-agent-input.json"
-        projectlib.write_json(agent_path, agent_input)
-        preview = {
-            "schema_version": 1,
-            "shots": [{
-                "shot_id": "shot",
-                "base_broll": {
-                    "path": base.relative_to(self.root / "work").as_posix(),
-                    "sha256": broll_plan.sha256_file(base),
-                },
-                "preview": {
-                    "path": context.relative_to(self.root / "work").as_posix(),
-                    "sha256": broll_plan.sha256_file(context),
-                },
-                "anchor_previews": alternates,
-            }],
-        }
-        preview_path = self.root / "work/b-roll/speaker-inset-preview.json"
-        projectlib.write_json(preview_path, preview)
-        clearance = {
-            "schema_version": 1, "actor": "Codex",
-            "shots": [{
-                "shot_id": "shot",
-                "continuity": {
-                    "risk": "none",
-                    "decision": "continuous",
-                    "rationale": "The inset remains enabled for the complete shot.",
-                },
-                "subshots": [{
-                    "id": "shot-subshot-001", "display_mode": "enabled",
-                    "anchor": "top-left", "clearance_status": "pass",
-                    "checked_anchors": ["top-left"],
-                    "subject_legibility": "pass",
-                    "legibility_rationale": "The speaker remains readable at final size.",
-                    "pixel_budget": {
-                        "pixel_risk": "medium", "max_scale_factor": 1.75,
-                        "checkpoints": [{
-                            "role": "entry", "program_time_s": 1.0,
-                            "input_crop_px": {"width": 200, "height": 300},
-                            "output_content_px": {"width": 350, "height": 525},
-                            "scale_factor": 1.75,
-                        }],
-                    },
-                    "legibility_checks": [{
-                        "role": "entry", "program_time_s": 1.0,
-                        "preview_sha256": "c" * 64,
-                        "observation": "The complete speaker silhouette is readable.",
-                    }],
-                    "rationale": "The inset does not cover the B-roll focal action.",
-                }],
-            }],
-        }
-        clearance_path = self.root / "work/b-roll/speaker-inset-clearance.json"
-        projectlib.write_json(clearance_path, clearance)
-        plan["speaker_inset"] = {
-            "analysis": {"path": "b-roll/speaker-inset-analysis.json", "sha256": broll_plan.sha256_file(analysis_path)},
-            "agent_input": {"path": "b-roll/speaker-inset-agent-input.json", "sha256": broll_plan.sha256_file(agent_path)},
-            "preview": {"path": "b-roll/speaker-inset-preview.json", "sha256": broll_plan.sha256_file(preview_path)},
-            "clearance": {"path": "b-roll/speaker-inset-clearance.json", "sha256": broll_plan.sha256_file(clearance_path)},
-        }
+        self._bind_composite_artifacts(plan)
         with mock.patch.object(broll_plan, "validate_plan", return_value=[]), mock.patch.object(
                 build_review_page, "_extract_frame") as extract:
             result = build_review_page.build_review_page(
