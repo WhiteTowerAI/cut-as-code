@@ -428,6 +428,54 @@ test('timeline ruler sets a visible work area and adds a review note', async ({ 
   await expect(page.getByLabel('Playhead time')).toHaveText('00:09')
 })
 
+test('track header context menu controls view-only density, collapse, solo, and info', async ({ page }) => {
+  await page.setViewportSize({ width: 1008, height: 444 })
+  await page.goto('/?scenario=timeline-editing')
+
+  const videoHeader = page.locator('[data-timeline-track-header="track-video"]')
+  const videoLane = page.locator('[data-timeline-track-lane="track-video"]')
+  const audioHeader = page.locator('[data-timeline-track-header="track-audio"]')
+  await videoHeader.click({ button: 'right' })
+  const menu = page.getByRole('menu', { name: 'Video' })
+  await expect(menu.getByRole('menuitem', { name: 'Collapse track' })).toBeVisible()
+  await menu.getByRole('menuitem', { name: 'Track height' }).click()
+  const heightMenu = page.getByRole('menu', { name: 'Track height' })
+  await expect(heightMenu.getByRole('menuitem')).toHaveCount(3)
+  await heightMenu.getByRole('menuitem', { name: /Compact/ }).click()
+  await expect(videoLane).toHaveClass(/timeline-track-density--compact/)
+  await expect(videoHeader).toHaveCSS('height', '48px')
+  await expect(videoLane).toHaveCSS('height', '48px')
+  await expect(page.locator('[data-timeline-clip="edit-video-1"]')).toHaveCSS('height', '40px')
+
+  await videoHeader.click({ button: 'right' })
+  await page.getByRole('menu', { name: 'Video' }).getByRole('menuitem', { name: 'Track height' }).click()
+  await page.getByRole('menu', { name: 'Track height' }).getByRole('menuitem', { name: /Relaxed/ }).click()
+  await expect(videoHeader).toHaveCSS('height', '136px')
+  await expect(videoLane).toHaveCSS('height', '136px')
+
+  await videoHeader.click({ button: 'right' })
+  await page.getByRole('menu', { name: 'Video' }).getByRole('menuitem', { name: 'Collapse track' }).click()
+  await expect(videoLane).toHaveClass(/is-collapsed/)
+  await expect(page.locator('[data-timeline-clip="edit-video-1"]')).toBeHidden()
+
+  await videoHeader.click({ button: 'right' })
+  await page.getByRole('menu', { name: 'Video' }).getByRole('menuitem', { name: 'Show only this track' }).click()
+  await expect(audioHeader).toHaveCount(0)
+  await expect(page.locator('[data-timeline-track-header="track-video"]')).toContainText('Solo')
+
+  await videoHeader.click({ button: 'right' })
+  await page.getByRole('menu', { name: 'Video' }).getByRole('menuitem', { name: 'View track information' }).click()
+  const info = page.getByRole('dialog', { name: 'Video' })
+  await expect(info).toContainText('track-video')
+  await expect(info).toContainText('Only affects this editor view')
+  await info.getByRole('button', { name: 'Close track information' }).click()
+
+  await videoHeader.focus()
+  await page.keyboard.press('Shift+F10')
+  await expect(page.getByRole('menu', { name: 'Video' })).toBeVisible()
+  await page.keyboard.press('Escape')
+})
+
 test('video clip context menu uses the hit time for split and exposes range submenu', async ({ page }) => {
   await page.setViewportSize({ width: 1008, height: 444 })
   await page.goto('/?scenario=timeline-editing')

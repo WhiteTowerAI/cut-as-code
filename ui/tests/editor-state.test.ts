@@ -110,6 +110,22 @@ test('timeline work area and annotations snap to project frames', () => {
   expect(store.getState().timelineWorkspace).toEqual({})
 })
 
+test('timeline track view controls stay local to the editor store', () => {
+  const store = createStateStore()
+
+  store.getState().setTimelineTrackDensity('track-video', 'compact')
+  store.getState().setTimelineTrackCollapsed('track-video', true)
+  store.getState().setTimelineSoloTrack('track-video')
+
+  expect(store.getState().timelineTrackViews).toEqual({
+    'track-video': { density: 'compact', collapsed: true },
+  })
+  expect(store.getState().timelineSoloTrackId).toBe('track-video')
+
+  store.getState().setTimelineSoloTrack()
+  expect(store.getState().timelineSoloTrackId).toBeUndefined()
+})
+
 test('select replaces the existing editor selection', () => {
   const store = createStateStore()
 

@@ -66,6 +66,13 @@ export type TimelineMarker = Readonly<{
   label: string
 }>
 
+export type TimelineTrackDensity = 'compact' | 'standard' | 'relaxed'
+
+export type TimelineTrackView = Readonly<{
+  collapsed?: boolean
+  density?: TimelineTrackDensity
+}>
+
 function timelineCommandMessage(command: TimelineEditCommand) {
   if (command.type === 'split') return 'Clip split'
   if (command.type === 'delete') return 'Clip deleted'
@@ -289,6 +296,8 @@ export type EditorState = {
   playbackRange: PlaybackRange | null
   timelineWorkspace: TimelineWorkspace
   timelineMarkers: readonly TimelineMarker[]
+  timelineTrackViews: Readonly<Record<string, TimelineTrackView>>
+  timelineSoloTrackId?: string
   timelineZoom: number
   snapEnabled: boolean
   openMenu: MenuId
@@ -306,6 +315,9 @@ export type EditorState = {
   setTimelineWorkspaceBoundary: (edge: 'in' | 'out', timeS: number) => void
   clearTimelineWorkspace: () => void
   addTimelineMarker: (kind: TimelineMarker['kind'], timeS: number, label: string) => void
+  setTimelineTrackCollapsed: (trackId: string, collapsed: boolean) => void
+  setTimelineTrackDensity: (trackId: string, density: TimelineTrackDensity) => void
+  setTimelineSoloTrack: (trackId?: string) => void
   select: (selection: EditorSelection) => void
   setActiveTab: (tab: LibraryTab) => void
   setTimelineZoom: (zoom: number) => void
@@ -349,6 +361,9 @@ export type EditorInitialState = Omit<
   | 'setTimelineWorkspaceBoundary'
   | 'clearTimelineWorkspace'
   | 'addTimelineMarker'
+  | 'setTimelineTrackCollapsed'
+  | 'setTimelineTrackDensity'
+  | 'setTimelineSoloTrack'
   | 'select'
   | 'setActiveTab'
   | 'setTimelineZoom'
@@ -378,6 +393,8 @@ export type EditorInitialState = Omit<
   | 'timelineError'
   | 'timelineWorkspace'
   | 'timelineMarkers'
+  | 'timelineTrackViews'
+  | 'timelineSoloTrackId'
 >
 
 export function createEditorStore(initialState: EditorInitialState, runtime?: EditorRuntimeAdapter) {
@@ -394,6 +411,8 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
     playbackRange: null,
     timelineWorkspace: {},
     timelineMarkers: [],
+    timelineTrackViews: {},
+    timelineSoloTrackId: undefined,
     addActivity: (entry) => set((state) => ({
       activityLog: [...state.activityLog, {
         ...entry,
@@ -464,6 +483,19 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
       }
       set({ timelineMarkers: [...state.timelineMarkers, marker] })
     },
+    setTimelineTrackCollapsed: (trackId, collapsed) => set((state) => ({
+      timelineTrackViews: {
+        ...state.timelineTrackViews,
+        [trackId]: { ...state.timelineTrackViews[trackId], collapsed },
+      },
+    })),
+    setTimelineTrackDensity: (trackId, density) => set((state) => ({
+      timelineTrackViews: {
+        ...state.timelineTrackViews,
+        [trackId]: { ...state.timelineTrackViews[trackId], density },
+      },
+    })),
+    setTimelineSoloTrack: (trackId) => set({ timelineSoloTrackId: trackId }),
     select: (selection) => set({ selection }),
     setActiveTab: (activeTab) => set({ activeTab }),
     setTimelineZoom: (zoom) => {

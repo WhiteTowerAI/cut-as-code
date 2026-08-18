@@ -9,6 +9,8 @@ import {
 } from 'react'
 import {
   ArrowUpDown,
+  ChevronDown,
+  ChevronRight,
   Flag,
   Copy,
   Eye,
@@ -40,7 +42,7 @@ import {
 import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand/vanilla'
 import type { ClipView, EditorSelection, TrackView } from './editor-model'
-import type { EditorState } from './editor-store'
+import type { EditorState, TimelineTrackView } from './editor-store'
 import { TimelineContextMenu, type TimelineContextMenuModel } from './TimelineContextMenu'
 import {
   applyTimelineEdit,
@@ -172,14 +174,36 @@ function DisabledTimelineCommand({
   )
 }
 
-function TrackHeader({ track, runtime }: { track: TrackView; runtime: boolean }) {
+function TrackHeader({
+  track,
+  runtime,
+  view,
+  solo,
+  onContextMenu,
+  onContextKey,
+}: {
+  track: TrackView
+  runtime: boolean
+  view: TimelineTrackView
+  solo: boolean
+  onContextMenu: (event: ReactMouseEvent<HTMLDivElement>, track: TrackView) => void
+  onContextKey: (event: ReactKeyboardEvent<HTMLDivElement>, track: TrackView) => void
+}) {
   const badge = track.kind === 'video' ? 'V1'
     : track.kind === 'audio' ? 'A1'
       : track.kind === 'caption' ? 'C1'
         : track.kind === 'card' ? 'K1'
           : 'M1'
   return (
-    <div className={`timeline-track-header timeline-track-header--${track.kind}`}>
+    <div
+      className={`timeline-track-header timeline-track-header--${track.kind} timeline-track-density--${view.density ?? 'standard'}${view.collapsed ? ' is-collapsed' : ''}${solo ? ' is-solo' : ''}`}
+      data-timeline-track-header={track.id}
+      tabIndex={0}
+      role="group"
+      aria-label={`${track.name} track header`}
+      onContextMenu={(event) => onContextMenu(event, track)}
+      onKeyDown={(event) => onContextKey(event, track)}
+    >
       <span className="timeline-track-badge">{badge}</span>
       {runtime ? <span className="timeline-track-name">{track.name}</span> : (
         <>
@@ -188,6 +212,7 @@ function TrackHeader({ track, runtime }: { track: TrackView; runtime: boolean })
           <button type="button" aria-label={`Mute ${track.name} track`} disabled title="Track muting is not available in project protocol V1."><VolumeX aria-hidden size={14} /></button>
         </>
       )}
+      {solo ? <span className="timeline-track-solo-label">Solo</span> : null}
     </div>
   )
 }
@@ -325,6 +350,8 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
   const snapEnabled = useStore(store, (state) => state.snapEnabled)
   const timelineWorkspace = useStore(store, (state) => state.timelineWorkspace)
   const timelineMarkers = useStore(store, (state) => state.timelineMarkers)
+  const timelineTrackViews = useStore(store, (state) => state.timelineTrackViews)
+  const timelineSoloTrackId = useStore(store, (state) => state.timelineSoloTrackId)
   const seek = useStore(store, (state) => state.seek)
   const select = useStore(store, (state) => state.select)
   const setTimelineZoom = useStore(store, (state) => state.setTimelineZoom)
@@ -332,6 +359,9 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
   const setTimelineWorkspaceBoundary = useStore(store, (state) => state.setTimelineWorkspaceBoundary)
   const clearTimelineWorkspace = useStore(store, (state) => state.clearTimelineWorkspace)
   const addTimelineMarker = useStore(store, (state) => state.addTimelineMarker)
+  const setTimelineTrackCollapsed = useStore(store, (state) => state.setTimelineTrackCollapsed)
+  const setTimelineTrackDensity = useStore(store, (state) => state.setTimelineTrackDensity)
+  const setTimelineSoloTrack = useStore(store, (state) => state.setTimelineSoloTrack)
   const editTimeline = useStore(store, (state) => state.editTimeline)
   const playRange = useStore(store, (state) => state.playRange)
   const undoTimeline = useStore(store, (state) => state.undoTimeline)
@@ -364,6 +394,7 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
   const [trimPreview, setTrimPreview] = useState<null | Readonly<{ project: NonNullable<typeof project>; sourceS: number }>>(null)
   const [contextMenu, setContextMenu] = useState<Omit<TimelineContextMenuModel, 'onClose'> | null>(null)
   const [clipInfo, setClipInfo] = useState<ClipView | null>(null)
+  const [trackInfo, setTrackInfo] = useState<TrackView | null>(null)
   const [cueInfo, setCueInfo] = useState<null | Readonly<{
     clip: ClipView
     operationId: string
@@ -395,7 +426,11 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
   const trackOrder: Readonly<Record<TrackView['kind'], number>> = {
     caption: 0, card: 1, 'graphic-motion': 2, video: 3, audio: 4,
   }
+  const effectiveSoloTrackId = timelineSoloTrackId && tracks.some((track) => track.id === timelineSoloTrackId)
+    ? timelineSoloTrackId
+    : undefined
   const visibleTracks = tracks
+    .filter((track) => !effectiveSoloTrackId || track.id === effectiveSoloTrackId)
     .slice()
     .sort((left, right) => trackOrder[left.kind] - trackOrder[right.kind])
   const selectedVideo = selection?.kind === 'video'
@@ -712,6 +747,60 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
         },
       ],
     })
+  }
+
+  function openTrackContextMenu(event: ReactMouseEvent<HTMLDivElement>, track: TrackView) {
+    event.preventDefault()
+    event.stopPropagation()
+    const view = timelineTrackViews[track.id] ?? {}
+    const isSolo = effectiveSoloTrackId === track.id
+    const clips = track.clips ?? []
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      title: track.name,
+      subtitle: `${track.kind.toUpperCase()} · ${clips.length} ${clips.length === 1 ? 'item' : 'items'}`,
+      actions: [
+        {
+          id: 'toggle-track-collapse',
+          label: view.collapsed ? 'Expand track' : 'Collapse track',
+          icon: view.collapsed ? ChevronRight : ChevronDown,
+          onSelect: () => setTimelineTrackCollapsed(track.id, !view.collapsed),
+        },
+        {
+          id: 'track-density',
+          label: 'Track height',
+          icon: Ruler,
+          separatorBefore: true,
+          submenu: (['compact', 'standard', 'relaxed'] as const).map((density) => ({
+            id: `track-density-${density}`,
+            label: `${density[0].toUpperCase()}${density.slice(1)}${(view.density ?? 'standard') === density ? ' (current)' : ''}`,
+            onSelect: () => setTimelineTrackDensity(track.id, density),
+          })),
+        },
+        {
+          id: 'solo-track',
+          label: isSolo ? 'Show all tracks' : 'Show only this track',
+          icon: Eye,
+          onSelect: () => setTimelineSoloTrack(isSolo ? undefined : track.id),
+        },
+        {
+          id: 'track-info',
+          label: 'View track information',
+          icon: Info,
+          separatorBefore: true,
+          onSelect: () => setTrackInfo(track),
+        },
+      ],
+    })
+  }
+
+  function handleTrackContextKey(event: ReactKeyboardEvent<HTMLDivElement>, track: TrackView) {
+    if (!(event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) return
+    event.preventDefault()
+    const rect = event.currentTarget.getBoundingClientRect()
+    openTrackContextMenu(event as unknown as ReactMouseEvent<HTMLDivElement>, track)
+    setContextMenu((menu) => menu ? { ...menu, x: rect.left + rect.width / 2, y: rect.top + Math.min(64, rect.height / 2) } : menu)
   }
 
   function clipSourceTimeAtProgramTime(clip: ClipView, programTimeS: number) {
@@ -1205,7 +1294,17 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
           }}
         >
           {reserveCaptionTrack && <div className="timeline-track-reserved" aria-hidden="true" />}
-          {visibleTracks.map((track) => <TrackHeader key={track.id} track={track} runtime={runtime} />)}
+          {visibleTracks.map((track) => (
+            <TrackHeader
+              key={track.id}
+              track={track}
+              runtime={runtime}
+              view={timelineTrackViews[track.id] ?? {}}
+              solo={effectiveSoloTrackId === track.id}
+              onContextMenu={openTrackContextMenu}
+              onContextKey={handleTrackContextKey}
+            />
+          ))}
         </div>
         <div
           className="timeline-surface"
@@ -1231,31 +1330,38 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
             style={{ width: hasMedia ? `${contentWidth}px` : 'calc(100% - 48px)' }}
           >
             {hasMedia && reserveCaptionTrack && <div className="timeline-lane timeline-lane--reserved" aria-hidden="true" />}
-            {hasMedia ? visibleTracks.map((track) => (
-              <div className={`timeline-lane timeline-lane--${track.kind}`} key={track.id}>
-                {(track.clips ?? []).map((clip) => (
-                  <Clip
-                    key={clip.id}
-                    track={track}
-                    clip={clip}
-                    durationS={viewDurationS}
-                    timelineZoom={timelineZoom}
-                    timelineWidthPx={viewWidthPx}
-                    presentationInsetPx={presentationInsetPx}
-                    selection={selection}
-                    select={select}
-                    editable={timelineEditable && (
-                      track.kind === 'video'
-                      || (track.kind === 'audio' && !clip.implicit && !clip.linked)
-                    )}
-                    trimming={trimDrag?.clipId === clip.id ? trimDrag.edge : null}
-                    onTrimStart={startTrim}
-                    onAudioMoveStart={startAudioMove}
-                    onContextMenu={openClipContextMenu}
-                  />
-                ))}
-              </div>
-            )) : (
+            {hasMedia ? visibleTracks.map((track) => {
+              const trackView = timelineTrackViews[track.id] ?? {}
+              return (
+                <div
+                  className={`timeline-lane timeline-lane--${track.kind} timeline-track-density--${trackView.density ?? 'standard'}${trackView.collapsed ? ' is-collapsed' : ''}`}
+                  data-timeline-track-lane={track.id}
+                  key={track.id}
+                >
+                  {(track.clips ?? []).map((clip) => (
+                    <Clip
+                      key={clip.id}
+                      track={track}
+                      clip={clip}
+                      durationS={viewDurationS}
+                      timelineZoom={timelineZoom}
+                      timelineWidthPx={viewWidthPx}
+                      presentationInsetPx={presentationInsetPx}
+                      selection={selection}
+                      select={select}
+                      editable={timelineEditable && (
+                        track.kind === 'video'
+                        || (track.kind === 'audio' && !clip.implicit && !clip.linked)
+                      )}
+                      trimming={trimDrag?.clipId === clip.id ? trimDrag.edge : null}
+                      onTrimStart={startTrim}
+                      onAudioMoveStart={startAudioMove}
+                      onContextMenu={openClipContextMenu}
+                    />
+                  ))}
+                </div>
+              )
+            }) : (
               <div className="timeline-empty-state"><span aria-hidden>▣</span><p>{runtime ? 'No timeline media in this project' : 'Drag media here to start creating'}</p></div>
             )}
             <div
@@ -1285,6 +1391,22 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
               <div><dt>Source range</dt><dd>{formatPreciseTime(clipInfo.sourceRange.startS)} – {formatPreciseTime(clipInfo.sourceRange.endS)}</dd></div>
               <div><dt>Duration</dt><dd>{formatPreciseTime(clipInfo.programRange.endS - clipInfo.programRange.startS)}</dd></div>
               <div><dt>Speed</dt><dd>{(clipInfo.speed ?? 1).toFixed(2)}×</dd></div>
+            </dl>
+          </section>
+        </div>
+      ) : null}
+      {trackInfo ? (
+        <div className="timeline-dialog-backdrop" role="presentation" onMouseDown={() => setTrackInfo(null)}>
+          <section className="timeline-clip-info-dialog" role="dialog" aria-modal="true" aria-labelledby="track-info-title" onMouseDown={(event) => event.stopPropagation()}>
+            <header><h2 id="track-info-title">{trackInfo.name}</h2><button type="button" aria-label="Close track information" onClick={() => setTrackInfo(null)}>×</button></header>
+            <dl>
+              <div><dt>Track ID</dt><dd>{trackInfo.id}</dd></div>
+              <div><dt>Type</dt><dd>{trackInfo.kind}</dd></div>
+              <div><dt>Items</dt><dd>{trackInfo.clips?.length ?? 0}</dd></div>
+              <div><dt>Program range</dt><dd>{trackInfo.clips?.length
+                ? `${formatPreciseTime(Math.min(...trackInfo.clips.map((clip) => clip.programRange.startS)))} – ${formatPreciseTime(Math.max(...trackInfo.clips.map((clip) => clip.programRange.endS)))}`
+                : 'No timeline items'}</dd></div>
+              <div><dt>View controls</dt><dd>Only affects this editor view</dd></div>
             </dl>
           </section>
         </div>

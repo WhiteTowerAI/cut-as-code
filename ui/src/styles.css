@@ -1552,6 +1552,36 @@ button {
 .timeline-track-header--audio,
 .timeline-lane--audio { --timeline-row-height: 76px; }
 
+.timeline-track-header.timeline-track-density--compact,
+.timeline-lane.timeline-track-density--compact { --timeline-row-height: 48px; }
+.timeline-track-header.timeline-track-density--relaxed,
+.timeline-lane.timeline-track-density--relaxed { --timeline-row-height: 136px; }
+.timeline-track-header.timeline-track-density--compact.timeline-track-header--caption,
+.timeline-lane.timeline-track-density--compact.timeline-lane--caption,
+.timeline-track-header.timeline-track-density--compact.timeline-track-header--card,
+.timeline-lane.timeline-track-density--compact.timeline-lane--card,
+.timeline-track-header.timeline-track-density--compact.timeline-track-header--graphic-motion,
+.timeline-lane.timeline-track-density--compact.timeline-lane--graphic-motion { --timeline-row-height: 48px; }
+.timeline-track-header.timeline-track-density--relaxed.timeline-track-header--caption,
+.timeline-lane.timeline-track-density--relaxed.timeline-lane--caption,
+.timeline-track-header.timeline-track-density--relaxed.timeline-track-header--card,
+.timeline-lane.timeline-track-density--relaxed.timeline-lane--card,
+.timeline-track-header.timeline-track-density--relaxed.timeline-track-header--graphic-motion { --timeline-row-height: 96px; }
+.timeline-lane.timeline-track-density--compact { padding-top: 4px; padding-bottom: 4px; }
+.timeline-lane--video.timeline-track-density--compact .timeline-clip-shell,
+.timeline-lane--video.timeline-track-density--compact .timeline-clip { height: 40px; }
+.timeline-lane--audio.timeline-track-density--compact .timeline-clip-shell,
+.timeline-lane--audio.timeline-track-density--compact .timeline-clip { height: 32px; }
+.timeline-lane--caption.timeline-track-density--compact .timeline-clip-shell,
+.timeline-lane--caption.timeline-track-density--compact .timeline-clip,
+.timeline-lane--card.timeline-track-density--compact .timeline-clip-shell,
+.timeline-lane--card.timeline-track-density--compact .timeline-clip,
+.timeline-lane--graphic-motion.timeline-track-density--compact .timeline-clip-shell,
+.timeline-lane--graphic-motion.timeline-track-density--compact .timeline-clip { height: 32px; }
+.timeline-track-header.is-collapsed,
+.timeline-lane.is-collapsed { --timeline-row-height: 32px; min-height: 32px; height: 32px; padding-top: 4px; padding-bottom: 4px; }
+.timeline-lane.is-collapsed > .timeline-clip-shell { display: none; }
+
 .timeline-track-badge {
   display: grid;
   place-items: center;
@@ -1580,6 +1610,9 @@ button {
 }
 
 .timeline-track-header button:disabled { cursor: not-allowed; opacity: 0.9; }
+.timeline-track-header:focus-visible { outline: 2px solid #86cabb; outline-offset: -2px; }
+.timeline-track-header.is-solo { box-shadow: inset 3px 0 #86cabb; }
+.timeline-track-solo-label { margin-left: auto; color: #86cabb; font-size: 9px; font-weight: 600; text-transform: uppercase; }
 
 .timeline-surface {
   grid-column: 2;
