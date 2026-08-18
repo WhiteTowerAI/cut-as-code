@@ -97,6 +97,7 @@ class ProjectSnapshotTests(unittest.TestCase):
             snapshot = build_snapshot(root)
 
         self.assertEqual("landscape-project", snapshot["view"]["project_id"])
+        self.assertEqual(root.name, snapshot["view"]["project_name"])
         self.assertEqual({"width": 1280, "height": 720}, snapshot["view"]["sequence_geometry"])
         self.assertEqual({
             "name": "landscape.mp4",

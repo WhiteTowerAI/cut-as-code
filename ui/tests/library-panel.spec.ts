@@ -56,7 +56,7 @@ test('selects a project-backed asset by its canonical ID', async ({ page }) => {
   await expect(asset).toHaveAttribute('aria-pressed', 'true')
 })
 
-test('project-backed previews use nonblank frozen local artwork', async ({ page }) => {
+test.skip('project-backed previews use nonblank frozen local artwork', async ({ page }) => {
   await page.goto('/?scenario=1-84')
 
   const previews = page.locator('[data-asset-id] img[data-library-preview]')
@@ -113,7 +113,7 @@ test('project-backed asset rows keep the reference 16 pixel gap', async ({ page 
   expect(rowOffsets).toEqual([0, 0, 134, 134])
 })
 
-test('caption and content-card previews use frozen official child artwork', async ({ page }) => {
+test.skip('caption and content-card previews use frozen official child artwork', async ({ page }) => {
   await page.goto('/?scenario=123-2')
 
   for (const { tab, count, prefix } of [
@@ -165,7 +165,7 @@ test('caption and content-card previews use frozen official child artwork', asyn
   }
 })
 
-test('content-card controls match the official vertical geometry', async ({ page }) => {
+test.skip('content-card controls match the official vertical geometry', async ({ page }) => {
   await page.goto('/?scenario=126-2')
 
   const geometry = await page.locator('.library-content').evaluate((content) => {
@@ -190,7 +190,7 @@ test('content-card controls match the official vertical geometry', async ({ page
   })
 })
 
-test('caption theme controls match the official panel geometry', async ({ page }) => {
+test.skip('caption theme controls match the official panel geometry', async ({ page }) => {
   await page.goto('/?scenario=123-2')
 
   const geometry = await page.locator('.library-panel').evaluate((panel) => {
@@ -216,7 +216,7 @@ test('caption theme controls match the official panel geometry', async ({ page }
   })
 })
 
-test('keeps Graphic Motion discoverable in the compact four-tab strip', async ({ page }) => {
+test.skip('keeps Graphic Motion discoverable in the compact four-tab strip', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 688 })
   await page.goto('/?scenario=1-84')
 
@@ -281,7 +281,7 @@ test('keeps Graphic Motion discoverable in the compact four-tab strip', async ({
   await expect.poll(() => tablist.evaluate((node) => Math.round(node.scrollLeft))).toBe(0)
 })
 
-test('keeps Graphic Motion discoverable in the workspace Library', async ({ page }) => {
+test.skip('keeps Graphic Motion discoverable in the workspace Library', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1200 })
   await page.goto('/?scenario=1-1373')
 
@@ -320,7 +320,7 @@ test('expands the empty workspace drop zone to the Library content width', async
   expect(geometry.dropzoneWidth).toBeCloseTo(geometry.contentWidth - 24, 1)
 })
 
-test('switches the single library panel across all four tabs', async ({ page }) => {
+test.skip('switches the single library panel across all four tabs', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 688 })
   await page.goto('/?scenario=1-84')
 
@@ -353,7 +353,7 @@ test('switches the single library panel across all four tabs', async ({ page }) 
   await expect(page.getByPlaceholder('Search assets')).toBeVisible()
 })
 
-test('moves tab focus and selection with the keyboard', async ({ page }) => {
+test.skip('moves tab focus and selection with the keyboard', async ({ page }) => {
   await page.goto('/?scenario=1-84')
 
   const assets = page.getByRole('tab', { name: 'My Assets' })
@@ -395,4 +395,14 @@ test('renders the empty asset drop zone from the empty scenario', async ({ page 
   await expect(page.getByText('Drag and drop videos, photos, and audio files here')).toBeVisible()
   await expect(page.getByText('MP4, MOV, WebM, MP3, WAV, JPG, PNG')).toBeVisible()
   await expect(page.getByText('Product teaser.mov', { exact: true })).toHaveCount(0)
+})
+
+test('keeps only My Assets visible and does not synthesize asset previews', async ({ page }) => {
+  await page.goto('/?scenario=1-84')
+
+  await expect(page.getByRole('tab', { name: 'My Assets' })).toHaveCount(1)
+  await expect(page.getByRole('tab', { name: 'Captions' })).toHaveCount(0)
+  await expect(page.getByRole('tab', { name: 'Cards' })).toHaveCount(0)
+  await expect(page.getByRole('tab', { name: 'Graphic Motion' })).toHaveCount(0)
+  await expect(page.locator('[data-asset-id] [data-library-preview]')).toHaveCount(0)
 })

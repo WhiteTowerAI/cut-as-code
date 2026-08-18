@@ -36,6 +36,7 @@ export type RuntimeSnapshot = Readonly<{
   view: Readonly<{
     schema_version?: number
     project_id?: string
+    project_name?: string
     project_revision?: number
     active_sequence?: string
     source_media_id?: string

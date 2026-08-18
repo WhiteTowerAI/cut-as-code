@@ -108,6 +108,7 @@ test('loads snapshots and exposes only opaque resource identifiers', async () =>
 
     expect(snapshot.ok).toBe(true)
     expect(snapshot.snapshot.view.active_sequence).toBe('main')
+    expect(snapshot.snapshot.view.project_name).toBe(path.basename(projectRoot))
     expect(snapshot.snapshot.resources).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: expect.stringMatching(/^res_[a-f0-9]+$/), kind: 'project' }),
       expect.objectContaining({ id: expect.stringMatching(/^res_[a-f0-9]+$/), kind: 'plan' }),
@@ -136,6 +137,50 @@ test('loads snapshots and exposes only opaque resource identifiers', async () =>
     expect(pathEscape.status()).toBe(404)
   } finally {
     await isolated.client.dispose()
+    await stopSidecar(isolated.process)
+  }
+})
+
+test('imports a selected media file into the opened project input directory', async () => {
+  const isolated = await authenticatedSidecar()
+  try {
+    const response = await isolated.client.post(
+      `/v1/projects/${isolated.ready.projectId}/imports`,
+      {
+        multipart: {
+          asset: { name: 'intro.mp3', mimeType: 'audio/mpeg', buffer: Buffer.from('imported audio') },
+        },
+        headers: { Origin: isolatedURL(isolated.ready) },
+      },
+    )
+    const body = await response.json()
+    expect(response.status(), JSON.stringify(body)).toBe(201)
+    expect(body).toMatchObject({
+      ok: true,
+      import: { name: 'intro.mp3', size: 14, media_type: 'audio/mpeg' },
+      snapshot: { media: expect.arrayContaining([expect.objectContaining({ name: 'intro.mp3', media_type: 'audio/mpeg' })]) },
+    })
+    expect((await readFile(path.join(projectRoot, 'input', 'intro.mp3'))).toString()).toBe('imported audio')
+  } finally {
+    await isolated.client.dispose()
+    await stopSidecar(isolated.process)
+  }
+})
+
+test('browser file selection immediately adds the imported asset to My Assets', async ({ page }) => {
+  const isolated = await startSidecar(projectRoot)
+  try {
+    await page.goto(await armLaunch(isolated))
+    await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+    await expect(page.locator('[data-runtime-project-status]')).toContainText(path.basename(projectRoot))
+
+    const fileInput = page.locator('input.asset-file-input').first()
+    await fileInput.setInputFiles({ name: 'voiceover.wav', mimeType: 'audio/wav', buffer: Buffer.from('waveform') })
+
+    await expect(page.locator('[data-asset-id]').filter({ hasText: 'voiceover.wav' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'My Assets' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Captions' })).toHaveCount(0)
+  } finally {
     await stopSidecar(isolated.process)
   }
 })

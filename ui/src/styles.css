@@ -288,6 +288,12 @@ button {
   object-fit: cover;
 }
 
+.asset-file-input { display: none; }
+
+.library-preview--asset {
+  background: transparent;
+}
+
 .library-runtime-empty {
   display: grid;
   min-height: 112px;

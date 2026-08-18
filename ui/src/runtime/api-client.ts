@@ -60,6 +60,23 @@ export class RuntimeApiClient {
     if (!response.ok || !value.ok) throw new Error(value.error ?? 'Could not open the exported video')
   }
 
+  async importFiles(files: readonly File[]): Promise<RuntimeSnapshot> {
+    if (!files.length) throw new Error('Choose at least one media file')
+    let snapshot: RuntimeSnapshot | undefined
+    for (const file of files) {
+      const body = new FormData()
+      body.append('asset', file, file.name)
+      const response = await fetch(`/v1/projects/${encodeURIComponent(this.projectId)}/imports`, {
+        method: 'POST', credentials: 'same-origin', body,
+      })
+      const value = await response.json() as SnapshotResponse
+      if (!response.ok || !value.ok) throw new Error((value as SnapshotResponse & { error?: string }).error ?? 'Could not import media')
+      snapshot = value.snapshot
+    }
+    if (!snapshot) throw new Error('Could not import media')
+    return snapshot
+  }
+
   async updateContentCards(readSet: RuntimeReadSet, review: ContentCardsReview) {
     return this.updatePlan('content-cards', readSet, review)
   }

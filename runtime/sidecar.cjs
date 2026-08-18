@@ -11,6 +11,8 @@ const readline = require('node:readline')
 const LOOPBACK = '127.0.0.1'
 const LAUNCH_TTL_MS = 60_000
 const PROTOCOL_CALL_TIMEOUT_MS = 30_000
+const MAX_IMPORT_BYTES = 2 * 1024 * 1024 * 1024
+const IMPORT_EXTENSIONS = new Set(['.mp4', '.mov', '.webm', '.mp3', '.wav', '.jpg', '.jpeg', '.png', '.webp', '.gif'])
 const HTTP_ROUTE_ALLOWLIST = Object.freeze([
   Object.freeze({ id: 'launch', methods: Object.freeze(['GET']), pattern: /^\/$/ }),
   Object.freeze({ id: 'meta', methods: Object.freeze(['GET']), pattern: /^\/v1\/meta$/ }),
@@ -21,6 +23,7 @@ const HTTP_ROUTE_ALLOWLIST = Object.freeze([
   Object.freeze({ id: 'export-status', methods: Object.freeze(['GET']), pattern: /^\/v1\/projects\/([^/]+)\/exports\/status$/ }),
   Object.freeze({ id: 'export-action', methods: Object.freeze(['POST']), pattern: /^\/v1\/projects\/([^/]+)\/exports\/(open|reveal)$/ }),
   Object.freeze({ id: 'resource', methods: Object.freeze(['GET']), pattern: /^\/v1\/projects\/([^/]+)\/resources\/(res_[a-f0-9]+)$/ }),
+  Object.freeze({ id: 'import', methods: Object.freeze(['POST']), pattern: /^\/v1\/projects\/([^/]+)\/imports$/ }),
   Object.freeze({ id: 'file', methods: Object.freeze(['GET']), pattern: /^\/v1\/projects\/([^/]+)\/(media|artifacts)\/((?:asset|artifact)_[a-f0-9]+)$/ }),
   Object.freeze({ id: 'layer-frame', methods: Object.freeze(['GET', 'HEAD']), pattern: /^\/v1\/projects\/([^/]+)\/layers\/(layer_[a-f0-9]+)\/frames\/(\d+)$/ }),
   Object.freeze({ id: 'events', methods: Object.freeze(['GET']), pattern: /^\/v1\/projects\/([^/]+)\/events$/ }),
@@ -211,6 +214,19 @@ async function handleRequest(state, request, response) {
       })
       return json(response, result.ok ? 200 : 404, result)
     }
+    if (route.id === 'import' && match[1] === state.projectId) {
+      if (request.headers.origin !== state.origin) return json(response, 403, { ok: false, error: 'invalid origin' })
+      try {
+        const imported = await writeMultipartImportedFile(state.root, request)
+        await refreshFiles(state, false)
+        const result = await state.protocol.call({ verb: 'get_snapshot', project_id: state.projectId })
+        attachPublicFiles(state, result)
+        notifyProjectChange(state)
+        return json(response, result.ok ? 201 : 400, { ...result, import: imported })
+      } catch (error) {
+        return json(response, 400, { ok: false, error: error instanceof Error ? error.message : 'could not import file' })
+      }
+    }
     if (route.id === 'file' && match[1] === state.projectId) {
       const registry = match[2] === 'media' ? state.media : state.artifacts
       const item = registry.get(match[3])
@@ -374,7 +390,7 @@ function watchProject(state) {
     clearTimeout(timer)
     timer = setTimeout(async () => {
       await refreshFiles(state).catch(() => {})
-      for (const client of state.clients) client.write(`event: project-change\ndata: ${JSON.stringify({ projectId: state.projectId })}\n\n`)
+      notifyProjectChange(state)
     }, 50)
   }
   const watchers = []
@@ -384,6 +400,10 @@ function watchProject(state) {
     try { watchers.push(fs.watch(directory, { recursive: true }, changed)) } catch { watchers.push(fs.watch(directory, changed)) }
   }
   return { close: () => { clearTimeout(timer); for (const watcher of watchers) watcher.close() } }
+}
+
+function notifyProjectChange(state) {
+  for (const client of state.clients) client.write(`event: project-change\ndata: ${JSON.stringify({ projectId: state.projectId })}\n\n`)
 }
 
 async function refreshFiles(state, refreshLayers = true) {
@@ -398,9 +418,7 @@ async function refreshLayerSequences(state) {
   } catch {
     return
   }
-  for (const client of state.clients) {
-    client.write(`event: project-change\ndata: ${JSON.stringify({ projectId: state.projectId })}\n\n`)
-  }
+  notifyProjectChange(state)
 }
 
 async function collectLayerSequences(root) {
@@ -808,6 +826,129 @@ function readJson(request) {
   })
 }
 
+function importName(value) {
+  if (typeof value !== 'string' || !value || value.length > 180 || value !== path.basename(value) || value === '.' || value === '..' || /[\0-\x1f]/.test(value)) {
+    throw new Error('invalid import file name')
+  }
+  if (!IMPORT_EXTENSIONS.has(path.extname(value).toLowerCase())) throw new Error('unsupported import file type')
+  return value
+}
+
+async function importDirectory(root) {
+  const directory = path.join(root, 'input')
+  await fsp.mkdir(directory, { recursive: true })
+  const real = await fsp.realpath(directory)
+  if (real !== directory || !isContained(root, real) || (await fsp.lstat(directory)).isSymbolicLink()) {
+    throw new Error('project input directory is unsafe')
+  }
+  return real
+}
+
+async function createImportWriter(root, name) {
+  const directory = await importDirectory(root)
+  const safeName = importName(name)
+  const temporary = path.join(directory, `.import-${crypto.randomBytes(16).toString('hex')}.tmp`)
+  const handle = await fsp.open(temporary, 'wx')
+  let size = 0
+  let closed = false
+  const close = async () => {
+    if (closed) return
+    closed = true
+    await handle.close()
+  }
+  return {
+    async write(chunk) {
+      const value = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+      size += value.length
+      if (size > MAX_IMPORT_BYTES) throw new Error('import file is too large')
+      await handle.write(value)
+    },
+    async finish() {
+      await close()
+      const parsed = path.parse(safeName)
+      try {
+        for (let index = 1; ; index += 1) {
+          const candidateName = index === 1 ? safeName : `${parsed.name}-${index}${parsed.ext}`
+          const candidate = path.join(directory, candidateName)
+          try {
+            await fsp.link(temporary, candidate)
+            return { name: candidateName, size, media_type: mediaType(candidate) }
+          } catch (error) {
+            if (error?.code !== 'EEXIST') throw error
+          }
+        }
+      } finally {
+        await fsp.unlink(temporary).catch(() => {})
+      }
+    },
+    async abort() {
+      await close().catch(() => {})
+      await fsp.unlink(temporary).catch(() => {})
+    },
+  }
+}
+
+async function writeImportedFile(root, name, source) {
+  const writer = await createImportWriter(root, name)
+  try {
+    for await (const chunk of source) await writer.write(chunk)
+    return await writer.finish()
+  } catch (error) {
+    await writer.abort()
+    throw error
+  }
+}
+
+async function writeMultipartImportedFile(root, request) {
+  const contentType = request.headers['content-type']
+  const match = typeof contentType === 'string' ? /^multipart\/form-data;\s*boundary=(?:"([^"]+)"|([^;\s]+))/i.exec(contentType) : null
+  const boundary = match?.[1] ?? match?.[2]
+  if (!boundary) throw new Error('import must use multipart form data')
+  const delimiter = Buffer.from(`\r\n--${boundary}`)
+  const opening = Buffer.from(`--${boundary}\r\n`)
+  let pending = Buffer.alloc(0)
+  let writer = null
+  let completed = false
+  try {
+    for await (const chunk of request) {
+      pending = Buffer.concat([pending, Buffer.from(chunk)])
+      if (!writer) {
+        const headerEnd = pending.indexOf('\r\n\r\n')
+        if (headerEnd < 0) {
+          if (pending.length > 16_384) throw new Error('import headers are too large')
+          continue
+        }
+        if (!pending.subarray(0, opening.length).equals(opening)) throw new Error('invalid import form data')
+        const headers = pending.subarray(opening.length, headerEnd).toString('utf8')
+        const disposition = /content-disposition:\s*form-data;\s*name="asset";\s*filename="([^"]+)"/i.exec(headers)
+        if (!disposition) throw new Error('import requires one asset file')
+        writer = await createImportWriter(root, disposition[1])
+        pending = pending.subarray(headerEnd + 4)
+      }
+      const boundaryIndex = pending.indexOf(delimiter)
+      if (boundaryIndex >= 0) {
+        await writer.write(pending.subarray(0, boundaryIndex))
+        pending = pending.subarray(boundaryIndex + delimiter.length)
+        if (pending.length < 2) continue
+        if (!pending.subarray(0, 2).equals(Buffer.from('--'))) throw new Error('only one import file is allowed')
+        completed = true
+        request.resume()
+        break
+      }
+      const retained = delimiter.length + 4
+      if (pending.length > retained) {
+        await writer.write(pending.subarray(0, pending.length - retained))
+        pending = pending.subarray(pending.length - retained)
+      }
+    }
+    if (!writer || !completed) throw new Error('invalid import form data')
+    return await writer.finish()
+  } catch (error) {
+    await writer?.abort()
+    throw error
+  }
+}
+
 function json(response, status, value) {
   if (response.headersSent) return response.end()
   const body = JSON.stringify(value)
@@ -909,7 +1050,7 @@ async function startProtocolService(runtimeRoot) {
   }
 }
 
-module.exports = { HTTP_ROUTE_ALLOWLIST, LAUNCH_TTL_MS, PROTOCOL_CALL_TIMEOUT_MS, launchIsExpired, routeForRequest, openExportPath, summarizeExportFailure, cueIdFor }
+module.exports = { HTTP_ROUTE_ALLOWLIST, LAUNCH_TTL_MS, PROTOCOL_CALL_TIMEOUT_MS, MAX_IMPORT_BYTES, launchIsExpired, routeForRequest, openExportPath, summarizeExportFailure, cueIdFor, writeImportedFile }
 
 if (require.main === module) {
   main().catch((error) => {

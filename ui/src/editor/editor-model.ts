@@ -12,7 +12,7 @@ export type EditorSelection =
 export type AssetView = Readonly<{
   id: string
   name: string
-  kind: 'video' | 'audio'
+  kind: 'video' | 'audio' | 'image'
   mediaType?: string
   url?: string
   durationS?: number

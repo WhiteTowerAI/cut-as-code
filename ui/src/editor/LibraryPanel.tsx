@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { Plus } from 'lucide-react'
 import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand/vanilla'
@@ -7,12 +7,13 @@ import { draftFieldsForCue, type EditorState } from './editor-store'
 
 type LibraryPanelProps = {
   store: StoreApi<EditorState>
+  importAssets?: (files: readonly File[]) => Promise<void>
 }
 
 type TileItem = {
   id: string
   label: string
-  preview: 'product' | 'founder' | 'brand' | 'city' | 'runtime'
+  preview: 'asset' | 'product' | 'founder' | 'brand' | 'city' | 'runtime'
   image?: string
   previewText?: string
   duration?: string
@@ -24,34 +25,22 @@ type TileItem = {
 
 const tabs: ReadonlyArray<{ id: LibraryTab; label: string }> = [
   { id: 'assets', label: 'My Assets' },
-  { id: 'captions', label: 'Captions' },
-  { id: 'cards', label: 'Cards' },
-  { id: 'graphic-motion', label: 'Graphic Motion' },
 ]
 
-const assetPreviewMetadata: Readonly<Record<string, Pick<TileItem, 'preview' | 'image' | 'duration' | 'status'>>> = {
-  'asset-product': { preview: 'product', image: '/assets/editor/product.png', duration: '00:18', status: 'Added' },
-  'asset-interview': { preview: 'founder', image: '/assets/editor/founder.png', duration: '18:42' },
-  'asset-brand': { preview: 'brand', image: '/assets/editor/brand.png', duration: '00:08' },
-  'asset-city': { preview: 'city', image: '/assets/editor/city.png', duration: '00:05' },
-}
-
-const fallbackPreviews: readonly TileItem['preview'][] = ['product', 'founder', 'brand', 'city']
+// Captions, Cards, and Graphic Motion panels remain implemented below for a future restore.
 
 function tileForAsset(asset: AssetView, runtime = false): TileItem {
   if (runtime) {
     return {
       id: asset.id,
       label: asset.name,
-      preview: 'product',
+      preview: 'asset',
       mediaUrl: asset.url,
       mediaType: asset.mediaType,
       duration: asset.durationS === undefined ? undefined : `${asset.durationS.toFixed(1)}s`,
     }
   }
-  const fallbackIndex = [...asset.id].reduce((sum, character) => sum + character.charCodeAt(0), 0) % fallbackPreviews.length
-  const previewMetadata = assetPreviewMetadata[asset.id] ?? { preview: fallbackPreviews[fallbackIndex] }
-  return { id: asset.id, label: asset.name, ...previewMetadata }
+  return { id: asset.id, label: asset.name, preview: 'asset' }
 }
 
 const captionStyles: readonly TileItem[] = [
@@ -89,11 +78,16 @@ function SearchField({ placeholder, compact = false }: { placeholder: string; co
   )
 }
 
-function AssetControls() {
+function AssetControls({ onImport, disabled }: { onImport?: (files: readonly File[]) => void; disabled?: boolean }) {
+  const inputRef = useRef<HTMLInputElement>(null)
   return (
     <div className="library-controls">
       <SearchField placeholder="Search assets" compact />
-      <button className="library-icon-button" type="button" aria-label="Import assets" title="Import assets">
+      <input ref={inputRef} className="asset-file-input" type="file" accept="video/mp4,video/quicktime,video/webm,audio/mpeg,audio/wav,image/jpeg,image/png,image/webp,image/gif" multiple onChange={(event) => {
+        onImport?.([...event.currentTarget.files ?? []])
+        event.currentTarget.value = ''
+      }} />
+      <button className="library-icon-button" type="button" aria-label="Import assets" title="Import assets" disabled={disabled} onClick={() => inputRef.current?.click()}>
         <img className="library-control-icon" src="/assets/editor/icon-upload.svg" alt="" />
       </button>
       <button className="library-icon-button" type="button" aria-label="Filter assets" title="Filter assets">
@@ -153,10 +147,10 @@ function TileGrid({
   )
 }
 
-function EmptyAssets() {
+function EmptyAssets({ onImport, disabled }: { onImport?: () => void; disabled?: boolean }) {
   return (
     <div className="asset-dropzone">
-      <button className="asset-import-action" type="button">
+      <button className="asset-import-action" type="button" disabled={disabled} onClick={onImport}>
         <span className="asset-import-icon"><Plus aria-hidden="true" size={20} /></span>
         <span>Import media</span>
       </button>
@@ -170,23 +164,44 @@ function RuntimeEmpty({ children }: { children: ReactNode }) {
   return <div className="library-runtime-empty" role="status">{children}</div>
 }
 
-function AssetsPanel({ store }: LibraryPanelProps) {
+function AssetsPanel({ store, importAssets }: LibraryPanelProps) {
   const project = useStore(store, (state) => state.project)
   const selection = useStore(store, (state) => state.selection)
   const select = useStore(store, (state) => state.select)
   const runtime = Boolean(project?.runtime)
   const assetTiles = project?.assets.map((asset) => tileForAsset(asset, runtime)) ?? []
+  const [importError, setImportError] = useState<string | null>(null)
+  const importInputRef = useRef<HTMLInputElement>(null)
+  const importFiles = async (files: readonly File[]) => {
+    if (!importAssets || !files.length) return
+    setImportError(null)
+    try {
+      await importAssets(files)
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : 'Could not import media')
+    }
+  }
+  const importFromInput = (event: ChangeEvent<HTMLInputElement>) => {
+    void importFiles([...event.currentTarget.files ?? []])
+    event.currentTarget.value = ''
+  }
+  const importFromDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    void importFiles([...event.dataTransfer.files])
+  }
 
   return (
     <>
-      {!runtime && <AssetControls />}
+      <AssetControls onImport={(files) => { void importFiles(files) }} disabled={!importAssets} />
+      <input ref={importInputRef} className="asset-file-input" type="file" accept="video/mp4,video/quicktime,video/webm,audio/mpeg,audio/wav,image/jpeg,image/png,image/webp,image/gif" multiple onChange={importFromInput} />
       {assetTiles.length ? (
         <TileGrid items={assetTiles} kind="asset" selectedId={selection?.id} onSelect={select} assetSize />
-      ) : runtime ? (
-        <RuntimeEmpty>No project media</RuntimeEmpty>
       ) : (
-        <EmptyAssets />
+        <div onDrop={importFromDrop} onDragOver={(event) => event.preventDefault()}>
+          <EmptyAssets onImport={() => importInputRef.current?.click()} disabled={!importAssets} />
+        </div>
       )}
+      {importError ? <RuntimeEmpty>{importError}</RuntimeEmpty> : null}
     </>
   )
 }
@@ -353,18 +368,20 @@ function PanelContent({ activeTab, store, operation }: { activeTab: LibraryTab; 
   return <MotionPanel store={store} />
 }
 
-export function LibraryPanel({ store }: LibraryPanelProps) {
+export function LibraryPanel({ store, importAssets }: LibraryPanelProps) {
   const activeTab = useStore(store, (state) => state.activeTab)
+  const visibleActiveTab: LibraryTab = activeTab === 'assets' ? activeTab : 'assets'
   const setActiveTab = useStore(store, (state) => state.setActiveTab)
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
   const contentCardsOperation = useStore(store, (state) => state.project?.operations?.find((operation) => operation.kind === 'content-cards'))
 
   useEffect(() => {
-    tabRefs.current[tabs.findIndex((tab) => tab.id === activeTab)]?.scrollIntoView({
+    if (activeTab !== 'assets') setActiveTab('assets')
+    tabRefs.current[tabs.findIndex((tab) => tab.id === visibleActiveTab)]?.scrollIntoView({
       block: 'nearest',
       inline: 'nearest',
     })
-  }, [activeTab])
+  }, [activeTab, setActiveTab, visibleActiveTab])
 
   function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     let nextIndex = index
@@ -384,7 +401,7 @@ export function LibraryPanel({ store }: LibraryPanelProps) {
       <header className="library-titlebar">
         <div className="library-tabs" role="tablist" aria-label="Library sections">
           {tabs.map((tab, index) => {
-            const selected = activeTab === tab.id
+            const selected = visibleActiveTab === tab.id
             return (
               <button
                 key={tab.id}
@@ -410,9 +427,9 @@ export function LibraryPanel({ store }: LibraryPanelProps) {
         className="library-content"
         id="library-panel-content"
         role="tabpanel"
-        aria-labelledby={`library-tab-${activeTab}`}
+        aria-labelledby={`library-tab-${visibleActiveTab}`}
       >
-        <PanelContent activeTab={activeTab} store={store} operation={contentCardsOperation} />
+        <AssetsPanel store={store} importAssets={importAssets} />
       </div>
     </section>
   )

@@ -133,6 +133,7 @@ def build_snapshot(project_root):
     view = {
         "schema_version": project.get("schema_version"),
         "project_id": project.get("project_id"),
+        "project_name": root.name,
         "project_revision": project.get("revision", 1),
         "active_sequence": project.get("active_sequence"),
         "operation_count": len(operations),

@@ -280,6 +280,34 @@ process.stdout.write(summarizeExportFailure(
         self.assertNotIn("Projects", result.stdout)
         self.assertNotIn("46-sol", result.stdout)
 
+    def test_import_writes_unique_files_inside_the_project_input_directory(self) -> None:
+        script = r"""
+const { Readable } = require('node:stream');
+const { writeImportedFile } = require(process.argv[1]);
+const root = process.argv[2];
+(async () => {
+  const first = await writeImportedFile(root, 'clip.mp4', Readable.from(Buffer.from('first')));
+  const second = await writeImportedFile(root, 'clip.mp4', Readable.from(Buffer.from('second')));
+  process.stdout.write(JSON.stringify({ first, second }));
+})().catch((error) => { process.stderr.write(error.stack); process.exitCode = 1; });
+"""
+        with tempfile.TemporaryDirectory(prefix="cut editor import ") as temporary:
+            root = Path(temporary) / "project"
+            root.mkdir()
+            result = subprocess.run(
+                ["node", "-e", script, str(REPOSITORY_ROOT / "runtime" / "sidecar.cjs"), str(root)],
+                check=True,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=20,
+            )
+            imported = json.loads(result.stdout)
+            self.assertEqual("clip.mp4", imported["first"]["name"])
+            self.assertEqual("clip-2.mp4", imported["second"]["name"])
+            self.assertEqual(b"first", (root / "input" / "clip.mp4").read_bytes())
+            self.assertEqual(b"second", (root / "input" / "clip-2.mp4").read_bytes())
+
     def test_invalid_open_browser_is_a_correlated_invalid_params_error(self) -> None:
         with tempfile.TemporaryDirectory(prefix="cut invalid browser flag ") as temporary:
             project_root = Path(temporary) / "project"

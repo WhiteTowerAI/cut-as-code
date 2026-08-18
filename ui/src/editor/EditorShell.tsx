@@ -321,7 +321,13 @@ function Workspace({
         </div>
       ) : null}
       <div className="workspace-primary">
-        <LibraryPanel store={store} />
+        <LibraryPanel
+          store={store}
+          importAssets={runtime ? async (files) => {
+            const snapshot = await runtime.client.importFiles(files)
+            store.getState().setProject(projectFromSnapshot(null, snapshot))
+          } : undefined}
+        />
         <ViewerPanel store={store} />
       </div>
       <div className="workspace-timeline">
@@ -432,7 +438,13 @@ export function EditorShell({ runtime }: { runtime?: RuntimeProjectStatus }) {
       ) : isViewerScenario ? (
         <ViewerPanel store={store} />
       ) : (
-        <LibraryPanel store={store} />
+        <LibraryPanel
+          store={store}
+          importAssets={runtime ? async (files) => {
+            const snapshot = await runtime.client.importFiles(files)
+            store.getState().setProject(projectFromSnapshot(null, snapshot))
+          } : undefined}
+        />
       )}
     </main>
   )
@@ -555,7 +567,9 @@ export function projectFromSnapshot(base: EditorProjectView | null, snapshot: Ru
   const assets = snapshot.media.map((item) => ({
     id: item.id,
     name: item.name,
-    kind: item.media_type?.startsWith('audio/') ? 'audio' as const : 'video' as const,
+    kind: item.media_type?.startsWith('audio/') ? 'audio' as const
+      : item.media_type?.startsWith('image/') ? 'image' as const
+        : 'video' as const,
     mediaType: item.media_type,
     url: item.url,
     ...(item.id === snapshot.view.source_media_id && snapshot.view.source_media ? {
@@ -766,7 +780,7 @@ function RuntimeStatus({ status }: { status: RuntimeProjectStatus }) {
       aria-label="Runtime project status"
     >
       <strong>Cut as Code</strong>
-      <span>{projectId}</span>
+      <span>{snapshot.view.project_name ?? projectId}</span>
       <span className="runtime-status-secondary">{snapshot.errors.length ? `${snapshot.errors.length} protocol errors` : 'No protocol errors'}</span>
     </div>
   )
