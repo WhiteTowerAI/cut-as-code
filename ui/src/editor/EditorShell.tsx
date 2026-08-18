@@ -43,6 +43,7 @@ import type { ContentCardsReview, RuntimeExportJob, RuntimeReadSet, RuntimeSnaps
 import { RuntimeApiClient, RuntimeConflictError } from '../runtime/api-client'
 import type { ContentCardsDraftChange } from './editor-store'
 import type { EditorProjectView } from './editor-model'
+import type { TimelineEditCommand } from './timeline-edit'
 
 type IconItem = Readonly<{
   label: string
@@ -405,7 +406,7 @@ export function EditorShell({ runtime }: { runtime?: RuntimeProjectStatus }) {
     store.getState().setProject(projectFromSnapshot(null, runtime.snapshot))
   }, [bridge, runtime, scenario.initialState.project, store])
   const viewerScenarios = new Set(['1-282', '57-152', '1-1026', '1-528', '123-79'])
-  const timelineScenarios = new Set(['1-324', '1-1115', '1-754', '123-167'])
+  const timelineScenarios = new Set(['1-324', '1-1115', '1-754', '123-167', 'timeline-editing'])
   const isViewerScenario = viewerScenarios.has(scenarioId)
   const isTimelineScenario = timelineScenarios.has(scenarioId)
   const isMenuFrame = scenarioId === '57-152' || scenarioId === '1-528'
@@ -462,11 +463,35 @@ function runtimeAdapter(client: RuntimeApiClient, initial: RuntimeSnapshot) {
   const currentProject = (next: RuntimeSnapshot) => {
     snapshot = next
     const project = projectFromSnapshot(null, next)
-    if (!project) throw new Error('Content Cards snapshot is unavailable')
+    if (!project) throw new Error('Editor snapshot is unavailable')
     return project
   }
   return {
     sync: (next: RuntimeSnapshot) => { snapshot = next },
+    timelineEdit: async (command: TimelineEditCommand) => {
+      try {
+        const project = snapshot.resources.find((item) => item.kind === 'project')
+        const timeline = snapshot.resources.find((item) => item.kind === 'timeline')
+        const cut = snapshot.view.operations?.find((item) => item.id === 'cut')
+        if (!project || !timeline || !cut) throw new Error('Timeline read set is incomplete')
+        const plans = Object.fromEntries(snapshot.resources
+          .filter((item) => item.kind === 'plan' && item.operation_id)
+          .map((item) => [item.operation_id!, item.etag]))
+        const response = await client.editTimeline({
+          project: project.etag,
+          operation: cut.etag,
+          timeline: timeline.etag,
+          plans,
+        }, command)
+        return currentProject(response.snapshot ?? await client.getSnapshot())
+      } catch (error) {
+        if (error instanceof RuntimeConflictError) {
+          const project = error.snapshot ? currentProject(error.snapshot) : null
+          throw Object.assign(error, { conflict: true, ...(project ? { project } : {}) })
+        }
+        throw error
+      }
+    },
     save: async (operationId: string, draft: ContentCardsDraftChange) => {
       let review: Readonly<Record<string, unknown>>
       if (operationId === 'content-cards') {
@@ -585,6 +610,7 @@ export function projectFromSnapshot(base: EditorProjectView | null, snapshot: Ru
     id: clip.id,
     trackId: 'track-video',
     sourceAssetId: sourceAsset?.id,
+    decisionRef: clip.decision_ref,
     displayName: sourceAsset?.name ?? 'Unknown source',
     speed: clip.speed,
     sourceRange: { startS: clip.source_range.start_s, endS: clip.source_range.end_s },
@@ -676,6 +702,8 @@ export function projectFromSnapshot(base: EditorProjectView | null, snapshot: Ru
     activeSequence: snapshot.view.active_sequence,
     revision: snapshot.view.project_revision ?? 1,
     durationS: timeline?.duration_s ?? 0,
+    sourceDurationS: timeline?.source_duration_s ?? snapshot.view.source_media?.duration_s,
+    timelineEditable: !snapshot.read_only && runtimeOperations.some((operation) => operation.id === 'cut'),
     fps: { numerator: timeline?.fps.num ?? 30, denominator: timeline?.fps.den ?? 1 },
     sequenceGeometry: snapshot.view.sequence_geometry,
     assets,

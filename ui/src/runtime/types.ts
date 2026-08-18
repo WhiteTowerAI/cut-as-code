@@ -100,13 +100,23 @@ export type RuntimeLayer = Readonly<{
 
 export type RuntimeTimeline = Readonly<{
   duration_s: number
+  source_duration_s?: number
   fps: Readonly<{ num: number; den: number }>
   clips: readonly Readonly<{
     id: string
     source_range: Readonly<{ start_s: number; end_s: number }>
     program_range: Readonly<{ start_s: number; end_s: number }>
     speed?: number
+    decision_ref?: string
+    source_asset_id?: string
   }>[]
+}>
+
+export type RuntimeTimelineReadSet = Readonly<{
+  project: string
+  operation: string
+  timeline: string
+  plans: Readonly<Record<string, string>>
 }>
 
 export type RuntimeCaptionCue = Readonly<{

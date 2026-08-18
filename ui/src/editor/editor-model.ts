@@ -73,6 +73,7 @@ export type ClipView = Readonly<{
   id: string
   trackId?: string
   sourceAssetId?: string
+  decisionRef?: string
   displayName?: string
   summary?: string
   speed?: number
@@ -121,6 +122,8 @@ export type EditorProjectView = Readonly<{
   activeSequence?: string
   revision: number
   durationS: number
+  sourceDurationS?: number
+  timelineEditable?: boolean
   fps: Readonly<{ numerator: number; denominator: number }>
   sequenceGeometry?: Readonly<{ width: number; height: number }>
   assets: readonly AssetView[]

@@ -9,6 +9,7 @@ import type {
   MenuId,
   LayerTransform,
 } from './editor-model'
+import { applyTimelineEdit, type TimelineEditCommand } from './timeline-edit'
 
 export type ContentCardsDraftChange = Readonly<{
   cueId?: string
@@ -35,12 +36,25 @@ export type OperationDraft = Readonly<{
 export type ActivityLogEntry = Readonly<{
   id: number
   timestamp: string
-  category: 'save' | 'export'
+  category: 'save' | 'export' | 'timeline'
   status: 'running' | 'succeeded' | 'failed'
   message: string
   operationId?: string
   detail?: string
 }>
+
+type TimelineHistoryEntry = Readonly<{
+  undo: TimelineEditCommand
+  redo: TimelineEditCommand
+}>
+
+function timelineCommandMessage(command: TimelineEditCommand) {
+  if (command.type === 'split') return 'Clip split'
+  if (command.type === 'delete') return 'Clip deleted'
+  if (command.type === 'trim') return `${command.edge === 'start' ? 'In point' : 'Out point'} trimmed`
+  if (command.type === 'join') return 'Split undone'
+  return 'Clip restored'
+}
 
 export type ExportBlocker = Readonly<{
   operationId: string
@@ -196,6 +210,10 @@ export type EditorState = {
   openMenu: MenuId
   operationDrafts: Readonly<Record<string, OperationDraft | undefined>>
   activityLog: readonly ActivityLogEntry[]
+  timelinePast: readonly TimelineHistoryEntry[]
+  timelineFuture: readonly TimelineHistoryEntry[]
+  timelinePending: boolean
+  timelineError?: string
   setProject: (project: EditorProjectView | null) => void
   seek: (timeS: number) => void
   setPlaying: (isPlaying: boolean) => void
@@ -204,6 +222,9 @@ export type EditorState = {
   setTimelineZoom: (zoom: number) => void
   setSnapEnabled: (enabled: boolean) => void
   setOpenMenu: (menu: MenuId) => void
+  editTimeline: (command: TimelineEditCommand) => Promise<void>
+  undoTimeline: () => Promise<void>
+  redoTimeline: () => Promise<void>
   editOperationDraft: (operationId: string, change: ContentCardsDraftChange) => void
   discardOperationDraft: (operationId: string) => void
   saveOperationDraft: (operationId: string) => Promise<void>
@@ -222,6 +243,7 @@ export type EditorState = {
 export type EditorRuntimeAdapter = Readonly<{
   save: (operationId: string, draft: ContentCardsDraftChange) => Promise<EditorProjectView>
   review: (operationId: string, decision: 'approved' | 'rejected', rationale?: string) => Promise<EditorProjectView>
+  timelineEdit?: (command: TimelineEditCommand) => Promise<EditorProjectView>
 }>
 
 export function draftFieldsForCue(draft: OperationDraft | null | undefined, cueId: string) {
@@ -238,6 +260,9 @@ export type EditorInitialState = Omit<
   | 'setTimelineZoom'
   | 'setSnapEnabled'
   | 'setOpenMenu'
+  | 'editTimeline'
+  | 'undoTimeline'
+  | 'redoTimeline'
   | 'editOperationDraft'
   | 'discardOperationDraft'
   | 'saveOperationDraft'
@@ -253,6 +278,10 @@ export type EditorInitialState = Omit<
   | 'canApproveOperation'
   | 'operationDrafts'
   | 'activityLog'
+  | 'timelinePast'
+  | 'timelineFuture'
+  | 'timelinePending'
+  | 'timelineError'
 >
 
 export function createEditorStore(initialState: EditorInitialState, runtime?: EditorRuntimeAdapter) {
@@ -261,6 +290,9 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
     ...initialState,
     operationDrafts: {},
     activityLog: [],
+    timelinePast: [],
+    timelineFuture: [],
+    timelinePending: false,
     addActivity: (entry) => set((state) => ({
       activityLog: [...state.activityLog, {
         ...entry,
@@ -298,6 +330,121 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
     },
     setSnapEnabled: (snapEnabled) => set({ snapEnabled }),
     setOpenMenu: (openMenu) => set({ openMenu }),
+    editTimeline: async (command) => {
+      const state = get()
+      if (!state.project || state.timelinePending) return
+      if (Object.values(state.operationDrafts).some((draft) => draft?.pending || draft?.dirty)) {
+        set({ timelineError: 'Save or discard other timeline changes before editing clips' })
+        return
+      }
+      let edit
+      try {
+        edit = applyTimelineEdit(state.project, command)
+      } catch (error) {
+        set({ timelineError: error instanceof Error ? error.message : 'Timeline edit failed' })
+        return
+      }
+      set({ timelinePending: true, timelineError: undefined })
+      try {
+        if (runtime && !runtime.timelineEdit) throw new Error('Timeline editing is unavailable for this project')
+        const project = runtime ? await runtime.timelineEdit!(command) : edit.project
+        set({
+          project,
+          selection: edit.selection,
+          currentTimeS: Math.min(get().currentTimeS, project.durationS),
+          timelinePast: [...state.timelinePast, { undo: edit.inverse, redo: command }].slice(-100),
+          timelineFuture: [],
+          timelinePending: false,
+        })
+        get().addActivity({ category: 'timeline', status: 'succeeded', message: timelineCommandMessage(command) })
+      } catch (error) {
+        const project = error && typeof error === 'object' && 'project' in error
+          ? error.project as EditorProjectView
+          : undefined
+        set({
+          ...(project ? { project } : {}),
+          ...(project ? { timelinePast: [], timelineFuture: [] } : {}),
+          timelinePending: false,
+          timelineError: error instanceof Error ? error.message : 'Timeline edit failed',
+        })
+        get().addActivity({
+          category: 'timeline',
+          status: 'failed',
+          message: timelineCommandMessage(command),
+          detail: error instanceof Error ? error.message : 'Timeline edit failed',
+        })
+      }
+    },
+    undoTimeline: async () => {
+      const state = get()
+      const entry = state.timelinePast.at(-1)
+      if (!entry || !state.project || state.timelinePending) return
+      let edit
+      try {
+        edit = applyTimelineEdit(state.project, entry.undo)
+      } catch (error) {
+        set({ timelineError: error instanceof Error ? error.message : 'Timeline undo failed' })
+        return
+      }
+      set({ timelinePending: true, timelineError: undefined })
+      try {
+        if (runtime && !runtime.timelineEdit) throw new Error('Timeline editing is unavailable for this project')
+        const project = runtime ? await runtime.timelineEdit!(entry.undo) : edit.project
+        set({
+          project,
+          selection: edit.selection,
+          currentTimeS: Math.min(state.currentTimeS, project.durationS),
+          timelinePast: state.timelinePast.slice(0, -1),
+          timelineFuture: [...state.timelineFuture, entry].slice(-100),
+          timelinePending: false,
+        })
+      } catch (error) {
+        const project = error && typeof error === 'object' && 'project' in error
+          ? error.project as EditorProjectView
+          : undefined
+        set({
+          ...(project ? { project } : {}),
+          ...(project ? { timelinePast: [], timelineFuture: [] } : {}),
+          timelinePending: false,
+          timelineError: error instanceof Error ? error.message : 'Timeline undo failed',
+        })
+      }
+    },
+    redoTimeline: async () => {
+      const state = get()
+      const entry = state.timelineFuture.at(-1)
+      if (!entry || !state.project || state.timelinePending) return
+      let edit
+      try {
+        edit = applyTimelineEdit(state.project, entry.redo)
+      } catch (error) {
+        set({ timelineError: error instanceof Error ? error.message : 'Timeline redo failed' })
+        return
+      }
+      set({ timelinePending: true, timelineError: undefined })
+      try {
+        if (runtime && !runtime.timelineEdit) throw new Error('Timeline editing is unavailable for this project')
+        const project = runtime ? await runtime.timelineEdit!(entry.redo) : edit.project
+        set({
+          project,
+          selection: edit.selection,
+          currentTimeS: Math.min(state.currentTimeS, project.durationS),
+          timelinePast: [...state.timelinePast, entry].slice(-100),
+          timelineFuture: state.timelineFuture.slice(0, -1),
+          timelinePending: false,
+        })
+      } catch (error) {
+        const project = error && typeof error === 'object' && 'project' in error
+          ? error.project as EditorProjectView
+          : undefined
+        set({
+          ...(project ? { project } : {}),
+          ...(project ? { timelinePast: [], timelineFuture: [] } : {}),
+          timelinePending: false,
+          timelineError: error instanceof Error ? error.message : 'Timeline redo failed',
+        })
+      }
+    },
     editOperationDraft: (operationId, change) => {
       const operation = getOperation(get().project, operationId)
       if (!isSupportedOperation(operation) || !isOperationDraftChange(operation, change)) return

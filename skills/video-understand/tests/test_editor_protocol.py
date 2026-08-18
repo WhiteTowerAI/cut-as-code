@@ -18,6 +18,24 @@ import projectlib  # noqa: E402
 
 
 class EditorProtocolFreshnessTests(unittest.TestCase):
+    def test_validate_timeline_accepts_only_zero_duration_when_clips_are_empty(self):
+        timeline = {
+            "schema_version": 1,
+            "timeline_id": "main",
+            "source_asset_id": "source",
+            "fps": {"num": 30000, "den": 1001},
+            "source_duration_s": 10.0,
+            "program_duration_s": 0.0,
+            "clips": [],
+        }
+
+        self.assertEqual([], projectlib.validate_timeline(timeline))
+        timeline["program_duration_s"] = 0.01
+        self.assertIn(
+            "an empty timeline must have zero program duration",
+            projectlib.validate_timeline(timeline),
+        )
+
     def test_build_render_plan_expands_caption_cues_into_independent_layers(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

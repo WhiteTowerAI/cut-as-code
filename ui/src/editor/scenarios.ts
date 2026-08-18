@@ -21,6 +21,7 @@ export const scenarioIds = [
   'graphic-motion',
   'review-content-cards',
   'review-content-cards-conflict',
+  'timeline-editing',
 ] as const
 
 export type ScenarioId = (typeof scenarioIds)[number]
@@ -166,6 +167,65 @@ const twentySecondProject: EditorProjectView = {
   ],
 }
 
+const editableTimelineProject: EditorProjectView = {
+  ...populatedProject,
+  durationS: 20,
+  sourceDurationS: 30,
+  timelineEditable: true,
+  tracks: [
+    {
+      ...populatedProject.tracks[0],
+      clips: [
+        {
+          id: 'edit-video-1',
+          sourceRange: { startS: 0, endS: 8 },
+          programRange: { startS: 0, endS: 8 },
+          speed: 1,
+        },
+        {
+          id: 'edit-video-2',
+          sourceRange: { startS: 12, endS: 24 },
+          programRange: { startS: 8, endS: 20 },
+          speed: 1,
+        },
+      ],
+    },
+    {
+      ...populatedProject.tracks[1],
+      clips: [{
+        id: 'edit-audio',
+        sourceRange: { startS: 0, endS: 20 },
+        programRange: { startS: 0, endS: 20 },
+        speed: 1,
+      }],
+    },
+    {
+      id: 'edit-cards',
+      name: 'Cards',
+      kind: 'card',
+      clips: [{
+        id: 'edit-card-1',
+        trackId: 'edit-cards',
+        displayName: 'Later card',
+        summary: 'Right-side ripple marker',
+        sourceRange: { startS: 16, endS: 18 },
+        programRange: { startS: 16, endS: 18 },
+      }],
+    },
+  ],
+  layers: [{
+    id: 'edit-layer-1',
+    operationId: 'content-cards',
+    cueId: 'edit-card-1',
+    kind: 'card',
+    mediaType: 'dom',
+    zIndex: 200,
+    programRange: { startS: 16, endS: 18 },
+    transform: { x: 0.5, y: 0.5, scale: 1 },
+    content: { text: 'Right-side ripple marker' },
+  }],
+}
+
 function state(overrides: Partial<EditorInitialState> = {}): EditorInitialState {
   return {
     project: populatedProject,
@@ -231,6 +291,10 @@ const scenarios: readonly EditorScenario[] = [
       project: reviewProject,
       activeTab: 'cards',
     }),
+  },
+  {
+    id: 'timeline-editing',
+    initialState: state({ project: editableTimelineProject, currentTimeS: 4 }),
   },
 ]
 

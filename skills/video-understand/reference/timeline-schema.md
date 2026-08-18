@@ -24,4 +24,6 @@
 
 Ranges are half-open `[start_s, end_s)`. V1 supports only chronological clips, linear positive speed, and one-frame numerical tolerance. A source time inside a dropped range has no program-time mapping.
 
+An editor-cleared sequence is represented by `"clips": []` and `"program_duration_s": 0`. It retains the source duration and rational FPS so the last deletion can be undone or new source ranges can be inserted. A zero-duration sequence is valid project state but is not a renderable delivery.
+
 Validate with `python scripts/validate.py timeline work/timeline.json`.

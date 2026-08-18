@@ -18,6 +18,7 @@ const HTTP_ROUTE_ALLOWLIST = Object.freeze([
   Object.freeze({ id: 'meta', methods: Object.freeze(['GET']), pattern: /^\/v1\/meta$/ }),
   Object.freeze({ id: 'snapshot', methods: Object.freeze(['GET']), pattern: /^\/v1\/projects\/([^/]+)\/snapshot$/ }),
   Object.freeze({ id: 'transaction', methods: Object.freeze(['POST']), pattern: /^\/v1\/projects\/([^/]+)\/transactions$/ }),
+  Object.freeze({ id: 'timeline-edit', methods: Object.freeze(['POST']), pattern: /^\/v1\/projects\/([^/]+)\/timeline\/edits$/ }),
   Object.freeze({ id: 'review', methods: Object.freeze(['POST']), pattern: /^\/v1\/projects\/([^/]+)\/reviews\/decision$/ }),
   Object.freeze({ id: 'export-start', methods: Object.freeze(['POST']), pattern: /^\/v1\/projects\/([^/]+)\/exports$/ }),
   Object.freeze({ id: 'export-status', methods: Object.freeze(['GET']), pattern: /^\/v1\/projects\/([^/]+)\/exports\/status$/ }),
@@ -29,7 +30,7 @@ const HTTP_ROUTE_ALLOWLIST = Object.freeze([
   Object.freeze({ id: 'events', methods: Object.freeze(['GET']), pattern: /^\/v1\/projects\/([^/]+)\/events$/ }),
   Object.freeze({ id: 'static', methods: Object.freeze(['GET', 'HEAD']), pattern: /^(?!\/v1(?:\/|$)).+$/ }),
 ])
-const PROTOCOL_VERB_ALLOWLIST = Object.freeze(['open_project', 'get_snapshot', 'get_resource', 'plan.update', 'review.record'])
+const PROTOCOL_VERB_ALLOWLIST = Object.freeze(['open_project', 'get_snapshot', 'get_resource', 'timeline.edit', 'plan.update', 'review.record'])
 
 async function main() {
   const options = parseArguments(process.argv.slice(2))
@@ -159,6 +160,16 @@ async function handleRequest(state, request, response) {
       const result = await state.protocol.call({
         verb: 'plan.update', project_id: state.projectId, operation: body.operation,
         read_set: body.readSet, review: body.review,
+      })
+      attachPublicFiles(state, result)
+      return json(response, result.status || (result.ok ? 200 : 400), result)
+    }
+    if (route.id === 'timeline-edit' && match[1] === state.projectId) {
+      if (request.headers.origin !== state.origin) return json(response, 403, { ok: false, error: 'invalid origin' })
+      const body = await readJson(request)
+      const result = await state.protocol.call({
+        verb: 'timeline.edit', project_id: state.projectId,
+        read_set: body.readSet, command: body.command,
       })
       attachPublicFiles(state, result)
       return json(response, result.status || (result.ok ? 200 : 400), result)

@@ -119,6 +119,201 @@ class ProtocolServiceTests(unittest.TestCase):
         self.assertNotEqual(plan_before["etag"], plan_after["etag"])
         self.assertEqual(plan_before["id"], plan_after["id"])
 
+    def test_timeline_edits_split_trim_delete_and_invalidate_active_dependents(self):
+        self._configure_cut_project()
+        opened = self.service.handle_request(
+            {"verb": "open_project", "project_root": str(self.root)}
+        )
+        project_id = opened["project_id"]
+
+        split = self.service.handle_request({
+            "verb": "timeline.edit",
+            "project_id": project_id,
+            "read_set": self._timeline_read_set(opened["snapshot"]),
+            "command": {"type": "split", "clip_id": "clip-1", "at_s": 0.5},
+        })
+
+        self.assertTrue(split["ok"], split)
+        timeline = json.loads(self.timeline.read_text(encoding="utf-8"))
+        self.assertEqual(2, len(timeline["clips"]))
+        self.assertEqual(1.0, timeline["program_duration_s"])
+        self.assertEqual(0.5, timeline["clips"][0]["source_range"]["end_s"])
+        right_id = timeline["clips"][1]["id"]
+        project = json.loads(self.project_path.read_text(encoding="utf-8"))
+        cut, captions = project["operations"]
+        self.assertEqual((2, "stale"), (cut["revision"], cut["status"]))
+        self.assertEqual("stale", captions["status"])
+        self.assertEqual("draft", project["render"]["status"])
+
+        trim = self.service.handle_request({
+            "verb": "timeline.edit",
+            "project_id": project_id,
+            "read_set": self._timeline_read_set(split["snapshot"]),
+            "command": {"type": "trim", "clip_id": right_id, "edge": "start", "source_s": 0.6},
+        })
+        self.assertTrue(trim["ok"])
+        timeline = json.loads(self.timeline.read_text(encoding="utf-8"))
+        self.assertAlmostEqual(0.9, timeline["program_duration_s"])
+        self.assertAlmostEqual(0.5, timeline["clips"][1]["program_range"]["start_s"])
+
+        delete = self.service.handle_request({
+            "verb": "timeline.edit",
+            "project_id": project_id,
+            "read_set": self._timeline_read_set(trim["snapshot"]),
+            "command": {"type": "delete", "clip_id": "clip-1"},
+        })
+        self.assertTrue(delete["ok"])
+        timeline = json.loads(self.timeline.read_text(encoding="utf-8"))
+        self.assertEqual([right_id], [clip["id"] for clip in timeline["clips"]])
+        self.assertEqual(0.0, timeline["clips"][0]["program_range"]["start_s"])
+        self.assertAlmostEqual(0.4, timeline["program_duration_s"])
+
+    def test_timeline_trim_ripples_downstream_plan_cues_and_render_contributions(self):
+        self._configure_cut_project()
+        self.plan.write_text(json.dumps({
+            "schema_version": 1,
+            "cues": [{
+                "id": "cue-later",
+                "text": "Later cue",
+                "program_range": {"start_s": 0.75, "end_s": 0.9},
+            }],
+        }), encoding="utf-8")
+        project = json.loads(self.project_path.read_text(encoding="utf-8"))
+        project["operations"][1]["render"] = [{
+            "kind": "overlay", "asset": "cache/caption.mov", "start_s": 0.75, "duration_s": 0.15,
+        }]
+        project["operations"].append({
+            "id": "shorts",
+            "revision": 1,
+            "status": "approved",
+            "depends_on": ["cut"],
+            "based_on": {"cut": 1},
+            "target": {"sequence": "main", "scope": "derivative"},
+            "effects": {
+                "changes_timeline": False,
+                "changes_geometry": True,
+                "changes_video_pixels": True,
+                "changes_audio": True,
+            },
+            "render": [{
+                "kind": "overlay", "asset": "cache/short.mp4", "start_s": 0.75, "duration_s": 0.15,
+            }],
+            "outputs": [],
+        })
+        self.project_path.write_text(json.dumps(project), encoding="utf-8")
+        opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+
+        split = self.service.handle_request({
+            "verb": "timeline.edit",
+            "project_id": opened["project_id"],
+            "read_set": self._timeline_read_set(opened["snapshot"]),
+            "command": {"type": "split", "clip_id": "clip-1", "at_s": 0.5},
+        })
+        self.assertTrue(split["ok"], split)
+        trimmed = self.service.handle_request({
+            "verb": "timeline.edit",
+            "project_id": opened["project_id"],
+            "read_set": self._timeline_read_set(split["snapshot"]),
+            "command": {"type": "trim", "clip_id": "clip-1", "edge": "end", "source_s": 0.4},
+        })
+        self.assertTrue(trimmed["ok"])
+
+        plan = json.loads(self.plan.read_text(encoding="utf-8"))
+        self.assertEqual({"start_s": 0.65, "end_s": 0.8}, plan["cues"][0]["program_range"])
+        project = json.loads(self.project_path.read_text(encoding="utf-8"))
+        captions = next(item for item in project["operations"] if item["id"] == "captions")
+        self.assertEqual((2, "stale"), (captions["revision"], captions["status"]))
+        self.assertEqual(0.65, captions["render"][0]["start_s"])
+        shorts = next(item for item in project["operations"] if item["id"] == "shorts")
+        self.assertEqual((1, "stale", 0.75), (
+            shorts["revision"], shorts["status"], shorts["render"][0]["start_s"],
+        ))
+        layer = trimmed["snapshot"]["view"]["layers"][0]
+        self.assertEqual({"start_s": 0.65, "end_s": 0.8}, layer["program_range"])
+
+    def test_timeline_edit_rejects_stale_etag_and_noncanonical_trim(self):
+        self._configure_cut_project()
+        opened = self.service.handle_request(
+            {"verb": "open_project", "project_root": str(self.root)}
+        )
+        read_set = self._timeline_read_set(opened["snapshot"])
+        timeline = json.loads(self.timeline.read_text(encoding="utf-8"))
+        timeline["timeline_id"] = "externally-changed"
+        self.timeline.write_text(json.dumps(timeline), encoding="utf-8")
+
+        conflict = self.service.handle_request({
+            "verb": "timeline.edit",
+            "project_id": opened["project_id"],
+            "read_set": read_set,
+            "command": {"type": "trim", "clip_id": "clip-1", "edge": "end", "source_s": 0.8},
+        })
+        self.assertEqual((False, 409, "conflict"), (conflict["ok"], conflict["status"], conflict["error"]))
+        current = self.service.handle_request({"verb": "get_snapshot", "project_id": opened["project_id"]})
+        invalid = self.service.handle_request({
+            "verb": "timeline.edit",
+            "project_id": opened["project_id"],
+            "read_set": self._timeline_read_set(current["snapshot"]),
+            "command": {"type": "trim", "clip_id": "clip-1", "edge": "end", "source_s": 0.0},
+        })
+        self.assertFalse(invalid["ok"])
+        self.assertIn("trim would overlap", invalid["error"])
+
+    def test_timeline_edit_rejects_an_externally_changed_active_downstream_plan(self):
+        self._configure_cut_project()
+        opened = self.service.handle_request(
+            {"verb": "open_project", "project_root": str(self.root)}
+        )
+        read_set = self._timeline_read_set(opened["snapshot"])
+        plan = json.loads(self.plan.read_text(encoding="utf-8"))
+        plan["external_change"] = True
+        self.plan.write_text(json.dumps(plan), encoding="utf-8")
+
+        conflict = self.service.handle_request({
+            "verb": "timeline.edit",
+            "project_id": opened["project_id"],
+            "read_set": read_set,
+            "command": {"type": "trim", "clip_id": "clip-1", "edge": "end", "source_s": 0.8},
+        })
+
+        self.assertEqual((False, 409, "conflict"), (conflict["ok"], conflict["status"], conflict["error"]))
+        timeline = json.loads(self.timeline.read_text(encoding="utf-8"))
+        self.assertEqual({"start_s": 0.0, "end_s": 1.0}, timeline["clips"][0]["program_range"])
+
+    def test_timeline_edit_deletes_and_restores_the_final_clip(self):
+        self._configure_cut_project()
+        opened = self.service.handle_request(
+            {"verb": "open_project", "project_root": str(self.root)}
+        )
+
+        deleted = self.service.handle_request({
+            "verb": "timeline.edit",
+            "project_id": opened["project_id"],
+            "read_set": self._timeline_read_set(opened["snapshot"]),
+            "command": {"type": "delete", "clip_id": "clip-1"},
+        })
+        self.assertTrue(deleted["ok"])
+        timeline = json.loads(self.timeline.read_text(encoding="utf-8"))
+        self.assertEqual(([], 0.0), (timeline["clips"], timeline["program_duration_s"]))
+
+        restored = self.service.handle_request({
+            "verb": "timeline.edit",
+            "project_id": opened["project_id"],
+            "read_set": self._timeline_read_set(deleted["snapshot"]),
+            "command": {
+                "type": "insert",
+                "index": 0,
+                "clip": {
+                    "id": "clip-1",
+                    "source_range": {"start_s": 0.0, "end_s": 1.0},
+                    "speed": 1.0,
+                },
+            },
+        })
+        self.assertTrue(restored["ok"])
+        timeline = json.loads(self.timeline.read_text(encoding="utf-8"))
+        self.assertEqual(["clip-1"], [clip["id"] for clip in timeline["clips"]])
+        self.assertEqual({"start_s": 0.0, "end_s": 1.0}, timeline["clips"][0]["program_range"])
+
     def test_content_cards_update_targets_the_second_card_by_id(self):
         self._configure_content_cards_project()
         plan = json.loads(self.plan.read_text(encoding="utf-8"))
@@ -1616,6 +1811,46 @@ class ProtocolServiceTests(unittest.TestCase):
         plan = next(item for item in resources if item.get("operation_id") == operation_id)
         operation = next(item for item in snapshot["view"]["operations"] if item["id"] == operation_id)
         return {"project": project["etag"], "operation": operation["etag"], "plan": plan["etag"]}
+
+    @staticmethod
+    def _timeline_read_set(snapshot):
+        resources = snapshot["resources"]
+        project = next(item for item in resources if item["kind"] == "project")
+        timeline = next(item for item in resources if item["kind"] == "timeline")
+        operation = next(item for item in snapshot["view"]["operations"] if item["id"] == "cut")
+        plans = {
+            item["operation_id"]: item["etag"]
+            for item in resources
+            if item["kind"] == "plan" and item.get("operation_id")
+        }
+        return {"project": project["etag"], "operation": operation["etag"], "timeline": timeline["etag"], "plans": plans}
+
+    def _configure_cut_project(self):
+        project = self._project()
+        cut = {
+            "id": "cut",
+            "revision": 1,
+            "status": "verified",
+            "depends_on": [],
+            "based_on": {},
+            "target": {"sequence": "main", "scope": "full"},
+            "effects": {
+                "changes_timeline": True,
+                "changes_geometry": False,
+                "changes_video_pixels": True,
+                "changes_audio": True,
+            },
+            "outputs": [],
+        }
+        captions = project["operations"][0]
+        captions.update({
+            "status": "approved",
+            "depends_on": ["cut"],
+            "based_on": {"cut": 1},
+        })
+        project["operations"] = [cut, captions]
+        project["sequences"]["main"]["operations"] = ["cut", "captions"]
+        self.project_path.write_text(json.dumps(project), encoding="utf-8")
 
     def _write_project(self):
         self.project_path.write_text(json.dumps(self._project()), encoding="utf-8")

@@ -1931,8 +1931,12 @@ def validate_timeline(timeline, decision_ids=None):
         errors.append("program_duration_s must not be negative")
 
     clips = timeline.get("clips")
-    if not isinstance(clips, list) or not clips:
-        errors.append("timeline clips must be a non-empty list")
+    if not isinstance(clips, list):
+        errors.append("timeline clips must be a list")
+        return errors
+    if not clips:
+        if abs(program_duration) > 1e-9:
+            errors.append("an empty timeline must have zero program duration")
         return errors
 
     seen = set()

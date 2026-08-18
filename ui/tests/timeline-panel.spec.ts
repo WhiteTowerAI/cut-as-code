@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { isTimeInHalfOpenRange, pxToTime, timeToPx } from '../src/editor/TimelinePanel'
+import { applyTimelineEdit, trimSourceAtProgramDelta } from '../src/editor/timeline-edit'
 import { getScenario } from '../src/editor/scenarios'
 
 test('clip ranges include their start and exclude their exact end', () => {
@@ -109,9 +110,9 @@ test('Timeline keeps terminal ruler and protocol clips visible without synthetic
   await page.goto('/?scenario=1-754')
   const selectedVideo = page.locator('[data-timeline-clip="video-2"]')
   await expect(selectedVideo).toHaveAttribute('aria-pressed', 'true')
-  await expect(selectedVideo).toHaveCSS('background-color', 'rgb(81, 70, 108)')
-  await expect(selectedVideo).toHaveCSS('border-color', 'rgb(167, 139, 250)')
-  await expect(selectedVideo.locator('.timeline-clip-label')).toHaveCSS('background-color', 'rgb(43, 39, 56)')
+  await expect(selectedVideo).toHaveCSS('background-color', 'rgb(41, 78, 74)')
+  await expect(selectedVideo).toHaveCSS('border-color', 'rgb(121, 183, 167)')
+  await expect(selectedVideo.locator('.timeline-clip-label')).toHaveCSS('background-color', 'rgb(30, 48, 52)')
   await expect(selectedVideo.locator('.timeline-clip-label')).toHaveCSS('height', '17px')
   await expect(selectedVideo.locator('.timeline-clip-speed')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Speed' }).first()).toBeDisabled()
@@ -137,6 +138,70 @@ test('pixel mapping snaps seeks to rational FPS only when snap is enabled', () =
   expect(pxToTime(100, 20, 876, { fps, snapEnabled: false })).toBeCloseTo(raw, 8)
 })
 
+test('timeline domain split, ripple delete, trim, and inverse commands preserve canonical ranges', () => {
+  const project = getScenario('timeline-editing')!.initialState.project!
+  const originalVideo = project.tracks.find((track) => track.kind === 'video')!.clips!
+  const splitAtS = (originalVideo[0].programRange.startS + originalVideo[0].programRange.endS) / 2
+
+  const split = applyTimelineEdit(project, { type: 'split', clipId: 'edit-video-1', atS: splitAtS })
+  const splitVideo = split.project.tracks.find((track) => track.kind === 'video')!.clips!
+  expect(splitVideo).toHaveLength(3)
+  expect(splitVideo[0].sourceRange.endS).toBeCloseTo(splitVideo[1].sourceRange.startS, 8)
+  expect(splitVideo[1].programRange.startS).toBeCloseTo(splitVideo[0].programRange.endS, 8)
+  expect(split.project.durationS).toBeCloseTo(project.durationS, 8)
+
+  const joined = applyTimelineEdit(split.project, split.inverse)
+  expect(joined.project.tracks.find((track) => track.kind === 'video')!.clips).toEqual(originalVideo)
+
+  const deleted = applyTimelineEdit(project, { type: 'delete', clipId: 'edit-video-1' })
+  const remaining = deleted.project.tracks.find((track) => track.kind === 'video')!.clips!
+  expect(remaining).toHaveLength(1)
+  expect(remaining[0].programRange.startS).toBe(0)
+  expect(deleted.project.durationS).toBeCloseTo(
+    originalVideo[1].sourceRange.endS - originalVideo[1].sourceRange.startS,
+    8,
+  )
+  expect(applyTimelineEdit(deleted.project, deleted.inverse).project.tracks.find((track) => track.kind === 'video')!.clips).toEqual(originalVideo)
+
+  const restoredStart = trimSourceAtProgramDelta(project, 'edit-video-2', 'start', -5)
+  expect(restoredStart).toBe(originalVideo[0].sourceRange.endS)
+  const trimmed = applyTimelineEdit(project, { type: 'trim', clipId: 'edit-video-2', edge: 'start', sourceS: restoredStart! })
+  expect(trimmed.project.durationS).toBeGreaterThan(project.durationS)
+  expect(applyTimelineEdit(trimmed.project, trimmed.inverse).project.tracks.find((track) => track.kind === 'video')!.clips).toEqual(originalVideo)
+})
+
+test('ripple trim shifts every later track element and layer together', () => {
+  const project = getScenario('timeline-editing')!.initialState.project!
+  const endTrim = applyTimelineEdit(project, {
+    type: 'trim', clipId: 'edit-video-1', edge: 'end', sourceS: 10,
+  })
+  const endCard = endTrim.project.tracks.find((track) => track.kind === 'card')!.clips![0]
+  expect(endCard.programRange).toEqual({ startS: 18, endS: 20 })
+  expect(endTrim.project.layers![0].programRange).toEqual({ startS: 18, endS: 20 })
+  expect(endTrim.project.tracks.find((track) => track.kind === 'video')!.clips![1].programRange.startS).toBe(10)
+
+  const startTrim = applyTimelineEdit(project, {
+    type: 'trim', clipId: 'edit-video-1', edge: 'start', sourceS: 2,
+  })
+  const startCard = startTrim.project.tracks.find((track) => track.kind === 'card')!.clips![0]
+  expect(startCard.programRange).toEqual({ startS: 14, endS: 16 })
+  expect(startTrim.project.tracks.find((track) => track.kind === 'video')!.clips![1].programRange.startS).toBe(6)
+})
+
+test('deleting the final clip creates an undoable empty timeline', () => {
+  const project = getScenario('timeline-editing')!.initialState.project!
+  const firstDelete = applyTimelineEdit(project, { type: 'delete', clipId: 'edit-video-1' })
+  const finalDelete = applyTimelineEdit(firstDelete.project, { type: 'delete', clipId: 'edit-video-2' })
+
+  expect(finalDelete.project.durationS).toBe(0)
+  expect(finalDelete.project.tracks.find((track) => track.kind === 'video')!.clips).toEqual([])
+
+  const restored = applyTimelineEdit(finalDelete.project, finalDelete.inverse)
+  expect(restored.project.tracks.find((track) => track.kind === 'video')!.clips).toEqual(
+    firstDelete.project.tracks.find((track) => track.kind === 'video')!.clips,
+  )
+})
+
 test('timeline selection and click seek update one store playhead', async ({ page }) => {
   await page.setViewportSize({ width: 1008, height: 444 })
   await page.goto('/?scenario=1-324')
@@ -149,6 +214,107 @@ test('timeline selection and click seek update one store playhead', async ({ pag
   const clip = page.locator('[data-timeline-clip="video-2"]')
   await clip.click()
   await expect(clip).toHaveAttribute('aria-pressed', 'true')
+})
+
+test('timeline split, delete, keyboard undo, and redo form one edit history', async ({ page }) => {
+  await page.setViewportSize({ width: 1008, height: 444 })
+  await page.goto('/?scenario=timeline-editing')
+
+  const firstClip = page.locator('[data-timeline-clip="edit-video-1"]')
+  await firstClip.click()
+  const firstBox = await firstClip.boundingBox()
+  const surfaceBox = await page.locator('[data-timeline-surface]').boundingBox()
+  expect(firstBox).not.toBeNull()
+  expect(surfaceBox).not.toBeNull()
+  await page.locator('[data-timeline-surface]').click({ position: {
+    x: firstBox!.x + firstBox!.width / 2 - surfaceBox!.x,
+    y: firstBox!.y - surfaceBox!.y + firstBox!.height / 2,
+  } })
+  await firstClip.click()
+  await page.getByRole('button', { name: 'Split' }).click()
+  await expect(page.locator('.timeline-clip--video')).toHaveCount(3)
+
+  await page.getByRole('button', { name: 'Delete clip' }).click()
+  await expect(page.locator('.timeline-clip--video')).toHaveCount(2)
+  await page.keyboard.press('Control+z')
+  await expect(page.locator('.timeline-clip--video')).toHaveCount(3)
+  await page.keyboard.press('Control+Shift+z')
+  await expect(page.locator('.timeline-clip--video')).toHaveCount(2)
+})
+
+test('deleting every clip leaves undo available and restores the final clip', async ({ page }) => {
+  await page.goto('/?scenario=timeline-editing')
+
+  for (const clipId of ['edit-video-1', 'edit-video-2']) {
+    await page.locator(`[data-timeline-clip="${clipId}"]`).click()
+    await page.getByRole('button', { name: 'Delete clip' }).click()
+  }
+
+  await expect(page.locator('.timeline-clip--video')).toHaveCount(0)
+  await expect(page.getByText('Drag media here to start creating')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Undo' })).toBeEnabled()
+  await page.getByRole('button', { name: 'Undo' }).click()
+  await expect(page.locator('[data-timeline-clip="edit-video-2"]')).toBeVisible()
+})
+
+test('selected video exposes two drag handles and previews a frame-snapped ripple trim', async ({ page }) => {
+  await page.setViewportSize({ width: 1008, height: 444 })
+  await page.goto('/?scenario=timeline-editing')
+
+  const clip = page.locator('[data-timeline-clip="edit-video-2"]')
+  await clip.click()
+  await expect(page.getByRole('button', { name: 'Trim clip start' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Trim clip end' })).toBeVisible()
+  const before = await clip.boundingBox()
+  const handle = page.getByRole('button', { name: 'Trim clip start' })
+  const handleBox = await handle.boundingBox()
+  expect(before).not.toBeNull()
+  expect(handleBox).not.toBeNull()
+
+  await page.mouse.move(handleBox!.x + handleBox!.width / 2, handleBox!.y + handleBox!.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(handleBox!.x + handleBox!.width / 2 + 44, handleBox!.y + handleBox!.height / 2)
+  await expect(page.locator('.timeline-trim-readout')).toContainText('In ')
+  await expect(page.locator('.timeline-trim-readout')).toContainText('Duration ')
+  await page.mouse.up()
+
+  const after = await page.locator('[data-timeline-clip="edit-video-2"]').boundingBox()
+  expect(after).not.toBeNull()
+  expect(after!.width).toBeLessThan(before!.width)
+  await page.keyboard.press('Control+z')
+  const restored = await page.locator('[data-timeline-clip="edit-video-2"]').boundingBox()
+  expect(restored!.width).toBeCloseTo(before!.width, 1)
+})
+
+test('dragging a video edge moves every later timeline element together', async ({ page }) => {
+  await page.setViewportSize({ width: 1008, height: 444 })
+  await page.goto('/?scenario=timeline-editing')
+
+  const clip = page.locator('[data-timeline-clip="edit-video-1"]')
+  const laterVideo = page.locator('[data-timeline-clip="edit-video-2"]')
+  const laterCard = page.locator('[data-timeline-clip="edit-card-1"]')
+  await clip.click()
+  const handle = page.getByRole('button', { name: 'Trim clip end' })
+  const handleBox = await handle.boundingBox()
+  const beforeVideo = await laterVideo.boundingBox()
+  const beforeCard = await laterCard.boundingBox()
+  expect(handleBox).not.toBeNull()
+  expect(beforeVideo).not.toBeNull()
+  expect(beforeCard).not.toBeNull()
+
+  await page.mouse.move(handleBox!.x + handleBox!.width / 2, handleBox!.y + handleBox!.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(handleBox!.x + handleBox!.width / 2 + 44, handleBox!.y + handleBox!.height / 2)
+  const previewVideo = await laterVideo.boundingBox()
+  const previewCard = await laterCard.boundingBox()
+  expect(previewVideo!.x - beforeVideo!.x).toBeCloseTo(previewCard!.x - beforeCard!.x, 1)
+  expect(previewVideo!.x).toBeGreaterThan(beforeVideo!.x)
+  await page.mouse.up()
+
+  const savedVideo = await laterVideo.boundingBox()
+  const savedCard = await laterCard.boundingBox()
+  expect(savedVideo!.x - beforeVideo!.x).toBeCloseTo(savedCard!.x - beforeCard!.x, 1)
+  expect(savedCard!.x).toBeGreaterThan(beforeCard!.x)
 })
 
 test('timeline seek roundtrips the playhead between the two video spans', async ({ page }) => {
@@ -346,13 +512,14 @@ test('the populated Timeline fixture renders its two source spans on the twenty-
     clips.nth(1).boundingBox(),
     page.locator('[data-timeline-clip="audio-1"]').boundingBox(),
   ])
-  expect(firstVideo).toMatchObject({ x: 148, y: 164, height: 80 })
+  expect(firstVideo).toMatchObject({ x: 148, height: 80 })
   expect(firstVideo?.width).toBeCloseTo(263, 1)
-  expect(secondVideo).toMatchObject({ y: 164, height: 80 })
+  expect(secondVideo).toMatchObject({ y: firstVideo?.y, height: 80 })
   expect(secondVideo?.x).toBeCloseTo(415, 1)
   expect(secondVideo?.width).toBeCloseTo(513, 1)
   expect(secondVideo!.x - (firstVideo!.x + firstVideo!.width)).toBeCloseTo(4, 1)
-  expect(audio).toMatchObject({ x: 148, y: 272, height: 60 })
+  expect(audio).toMatchObject({ x: 148, height: 60 })
+  expect(audio!.y).toBeGreaterThan(firstVideo!.y + firstVideo!.height)
   expect(audio?.width).toBeCloseTo(780, 1)
   expect(1008 - (audio!.x + audio!.width)).toBeCloseTo(80, 1)
 })
@@ -367,9 +534,9 @@ test('the caption Timeline fixture preserves its measured lane hierarchy', async
     page.locator('.timeline-lane--audio').boundingBox(),
   ])
   expect(caption?.height).toBe(64)
-  expect(video?.height).toBe(96)
+  expect(video?.height).toBe(108)
   expect(audio?.height).toBe(76)
-  expect(video?.y).toBe(caption!.y + caption!.height + 12)
-  expect(audio?.y).toBe(video!.y + video!.height + 12)
+  expect(video?.y).toBe(caption!.y + caption!.height)
+  expect(audio?.y).toBe(video!.y + video!.height)
   await expect(page.locator('[data-timeline-clip="caption-3"]')).toHaveAttribute('aria-pressed', 'true')
 })

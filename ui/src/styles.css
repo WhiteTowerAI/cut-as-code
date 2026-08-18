@@ -1382,6 +1382,18 @@ button {
   min-width: 0;
 }
 
+.timeline-edit-status {
+  max-width: 220px;
+  margin-left: 8px;
+  overflow: hidden;
+  color: #b9dfd6;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeline-edit-status--error { color: #ffb7b2; }
+
 .timeline-body {
   position: relative;
   display: grid;
@@ -1557,9 +1569,20 @@ button {
 .timeline-lane--graphic-motion { padding-top: 8px; }
 .timeline-lane--reserved { height: 88px; padding: 0; background: #242529; }
 
-.timeline-clip {
+.timeline-clip-shell {
   position: absolute;
+  height: 80px;
+}
+
+.timeline-clip-shell--audio { height: 60px; }
+.timeline-clip-shell--caption,
+.timeline-clip-shell--card,
+.timeline-clip-shell--graphic-motion { height: 48px; }
+
+.timeline-clip {
+  position: relative;
   display: block;
+  width: 100%;
   height: 80px;
   padding: 5px;
   overflow: hidden;
@@ -1570,6 +1593,75 @@ button {
   text-align: left;
   cursor: pointer;
 }
+
+.timeline-clip:focus-visible {
+  outline: 2px solid #e7f8f4;
+  outline-offset: 2px;
+  z-index: 4;
+}
+
+.timeline-clip-shell.is-trimming {
+  overflow: visible;
+  z-index: 5;
+}
+
+.timeline-trim-handle {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  z-index: 3;
+  width: 12px;
+  padding: 0;
+  border: 0;
+  color: #10211e;
+  background: #9ed6c8;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.timeline-trim-handle--start {
+  left: -1px;
+  border-radius: 4px 0 0 4px;
+}
+
+.timeline-trim-handle--end {
+  right: -1px;
+  border-radius: 0 4px 4px 0;
+}
+
+.timeline-trim-handle span {
+  display: block;
+  width: 2px;
+  height: 20px;
+  margin: auto;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+.timeline-trim-handle:hover,
+.timeline-trim-handle:focus-visible { background: #c4eee4; }
+
+.timeline-trim-readout {
+  position: absolute;
+  top: 8px;
+  z-index: 5;
+  display: grid;
+  gap: 2px;
+  min-width: 132px;
+  padding: 6px 8px;
+  border: 1px solid #5c6c69;
+  border-radius: 4px;
+  color: #dce7e4;
+  background: #171a1c;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 36%);
+  font-size: 10px;
+  line-height: 13px;
+  pointer-events: none;
+}
+
+.timeline-trim-readout strong { color: #aee2d6; font-weight: 600; }
+.timeline-trim-readout--start { left: 16px; }
+.timeline-trim-readout--end { right: 16px; }
 
 .timeline-clip--video[aria-pressed='true'] { border-color: #79b7a7; background: #294e4a; }
 .timeline-clip--caption[aria-pressed='true'] { border-color: #3b3e46; box-shadow: inset 0 0 0 1px #fff; background: #294e4a; }

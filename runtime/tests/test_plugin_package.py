@@ -612,11 +612,13 @@ process.stdout.write(JSON.stringify({
             ["GET", "/v1/meta"],
             ["GET", "/v1/projects/project_a/snapshot"],
             ["POST", "/v1/projects/project_a/transactions"],
+            ["POST", "/v1/projects/project_a/timeline/edits"],
             ["POST", "/v1/projects/project_a/reviews/decision"],
             ["POST", "/v1/projects/project_a/exports"],
             ["GET", "/v1/projects/project_a/exports/status"],
             ["POST", "/v1/projects/project_a/exports/open"],
             ["GET", "/v1/projects/project_a/resources/res_a1"],
+            ["POST", "/v1/projects/project_a/imports"],
             ["GET", "/v1/projects/project_a/media/asset_a1"],
             ["GET", "/v1/projects/project_a/artifacts/artifact_a1"],
             ["GET", "/v1/projects/project_a/layers/layer_a1/frames/1"],
@@ -645,11 +647,11 @@ process.stdout.write(JSON.stringify({
         audit = json.loads(result.stdout)
         self.assertEqual(
             audit["declared"],
-            ["launch", "meta", "snapshot", "transaction", "review", "export-start", "export-status", "export-action", "resource", "file", "layer-frame", "events", "static"],
+            ["launch", "meta", "snapshot", "transaction", "timeline-edit", "review", "export-start", "export-status", "export-action", "resource", "import", "file", "layer-frame", "events", "static"],
         )
         self.assertEqual(
             audit["actual"],
-            ["launch", "meta", "snapshot", "transaction", "review", "export-start", "export-status", "export-action", "resource", "file", "file", "layer-frame", "events", "static", "static", None, None, None, None],
+            ["launch", "meta", "snapshot", "transaction", "timeline-edit", "review", "export-start", "export-status", "export-action", "resource", "import", "file", "file", "layer-frame", "events", "static", "static", None, None, None, None],
         )
 
     def _assert_unknown_third_party_asset_is_rejected(
@@ -778,7 +780,7 @@ process.stdout.write(JSON.stringify({
             self.assertIn("launch=", details["url"])
             self.assertEqual(set(details), {"pid", "projectRoot", "url", "projectId"})
             first_pid = details["pid"]
-            self._assert_real_browser_ready(details["url"], details["projectId"])
+            self._assert_real_browser_ready(details["url"], details["projectId"], project_root.name)
             self._assert_launch_error(details["url"])
 
             reopened = self._rpc(process, {
@@ -791,11 +793,11 @@ process.stdout.write(JSON.stringify({
             self.assertNotEqual(reconnected["url"], details["url"])
             self.assertEqual(reconnected["pid"], details["pid"])
             self._assert_adversarial_launch_rejections(reconnected["url"], reconnected["projectId"])
-            self._assert_real_browser_ready(reconnected["url"], reconnected["projectId"])
+            self._assert_real_browser_ready(reconnected["url"], reconnected["projectId"], project_root.name)
             self._assert_launch_error(reconnected["url"])
 
             final = self._open_editor(process, 4, project_root)
-            self._assert_real_browser_ready(final["url"], final["projectId"])
+            self._assert_real_browser_ready(final["url"], final["projectId"], project_root.name)
             self._assert_no_secret_persistence(temporary_root, process)
             self._rpc(process, {"jsonrpc": "2.0", "id": 5, "method": "shutdown"})
         finally:
@@ -809,7 +811,7 @@ process.stdout.write(JSON.stringify({
             details = self._open_editor(restarted, 1, project_root)
             restarted_pid = details["pid"]
             self.assertNotEqual(restarted_pid, first_pid)
-            self._assert_real_browser_ready(details["url"], details["projectId"])
+            self._assert_real_browser_ready(details["url"], details["projectId"], project_root.name)
             self._rpc(restarted, {"jsonrpc": "2.0", "id": 2, "method": "shutdown"})
         finally:
             self._stop_mcp(restarted)
@@ -959,22 +961,28 @@ process.stdout.write(JSON.stringify(PROTOCOL_CALL_TIMEOUT_MS));
         })
         return json.loads(opened["result"]["content"][0]["text"])
 
-    def _assert_real_browser_ready(self, url: str, project_id: str) -> None:
+    def _assert_real_browser_ready(self, url: str, project_id: str, project_name: str) -> None:
         script = r"""
 const { chromium } = require(process.argv[1]);
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome' });
-  try {
-    const page = await browser.newPage();
-    await page.goto(process.argv[2]);
-    await page.waitForFunction(() => document.documentElement.dataset.runtimeState === 'ready');
-    const cookie = (await page.context().cookies()).find((item) => item.name === 'cut_session');
-    process.stdout.write(JSON.stringify({
-      url: page.url(),
-      shellVisible: await page.locator('[data-editor-shell]').isVisible(),
-      projectVisible: await page.getByText(process.argv[3], { exact: true }).isVisible(),
-      cookie,
-    }));
+    try {
+      const page = await browser.newPage();
+      await page.goto(process.argv[2]);
+      await page.waitForFunction(() => document.documentElement.dataset.runtimeState === 'ready');
+      const shell = page.locator('[data-editor-shell]');
+      const project = page.getByText(process.argv[3], { exact: true });
+      await Promise.all([
+        shell.waitFor({ state: 'visible' }),
+        project.waitFor({ state: 'visible' }),
+      ]);
+      const cookie = (await page.context().cookies()).find((item) => item.name === 'cut_session');
+      process.stdout.write(JSON.stringify({
+        url: page.url(),
+        shellVisible: await shell.isVisible(),
+        projectVisible: await project.isVisible(),
+        cookie,
+      }));
   } finally {
     await browser.close();
   }
@@ -987,7 +995,7 @@ const { chromium } = require(process.argv[1]);
                 script,
                 str(REPOSITORY_ROOT / "ui" / "node_modules" / "playwright"),
                 url,
-                project_id,
+                project_name,
             ],
             check=True,
             capture_output=True,

@@ -1,4 +1,5 @@
-import type { ContentCardsReview, ResourceResponse, RuntimeExportJob, RuntimeExportResponse, RuntimeMutationResponse, RuntimeReadSet, RuntimeResourceContent, RuntimeSnapshot, SnapshotResponse } from './types'
+import type { ContentCardsReview, ResourceResponse, RuntimeExportJob, RuntimeExportResponse, RuntimeMutationResponse, RuntimeReadSet, RuntimeResourceContent, RuntimeSnapshot, RuntimeTimelineReadSet, SnapshotResponse } from './types'
+import type { TimelineEditCommand } from '../editor/timeline-edit'
 
 export class RuntimeConflictError extends Error {
   constructor(readonly snapshot?: RuntimeSnapshot) {
@@ -79,6 +80,35 @@ export class RuntimeApiClient {
 
   async updateContentCards(readSet: RuntimeReadSet, review: ContentCardsReview) {
     return this.updatePlan('content-cards', readSet, review)
+  }
+
+  async editTimeline(readSet: RuntimeTimelineReadSet, command: TimelineEditCommand) {
+    const serialized = command.type === 'split'
+      ? { type: command.type, clip_id: command.clipId, at_s: command.atS }
+      : command.type === 'delete'
+        ? { type: command.type, clip_id: command.clipId }
+        : command.type === 'trim'
+          ? { type: command.type, clip_id: command.clipId, edge: command.edge, source_s: command.sourceS }
+          : command.type === 'join'
+            ? { type: command.type, left_clip_id: command.leftClipId, right_clip_id: command.rightClipId }
+            : {
+                type: command.type,
+                index: command.index,
+                clip: {
+                  id: command.clip.id,
+                  source_range: {
+                    start_s: command.clip.sourceRange.startS,
+                    end_s: command.clip.sourceRange.endS,
+                  },
+                  speed: command.clip.speed ?? 1,
+                  ...(command.clip.decisionRef ? { decision_ref: command.clip.decisionRef } : {}),
+                  ...(command.clip.sourceAssetId ? { source_asset_id: command.clip.sourceAssetId } : {}),
+                },
+              }
+    return this.mutate(`/v1/projects/${encodeURIComponent(this.projectId)}/timeline/edits`, {
+      readSet,
+      command: serialized,
+    })
   }
 
   async updatePlan(operation: string, readSet: RuntimeReadSet, review: Readonly<Record<string, unknown>>) {

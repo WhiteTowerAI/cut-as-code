@@ -63,6 +63,8 @@ class ProtocolService:
             return self._get_resource(request)
         if verb == "plan.update":
             return self._update_plan(request)
+        if verb == "timeline.edit":
+            return self._edit_timeline(request)
         if verb == "review.record":
             return self._record_review(request)
         return {"ok": False, "error": "unknown verb"}
@@ -139,6 +141,435 @@ class ProtocolService:
         if set(request) != {"verb", "project_id", "operation", "read_set", "review"}:
             return {"ok": False, "error": "plan.update accepts only a typed operation update"}
         return self._under_lease(request, lambda context: self._apply_plan_update(context, request["review"]))
+
+    def _edit_timeline(self, request):
+        if set(request) != {"verb", "project_id", "read_set", "command"}:
+            return {"ok": False, "error": "timeline.edit accepts only a typed timeline command"}
+        project_id = request.get("project_id")
+        invalid = self._validate_id("project_id", project_id)
+        if invalid:
+            return invalid
+        registered = self._projects.get(project_id)
+        if registered is None:
+            return {"ok": False, "error": "unknown project_id"}
+        if registered["quarantine"]:
+            return {"ok": False, "error": "project is in recovery quarantine"}
+        root = registered["root"]
+        lease = self._acquire_lease(root)
+        if lease is None:
+            return {"ok": False, "status": 409, "error": "project mutation is busy"}
+        try:
+            context = self._timeline_mutation_context(request)
+            if isinstance(context, dict) and "error" in context:
+                return context
+            return self._apply_timeline_edit(context, request["command"])
+        except PreparedTransactionError:
+            registered["quarantine"] = "pending transaction requires recovery"
+            return {"ok": False, "error": "project entered recovery quarantine"}
+        finally:
+            self._release_lease(lease)
+
+    def _timeline_mutation_context(self, request):
+        root = self._projects[request["project_id"]]["root"]
+        snapshot = build_snapshot(root)
+        if snapshot["read_only"]:
+            return {"ok": False, "error": "project is read-only"}
+        read_set = request.get("read_set")
+        if not isinstance(read_set, dict) or set(read_set) != {"project", "operation", "timeline", "plans"}:
+            return {"ok": False, "error": "complete timeline read_set is required"}
+        if not isinstance(read_set.get("plans"), dict):
+            return {"ok": False, "error": "complete timeline read_set is required"}
+        project_resource = next((item for item in snapshot["resources"] if item["kind"] == "project"), None)
+        timeline_resource = next((item for item in snapshot["resources"] if item["kind"] == "timeline"), None)
+        cut_operation = next((item for item in snapshot["view"]["operations"] if item["id"] == "cut"), None)
+        if not project_resource or not timeline_resource or not cut_operation:
+            return {"ok": False, "error": "an editable cut operation and timeline are required"}
+        expected = {
+            "project": project_resource["etag"],
+            "operation": cut_operation["etag"],
+            "timeline": timeline_resource["etag"],
+        }
+        if any(read_set.get(key) != value for key, value in expected.items()):
+            return {"ok": False, "status": 409, "error": "conflict", "snapshot": self._public_snapshot(snapshot)}
+        registry = snapshot["_registry"][timeline_resource["id"]]
+        timeline_path = root / "work" / registry["value"]
+        project_path = root / "work" / "project.json"
+        try:
+            project = json.loads(project_path.read_text(encoding="utf-8"))
+            timeline = json.loads(timeline_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            return {"ok": False, "error": "project changed during timeline mutation"}
+        active_sequence = project.get("active_sequence")
+        sequence = project.get("sequences", {}).get(active_sequence, {})
+        if "cut" not in sequence.get("operations", []):
+            return {"ok": False, "error": "cut is not active on the current sequence"}
+        plan_files = []
+        active_operation_ids = set(sequence.get("operations", []))
+        for operation in project.get("operations", []):
+            operation_id = operation.get("id") if isinstance(operation, dict) else None
+            plan_value = operation.get("plan") if isinstance(operation, dict) else None
+            if (operation_id in active_operation_ids and operation_id != "cut"
+                    and isinstance(plan_value, str) and plan_value.strip()):
+                path = projectlib.resolve_project_path(root, plan_value)
+                try:
+                    data = path.read_bytes()
+                    plan_files.append({
+                        "operation_id": operation_id,
+                        "path": path,
+                        "etag": self._hash(data),
+                        "plan": json.loads(data.decode("utf-8")),
+                    })
+                except (OSError, UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
+                    return {"ok": False, "error": "an active downstream plan is unavailable"}
+        plan_etags = {entry["operation_id"]: entry["etag"] for entry in plan_files}
+        if any(read_set["plans"].get(operation_id) != etag for operation_id, etag in plan_etags.items()):
+            return {"ok": False, "status": 409, "error": "conflict", "snapshot": self._public_snapshot(snapshot)}
+        return root, snapshot, project, timeline_path, timeline, expected, plan_files
+
+    def _apply_timeline_edit(self, context, command):
+        root, snapshot, project, timeline_path, timeline, expected, plan_files = context
+        try:
+            updated_timeline = self._apply_timeline_command(timeline, command)
+        except (KeyError, TypeError, ValueError) as exc:
+            return {"ok": False, "error": f"invalid timeline edit: {exc}"}
+        if updated_timeline == timeline:
+            return {"ok": True, "result": "no_change", "snapshot": self._public_snapshot(snapshot)}
+        timeline_errors = projectlib.validate_timeline(updated_timeline)
+        if timeline_errors:
+            return {"ok": False, "error": "invalid timeline edit: " + "; ".join(timeline_errors)}
+
+        ripple = self._timeline_ripple(timeline, updated_timeline, command)
+        plan_writes = []
+        shifted_operation_ids = set()
+        if ripple:
+            boundary_s, delta_s = ripple
+            for entry in plan_files:
+                shifted = self._shift_operation_plan(
+                    entry["operation_id"], entry["plan"], boundary_s, delta_s
+                )
+                if shifted != entry["plan"]:
+                    plan_writes.append((entry["path"], self._json_bytes(shifted), entry["etag"]))
+                    shifted_operation_ids.add(entry["operation_id"])
+
+        updated_project = copy.deepcopy(project)
+        active_sequence = updated_project.get("active_sequence")
+        active_operation_ids = set(
+            updated_project.get("sequences", {}).get(active_sequence, {}).get("operations", [])
+        )
+        if ripple:
+            boundary_s, delta_s = ripple
+            for operation in updated_project.get("operations", []):
+                if (isinstance(operation, dict)
+                        and operation.get("id") in active_operation_ids
+                        and operation.get("id") != "cut"
+                        and "render" in operation):
+                    shifted_render = self._shift_render_timing(operation["render"], boundary_s, delta_s)
+                    if shifted_render != operation["render"]:
+                        shifted_operation_ids.add(operation.get("id"))
+                        operation["render"] = shifted_render
+        cut = next(item for item in updated_project["operations"] if item.get("id") == "cut")
+        cut["revision"] += 1
+        cut.update({"status": "stale", "outputs": []})
+        if isinstance(cut.get("check"), dict):
+            cut["check"] = {**cut["check"], "status": "pending"}
+        stale_operation_ids = set(active_operation_ids)
+        changed = True
+        while changed:
+            changed = False
+            for operation in updated_project.get("operations", []):
+                if not isinstance(operation, dict) or operation.get("id") in stale_operation_ids:
+                    continue
+                dependencies = set(operation.get("depends_on", [])) | set(operation.get("based_on", {}))
+                if dependencies.intersection(stale_operation_ids):
+                    stale_operation_ids.add(operation.get("id"))
+                    changed = True
+        for operation in updated_project.get("operations", []):
+            if operation.get("id") in stale_operation_ids and operation.get("id") != "cut":
+                operation.update({"status": "stale", "outputs": []})
+                if operation.get("id") in shifted_operation_ids:
+                    operation["revision"] = int(operation.get("revision", 0)) + 1
+                if isinstance(operation.get("check"), dict):
+                    operation["check"] = {**operation["check"], "status": "pending"}
+        for review in updated_project.get("reviews", []):
+            dependencies = set(review.get("depends_on", [])) | set(review.get("based_on", {}))
+            if dependencies.intersection(stale_operation_ids):
+                review["status"] = "stale"
+        revision = updated_project.get("revision")
+        if isinstance(revision, int) and not isinstance(revision, bool):
+            updated_project["revision"] = revision + 1
+        updated_project.setdefault("render", {})["status"] = "draft"
+        return self._commit_timeline(root, timeline_path, updated_timeline, updated_project, expected, plan_writes)
+
+    @classmethod
+    def _apply_timeline_command(cls, timeline, command):
+        if not isinstance(command, dict) or not isinstance(command.get("type"), str):
+            raise ValueError("command must be an object with a type")
+        updated = copy.deepcopy(timeline)
+        clips = updated.get("clips")
+        if not isinstance(clips, list) or (not clips and command.get("type") != "insert"):
+            raise ValueError("timeline clips are unavailable")
+        command_type = command["type"]
+        allowed = {
+            "split": {"type", "clip_id", "at_s"},
+            "delete": {"type", "clip_id"},
+            "trim": {"type", "clip_id", "edge", "source_s"},
+            "join": {"type", "left_clip_id", "right_clip_id"},
+            "insert": {"type", "index", "clip"},
+        }
+        if command_type not in allowed or set(command) != allowed[command_type]:
+            raise ValueError("command fields do not match its type")
+        fps = updated.get("fps", {})
+        frame_duration = float(fps.get("den")) / float(fps.get("num"))
+        source_duration = float(updated["source_duration_s"])
+
+        if command_type == "split":
+            index = cls._clip_index(clips, command["clip_id"])
+            clip = clips[index]
+            at_s = cls._finite_number(command["at_s"], "at_s")
+            at_s = cls._rounded(int(at_s / frame_duration + 0.5) * frame_duration)
+            start = float(clip["program_range"]["start_s"])
+            end = float(clip["program_range"]["end_s"])
+            if at_s < start + frame_duration - 1e-7 or at_s > end - frame_duration + 1e-7:
+                raise ValueError("split point must be inside the clip")
+            speed = float(clip["speed"])
+            source_split = cls._rounded(float(clip["source_range"]["start_s"]) + (at_s - start) * speed)
+            right_id = cls._split_clip_id(clips, clip["id"], at_s, frame_duration)
+            left = copy.deepcopy(clip)
+            right = copy.deepcopy(clip)
+            left["source_range"]["end_s"] = source_split
+            right["id"] = right_id
+            right["source_range"]["start_s"] = source_split
+            clips[index:index + 1] = [left, right]
+        elif command_type == "delete":
+            clips.pop(cls._clip_index(clips, command["clip_id"]))
+        elif command_type == "trim":
+            index = cls._clip_index(clips, command["clip_id"])
+            edge = command["edge"]
+            if edge not in {"start", "end"}:
+                raise ValueError("trim edge must be start or end")
+            clip = clips[index]
+            source_s = cls._finite_number(command["source_s"], "source_s")
+            speed = float(clip["speed"])
+            minimum_duration = frame_duration * speed
+            if edge == "start":
+                minimum = float(clips[index - 1]["source_range"]["end_s"]) if index else 0.0
+                maximum = float(clip["source_range"]["end_s"]) - minimum_duration
+            else:
+                minimum = float(clip["source_range"]["start_s"]) + minimum_duration
+                maximum = float(clips[index + 1]["source_range"]["start_s"]) if index + 1 < len(clips) else source_duration
+            if source_s < minimum - 1e-7 or source_s > maximum + 1e-7:
+                raise ValueError("trim would overlap another source range")
+            clip["source_range"][f"{edge}_s"] = cls._rounded(source_s)
+        elif command_type == "join":
+            index = cls._clip_index(clips, command["left_clip_id"])
+            if index + 1 >= len(clips) or clips[index + 1].get("id") != command["right_clip_id"]:
+                raise ValueError("join clips must be adjacent")
+            left, right = clips[index], clips[index + 1]
+            if (abs(float(left["source_range"]["end_s"]) - float(right["source_range"]["start_s"])) > 1e-7
+                    or abs(float(left["speed"]) - float(right["speed"])) > 1e-7):
+                raise ValueError("only matching split clips can be joined")
+            left["source_range"]["end_s"] = right["source_range"]["end_s"]
+            clips.pop(index + 1)
+        else:
+            index = command["index"]
+            candidate = command["clip"]
+            if (not isinstance(index, int) or isinstance(index, bool) or index < 0 or index > len(clips)
+                    or not isinstance(candidate, dict)
+                    or set(candidate) - {"id", "source_range", "speed", "decision_ref", "source_asset_id"}
+                    or set(candidate) < {"id", "source_range", "speed"}):
+                raise ValueError("insert command is invalid")
+            if not isinstance(candidate.get("id"), str) or not candidate["id"].strip():
+                raise ValueError("insert clip id must be nonblank")
+            if any(clip.get("id") == candidate["id"] for clip in clips):
+                raise ValueError("insert clip id already exists")
+            source_range = candidate.get("source_range")
+            if not isinstance(source_range, dict) or set(source_range) != {"start_s", "end_s"}:
+                raise ValueError("insert source_range is invalid")
+            start = cls._finite_number(source_range["start_s"], "start_s")
+            end = cls._finite_number(source_range["end_s"], "end_s")
+            speed = cls._finite_number(candidate["speed"], "speed")
+            if start < 0 or end <= start or end > source_duration + frame_duration or speed <= 0:
+                raise ValueError("insert clip range is invalid")
+            clips.insert(index, copy.deepcopy(candidate))
+
+        return cls._reflow_timeline(updated)
+
+    @classmethod
+    def _timeline_ripple(cls, before, after, command):
+        """Return (old program boundary, duration delta) for downstream ripple edits."""
+        if command.get("type") in {"split", "join"}:
+            return None
+        before_clips = before.get("clips", [])
+        after_clips = after.get("clips", [])
+        if command.get("type") == "delete":
+            clip = next((item for item in before_clips if item.get("id") == command.get("clip_id")), None)
+            if not clip:
+                return None
+            boundary = float(clip["program_range"]["end_s"])
+            duration = (float(clip["source_range"]["end_s"]) - float(clip["source_range"]["start_s"])) / float(clip["speed"])
+            return cls._ripple_or_none(boundary, -duration)
+        if command.get("type") == "insert":
+            index = command.get("index")
+            boundary = (float(before_clips[index]["program_range"]["start_s"])
+                        if index < len(before_clips) else float(before.get("program_duration_s", 0)))
+            clip = next((item for item in after_clips if item.get("id") == command.get("clip", {}).get("id")), None)
+            if not clip:
+                return None
+            duration = float(clip["program_range"]["end_s"]) - float(clip["program_range"]["start_s"])
+            return cls._ripple_or_none(boundary, duration)
+        if command.get("type") == "trim":
+            before_clip = next((item for item in before_clips if item.get("id") == command.get("clip_id")), None)
+            after_clip = next((item for item in after_clips if item.get("id") == command.get("clip_id")), None)
+            if not before_clip or not after_clip:
+                return None
+            old_duration = float(before_clip["program_range"]["end_s"]) - float(before_clip["program_range"]["start_s"])
+            new_duration = float(after_clip["program_range"]["end_s"]) - float(after_clip["program_range"]["start_s"])
+            delta = new_duration - old_duration
+            boundary = (float(before_clip["program_range"]["start_s"]) + max(0.0, -delta)
+                        if command.get("edge") == "start"
+                        else float(before_clip["program_range"]["end_s"]))
+            return cls._ripple_or_none(boundary, delta)
+        return None
+
+    @staticmethod
+    def _ripple_or_none(boundary, delta):
+        if not (float("-inf") < boundary < float("inf") and float("-inf") < delta < float("inf")):
+            return None
+        if abs(delta) <= 1e-7:
+            return None
+        return round(boundary, 9), round(delta, 9)
+
+    @classmethod
+    def _shift_operation_plan(cls, operation_id, plan, boundary, delta):
+        shifted = copy.deepcopy(plan)
+        if not isinstance(shifted, dict):
+            return shifted
+        if operation_id == "content-cards":
+            for card in shifted.get("cards", []):
+                cls._shift_program_start(card, boundary, delta)
+        elif operation_id == "captions":
+            for cue in shifted.get("cues", []):
+                if not cls._shift_program_range(cue, boundary, delta):
+                    cls._shift_start_end(cue, boundary, delta)
+        elif operation_id == "graphic-motion":
+            for cue in shifted.get("cues", []):
+                cls._shift_program_range(cue, boundary, delta)
+        elif operation_id == "b-roll":
+            for shot in shifted.get("shots", []):
+                if cls._shift_program_range(shot, boundary, delta):
+                    for segment in shot.get("segments", []):
+                        cls._shift_program_range(segment, boundary, delta)
+        return shifted
+
+    @staticmethod
+    def _shift_program_range(value, boundary, delta):
+        if not isinstance(value, dict):
+            return False
+        program_range = value.get("program_range")
+        if (not isinstance(program_range, dict)
+                or not isinstance(program_range.get("start_s"), (int, float))
+                or isinstance(program_range.get("start_s"), bool)
+                or not isinstance(program_range.get("end_s"), (int, float))
+                or isinstance(program_range.get("end_s"), bool)
+                or float(program_range["start_s"]) < boundary - 1e-7):
+            return False
+        value["program_range"] = {
+            **program_range,
+            "start_s": round(float(program_range["start_s"]) + delta, 9),
+            "end_s": round(float(program_range["end_s"]) + delta, 9),
+        }
+        return True
+
+    @staticmethod
+    def _shift_program_start(value, boundary, delta):
+        if (isinstance(value, dict)
+                and isinstance(value.get("program_start_s"), (int, float))
+                and not isinstance(value.get("program_start_s"), bool)
+                and isinstance(value.get("duration_s"), (int, float))
+                and not isinstance(value.get("duration_s"), bool)
+                and float(value["program_start_s"]) >= boundary - 1e-7):
+            value["program_start_s"] = round(float(value["program_start_s"]) + delta, 9)
+            return True
+        return False
+
+    @staticmethod
+    def _shift_start_end(value, boundary, delta):
+        if (isinstance(value, dict)
+                and isinstance(value.get("start"), (int, float))
+                and not isinstance(value.get("start"), bool)
+                and isinstance(value.get("end"), (int, float))
+                and not isinstance(value.get("end"), bool)
+                and float(value["start"]) >= boundary - 1e-7):
+            value["start"] = round(float(value["start"]) + delta, 9)
+            value["end"] = round(float(value["end"]) + delta, 9)
+            return True
+        return False
+
+    @classmethod
+    def _shift_render_timing(cls, value, boundary, delta):
+        if isinstance(value, list):
+            return [cls._shift_render_timing(item, boundary, delta) for item in value]
+        if not isinstance(value, dict):
+            return value
+        shifted = copy.deepcopy(value)
+        if (isinstance(shifted.get("start_s"), (int, float))
+                and not isinstance(shifted.get("start_s"), bool)
+                and isinstance(shifted.get("duration_s"), (int, float))
+                and not isinstance(shifted.get("duration_s"), bool)
+                and float(shifted["start_s"]) >= boundary - 1e-7):
+            shifted["start_s"] = round(float(shifted["start_s"]) + delta, 9)
+        return {
+            key: value if key in {"start_s", "duration_s"}
+            else cls._shift_render_timing(value, boundary, delta)
+            for key, value in shifted.items()
+        }
+
+    @staticmethod
+    def _clip_index(clips, clip_id):
+        if not isinstance(clip_id, str) or not clip_id.strip():
+            raise ValueError("clip id must be nonblank")
+        index = next((index for index, clip in enumerate(clips) if clip.get("id") == clip_id), None)
+        if index is None:
+            raise ValueError("clip does not exist")
+        return index
+
+    @staticmethod
+    def _finite_number(value, name):
+        try:
+            number = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{name} must be numeric") from exc
+        if not (float("-inf") < number < float("inf")):
+            raise ValueError(f"{name} must be finite")
+        return number
+
+    @staticmethod
+    def _rounded(value):
+        return round(float(value), 9)
+
+    @classmethod
+    def _reflow_timeline(cls, timeline):
+        program_start = 0.0
+        for clip in timeline["clips"]:
+            speed = float(clip["speed"])
+            duration = (float(clip["source_range"]["end_s"]) - float(clip["source_range"]["start_s"])) / speed
+            program_end = cls._rounded(program_start + duration)
+            clip["program_range"] = {"start_s": cls._rounded(program_start), "end_s": program_end}
+            program_start = program_end
+        timeline["program_duration_s"] = cls._rounded(program_start)
+        return timeline
+
+    @staticmethod
+    def _split_clip_id(clips, clip_id, at_s, frame_duration):
+        frame = round(at_s / frame_duration)
+        base = f"{clip_id}:split-{frame}"
+        ids = {clip.get("id") for clip in clips}
+        candidate = base
+        suffix = 2
+        while candidate in ids:
+            candidate = f"{base}-{suffix}"
+            suffix += 1
+        return candidate
 
     def _apply_plan_update(self, context, review):
         root, snapshot, project, operation, plan_path, plan, expected = context
@@ -714,6 +1145,99 @@ class ProtocolService:
             for _path, temporary in staged:
                 temporary.unlink(missing_ok=True)
 
+    def _commit_timeline(self, root, timeline_path, timeline, project, expected, plan_writes=()):
+        project_path = root / "work" / "project.json"
+        validation_errors = projectlib.validate_project(
+            project, root, check_files=True, dependency_mode="allow_stale"
+        )
+        if validation_errors:
+            return {"ok": False, "error": "invalid committed project: " + "; ".join(validation_errors)}
+        self._before_final_cas()
+        current = build_snapshot(root)
+        current_project = next(item for item in current["resources"] if item["kind"] == "project")["etag"]
+        current_timeline = next(item for item in current["resources"] if item["kind"] == "timeline")["etag"]
+        current_operation = next(item for item in current["view"]["operations"] if item["id"] == "cut")["etag"]
+        if (current_project, current_operation, current_timeline) != (
+                expected["project"], expected["operation"], expected["timeline"]):
+            return {"ok": False, "status": 409, "error": "conflict", "snapshot": self._public_snapshot(current)}
+        if any(self._hash(path.read_bytes()) != old_hash for path, _data, old_hash in plan_writes):
+            return {"ok": False, "status": 409, "error": "conflict", "snapshot": self._public_snapshot(current)}
+
+        writes = [
+            (timeline_path, self._json_bytes(timeline)),
+            *[(path, data) for path, data, _old_hash in plan_writes],
+            (project_path, self._json_bytes(project)),
+        ]
+        journal_dir = projectlib.editor_state_dir(root, create=True)
+        journal_path = journal_dir / "transaction.json"
+        if journal_path.exists():
+            raise PreparedTransactionError("pending transaction journal exists")
+        intent = {
+            "schema_version": 1,
+            "transaction_id": str(uuid.uuid4()),
+            "operation": "cut",
+            "verb": "timeline.edit",
+            "state": "prepared",
+            "files": [
+                {
+                    "path": str(path.relative_to(root)).replace("\\", "/"),
+                    "old_hash": self._hash(path.read_bytes()),
+                    "new_hash": self._hash(data),
+                    "new_content": data.decode("utf-8"),
+                }
+                for path, data in writes
+            ],
+        }
+        self._atomic_write(journal_path, self._json_bytes(intent))
+        staged = []
+        try:
+            self._after_prepare()
+            for path, data in writes:
+                handle = tempfile.NamedTemporaryFile(
+                    dir=path.parent, prefix=f".{path.name}.", suffix=".tmp", delete=False
+                )
+                temporary = Path(handle.name)
+                try:
+                    handle.write(data)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                finally:
+                    handle.close()
+                staged.append((path, temporary))
+            current = build_snapshot(root)
+            current_project = next(item for item in current["resources"] if item["kind"] == "project")["etag"]
+            current_timeline = next(item for item in current["resources"] if item["kind"] == "timeline")["etag"]
+            current_operation = next(item for item in current["view"]["operations"] if item["id"] == "cut")["etag"]
+            if (current_project, current_operation, current_timeline) != (
+                    expected["project"], expected["operation"], expected["timeline"]):
+                journal_path.unlink()
+                return {"ok": False, "status": 409, "error": "conflict", "snapshot": self._public_snapshot(current)}
+            if any(self._hash(path.read_bytes()) != old_hash for path, _data, old_hash in plan_writes):
+                journal_path.unlink()
+                return {"ok": False, "status": 409, "error": "conflict", "snapshot": self._public_snapshot(current)}
+            for path, temporary in staged:
+                os.replace(temporary, path)
+                self._after_replace(path)
+            self._before_post_commit_validation()
+            snapshot = build_snapshot(root)
+            if snapshot["read_only"]:
+                raise PreparedTransactionError("committed project failed validation")
+            self._before_hash_verification()
+            for item in intent["files"]:
+                if self._hash((root / item["path"]).read_bytes()) != item["new_hash"]:
+                    raise PreparedTransactionError("committed project hash verification failed")
+            intent["state"] = "committed"
+            self._atomic_write(journal_path, self._json_bytes(intent))
+            journal_path.unlink()
+            return {"ok": True, "result": "committed", "snapshot": self._public_snapshot(snapshot)}
+        except PreparedTransactionError:
+            raise
+        except Exception as exc:
+            raise PreparedTransactionError("timeline transaction failed after prepare") from exc
+        finally:
+            for _path, temporary in staged:
+                temporary.unlink(missing_ok=True)
+
     def _reconcile_project(self, current, proposed, verb, operation_id, target_review_id=None):
         reconciled = copy.deepcopy(current)
         if verb == "plan.update":
@@ -777,8 +1301,8 @@ class ProtocolService:
             transaction_id = intent.get("transaction_id")
             operation_id = intent.get("operation")
             if (intent.get("schema_version") != 1
-                    or operation_id not in {"content-cards", "captions", "graphic-motion"}
-                    or intent.get("verb") not in {"plan.update", "review.record"}
+                    or operation_id not in {"cut", "content-cards", "captions", "graphic-motion"}
+                    or intent.get("verb") not in {"timeline.edit", "plan.update", "review.record"}
                     or intent.get("state") not in {"prepared", "committed"}
                     or not isinstance(transaction_id, str) or str(uuid.UUID(transaction_id)) != transaction_id
                     or not isinstance(files, list) or not files):
@@ -786,12 +1310,26 @@ class ProtocolService:
             project_path = root / "work" / "project.json"
             current_project = json.loads(project_path.read_text(encoding="utf-8"))
             operation = next((item for item in current_project.get("operations", []) if item.get("id") == operation_id), None)
-            if not operation or not isinstance(operation.get("plan"), str):
+            if not operation or (intent["verb"] != "timeline.edit" and not isinstance(operation.get("plan"), str)):
                 raise ValueError
-            plan_path = projectlib.resolve_project_path(root, operation["plan"])
             required_targets = {project_path.resolve()}
             allowed = set(required_targets)
-            if intent["verb"] == "plan.update":
+            if intent["verb"] == "timeline.edit":
+                active = current_project.get("active_sequence")
+                sequence = current_project.get("sequences", {}).get(active, {})
+                timeline_value = sequence.get("timeline")
+                if not isinstance(timeline_value, str) or not timeline_value.strip():
+                    raise ValueError
+                timeline_path = projectlib.resolve_project_path(root, timeline_value).resolve()
+                required_targets.add(timeline_path)
+                allowed.add(timeline_path)
+                active_operation_ids = set(sequence.get("operations", []))
+                for candidate in current_project.get("operations", []):
+                    if (isinstance(candidate, dict) and candidate.get("id") in active_operation_ids
+                            and candidate.get("id") != "cut" and isinstance(candidate.get("plan"), str)):
+                        allowed.add(projectlib.resolve_project_path(root, candidate["plan"]).resolve())
+            elif intent["verb"] == "plan.update":
+                plan_path = projectlib.resolve_project_path(root, operation["plan"])
                 required_targets.add(plan_path.resolve())
                 allowed.add(plan_path.resolve())
                 graphic_operation = next(
@@ -824,7 +1362,7 @@ class ProtocolService:
                 targets.append((path, item))
             if not required_targets.issubset(seen):
                 raise ValueError
-            if self._validate_recovered(root, targets, operation_id):
+            if self._validate_recovered(root, targets, operation_id, intent["verb"]):
                 return "ambiguous transaction recovery"
             if intent.get("state") == "committed":
                 if not all(state == "new" for state in states):
@@ -863,12 +1401,33 @@ class ProtocolService:
                 continue
         return hashes
 
-    def _validate_recovered(self, root, targets, operation_id="content-cards"):
+    def _validate_recovered(self, root, targets, operation_id="content-cards", verb="plan.update"):
         proposed = {path: item["new_content"] for path, item in targets}
         project_path = root / "work" / "project.json"
         try:
             project = json.loads(proposed.get(project_path, project_path.read_text(encoding="utf-8")))
             errors = projectlib.validate_project(project, root, check_files=False, dependency_mode="allow_stale")
+            if verb == "timeline.edit":
+                active = project.get("active_sequence")
+                timeline_value = project.get("sequences", {}).get(active, {}).get("timeline")
+                timeline_path = projectlib.resolve_project_path(root, timeline_value).resolve()
+                timeline = json.loads(proposed.get(timeline_path, timeline_path.read_text(encoding="utf-8")))
+                active_ids = set(project.get("sequences", {}).get(active, {}).get("operations", []))
+                for candidate in project.get("operations", []):
+                    if (not isinstance(candidate, dict) or candidate.get("id") not in active_ids
+                            or candidate.get("id") == "cut" or not isinstance(candidate.get("plan"), str)):
+                        continue
+                    plan_path = projectlib.resolve_project_path(root, candidate["plan"]).resolve()
+                    if plan_path not in proposed:
+                        continue
+                    plan = json.loads(proposed[plan_path])
+                    if candidate.get("id") == "content-cards":
+                        self._validate_cards_plan(plan)
+                    elif candidate.get("id") == "captions":
+                        self._validate_caption_plan(plan)
+                    elif candidate.get("id") == "graphic-motion":
+                        self._validate_graphic_motion_plan(root, project, plan)
+                return [*errors, *projectlib.validate_timeline(timeline)]
             operation = next((item for item in project.get("operations", [])
                               if item.get("id") == operation_id), None)
             if not operation or not isinstance(operation.get("plan"), str):

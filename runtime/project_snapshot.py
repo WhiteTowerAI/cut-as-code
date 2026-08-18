@@ -156,6 +156,7 @@ def build_snapshot(project_root):
         fps = timeline.get("fps") if isinstance(timeline.get("fps"), dict) else {}
         view["timeline"] = {
             "duration_s": timeline.get("program_duration_s", 0),
+            "source_duration_s": timeline.get("source_duration_s", 0),
             "fps": {"num": fps.get("num", 30), "den": fps.get("den", 1)},
             "clips": [
                 {
@@ -163,6 +164,8 @@ def build_snapshot(project_root):
                     "source_range": clip.get("source_range"),
                     "program_range": clip.get("program_range"),
                     "speed": clip.get("speed"),
+                    "decision_ref": clip.get("decision_ref"),
+                    "source_asset_id": clip.get("source_asset_id"),
                 }
                 for clip in clips if isinstance(clip, dict)
             ],
