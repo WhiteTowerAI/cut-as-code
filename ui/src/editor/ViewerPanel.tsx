@@ -125,6 +125,8 @@ type LayerPointerState = Readonly<{
   startClientY: number
   canvasWidth: number
   canvasHeight: number
+  layerWidth: number
+  layerHeight: number
   bounds?: Readonly<{ x: number; y: number; width: number; height: number }>
 }>
 
@@ -155,21 +157,32 @@ function graphicMotionRect(layer: EditorLayerView, transform = layer.transform) 
 function clampGraphicMotionTransform(
   transform: LayerTransform,
   bounds: Readonly<{ x: number; y: number; width: number; height: number }>,
-  canvasWidth: number,
-  canvasHeight: number,
 ): LayerTransform {
   const { scaleX, scaleY } = axisScales(clampTransform(transform))
-  const reachableX = Math.min(12 / canvasWidth, bounds.width * scaleX / 2)
-  const reachableY = Math.min(12 / canvasHeight, bounds.height * scaleY / 2)
-  const minX = reachableX - (bounds.x - 0.5) * scaleX - bounds.width * scaleX
-  const maxX = 1 - reachableX - (bounds.x - 0.5) * scaleX
-  const minY = reachableY - (bounds.y - 0.5) * scaleY - bounds.height * scaleY
-  const maxY = 1 - reachableY - (bounds.y - 0.5) * scaleY
+  const minX = -(bounds.x - 0.5) * scaleX
+  const maxX = 1 - (bounds.x - 0.5) * scaleX - bounds.width * scaleX
+  const minY = -(bounds.y - 0.5) * scaleY
+  const maxY = 1 - (bounds.y - 0.5) * scaleY - bounds.height * scaleY
   return {
-    x: Math.min(1, Math.max(0, Math.min(maxX, Math.max(minX, transform.x)))),
-    y: Math.min(1, Math.max(0, Math.min(maxY, Math.max(minY, transform.y)))),
+    x: Math.min(maxX, Math.max(minX, transform.x)),
+    y: Math.min(maxY, Math.max(minY, transform.y)),
     scale_x: scaleX,
     scale_y: scaleY,
+  }
+}
+
+function clampCenteredTransform(
+  transform: LayerTransform,
+  layerWidth: number,
+  layerHeight: number,
+): LayerTransform {
+  const clamped = clampTransform(transform)
+  const halfWidth = Math.min(0.5, layerWidth / 2)
+  const halfHeight = Math.min(0.5, layerHeight / 2)
+  return {
+    ...clamped,
+    x: Math.min(1 - halfWidth, Math.max(halfWidth, clamped.x)),
+    y: Math.min(1 - halfHeight, Math.max(halfHeight, clamped.y)),
   }
 }
 
@@ -834,7 +847,8 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     if (event.button !== 0) return
     const canvas = event.currentTarget.closest('.viewer-canvas')
     const rect = canvas?.getBoundingClientRect()
-    if (!rect?.width || !rect.height) return
+    const layerRect = event.currentTarget.closest<HTMLElement>('[data-viewer-layer]')?.getBoundingClientRect()
+    if (!rect?.width || !rect.height || (mode === 'move' && !layerRect)) return
     event.preventDefault()
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -848,6 +862,8 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
       startClientY: event.clientY,
       canvasWidth: rect.width,
       canvasHeight: rect.height,
+      layerWidth: layerRect ? layerRect.width / rect.width : 0,
+      layerHeight: layerRect ? layerRect.height / rect.height : 0,
       bounds: layer.imageSequence?.contentBounds,
     }
   }
@@ -856,18 +872,24 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     const state = layerPointerRef.current
     if (!state || state.pointerId !== event.pointerId) return
     event.preventDefault()
+    const canvasRect = event.currentTarget.closest('.viewer-canvas')?.getBoundingClientRect()
+    const layerRect = event.currentTarget.closest<HTMLElement>('[data-viewer-layer]')?.getBoundingClientRect()
+    const canvasWidth = canvasRect?.width || state.canvasWidth
+    const canvasHeight = canvasRect?.height || state.canvasHeight
+    const layerWidth = layerRect ? layerRect.width / canvasWidth : state.layerWidth
+    const layerHeight = layerRect ? layerRect.height / canvasHeight : state.layerHeight
     const deltaX = event.clientX - state.startClientX
     const deltaY = event.clientY - state.startClientY
     let transform: LayerTransform
     if (state.mode === 'move') {
       const moved = {
           ...state.transform,
-          x: state.transform.x + deltaX / state.canvasWidth,
-          y: state.transform.y + deltaY / state.canvasHeight,
+          x: state.transform.x + deltaX / canvasWidth,
+          y: state.transform.y + deltaY / canvasHeight,
         } as LayerTransform
       transform = state.layer.imageSequence && state.bounds
-        ? clampGraphicMotionTransform(moved, state.bounds, state.canvasWidth, state.canvasHeight)
-        : clampTransform(moved)
+        ? clampGraphicMotionTransform(moved, state.bounds)
+        : clampCenteredTransform(moved, layerWidth, layerHeight)
     } else if (state.mode === 'scale') {
       const scale = typeof state.transform.scale === 'number'
         ? state.transform.scale
@@ -911,7 +933,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
         y: top - (bounds.y - 0.5) * scaleY,
         scale_x: scaleX,
         scale_y: scaleY,
-      }, bounds, state.canvasWidth, state.canvasHeight)
+      }, bounds)
     }
     editOperationDraft(state.layer.operationId, {
       cueId: state.layer.cueId,

@@ -1,21 +1,18 @@
 import { expect, test } from '@playwright/test'
 
-test('content cards review keeps edits local until explicit save and invalidates the preview', async ({ page }) => {
+test('content cards review keeps the cue list without redundant editable details', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1200 })
   await page.goto('/?scenario=review-content-cards')
 
   await expect(page.getByRole('status', { name: 'Content Cards review status' })).toContainText('Preview current')
   await expect(page.getByLabel('Preview artifact metadata')).toContainText('Existing preview artifact: current')
   await page.getByRole('tab', { name: 'Cards' }).click()
-  await page.getByLabel('Content card copy').fill('Revised lower third')
-
-  await expect(page.getByRole('button', { name: 'Save Changes' })).toBeEnabled()
-  await expect(page.getByRole('button', { name: 'Approve preview' })).toBeDisabled()
-  await page.getByRole('button', { name: 'Save Changes' }).click()
-
-  await expect(page.getByRole('status', { name: 'Content Cards review status' })).toContainText('Preview stale')
-  await expect(page.getByRole('button', { name: 'Approve preview' })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Reject preview' })).toHaveCount(0)
+  await expect(page.locator('.library-tile')).toHaveCount(1)
+  await expect(page.getByRole('group', { name: 'Content Card fields' })).toHaveCount(0)
+  await expect(page.getByLabel('Content card copy')).toHaveCount(0)
+  await expect(page.getByLabel('Content card layout')).toHaveCount(0)
+  await expect(page.getByLabel('Content card placement')).toHaveCount(0)
+  await expect(page.getByLabel('Content card enabled')).toHaveCount(0)
 })
 
 test('review rejection requires an explicit rationale and editor exposes no execution controls', async ({ page }) => {
@@ -36,7 +33,7 @@ test('conflicted card drafts cannot be saved or approved', async ({ page }) => {
   await page.goto('/?scenario=review-content-cards-conflict')
 
   await expect(page.getByRole('status', { name: 'Content Cards review status' })).toContainText('Conflict')
-  await expect(page.getByRole('button', { name: 'Save Changes' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Save All' })).toBeDisabled()
   await expect(page.getByRole('button', { name: 'Approve preview' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Reject preview' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Discard changes' })).toBeEnabled()

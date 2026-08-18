@@ -121,8 +121,8 @@ function isLayerTransform(value: unknown): value is LayerTransform {
   const { x, y } = transform
   const scaleX = legacy ? transform.scale : transform.scale_x
   const scaleY = legacy ? transform.scale : transform.scale_y
-  return typeof x === 'number' && Number.isFinite(x) && x >= 0 && x <= 1
-    && typeof y === 'number' && Number.isFinite(y) && y >= 0 && y <= 1
+  return typeof x === 'number' && Number.isFinite(x) && x >= -2 && x <= 3
+    && typeof y === 'number' && Number.isFinite(y) && y >= -2 && y <= 3
     && typeof scaleX === 'number' && Number.isFinite(scaleX) && scaleX >= 0.1 && scaleX <= 4
     && typeof scaleY === 'number' && Number.isFinite(scaleY) && scaleY >= 0.1 && scaleY <= 4
 }
@@ -207,9 +207,11 @@ export type EditorState = {
   editOperationDraft: (operationId: string, change: ContentCardsDraftChange) => void
   discardOperationDraft: (operationId: string) => void
   saveOperationDraft: (operationId: string) => Promise<void>
+  saveAllOperationDrafts: () => Promise<void>
   recordReviewDecision: (operationId: string, decision: 'approved' | 'rejected', rationale?: string) => Promise<void>
   getOperationDraft: (operationId: string) => OperationDraft | null
   canSaveOperation: (operationId: string) => boolean
+  canSaveAllOperations: () => boolean
   hasUnsavedChanges: () => boolean
   exportBlockers: () => readonly ExportBlocker[]
   addActivity: (entry: Omit<ActivityLogEntry, 'id' | 'timestamp'>) => void
@@ -239,9 +241,11 @@ export type EditorInitialState = Omit<
   | 'editOperationDraft'
   | 'discardOperationDraft'
   | 'saveOperationDraft'
+  | 'saveAllOperationDrafts'
   | 'recordReviewDecision'
   | 'getOperationDraft'
   | 'canSaveOperation'
+  | 'canSaveAllOperations'
   | 'hasUnsavedChanges'
   | 'exportBlockers'
   | 'addActivity'
@@ -402,6 +406,25 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
       const { [operationId]: _saved, ...operationDrafts } = state.operationDrafts
       set({ project: state.project ? { ...state.project, operations } : null, operationDrafts })
     },
+    saveAllOperationDrafts: async () => {
+      const kindOrder = new Map<EditorOperationView['kind'], number>([
+        ['captions', 0],
+        ['content-cards', 1],
+        ['graphic-motion', 2],
+      ])
+      const operationIds = (get().project?.operations ?? [])
+        .filter((operation) => isSupportedOperation(operation) && get().operationDrafts[operation.id]?.dirty)
+        .sort((left, right) => (kindOrder.get(left.kind) ?? 99) - (kindOrder.get(right.kind) ?? 99))
+        .map((operation) => operation.id)
+      for (const operationId of operationIds) {
+        const draft = get().operationDrafts[operationId]
+        if (!draft?.dirty) continue
+        if (draft.pending || draft.conflict) break
+        await get().saveOperationDraft(operationId)
+        const remaining = get().operationDrafts[operationId]
+        if (remaining?.conflict || remaining?.error) break
+      }
+    },
     recordReviewDecision: async (operationId, decision, rationale) => {
       const state = get()
       const operation = getOperation(state.project, operationId)
@@ -460,6 +483,11 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
     canSaveOperation: (operationId) => {
       const draft = get().operationDrafts[operationId]
       return Boolean(draft?.dirty && !draft.conflict && !draft.pending)
+    },
+    canSaveAllOperations: () => {
+      const drafts = Object.values(get().operationDrafts)
+      return !drafts.some((draft) => draft?.pending)
+        && drafts.some((draft) => draft?.dirty && !draft.conflict)
     },
     hasUnsavedChanges: () => Object.values(get().operationDrafts).some((draft) => draft?.dirty || draft?.pending),
     exportBlockers: () => Object.entries(get().operationDrafts).flatMap(([operationId, draft]) => {

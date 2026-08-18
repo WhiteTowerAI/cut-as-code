@@ -351,8 +351,8 @@ class ProtocolService:
         scale_y = transform.get("scale_y", transform.get("scale"))
         if any(isinstance(value, bool) or not isinstance(value, (int, float)) for value in (x, y, scale_x, scale_y)):
             raise ValueError("editor_transform values must be numbers")
-        if not 0 <= x <= 1 or not 0 <= y <= 1:
-            raise ValueError("editor_transform position must be normalized")
+        if not -2 <= x <= 3 or not -2 <= y <= 3:
+            raise ValueError("editor_transform position is out of range")
         if not 0.1 <= scale_x <= 4 or not 0.1 <= scale_y <= 4:
             raise ValueError("editor_transform scale is out of range")
         if "scale" in transform:

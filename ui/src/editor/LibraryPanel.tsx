@@ -17,7 +17,7 @@ type TileItem = {
   previewText?: string
   duration?: string
   status?: string
-  accent?: 'purple' | 'cyan' | 'yellow' | 'green' | 'pink'
+  accent?: 'teal' | 'cyan' | 'yellow' | 'green' | 'pink'
   mediaUrl?: string
   mediaType?: string
 }
@@ -65,16 +65,16 @@ const captionStyles: readonly TileItem[] = [
 ]
 
 const contentCards: readonly TileItem[] = [
-  { id: 'card-lower-third', label: 'Lower third', preview: 'product', image: '/assets/editor/card-lower-third.png', previewText: 'Presenter', duration: '00:18', status: 'Added', accent: 'purple' },
+  { id: 'card-lower-third', label: 'Lower third', preview: 'product', image: '/assets/editor/card-lower-third.png', previewText: 'Presenter', duration: '00:18', status: 'Added', accent: 'teal' },
   { id: 'card-quote', label: 'Quote', preview: 'founder', image: '/assets/editor/card-quote.png', previewText: 'Pull quote', duration: '18:42', accent: 'cyan' },
   { id: 'card-stat', label: 'Stat', preview: 'brand', image: '/assets/editor/card-stat.png', previewText: '72%', duration: '00:08', accent: 'yellow' },
   { id: 'card-split', label: 'Split', preview: 'city', image: '/assets/editor/card-split.png', previewText: 'Before / after', duration: '00:05', accent: 'green' },
   { id: 'card-cta', label: 'CTA', preview: 'product', image: '/assets/editor/card-cta.png', previewText: 'Try it now', duration: '00:18', status: 'Added', accent: 'pink' },
-  { id: 'card-product', label: 'Product', preview: 'founder', image: '/assets/editor/card-product.png', previewText: 'Feature callout', duration: '18:42', accent: 'purple' },
+  { id: 'card-product', label: 'Product', preview: 'founder', image: '/assets/editor/card-product.png', previewText: 'Feature callout', duration: '18:42', accent: 'teal' },
 ]
 
 const motionRecipes: readonly TileItem[] = [
-  { id: 'xyz-fade-up', label: 'XYZ Fade Up', preview: 'product', previewText: 'Fade up', accent: 'purple' },
+  { id: 'xyz-fade-up', label: 'XYZ Fade Up', preview: 'product', previewText: 'Fade up', accent: 'teal' },
   { id: 'xyz-fade-left', label: 'XYZ Fade Left', preview: 'founder', previewText: 'Fade left', accent: 'cyan' },
   { id: 'xyz-fade-big', label: 'XYZ Fade Big', preview: 'brand', previewText: 'Fade big', accent: 'yellow' },
   { id: 'xyz-fade-small', label: 'XYZ Fade Small', preview: 'city', previewText: 'Fade small', accent: 'green' },
@@ -250,55 +250,6 @@ function PlacementControls() {
   )
 }
 
-function ReviewCardFields({ operation, store }: { operation: EditorOperationView; store: StoreApi<EditorState> }) {
-  const selection = useStore(store, (state) => state.selection)
-  const draft = useStore(store, (state) => state.getOperationDraft(operation.id))
-  const edit = useStore(store, (state) => state.editOperationDraft)
-  const cues = Array.isArray(operation.fields.cues) ? operation.fields.cues as readonly Readonly<Record<string, unknown>>[] : []
-  const selectedId = selection?.kind === 'card' ? selection.id : draft?.fields.cueId ?? cues[0]?.id
-  const cue = cues.find((item) => item.id === selectedId)
-  if (!cue || typeof selectedId !== 'string') return null
-  const fields = { ...cue, ...draftFieldsForCue(draft, selectedId) }
-  return (
-    <fieldset aria-label="Content Card fields" className="library-inspector-fields">
-      <legend>{String(cue.card_type ?? 'Content card')}</legend>
-      <label>
-        <span className="sr-only">Content card copy</span>
-        <input aria-label="Content card copy" value={String(fields.copy ?? '')} onChange={(event) => edit(operation.id, { cueId: selectedId, copy: event.target.value })} />
-      </label>
-      <label>
-        Layout
-        <select aria-label="Content card layout" value={String(fields.layout ?? 'lower-third')} onChange={(event) => edit(operation.id, { cueId: selectedId, layout: event.target.value as 'lower-third' | 'quote' | 'statistic' })}>
-          <option value="lower-third">Lower third</option>
-          <option value="quote">Quote</option>
-          <option value="statistic">Statistic</option>
-          <option value="default">Default</option>
-          <option value="metric-spotlight">Metric spotlight</option>
-          <option value="side-by-side">Side by side</option>
-        </select>
-      </label>
-      <label>
-        Placement
-        <select aria-label="Content card placement" value={String(fields.placement ?? 'bottom-left')} onChange={(event) => edit(operation.id, { cueId: selectedId, placement: event.target.value as 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' })}>
-          <option value="top-left">Top left</option>
-          <option value="top-right">Top right</option>
-          <option value="bottom-left">Bottom left</option>
-          <option value="bottom-right">Bottom right</option>
-          <option value="top">Top</option>
-          <option value="bottom">Bottom</option>
-          <option value="left">Left</option>
-          <option value="right">Right</option>
-          <option value="center">Center</option>
-        </select>
-      </label>
-      <label>
-        <input aria-label="Content card enabled" type="checkbox" checked={Boolean(fields.enabled)} onChange={(event) => edit(operation.id, { cueId: selectedId, enabled: event.target.checked })} />
-        Enabled
-      </label>
-    </fieldset>
-  )
-}
-
 function CaptionFields({ operation, store }: { operation: EditorOperationView; store: StoreApi<EditorState> }) {
   const selection = useStore(store, (state) => state.selection)
   const draft = useStore(store, (state) => state.getOperationDraft(operation.id))
@@ -316,31 +267,6 @@ function CaptionFields({ operation, store }: { operation: EditorOperationView; s
         <textarea aria-label="Caption text" value={String(text ?? '')} onChange={(event) => edit(operation.id, { cueId: selectedId, text: event.target.value })} />
       </label>
       <output>{formatCueRange(cue.program_range)}</output>
-    </fieldset>
-  )
-}
-
-function MotionFields({ operation, store }: { operation: EditorOperationView; store: StoreApi<EditorState> }) {
-  const selection = useStore(store, (state) => state.selection)
-  const draft = useStore(store, (state) => state.getOperationDraft(operation.id))
-  const edit = useStore(store, (state) => state.editOperationDraft)
-  const cues = Array.isArray(operation.fields.cues) ? operation.fields.cues as readonly Readonly<Record<string, unknown>>[] : []
-  const selectedId = selection?.kind === 'graphic-motion' ? selection.id : draft?.fields.cueId ?? cues[0]?.id
-  const cue = cues.find((item) => item.id === selectedId)
-  if (!cue || typeof selectedId !== 'string') return null
-  const enabled = draftFieldsForCue(draft, selectedId)?.enabled ?? cue.enabled
-  return (
-    <fieldset aria-label="Graphic Motion fields" className="library-inspector-fields">
-      <legend>{String(cue.id)}</legend>
-      <strong>{String(cue.content || 'Untitled motion')}</strong>
-      <span>Recipe: {String(cue.recipe_id || 'Unknown')}</span>
-      <span>Source: {String(cue.source_status || 'Unknown')}</span>
-      <span>License: {String(cue.license_status || 'Unknown')}</span>
-      <span>Review: {String(cue.review_status || 'Unknown')}</span>
-      <label>
-        <input aria-label="Graphic Motion enabled" type="checkbox" checked={Boolean(enabled)} onChange={(event) => edit(operation.id, { cueId: selectedId, enabled: event.target.checked })} />
-        Enabled
-      </label>
     </fieldset>
   )
 }
@@ -368,7 +294,6 @@ function CardsPanel({ store, operation }: LibraryPanelProps & { operation?: Edit
         {items.length
           ? <TileGrid items={items} kind="card" selectedId={selection?.id} onSelect={select} />
           : <RuntimeEmpty>No content card cues</RuntimeEmpty>}
-        {operation?.editable ? <ReviewCardFields operation={operation} store={store} /> : null}
       </>
     )
   }
@@ -378,7 +303,6 @@ function CardsPanel({ store, operation }: LibraryPanelProps & { operation?: Edit
       <TileGrid items={contentCards} kind="card" selectedId={selection?.id} onSelect={select} />
       <PlacementControls />
       <button className="library-primary-action" type="button">Insert content card</button>
-      {operation?.editable ? <ReviewCardFields operation={operation} store={store} /> : null}
     </>
   )
 }
@@ -390,7 +314,6 @@ function MotionPanel({ store }: LibraryPanelProps) {
   const [query, setQuery] = useState('')
   const runtime = Boolean(project?.runtime)
   if (runtime) {
-    const operation = project?.operations?.find((item) => item.id === 'graphic-motion')
     const cues = project?.tracks.find((track) => track.kind === 'graphic-motion')?.clips ?? []
     const items: TileItem[] = cues.map((cue) => ({
       id: cue.id, label: cue.summary || cue.displayName || 'Untitled motion', preview: 'runtime', previewText: cue.summary || 'Untitled motion',
@@ -400,7 +323,6 @@ function MotionPanel({ store }: LibraryPanelProps) {
         {items.length
           ? <TileGrid items={items} kind="graphic-motion" selectedId={selection?.id} onSelect={select} />
           : <RuntimeEmpty>No graphic motion cues</RuntimeEmpty>}
-        {operation?.editable ? <MotionFields operation={operation} store={store} /> : null}
       </>
     )
   }

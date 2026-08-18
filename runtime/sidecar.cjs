@@ -321,8 +321,10 @@ function openExportPath(output, action, spawnProcess = spawn, platform = process
   let command
   let args
   if (platform === 'win32') {
-    command = 'explorer.exe'
-    args = action === 'reveal' ? ['/select,', output] : [output]
+    command = action === 'reveal' ? 'explorer.exe' : 'powershell.exe'
+    args = action === 'reveal'
+      ? ['/select,', output]
+      : ['-NoProfile', '-NonInteractive', '-Command', 'Start-Process -FilePath $args[0]', output]
   } else if (platform === 'darwin') {
     command = 'open'
     args = action === 'reveal' ? ['-R', output] : [output]

@@ -486,7 +486,7 @@ def _editor_transform(value):
     scale_y = value.get("scale_y", value.get("scale"))
     if any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in (x, y, scale_x, scale_y)):
         return default
-    if not (0 <= x <= 1 and 0 <= y <= 1 and 0.1 <= scale_x <= 4 and 0.1 <= scale_y <= 4):
+    if not (-2 <= x <= 3 and -2 <= y <= 3 and 0.1 <= scale_x <= 4 and 0.1 <= scale_y <= 4):
         return default
     if "scale" in value:
         return {"x": float(x), "y": float(y), "scale": float(scale_x)}

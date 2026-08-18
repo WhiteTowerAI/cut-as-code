@@ -96,6 +96,15 @@ class OverlayFrameBoundaryTests(unittest.TestCase):
             position,
         )
 
+    def test_cropped_overlay_accepts_corner_position_outside_unit_center_range(self):
+        filters, position = render_project._overlay_transform_filters(
+            {"x": 1.15, "y": 1.0, "scale_x": 1.0, "scale_y": 1.0},
+            {"x": 0.1, "y": 0.2, "width": 0.25, "height": 0.3},
+        )
+
+        self.assertEqual("crop=iw*0.25:ih*0.3:iw*0.1:ih*0.2", filters)
+        self.assertIn("x='main_w*1.15+(0.1-0.5)*main_w*1'", position)
+
     def test_default_content_bound_transform_preserves_original_visible_position(self):
         transform = {"x": 0.5, "y": 0.5, "scale_x": 1.0, "scale_y": 1.0}
         bounds = {"x": 0.1, "y": 0.2, "width": 0.25, "height": 0.3}

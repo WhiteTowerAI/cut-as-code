@@ -218,6 +218,7 @@ test('export status restores completed output details and exposes file actions',
   }))
   await page.route(/\/v1\/projects\/project_export_restore\/exports\/(open|reveal)$/, async (route) => {
     actions.push(new URL(route.request().url()).pathname.split('/').at(-1)!)
+    await new Promise((resolve) => setTimeout(resolve, 150))
     await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true }) })
   })
 
@@ -227,8 +228,21 @@ test('export status restores completed output details and exposes file actions',
   await expect(status).toContainText('final-video.mp4')
   await expect(status).toContainText('12.0 MB')
   await expect(status).toContainText('1m 30s')
-  await page.getByRole('button', { name: 'Open exported video' }).click()
-  await page.getByRole('button', { name: 'Show exported video in folder' }).click()
+  const open = page.getByRole('button', { name: 'Open exported video' })
+  const reveal = page.getByRole('button', { name: 'Show exported video in folder' })
+  await open.click()
+  await expect(open).toHaveAttribute('aria-busy', 'true')
+  await expect(open).toBeDisabled()
+  await expect(reveal).toBeDisabled()
+  await expect(open).toHaveText('Opening')
+  await expect(open).toHaveText('Open file')
+  await expect(open).toBeEnabled()
+  await reveal.click()
+  await expect(reveal).toHaveAttribute('aria-busy', 'true')
+  await expect(reveal).toBeDisabled()
+  await expect(reveal).toHaveText('Showing')
+  await expect(reveal).toHaveText('Show in folder')
+  await expect(reveal).toBeEnabled()
   expect(actions).toEqual(['open', 'reveal'])
 })
 
@@ -449,6 +463,109 @@ test('runtime Viewer composites source video, evidence, captions, cards, and Gra
   await expect(canvas.locator('img[alt="gm-review.png"]')).toHaveCount(0)
 })
 
+test('Caption, Card, and Graphic Motion layers drag flush to every Viewer corner', async ({ page }) => {
+  const base = runtimeSnapshot()
+  const snapshot = runtimeSnapshot({
+    view: {
+      ...base.view,
+      operations: [
+        { id: 'captions', revision: 1, status: 'draft', etag: 'captions-r1' },
+        { id: 'content-cards', revision: 1, status: 'draft', etag: 'cards-r1' },
+        { id: 'graphic-motion', revision: 1, status: 'draft', etag: 'motion-r1' },
+      ],
+      captions_edit: {
+        style: {}, cues: [{ id: 'caption-001', text: 'Caption layer', program_range: { start_s: 0, end_s: 3 } }],
+      },
+      content_cards_edit: {
+        fields: {},
+        review_template: { schema_version: 1, cards: [{ id: 'card-001', selected: true, copy: 'Card layer' }] },
+        cues: [{ id: 'card-001', copy: 'Card layer', enabled: true, program_range: { start_s: 0, end_s: 3 } }],
+      },
+      graphic_motion_edit: {
+        cues: [{ id: 'gm-001', content: 'Motion layer', enabled: true, program_range: { start_s: 0, end_s: 3 } }],
+      },
+      layers: [
+        {
+          id: 'layer_caption', operation_id: 'captions', cue_id: 'caption-001',
+          kind: 'caption', media_type: 'dom', z_index: 100,
+          program_range: { start_s: 0, end_s: 3 },
+          transform: { x: 0.5, y: 0.5, scale: 0.5 },
+          content: { text: 'Caption layer' },
+        },
+        {
+          id: 'layer_card', operation_id: 'content-cards', cue_id: 'card-001',
+          kind: 'card', media_type: 'dom', z_index: 200,
+          program_range: { start_s: 0, end_s: 3 },
+          transform: { x: 0.5, y: 0.5, scale: 0.5 },
+          content: { text: 'Card layer' },
+        },
+        {
+          id: 'layer_motion', operation_id: 'graphic-motion', cue_id: 'gm-001',
+          kind: 'graphic-motion', media_type: 'image-sequence', z_index: 300,
+          program_range: { start_s: 0, end_s: 3 },
+          transform: { x: 0.5, y: 0.5, scale: 1 },
+          content: { text: 'Motion layer' },
+          image_sequence: {
+            pattern: 'frame_%06d.png', start_number: 1, fps: { num: 30, den: 1 }, frame_count: 90,
+            frame_url_template: '/v1/projects/viewer-project/layers/layer_motion/frames/%d',
+            content_bounds: { x: 0.1, y: 0.2, width: 0.25, height: 0.3 },
+          },
+        },
+      ],
+    },
+  })
+  await page.route('**/layers/layer_motion/frames/1', (route) => route.fulfill({
+    contentType: 'image/png', body: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAE/wH+Q6m9WQAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  }))
+
+  for (const kind of ['caption', 'card', 'graphic-motion']) {
+    const isolatedSnapshot = {
+      ...snapshot,
+      view: {
+        ...snapshot.view,
+        operations: snapshot.view.operations.filter((operation) => operation.id === (
+          kind === 'caption' ? 'captions' : kind === 'card' ? 'content-cards' : 'graphic-motion'
+        )),
+        layers: snapshot.view.layers.filter((layer) => layer.kind === kind),
+      },
+    }
+    await page.route(`**/v1/projects/project_layer_corners_${kind}/snapshot`, (route) => route.fulfill({
+      contentType: 'application/json', body: JSON.stringify({ ok: true, snapshot: isolatedSnapshot }),
+    }))
+    for (const corner of ['top-left', 'bottom-right']) {
+      await page.goto(`/?project=project_layer_corners_${kind}&corner=${corner}`)
+      const canvas = page.locator('.viewer-canvas')
+      const layer = canvas.locator(`[data-viewer-layer="${kind}"]`)
+      const [canvasBox, initialBox] = await Promise.all([canvas.boundingBox(), layer.boundingBox()])
+      expect(canvasBox).not.toBeNull()
+      expect(initialBox).not.toBeNull()
+      await page.mouse.move(initialBox!.x + initialBox!.width / 2, initialBox!.y + initialBox!.height / 2)
+      await page.mouse.down()
+      await page.mouse.move(
+        corner === 'top-left' ? canvasBox!.x - canvasBox!.width : canvasBox!.x + canvasBox!.width * 2,
+        corner === 'top-left' ? canvasBox!.y - canvasBox!.height : canvasBox!.y + canvasBox!.height * 2,
+      )
+      await page.mouse.up()
+      const [movedBox, movedCanvasBox] = await Promise.all([layer.boundingBox(), canvas.boundingBox()])
+      expect(movedBox).not.toBeNull()
+      expect(movedCanvasBox).not.toBeNull()
+      if (corner === 'top-left') {
+        expect(Math.abs(movedBox!.x - movedCanvasBox!.x), `${kind} left edge`).toBeLessThanOrEqual(1)
+        expect(Math.abs(movedBox!.y - movedCanvasBox!.y), `${kind} top edge`).toBeLessThanOrEqual(1)
+      } else {
+        expect(Math.abs(movedBox!.x + movedBox!.width - movedCanvasBox!.x - movedCanvasBox!.width), `${kind} right edge`).toBeLessThanOrEqual(1)
+        expect(Math.abs(movedBox!.y + movedBox!.height - movedCanvasBox!.y - movedCanvasBox!.height), `${kind} bottom edge`).toBeLessThanOrEqual(1)
+        if (kind === 'graphic-motion') {
+          expect(Number(await layer.getAttribute('data-layer-x'))).toBeGreaterThan(1)
+        }
+      }
+    }
+  }
+})
+
 test('Graphic Motion uses a content-fitted PowerPoint selection box with eight resize handles', async ({ page }) => {
   const base = runtimeSnapshot()
   const snapshot = runtimeSnapshot({
@@ -534,7 +651,7 @@ test('Graphic Motion uses a content-fitted PowerPoint selection box with eight r
   await expect(layer).not.toHaveAttribute('data-layer-scale-x', '1')
   await expect(layer).toHaveAttribute('data-layer-scale-y', '1')
 
-  await page.getByRole('button', { name: 'Save Changes' }).click()
+  await page.getByRole('button', { name: 'Save All' }).click()
   await expect.poll(() => transactionBody).toBeTruthy()
   expect(transactionBody).toMatchObject({
     operation: 'graphic-motion',
@@ -573,7 +690,7 @@ test('layer timing is half-open and Graphic Motion frame selection follows the p
   expect(graphicMotionFrameNumber(layer, 20)).toBe(90)
 })
 
-test('dragging and scaling a Viewer layer stays local until Save Changes and never exports', async ({ page }) => {
+test('dragging and scaling a Viewer layer stays local until Save All and never exports', async ({ page }) => {
   const transform = { x: 0.25, y: 0.25, scale: 1 }
   const snapshotFor = (revision: number, nextTransform = transform) => {
     const base = runtimeSnapshot()
@@ -658,7 +775,7 @@ test('dragging and scaling a Viewer layer stays local until Save Changes and nev
   expect(transactionBody).toBeUndefined()
   expect(exportRequests).toBe(0)
 
-  await page.getByRole('button', { name: 'Save Changes' }).click()
+  await page.getByRole('button', { name: 'Save All' }).click()
   await expect.poll(() => transactionBody).toBeTruthy()
   await expect(page.getByRole('button', { name: 'Export Video' })).toBeEnabled()
 

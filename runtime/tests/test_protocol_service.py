@@ -512,8 +512,8 @@ class ProtocolServiceTests(unittest.TestCase):
 
     def test_editor_transform_rejects_out_of_range_values_and_unknown_fields(self):
         for transform in (
-            {"x": -0.01, "y": 0.5, "scale": 1.0},
-            {"x": 0.5, "y": 1.01, "scale": 1.0},
+            {"x": -2.01, "y": 0.5, "scale": 1.0},
+            {"x": 0.5, "y": 3.01, "scale": 1.0},
             {"x": 0.5, "y": 0.5, "scale": 0.09},
             {"x": 0.5, "y": 0.5, "scale": 4.01},
             {"x": 0.5, "y": 0.5, "scale": 1.0, "rotation": 10},
@@ -521,6 +521,14 @@ class ProtocolServiceTests(unittest.TestCase):
             with self.subTest(transform=transform):
                 with self.assertRaises(ValueError):
                     self.service._validate_editor_transform(transform)
+
+    def test_editor_transform_accepts_cropped_overlay_corner_positions(self):
+        self.assertEqual(
+            {"x": 1.15, "y": -0.7, "scale_x": 1.0, "scale_y": 4.0},
+            self.service._validate_editor_transform(
+                {"x": 1.15, "y": -0.7, "scale_x": 1.0, "scale_y": 4.0},
+            ),
+        )
 
     def test_content_cards_update_persists_transform_on_the_target_card(self):
         self._configure_content_cards_project()

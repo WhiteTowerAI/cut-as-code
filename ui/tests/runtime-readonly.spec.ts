@@ -281,9 +281,9 @@ test('browser runtime is ready from the armed credential-free URL and refreshes 
     const status = page.locator('[data-runtime-project-status]')
     await expect(status).toBeVisible()
     await expect(status.getByText(isolated.ready.projectId, { exact: true })).toBeVisible()
-    await expect(status.getByText('main', { exact: true })).toBeVisible()
-    await expect(status.getByText('Read only', { exact: true })).toBeVisible()
-    await expect(status.getByText('3 resources', { exact: true })).toBeVisible()
+    await expect(status.getByText('main', { exact: true })).toHaveCount(0)
+    await expect(status.getByText('Read only', { exact: true })).toHaveCount(0)
+    await expect(status.getByText('3 resources', { exact: true })).toHaveCount(0)
     await expect(status.getByText(/^\d+ protocol errors$/)).toBeVisible()
 
     const before = Number(await page.locator('html').getAttribute('data-runtime-refresh-count'))
@@ -346,6 +346,7 @@ test('content cards review keeps Viewer and Timeline meaningfully visible in the
     await expect(page.getByPlaceholder('Search content cards')).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Insert content card' })).toHaveCount(0)
     await page.locator('.library-tile').first().click()
+    await expect(page.getByRole('group', { name: 'Content Card fields' })).toHaveCount(0)
 
     const reviewButton = page.getByRole('button', { name: 'Approve preview' })
     await expect(reviewButton).toBeVisible()
@@ -369,6 +370,26 @@ test('content cards review keeps Viewer and Timeline meaningfully visible in the
     expect(visibleHeights.timeline).toBeGreaterThan(100)
     await expect(page.getByText('Project data', { exact: true })).toHaveCount(0)
     await expect(page.getByRole('region', { name: 'Protocol resources' })).toHaveCount(0)
+  } finally {
+    await page.close()
+    await stopSidecar(isolated.process)
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('runtime cue lists do not repeat card or motion details below the selected item', async ({ page }) => {
+  const root = await createContentCardsArtifactProjectFixture()
+  const isolated = await startSidecar(root)
+  try {
+    await page.goto(await armLaunch(isolated))
+    await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+
+    await page.getByRole('tab', { name: 'Cards' }).click()
+    await expect(page.locator('.library-tile')).toHaveCount(1)
+    await expect(page.getByRole('group', { name: 'Content Card fields' })).toHaveCount(0)
+
+    await page.getByRole('tab', { name: 'Graphic Motion' }).click()
+    await expect(page.getByRole('group', { name: 'Graphic Motion fields' })).toHaveCount(0)
   } finally {
     await page.close()
     await stopSidecar(isolated.process)
@@ -1214,7 +1235,7 @@ test('content card Inspector updates the second cue without overwriting the firs
     await expect(page.getByLabel('Content card copy')).toHaveValue('Second original')
 
     await page.getByLabel('Content card copy').fill('Second updated in editor')
-    await page.getByRole('button', { name: 'Save Changes' }).click()
+    await page.getByRole('button', { name: 'Save All' }).click()
 
     await expect.poll(async () => {
       const plan = JSON.parse(await readFile(path.join(root, 'work', 'content-cards', 'cards-plan.json'), 'utf8'))
@@ -1241,7 +1262,7 @@ test('caption Inspector updates the second cue and keeps the first cue unchanged
     await expect(page.getByLabel('Caption text')).toHaveValue('Second real caption')
 
     await page.getByLabel('Caption text').fill('Second caption updated in editor')
-    await page.getByRole('button', { name: 'Save Changes' }).click()
+    await page.getByRole('button', { name: 'Save All' }).click()
 
     await expect.poll(async () => {
       const plan = JSON.parse(await readFile(path.join(root, 'work', 'captions', 'captions-plan.json'), 'utf8'))
@@ -1288,7 +1309,7 @@ test('real 42-sol Graphic Motion cue can be disabled, saved, and locally discard
     const transaction = page.waitForResponse((response) =>
       response.request().method() === 'POST' && response.url().endsWith('/transactions'),
     )
-    await page.getByRole('button', { name: 'Save Changes' }).click()
+    await page.getByRole('button', { name: 'Save All' }).click()
     const transactionResponse = await transaction
     const transactionBody = await transactionResponse.json()
     expect(transactionResponse.status(), JSON.stringify(transactionBody)).toBe(200)
@@ -1309,7 +1330,7 @@ test('real 42-sol Graphic Motion cue can be disabled, saved, and locally discard
       status: await page.getByRole('status', { name: 'Graphic Motion review status' }).textContent(),
     }
     expect(localEditState, JSON.stringify(localEditState)).toMatchObject({ checked: true })
-    await expect(page.getByRole('button', { name: 'Save Changes' })).toBeEnabled()
+    await expect(page.getByRole('button', { name: 'Save All' })).toBeEnabled()
     await page.getByRole('button', { name: 'Discard changes' }).click()
     await expect(enabled).not.toBeChecked()
   } finally {
@@ -1407,7 +1428,7 @@ test('real project saves a transformed Graphic Motion layer without rendering an
     const transaction = page.waitForResponse((response) =>
       response.request().method() === 'POST' && response.url().endsWith('/transactions'),
     )
-    await page.getByRole('button', { name: 'Save Changes' }).click()
+    await page.getByRole('button', { name: 'Save All' }).click()
     const transactionResponse = await transaction
     const transactionBody = await transactionResponse.json()
     expect(transactionResponse.status(), JSON.stringify({ transactionBody, editedTransform })).toBe(200)
@@ -1620,6 +1641,51 @@ test('real 42-sol workspace passes the desktop viewport and visual audit', async
   }
 })
 
+test('real 46-sol workspace satisfies the scoped UI review', async ({ page }) => {
+  const sourceRoot = process.env.CAC_REAL_UI_REVIEW_PROJECT
+  const visualOutput = process.env.CAC_EDITOR_VISUAL_OUTPUT
+  test.skip(!sourceRoot || !visualOutput, 'Set CAC_REAL_UI_REVIEW_PROJECT and CAC_EDITOR_VISUAL_OUTPUT')
+  test.setTimeout(180_000)
+  await mkdir(visualOutput!, { recursive: true })
+  const isolated = await startSidecar(sourceRoot!)
+  try {
+    await page.setViewportSize({ width: 1384, height: 865 })
+    await page.goto(await armLaunch(isolated))
+    await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+
+    const status = page.locator('[data-runtime-project-status]')
+    await expect(status.getByText('main', { exact: true })).toHaveCount(0)
+    await expect(status.getByText('Writable', { exact: true })).toHaveCount(0)
+    await expect(status.getByText('5 resources', { exact: true })).toHaveCount(0)
+
+    const palette = await page.evaluate(() => {
+      const root = getComputedStyle(document.documentElement)
+      return {
+        accent: root.getPropertyValue('--color-accent').trim(),
+        selection: root.getPropertyValue('--color-selection').trim(),
+        focus: root.getPropertyValue('--color-focus').trim(),
+      }
+    })
+    expect(palette).toEqual({ accent: '#3e8b82', selection: '#294e4a', focus: '#79b7a7' })
+    await page.screenshot({ path: path.join(visualOutput!, '46-sol-main.png'), fullPage: false })
+
+    await page.getByRole('tab', { name: 'Cards' }).click()
+    await expect(page.locator('.library-tile').filter({ hasText: 'WARMING A PLANET' })).toHaveCount(1)
+    await expect(page.getByRole('group', { name: 'Content Card fields' })).toHaveCount(0)
+    await expect(page.getByLabel('Content card copy')).toHaveCount(0)
+    await page.screenshot({ path: path.join(visualOutput!, '46-sol-cards.png'), fullPage: false })
+
+    await page.getByRole('tab', { name: 'Graphic Motion' }).click()
+    await expect(page.locator('.library-tile').filter({ hasText: 'Automatic snake charger plugs itself into the Tesla.' })).toHaveCount(1)
+    await expect(page.getByRole('group', { name: 'Graphic Motion fields' })).toHaveCount(0)
+    await expect(page.getByText('Recipe: xyz-fade-up', { exact: true })).toHaveCount(0)
+    await page.screenshot({ path: path.join(visualOutput!, '46-sol-graphic-motion.png'), fullPage: false })
+  } finally {
+    await page.close()
+    await stopSidecar(isolated.process)
+  }
+})
+
 async function authenticatedSidecar() {
   return authenticatedSidecarFor(projectRoot)
 }
@@ -1680,7 +1746,7 @@ async function startSidecar(root: string): Promise<StartedSidecar> {
     else lineWaiters.push(resolve)
   })
   const message = await new Promise<ReadyMessage>((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error(`sidecar startup timed out: ${stderr}`)), 10_000)
+    const timeout = setTimeout(() => reject(new Error(`sidecar startup timed out: ${stderr}`)), 30_000)
     void readLine().then((line) => {
       clearTimeout(timeout)
       resolve(JSON.parse(line))

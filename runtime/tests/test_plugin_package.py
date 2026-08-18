@@ -138,20 +138,27 @@ class PluginPackageTests(unittest.TestCase):
 const { TOOL, openBrowser, shouldOpenBrowser } = require(process.argv[1]);
 const url = 'http://127.0.0.1:43123/?project=project_a&launch=token-value';
 const calls = [];
-openBrowser(url, (command, args, options) => {
-  const child = { unref() {}, once(event) { calls.push({ event }); return child; } };
-  calls.push({ command, args, options });
-  return child;
-}, 'win32');
-process.stdout.write(JSON.stringify({
-  defaultValue: shouldOpenBrowser(undefined),
-  falseValue: shouldOpenBrowser(false),
-  trueValue: shouldOpenBrowser(true),
-  invalidValue: (() => { try { shouldOpenBrowser('false'); return null; } catch (error) { return error.message; } })(),
-  description: TOOL.description,
-  inputSchema: TOOL.inputSchema,
-  calls,
-}));
+(async () => {
+  await openBrowser(url, (command, args, options) => {
+    const handlers = {};
+    const child = {
+      unref() { calls.push({ event: 'unref' }); },
+      once(event, handler) { handlers[event] = handler; return child; },
+    };
+    calls.push({ command, args, options });
+    queueMicrotask(() => handlers.spawn?.());
+    return child;
+  }, 'win32');
+  process.stdout.write(JSON.stringify({
+    defaultValue: shouldOpenBrowser(undefined),
+    falseValue: shouldOpenBrowser(false),
+    trueValue: shouldOpenBrowser(true),
+    invalidValue: (() => { try { shouldOpenBrowser('false'); return null; } catch (error) { return error.message; } })(),
+    description: TOOL.description,
+    inputSchema: TOOL.inputSchema,
+    calls,
+  }));
+})().catch((error) => { process.stderr.write(error.stack); process.exitCode = 1; });
 """
         result = subprocess.run(
             ["node", "-e", script, str(REPOSITORY_ROOT / "runtime" / "mcp.cjs")],
@@ -176,10 +183,14 @@ process.stdout.write(JSON.stringify({
             "description": "Open the editor in the system default browser. Set false only for automation.",
         })
         self.assertEqual(audit["calls"], [{
-            "command": "rundll32.exe",
-            "args": ["url.dll,FileProtocolHandler", "http://127.0.0.1:43123/?project=project_a&launch=token-value"],
+            "command": "powershell.exe",
+            "args": [
+                "-NoProfile", "-NonInteractive", "-Command",
+                "Start-Process -FilePath $args[0]",
+                "http://127.0.0.1:43123/?project=project_a&launch=token-value",
+            ],
             "options": {"detached": True, "stdio": "ignore", "windowsHide": True},
-        }, {"event": "error"}])
+        }, {"event": "unref"}])
 
     def test_windows_export_actions_wait_for_system_process_start(self) -> None:
         script = r"""
@@ -210,8 +221,12 @@ Promise.all([
         )
         self.assertEqual(json.loads(result.stdout), [
             {
-                "command": "explorer.exe",
-                "args": [r"D:\Projects\46-sol\final\final-video.mp4"],
+                "command": "powershell.exe",
+                "args": [
+                    "-NoProfile", "-NonInteractive", "-Command",
+                    "Start-Process -FilePath $args[0]",
+                    r"D:\Projects\46-sol\final\final-video.mp4",
+                ],
                 "options": {"detached": True, "stdio": "ignore", "windowsHide": True},
             },
             {
@@ -537,7 +552,7 @@ process.stdout.write(summarizeExportFailure(
             for source in executable_sources.values():
                 for forbidden in ("execFile", "spawnSync", "shell: true", "codex exec", "/v1/render", "/v1/preview", "/v1/jobs", "/v1/shell", "/v1/exec", "/v1/files"):
                     self.assertNotIn(forbidden, source)
-            self.assertEqual(sidecar.count("spawn("), 4)
+            self.assertEqual(sidecar.count("spawn("), 3)
             self.assertIn("runProcess('ffmpeg',", sidecar)
             self.assertIn("path.join(__dirname, 'sequence_bounds.py')", sidecar)
             self.assertEqual(mcp.count("spawn("), 1)
@@ -546,7 +561,8 @@ process.stdout.write(summarizeExportFailure(
             self.assertIn("function browserLaunchSpec", mcp)
             self.assertIn("function openBrowser", mcp)
             self.assertIn("spawnProcess(command, [...args, url], options)", mcp)
-            self.assertIn("child.once('error', () => {})", mcp)
+            self.assertIn("child.once('spawn', resolve)", mcp)
+            self.assertIn("child.once('error', reject)", mcp)
             self.assertNotIn("ready-file", sidecar)
             self.assertNotIn("readyFile", mcp)
             self.assertNotIn("bootstrapToken", sidecar)

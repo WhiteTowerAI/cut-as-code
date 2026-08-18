@@ -108,6 +108,7 @@ function Workspace({
 }) {
   const [exportJob, setExportJob] = useState<RuntimeExportJob>({ status: 'idle' })
   const [exportError, setExportError] = useState<string | null>(null)
+  const [exportActionPending, setExportActionPending] = useState<'open' | 'reveal' | null>(null)
   const [exportConnectionError, setExportConnectionError] = useState<string | null>(null)
   const [exportNow, setExportNow] = useState(() => Date.now())
   const [activityOpen, setActivityOpen] = useState(false)
@@ -210,12 +211,15 @@ function Workspace({
   }
 
   const exportAction = async (action: 'open' | 'reveal') => {
-    if (!runtime) return
+    if (!runtime || exportActionPending) return
     try {
       setExportError(null)
+      setExportActionPending(action)
       await runtime.client.openExport(action)
     } catch (error) {
       setExportError(error instanceof Error ? error.message : 'Could not open the exported video')
+    } finally {
+      setExportActionPending(null)
     }
   }
 
@@ -256,8 +260,8 @@ function Workspace({
                   {exportJob.finishedAt ? <time dateTime={exportJob.finishedAt}>{new Date(exportJob.finishedAt).toLocaleString()}</time> : null}
                   {exportConnectionError && exportJob.status === 'running' ? <span className="workspace-export-connection">Connection lost — retrying</span> : null}
                   {exportJob.status === 'succeeded' ? <span className="workspace-export-actions">
-                    <button type="button" aria-label="Open exported video" onClick={() => exportAction('open')}><ExternalLink aria-hidden size={13} />Open file</button>
-                    <button type="button" aria-label="Show exported video in folder" onClick={() => exportAction('reveal')}><FolderOpen aria-hidden size={13} />Show in folder</button>
+                    <button type="button" aria-label="Open exported video" aria-busy={exportActionPending === 'open'} disabled={exportActionPending !== null} onClick={() => exportAction('open')}><ExternalLink aria-hidden size={13} />{exportActionPending === 'open' ? 'Opening' : 'Open file'}</button>
+                    <button type="button" aria-label="Show exported video in folder" aria-busy={exportActionPending === 'reveal'} disabled={exportActionPending !== null} onClick={() => exportAction('reveal')}><FolderOpen aria-hidden size={13} />{exportActionPending === 'reveal' ? 'Showing' : 'Show in folder'}</button>
                   </span> : null}
                 </div>
               ) : null}
@@ -763,9 +767,6 @@ function RuntimeStatus({ status }: { status: RuntimeProjectStatus }) {
     >
       <strong>Cut as Code</strong>
       <span>{projectId}</span>
-      <span>{snapshot.view.active_sequence ?? 'No active sequence'}</span>
-      <span className="runtime-status-chip">{snapshot.read_only ? 'Read only' : 'Writable'}</span>
-      <span className="runtime-status-secondary">{snapshot.resources.length} resources</span>
       <span className="runtime-status-secondary">{snapshot.errors.length ? `${snapshot.errors.length} protocol errors` : 'No protocol errors'}</span>
     </div>
   )

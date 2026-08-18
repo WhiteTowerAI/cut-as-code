@@ -99,7 +99,7 @@ def _overlay_transform_filters(value, content_bounds=None):
     scale_y = value.get("scale_y", value.get("scale"))
     if any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in (x, y, scale_x, scale_y)):
         raise ValueError("overlay editor_transform values must be numbers")
-    if not 0 <= x <= 1 or not 0 <= y <= 1 or not 0.1 <= scale_x <= 4 or not 0.1 <= scale_y <= 4:
+    if not -2 <= x <= 3 or not -2 <= y <= 3 or not 0.1 <= scale_x <= 4 or not 0.1 <= scale_y <= 4:
         raise ValueError("overlay editor_transform is out of range")
     if content_bounds is None and float(x) == 0.5 and float(y) == 0.5 and float(scale_x) == 1.0 and float(scale_y) == 1.0:
         return None, None
