@@ -144,8 +144,10 @@ class ProjectSnapshotTests(unittest.TestCase):
             (root / "work" / "captions" / "captions-plan.json").write_text(json.dumps({
                 "schema_version": 1,
                 "style": {"status": "approved", "preset": "clean"},
+                "presentation": {"layout_beats": [{"cue_ids": ["cue-001"], "rationale": "Stable opening."}]},
+                "review": {"status": "approved", "evidence": [{"path": "review/captions/frame-001.png"}]},
                 "cues": [
-                    {"id": "cue-001", "index": 1, "start": 1, "end": 2, "text": "First real caption", "program_range": {"start_s": 1, "end_s": 2}, "editor_transform": {"x": 0.4, "y": 0.8, "scale": 1.2}},
+                    {"id": "cue-001", "index": 1, "start": 1, "end": 2, "text": "First real caption", "source_ranges": [{"start_s": 1.5, "end_s": 2.5}], "program_range": {"start_s": 1, "end_s": 2}, "editor_transform": {"x": 0.4, "y": 0.8, "scale": 1.2}},
                     {"id": "cue-002", "index": 2, "start": 3, "end": 4, "text": "Second real caption", "program_range": {"start_s": 3, "end_s": 4}},
                 ],
             }), encoding="utf-8")
@@ -153,7 +155,7 @@ class ProjectSnapshotTests(unittest.TestCase):
                 "schema_version": 1,
                 "brief": {"theme": "editorial", "target_card_count": 2},
                 "cards": [
-                    {"id": "card-001", "card_type": "title", "program_start_s": 2, "duration_s": 2, "copy": {"text": "First card"}, "placement": {"region": "top"}, "visual_treatment": {"layout": "default"}},
+                    {"id": "card-001", "card_type": "title", "program_start_s": 2, "duration_s": 2, "source_range": {"start_s": 3, "end_s": 4}, "evidence_refs": ["segment:3"], "copy": {"text": "First card", "source_text": "Source-backed first card"}, "placement": {"region": "top", "face_clearance": "clear", "clearance_decision_mode": "agent", "clearance_rationale": "Top area remains clear.", "review_still": "review/cards/card-001.png"}, "visual_treatment": {"layout": "default"}},
                     {"id": "card-002", "card_type": "quote", "program_start_s": 6, "duration_s": 2, "copy": {"text": "Second card"}, "placement": {"region": "bottom"}, "visual_treatment": {"layout": "quote"}, "editor_transform": {"x": 0.6, "y": 0.7, "scale": 0.9}},
                 ],
             }), encoding="utf-8")
@@ -163,8 +165,10 @@ class ProjectSnapshotTests(unittest.TestCase):
                     "id": "motion-001",
                     "status": "verified",
                     "program_range": {"start_s": 0, "end_s": 5},
-                    "intent": {"content": "Real motion title"},
-                    "selection": {"chosen_recipe_id": "recipe-real"},
+                    "source_ranges": [{"start_s": 0.5, "end_s": 5.5}],
+                    "intent": {"content": "Real motion title", "timing_rationale": "Resolve before the next idea."},
+                    "evidence": {"transcript_words": [{"word": "Real"}, {"word": "motion"}]},
+                    "selection": {"chosen_recipe_id": "recipe-real", "agent_rationale": "The reveal matches the spoken transition."},
                     "recipe": {
                         "id": "recipe-real",
                         "manifest": {"path": "work/cache/recipe.motion.yaml", "sha256": "a" * 64},
@@ -185,7 +189,7 @@ class ProjectSnapshotTests(unittest.TestCase):
                         ],
                     },
                     "editor_transform": {"x": 0.55, "y": 0.5, "scale": 1.1},
-                    "review": {"status": "approved", "mode": "agent"},
+                    "review": {"status": "approved", "mode": "agent", "evidence": [{"path": "review/motion/gm-001.png"}]},
                 }],
             }), encoding="utf-8")
             operations = []
@@ -212,12 +216,18 @@ class ProjectSnapshotTests(unittest.TestCase):
 
         self.assertEqual(["cue-001", "cue-002"], [cue["id"] for cue in view["captions_edit"]["cues"]])
         self.assertEqual("Second real caption", view["captions_edit"]["cues"][1]["text"])
+        self.assertEqual("Stable opening.", view["captions_edit"]["cues"][0]["decision_rationale"])
+        self.assertEqual(["review/captions/frame-001.png"], view["captions_edit"]["cues"][0]["review_evidence"])
         self.assertEqual(["card-001", "card-002"], [cue["id"] for cue in view["content_cards_edit"]["cues"]])
         self.assertEqual({"start_s": 6, "end_s": 8}, view["content_cards_edit"]["cues"][1]["program_range"])
+        self.assertEqual(["segment:3"], view["content_cards_edit"]["cues"][0]["evidence_refs"])
+        self.assertEqual("Top area remains clear.", view["content_cards_edit"]["cues"][0]["decision_rationale"])
         self.assertEqual("motion-001", view["graphic_motion_edit"]["cues"][0]["id"])
         self.assertEqual("recipe-real", view["graphic_motion_edit"]["cues"][0]["recipe_id"])
         self.assertEqual("bound", view["graphic_motion_edit"]["cues"][0]["source_status"])
         self.assertEqual("unknown", view["graphic_motion_edit"]["cues"][0]["license_status"])
+        self.assertEqual("Real motion", view["graphic_motion_edit"]["cues"][0]["source_text"])
+        self.assertEqual("The reveal matches the spoken transition.", view["graphic_motion_edit"]["cues"][0]["decision_rationale"])
         self.assertEqual(
             ["caption", "caption", "card", "card", "graphic-motion"],
             [layer["kind"] for layer in view["layers"]],

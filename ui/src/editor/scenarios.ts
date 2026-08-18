@@ -22,6 +22,7 @@ export const scenarioIds = [
   'review-content-cards',
   'review-content-cards-conflict',
   'timeline-editing',
+  'cue-context-actions',
 ] as const
 
 export type ScenarioId = (typeof scenarioIds)[number]
@@ -144,6 +145,58 @@ const reviewProject: EditorProjectView = {
   ],
 }
 
+const cueContextProject: EditorProjectView = {
+  ...populatedProject,
+  runtime: true,
+  durationS: 20,
+  sourceDurationS: 20,
+  tracks: [
+    { id: 'track-video', name: 'Video', kind: 'video', clips: [{
+      id: 'cue-video', displayName: 'Interview.mp4', sourceRange: { startS: 0, endS: 20 }, programRange: { startS: 0, endS: 20 },
+    }] },
+    { id: 'track-captions', name: 'Captions', kind: 'caption', clips: [{
+      id: 'cue-caption', displayName: 'Caption 1', summary: 'Ship the smallest useful cut.',
+      sourceText: 'Ship the smallest useful cut.', decisionRationale: 'Keep the statement on the stable lower baseline.',
+      reviewStatus: 'approved', reviewEvidence: ['review/captions/frame-001.png'],
+      sourceRange: { startS: 2, endS: 4 }, programRange: { startS: 2, endS: 4 },
+    }] },
+    { id: 'track-content-cards', name: 'Cards', kind: 'card', clips: [{
+      id: 'cue-card', displayName: 'Card: lower-third', summary: 'Build once, deploy everywhere', enabled: true,
+      sourceText: 'Build once and deploy everywhere.', decisionRationale: 'The phrase is the section thesis and has clear lower-left space.',
+      evidenceRefs: ['segment:12'], reviewStatus: 'clear', reviewMode: 'agent', reviewEvidence: ['review/cards/card-001.png'],
+      metadata: { layout: 'lower-third', placement: 'bottom-left' },
+      sourceRange: { startS: 7, endS: 10 }, programRange: { startS: 7, endS: 10 },
+    }] },
+    { id: 'track-graphic-motion', name: 'Graphic Motion', kind: 'graphic-motion', clips: [{
+      id: 'cue-motion', displayName: 'Motion: xyz-fade-up', summary: 'A system comes online', enabled: true,
+      sourceText: 'The system comes online.', decisionRationale: 'The restrained rise makes the state change legible.',
+      reviewStatus: 'verified', reviewMode: 'agent', reviewEvidence: ['review/motion/gm-001.png'],
+      metadata: { recipe: 'xyz-fade-up', source: 'bound', license: 'verified' },
+      sourceRange: { startS: 13, endS: 15 }, programRange: { startS: 13, endS: 15 },
+    }] },
+  ],
+  operations: [
+    {
+      id: 'captions', kind: 'captions', revision: 1, editable: true,
+      fields: { cues: [{ id: 'cue-caption', text: 'Ship the smallest useful cut.', program_range: { start_s: 2, end_s: 4 } }] },
+      preview: { status: 'current', revision: 1, reviewId: 'caption-review', snapshotEtag: 'caption-snapshot', evidenceHashes: ['sha256:caption-preview'] },
+      approval: { status: 'none' },
+    },
+    {
+      id: 'content-cards', kind: 'content-cards', revision: 1, editable: true,
+      fields: { cues: [{ id: 'cue-card', copy: 'Build once, deploy everywhere', layout: 'lower-third', placement: 'bottom-left', enabled: true, program_range: { start_s: 7, end_s: 10 } }] },
+      preview: { status: 'current', revision: 1, reviewId: 'card-review', snapshotEtag: 'card-snapshot', evidenceHashes: ['sha256:card-preview'] },
+      approval: { status: 'none' },
+    },
+    {
+      id: 'graphic-motion', kind: 'graphic-motion', revision: 1, editable: true,
+      fields: { cues: [{ id: 'cue-motion', enabled: true, content: 'A system comes online', program_range: { start_s: 13, end_s: 15 } }] },
+      preview: { status: 'current', revision: 1, reviewId: 'motion-review', snapshotEtag: 'motion-snapshot', evidenceHashes: ['sha256:motion-preview'] },
+      approval: { status: 'none' },
+    },
+  ],
+}
+
 const fiveSecondProject: EditorProjectView = { ...populatedProject, durationS: 5 }
 const twentySecondProject: EditorProjectView = {
   ...populatedProject,
@@ -233,6 +286,7 @@ function state(overrides: Partial<EditorInitialState> = {}): EditorInitialState 
     selection: null,
     currentTimeS: 0,
     isPlaying: false,
+    playbackRange: null,
     timelineZoom: 1,
     snapEnabled: true,
     openMenu: null,
@@ -295,6 +349,10 @@ const scenarios: readonly EditorScenario[] = [
   {
     id: 'timeline-editing',
     initialState: state({ project: editableTimelineProject, currentTimeS: 4 }),
+  },
+  {
+    id: 'cue-context-actions',
+    initialState: state({ project: cueContextProject, currentTimeS: 0 }),
   },
 ]
 

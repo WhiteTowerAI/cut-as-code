@@ -78,6 +78,13 @@ export type ClipView = Readonly<{
   summary?: string
   speed?: number
   enabled?: boolean
+  sourceText?: string
+  decisionRationale?: string
+  evidenceRefs?: readonly string[]
+  reviewStatus?: string
+  reviewMode?: string
+  reviewEvidence?: readonly string[]
+  metadata?: Readonly<Record<string, string>>
   sourceRange: Readonly<{ startS: number; endS: number }>
   programRange: Readonly<{ startS: number; endS: number }>
 }>

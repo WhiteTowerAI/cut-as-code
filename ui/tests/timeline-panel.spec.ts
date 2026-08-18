@@ -339,6 +339,82 @@ test('video clip context menu shows clip information and ripple delete undo toas
   await expect(page.locator('[data-timeline-clip="edit-video-2"]')).toBeVisible()
 })
 
+test('caption context menu opens the Inspector and limits playback to the Cue range', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/?scenario=cue-context-actions')
+
+  const caption = page.locator('[data-timeline-clip="cue-caption"]')
+  await caption.click({ button: 'right' })
+  const menu = page.getByRole('menu', { name: 'Caption' })
+  await expect(menu).toBeVisible()
+  await expect(menu.getByRole('menuitem', { name: /Split/ })).toHaveCount(0)
+  await expect(menu.getByRole('menuitem', { name: /Enable Cue|Disable Cue/ })).toHaveCount(0)
+  await menu.getByRole('menuitem', { name: 'Edit in Inspector' }).click()
+
+  const inspector = page.getByRole('region', { name: 'Caption Inspector' })
+  await expect(inspector).toBeVisible()
+  await expect(inspector).toBeFocused()
+  await inspector.getByLabel('Caption text').fill('A revised caption from the timeline')
+  await page.getByRole('button', { name: 'Save All' }).click()
+  await expect(caption).toContainText('A revised caption from the timeline')
+
+  await caption.click({ button: 'right' })
+  await page.getByRole('menu', { name: 'Caption' }).getByRole('menuitem', { name: 'Play this Cue only' }).click()
+  await expect(page.locator('.timeline-playhead-time')).toHaveText('00:02')
+})
+
+test('content card context menu copies, explains, reviews, and toggles the Cue', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/?scenario=cue-context-actions')
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: (value: string) => { document.documentElement.dataset.copiedCueRange = value } },
+    })
+  })
+
+  const card = page.locator('[data-timeline-clip="cue-card"]')
+  await card.click({ button: 'right' })
+  await page.getByRole('menu', { name: 'Content Card' }).getByRole('menuitem', { name: 'Copy program time range' }).click()
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.copiedCueRange)).toBe('00:07.000 - 00:10.000')
+
+  await card.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'View source text / decision rationale' }).click()
+  const sourceDialog = page.getByRole('dialog', { name: 'Cue source and decision' })
+  await expect(sourceDialog).toContainText('Build once and deploy everywhere.')
+  await expect(sourceDialog).toContainText('segment:12')
+  await page.getByRole('button', { name: 'Close Cue information' }).click()
+
+  await card.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'View preview and review evidence' }).click()
+  await expect(page.getByRole('dialog', { name: 'Cue review evidence' })).toContainText('sha256:card-preview')
+  await page.getByRole('button', { name: 'Close Cue information' }).click()
+
+  await card.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Disable Cue' }).click()
+  await card.click({ button: 'right' })
+  await expect(page.getByRole('menuitem', { name: 'Enable Cue' })).toBeVisible()
+})
+
+test('graphic motion context menu exposes recipe review metadata and Inspector controls', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/?scenario=cue-context-actions')
+
+  const motion = page.locator('[data-timeline-clip="cue-motion"]')
+  await motion.click({ button: 'right' })
+  await page.getByRole('menu', { name: 'Graphic Motion' }).getByRole('menuitem', { name: 'Edit in Inspector' }).click()
+  const inspector = page.getByRole('region', { name: 'Graphic Motion Inspector' })
+  await expect(inspector).toBeVisible()
+  await expect(inspector.getByLabel('Graphic Motion Inspector enabled')).toBeChecked()
+  await expect(inspector).toContainText('Adjust position and scale')
+
+  await motion.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'View preview and review evidence' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Cue review evidence' })
+  await expect(dialog).toContainText('xyz-fade-up')
+  await expect(dialog).toContainText('verified')
+})
+
 test('timeline split, delete, keyboard undo, and redo form one edit history', async ({ page }) => {
   await page.setViewportSize({ width: 1008, height: 444 })
   await page.goto('/?scenario=timeline-editing')

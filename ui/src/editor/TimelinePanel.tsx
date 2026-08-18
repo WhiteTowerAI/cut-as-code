@@ -13,11 +13,15 @@ import {
   Eye,
   Gauge,
   Info,
+  FileText,
   Lock,
   LocateFixed,
   Magnet,
   MousePointer2,
   Plus,
+  Play,
+  Power,
+  Pencil,
   Redo2,
   RotateCcw,
   Ruler,
@@ -276,6 +280,7 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
   const setTimelineZoom = useStore(store, (state) => state.setTimelineZoom)
   const setSnapEnabled = useStore(store, (state) => state.setSnapEnabled)
   const editTimeline = useStore(store, (state) => state.editTimeline)
+  const playRange = useStore(store, (state) => state.playRange)
   const undoTimeline = useStore(store, (state) => state.undoTimeline)
   const redoTimeline = useStore(store, (state) => state.redoTimeline)
   const timelinePast = useStore(store, (state) => state.timelinePast)
@@ -298,6 +303,11 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
   const [trimPreview, setTrimPreview] = useState<null | Readonly<{ project: NonNullable<typeof project>; sourceS: number }>>(null)
   const [contextMenu, setContextMenu] = useState<Omit<TimelineContextMenuModel, 'onClose'> | null>(null)
   const [clipInfo, setClipInfo] = useState<ClipView | null>(null)
+  const [cueInfo, setCueInfo] = useState<null | Readonly<{
+    clip: ClipView
+    operationId: string
+    view: 'source' | 'review'
+  }>>(null)
   const [deleteNotice, setDeleteNotice] = useState<string | null>(null)
   const presentedProject = trimPreview?.project ?? project
   const durationS = project?.durationS ?? 0
@@ -530,6 +540,10 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
       clip.programRange.endS,
     )
     const sourceTimeS = clipSourceTimeAtProgramTime(clip, contextTimeS)
+    if (track.kind === 'caption' || track.kind === 'card' || track.kind === 'graphic-motion') {
+      openCueContextMenu(event, track, clip)
+      return
+    }
     const startBounds = project ? trimSourceBounds(project, clip.id, 'start') : null
     const endBounds = project ? trimSourceBounds(project, clip.id, 'end') : null
     const canRestore = Boolean(startBounds && endBounds && (
@@ -624,6 +638,90 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
               }
             })
           },
+        },
+      ],
+    })
+  }
+
+  function cueOperationId(kind: TrackView['kind']) {
+    return kind === 'caption' ? 'captions'
+      : kind === 'card' ? 'content-cards'
+        : kind === 'graphic-motion' ? 'graphic-motion'
+          : ''
+  }
+
+  function openCueContextMenu(event: ReactMouseEvent<HTMLButtonElement>, track: TrackView, clip: ClipView) {
+    const operationId = cueOperationId(track.kind)
+    const operation = project?.operations?.find((candidate) => candidate.id === operationId)
+    const canEdit = Boolean(operation?.editable && !store.getState().operationDrafts[operationId]?.pending)
+    const canToggle = track.kind !== 'caption' && canEdit
+    const kindLabel = track.kind === 'caption' ? 'Caption'
+      : track.kind === 'card' ? 'Content Card'
+        : 'Graphic Motion'
+    const programRange = `${formatPreciseTime(clip.programRange.startS)} - ${formatPreciseTime(clip.programRange.endS)}`
+    const editInInspector = () => {
+      window.requestAnimationFrame(() => {
+        const inspector = document.querySelector<HTMLElement>(`[data-cue-inspector="${CSS.escape(clip.id)}"]`)
+        inspector?.scrollIntoView({ block: 'nearest' })
+        inspector?.focus({ preventScroll: true })
+      })
+    }
+    const toggleEnabled = () => {
+      if (!canToggle) return
+      const state = store.getState()
+      state.editOperationDraft(operationId, { cueId: clip.id, enabled: !clip.enabled })
+      void state.saveOperationDraft(operationId)
+    }
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      title: kindLabel,
+      subtitle: clip.summary || clip.displayName || clip.id,
+      actions: [
+        {
+          id: 'edit-cue',
+          label: 'Edit in Inspector',
+          icon: Pencil,
+          disabled: !canEdit,
+          onSelect: editInInspector,
+        },
+        {
+          id: 'go-to-cue-start',
+          label: 'Go to Cue start',
+          icon: LocateFixed,
+          onSelect: () => seek(clip.programRange.startS),
+        },
+        {
+          id: 'play-cue-only',
+          label: 'Play this Cue only',
+          icon: Play,
+          onSelect: () => playRange(clip.programRange.startS, clip.programRange.endS),
+        },
+        ...(track.kind === 'caption' ? [] : [{
+          id: 'toggle-cue',
+          label: clip.enabled === false ? 'Enable Cue' : 'Disable Cue',
+          icon: Power,
+          disabled: !canToggle,
+          onSelect: toggleEnabled,
+        }]),
+        {
+          id: 'copy-cue-range',
+          label: 'Copy program time range',
+          icon: Copy,
+          separatorBefore: true,
+          onSelect: () => { void navigator.clipboard.writeText(programRange) },
+        },
+        {
+          id: 'view-cue-source',
+          label: track.kind === 'caption' ? 'View source text' : 'View source text / decision rationale',
+          icon: FileText,
+          onSelect: () => setCueInfo({ clip, operationId, view: 'source' }),
+        },
+        {
+          id: 'view-cue-review',
+          label: 'View preview and review evidence',
+          icon: Info,
+          onSelect: () => setCueInfo({ clip, operationId, view: 'review' }),
         },
       ],
     })
@@ -800,6 +898,35 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
               <div><dt>Source range</dt><dd>{formatPreciseTime(clipInfo.sourceRange.startS)} – {formatPreciseTime(clipInfo.sourceRange.endS)}</dd></div>
               <div><dt>Duration</dt><dd>{formatPreciseTime(clipInfo.programRange.endS - clipInfo.programRange.startS)}</dd></div>
               <div><dt>Speed</dt><dd>{(clipInfo.speed ?? 1).toFixed(2)}×</dd></div>
+            </dl>
+          </section>
+        </div>
+      ) : null}
+      {cueInfo ? (
+        <div className="timeline-dialog-backdrop" role="presentation" onMouseDown={() => setCueInfo(null)}>
+          <section className="timeline-clip-info-dialog timeline-cue-info-dialog" role="dialog" aria-modal="true" aria-labelledby="cue-info-title" onMouseDown={(event) => event.stopPropagation()}>
+            <header><h2 id="cue-info-title">{cueInfo.view === 'source' ? 'Cue source and decision' : 'Cue review evidence'}</h2><button type="button" aria-label="Close Cue information" onClick={() => setCueInfo(null)}>×</button></header>
+            <dl>
+              <div><dt>Cue ID</dt><dd>{cueInfo.clip.id}</dd></div>
+              <div><dt>Program range</dt><dd>{formatPreciseTime(cueInfo.clip.programRange.startS)} – {formatPreciseTime(cueInfo.clip.programRange.endS)}</dd></div>
+              {cueInfo.view === 'source' ? (
+                <>
+                  <div><dt>Source range</dt><dd>{formatPreciseTime(cueInfo.clip.sourceRange.startS)} – {formatPreciseTime(cueInfo.clip.sourceRange.endS)}</dd></div>
+                  <div><dt>Source text</dt><dd>{cueInfo.clip.sourceText || cueInfo.clip.summary || 'No source text recorded'}</dd></div>
+                  <div><dt>Decision rationale</dt><dd>{cueInfo.clip.decisionRationale || 'No cue-specific rationale recorded'}</dd></div>
+                  {cueInfo.clip.evidenceRefs?.length ? <div><dt>Evidence refs</dt><dd>{cueInfo.clip.evidenceRefs.join(', ')}</dd></div> : null}
+                </>
+              ) : (
+                <>
+                  <div><dt>Review status</dt><dd>{cueInfo.clip.reviewStatus || 'Not recorded'}</dd></div>
+                  <div><dt>Decision mode</dt><dd>{cueInfo.clip.reviewMode || 'Not recorded'}</dd></div>
+                  <div><dt>Evidence</dt><dd>{[
+                    ...(cueInfo.clip.reviewEvidence ?? []),
+                    ...(project?.operations?.find((operation) => operation.id === cueInfo.operationId)?.preview?.evidenceHashes ?? []),
+                  ].join(', ') || 'No review evidence recorded'}</dd></div>
+                </>
+              )}
+              {Object.entries(cueInfo.clip.metadata ?? {}).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
             </dl>
           </section>
         </div>

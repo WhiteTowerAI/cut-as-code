@@ -387,6 +387,20 @@ def _content_cards_edit_model(plan):
                 "start_s": card.get("program_start_s", 0),
                 "end_s": card.get("program_start_s", 0) + card.get("duration_s", 0),
             },
+            "source_range": copy_json(card.get("source_range")),
+            "source_text": card.get("source_text") or copy.get("source_text") or "",
+            "decision_rationale": (
+                card.get("decision_rationale")
+                or placement.get("clearance_rationale")
+                or ""
+            ),
+            "evidence_refs": copy_json(card.get("evidence_refs", [])),
+            "review_status": placement.get("face_clearance") or placement.get("status"),
+            "review_mode": placement.get("clearance_decision_mode"),
+            "review_evidence": [
+                value for value in (placement.get("review_still"),)
+                if isinstance(value, str) and value.strip()
+            ],
         }
         if "data" in card:
             entry["data"] = card["data"]
@@ -405,6 +419,13 @@ def _content_cards_edit_model(plan):
                 "placement": entry["placement"],
                 "enabled": entry["enabled"],
                 "program_range": entry["program_range"],
+                "source_range": entry["source_range"],
+                "source_text": entry["source_text"],
+                "decision_rationale": entry["decision_rationale"],
+                "evidence_refs": entry["evidence_refs"],
+                "review_status": entry["review_status"],
+                "review_mode": entry["review_mode"],
+                "review_evidence": entry["review_evidence"],
                 "transform": entry["transform"],
                 **({"data": entry["data"]} if "data" in entry else {}),
             }
@@ -429,12 +450,24 @@ def _captions_edit_model(plan):
         }
         if not isinstance(cue_id, str) or not isinstance(cue.get("text", ""), str):
             return None
+        presentation = plan.get("presentation") if isinstance(plan.get("presentation"), dict) else {}
+        beats = presentation.get("layout_beats") if isinstance(presentation.get("layout_beats"), list) else []
+        beat = next((item for item in beats if isinstance(item, dict) and cue_id in item.get("cue_ids", [])), {})
+        review = plan.get("review") if isinstance(plan.get("review"), dict) else {}
         entries.append({
             "id": cue_id,
             "index": cue.get("index", position),
             "text": cue.get("text", ""),
             "program_range": program_range,
             "source_ranges": cue.get("source_ranges", []),
+            "source_text": cue.get("source_text") or cue.get("text", ""),
+            "decision_rationale": beat.get("rationale", "") if isinstance(beat, dict) else "",
+            "review_status": review.get("status"),
+            "review_evidence": [
+                item.get("path", item) if isinstance(item, dict) else item
+                for item in review.get("evidence", [])
+                if isinstance(item, (dict, str))
+            ],
             "transform": _editor_transform(cue.get("editor_transform")),
         })
     return {"style": copy_json(plan.get("style", {})), "cues": entries}
@@ -462,11 +495,28 @@ def _graphic_motion_edit_model(plan, project_root):
             "enabled": cue.get("status") == "verified",
             "program_range": cue.get("program_range"),
             "content": intent.get("content", ""),
+            "source_ranges": copy_json(cue.get("source_ranges", [])),
+            "source_text": " ".join(
+                str(word.get("word", "")).strip()
+                for word in (cue.get("evidence", {}).get("transcript_words", [])
+                             if isinstance(cue.get("evidence"), dict) else [])
+                if isinstance(word, dict) and str(word.get("word", "")).strip()
+            ),
+            "decision_rationale": (
+                selection.get("agent_rationale")
+                or intent.get("timing_rationale")
+                or ""
+            ),
             "recipe_id": recipe.get("id") or selection.get("chosen_recipe_id"),
             "review_status": review.get("status"),
             "review_mode": review.get("mode"),
             "source_status": "bound" if recipe.get("manifest") and recipe.get("files") else "missing",
             "license_status": "unknown" if recipe.get("manifest") and recipe.get("files") else "missing",
+            "review_evidence": [
+                item.get("path")
+                for item in review.get("evidence", [])
+                if isinstance(item, dict) and isinstance(item.get("path"), str)
+            ],
             "transform": _editor_transform(cue.get("editor_transform")),
             "image_sequence": {
                 "pattern": render.get("pattern"),

@@ -48,6 +48,12 @@ type TimelineHistoryEntry = Readonly<{
   redo: TimelineEditCommand
 }>
 
+export type PlaybackRange = Readonly<{
+  startS: number
+  endS: number
+  requestId: number
+}>
+
 function timelineCommandMessage(command: TimelineEditCommand) {
   if (command.type === 'split') return 'Clip split'
   if (command.type === 'delete') return 'Clip deleted'
@@ -170,6 +176,59 @@ function fieldsMatch(
   })
 }
 
+function applyDraftChangesToFields(
+  fields: Readonly<Record<string, unknown>>,
+  changes: readonly ContentCardsDraftChange[],
+) {
+  const cues = Array.isArray(fields.cues) ? fields.cues : []
+  if (!cues.length || !changes.some((change) => change.cueId)) {
+    return { ...fields, ...changes.reduce((next, change) => ({ ...next, ...change }), {}) }
+  }
+  return {
+    ...fields,
+    cues: cues.map((cue) => {
+      if (!cue || typeof cue !== 'object') return cue
+      const cueId = (cue as { id?: unknown }).id
+      const change = changes.find((candidate) => candidate.cueId === cueId)
+      if (!change) return cue
+      const { cueId: _cueId, ...cueFields } = change
+      return { ...(cue as Readonly<Record<string, unknown>>), ...cueFields }
+    }),
+  }
+}
+
+function applyDraftChangesToTracks(
+  project: EditorProjectView,
+  operationId: string,
+  changes: readonly ContentCardsDraftChange[],
+) {
+  const kind = operationId === 'captions' ? 'caption'
+    : operationId === 'content-cards' ? 'card'
+      : operationId === 'graphic-motion' ? 'graphic-motion'
+        : null
+  if (!kind) return project.tracks
+  return project.tracks.map((track) => track.kind !== kind ? track : {
+    ...track,
+    clips: track.clips?.map((clip) => {
+      const change = changes.find((candidate) => candidate.cueId === clip.id)
+      if (!change) return clip
+      return {
+        ...clip,
+        ...(change.enabled !== undefined ? { enabled: change.enabled } : {}),
+        ...(change.text !== undefined ? { summary: change.text } : {}),
+        ...(change.copy !== undefined ? { summary: change.copy } : {}),
+        ...(change.layout !== undefined || change.placement !== undefined ? {
+          metadata: {
+            ...clip.metadata,
+            ...(change.layout !== undefined ? { layout: change.layout } : {}),
+            ...(change.placement !== undefined ? { placement: change.placement } : {}),
+          },
+        } : {}),
+      }
+    }),
+  })
+}
+
 function hasReviewEvidence(operation: EditorOperationView) {
   const preview = operation.preview
   return Boolean(
@@ -207,6 +266,7 @@ export type EditorState = {
   selection: EditorSelection
   currentTimeS: number
   isPlaying: boolean
+  playbackRange: PlaybackRange | null
   timelineZoom: number
   snapEnabled: boolean
   openMenu: MenuId
@@ -219,6 +279,8 @@ export type EditorState = {
   setProject: (project: EditorProjectView | null) => void
   seek: (timeS: number) => void
   setPlaying: (isPlaying: boolean) => void
+  playRange: (startS: number, endS: number) => void
+  clearPlaybackRange: () => void
   select: (selection: EditorSelection) => void
   setActiveTab: (tab: LibraryTab) => void
   setTimelineZoom: (zoom: number) => void
@@ -257,6 +319,8 @@ export type EditorInitialState = Omit<
   | 'setProject'
   | 'seek'
   | 'setPlaying'
+  | 'playRange'
+  | 'clearPlaybackRange'
   | 'select'
   | 'setActiveTab'
   | 'setTimelineZoom'
@@ -288,6 +352,7 @@ export type EditorInitialState = Omit<
 
 export function createEditorStore(initialState: EditorInitialState, runtime?: EditorRuntimeAdapter) {
   let nextActivityId = 1
+  let nextPlaybackRequestId = 1
   return createStore<EditorState>()((set, get) => ({
     ...initialState,
     operationDrafts: {},
@@ -295,6 +360,7 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
     timelinePast: [],
     timelineFuture: [],
     timelinePending: false,
+    playbackRange: null,
     addActivity: (entry) => set((state) => ({
       activityLog: [...state.activityLog, {
         ...entry,
@@ -323,7 +389,19 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
       const currentTimeS = Number.isFinite(timeS) ? Math.min(Math.max(timeS, 0), durationS) : 0
       set({ currentTimeS })
     },
-    setPlaying: (isPlaying) => set({ isPlaying }),
+    setPlaying: (isPlaying) => set({ isPlaying, ...(!isPlaying ? { playbackRange: null } : {}) }),
+    playRange: (startS, endS) => {
+      const durationS = get().project?.durationS ?? 0
+      const start = Math.min(Math.max(startS, 0), durationS)
+      const end = Math.min(Math.max(endS, start), durationS)
+      if (!(end > start)) return
+      set({
+        currentTimeS: start,
+        isPlaying: true,
+        playbackRange: { startS: start, endS: end, requestId: nextPlaybackRequestId++ },
+      })
+    },
+    clearPlaybackRange: () => set({ playbackRange: null }),
     select: (selection) => set({ selection }),
     setActiveTab: (activeTab) => set({ activeTab }),
     setTimelineZoom: (zoom) => {
@@ -541,7 +619,7 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
           ? {
               ...candidate,
               revision: candidate.revision + 1,
-              fields: { ...candidate.fields, ...draft.fields },
+              fields: applyDraftChangesToFields(candidate.fields, draft.changes),
               preview: candidate.preview
                 ? { ...candidate.preview, status: 'stale' as const }
                 : candidate.preview,
@@ -553,7 +631,15 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
           : candidate,
       )
       const { [operationId]: _saved, ...operationDrafts } = state.operationDrafts
-      set({ project: state.project ? { ...state.project, operations } : null, operationDrafts })
+      set({
+        project: state.project ? {
+          ...state.project,
+          revision: state.project.revision + 1,
+          tracks: applyDraftChangesToTracks(state.project, operationId, draft.changes),
+          operations,
+        } : null,
+        operationDrafts,
+      })
     },
     saveAllOperationDrafts: async () => {
       const kindOrder = new Map<EditorOperationView['kind'], number>([

@@ -125,6 +125,10 @@ export type RuntimeCaptionCue = Readonly<{
   text: string
   program_range: Readonly<{ start_s: number; end_s: number }>
   source_ranges?: readonly Readonly<{ start_s: number; end_s: number }>[]
+  source_text?: string
+  decision_rationale?: string
+  review_status?: string
+  review_evidence?: readonly string[]
   transform?: RuntimeLayerTransform
 }>
 
@@ -136,6 +140,13 @@ export type RuntimeCardCue = Readonly<{
   placement: string
   enabled: boolean
   program_range: Readonly<{ start_s: number; end_s: number }>
+  source_range?: Readonly<{ start_s: number; end_s: number }>
+  source_text?: string
+  decision_rationale?: string
+  evidence_refs?: readonly string[]
+  review_status?: string
+  review_mode?: string
+  review_evidence?: readonly string[]
   data?: Readonly<Record<string, unknown>>
   transform?: RuntimeLayerTransform
 }>
@@ -150,6 +161,10 @@ export type RuntimeGraphicMotionCue = Readonly<{
   review_mode?: string
   source_status?: string
   license_status?: string
+  source_ranges?: readonly Readonly<{ start_s: number; end_s: number }>[]
+  source_text?: string
+  decision_rationale?: string
+  review_evidence?: readonly string[]
   program_range: Readonly<{ start_s: number; end_s: number }>
   transform?: RuntimeLayerTransform
 }>

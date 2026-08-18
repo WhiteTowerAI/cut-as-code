@@ -493,9 +493,11 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
   const selection = useStore(store, (state) => state.selection)
   const currentTimeS = useStore(store, (state) => state.currentTimeS)
   const isPlaying = useStore(store, (state) => state.isPlaying)
+  const playbackRange = useStore(store, (state) => state.playbackRange)
   const openMenu = useStore(store, (state) => state.openMenu)
   const seek = useStore(store, (state) => state.seek)
   const setPlaying = useStore(store, (state) => state.setPlaying)
+  const clearPlaybackRange = useStore(store, (state) => state.clearPlaybackRange)
   const setOpenMenu = useStore(store, (state) => state.setOpenMenu)
   const select = useStore(store, (state) => state.select)
   const editOperationDraft = useStore(store, (state) => state.editOperationDraft)
@@ -601,9 +603,28 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
   }
 
   function publishNativeProgramTime(programTimeS: number) {
+    if (playbackRange && programTimeS >= playbackRange.endS - 0.001) {
+      const video = projectVideoRef.current
+      if (video) createPlaybackController(video).pause()
+      nativeProgramTimeRef.current = playbackRange.endS
+      seek(playbackRange.endS)
+      setPlaying(false)
+      return
+    }
     nativeProgramTimeRef.current = programTimeS
     seek(programTimeS)
   }
+
+  useEffect(() => {
+    if (!playbackRange) return
+    const video = projectVideoRef.current
+    if (!video) {
+      setPlaying(false)
+      return
+    }
+    seekProjectVideo(playbackRange.startS)
+    void createPlaybackController(video).play().catch(() => setPlaying(false))
+  }, [playbackRange?.requestId])
 
   useEffect(() => {
     if (nativeProgramTimeRef.current !== null && Math.abs(currentTimeS - nativeProgramTimeRef.current) < 0.0001) {
@@ -820,6 +841,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
       playback.pause()
       return
     }
+    clearPlaybackRange()
     const restartFromBeginning = Boolean(project && currentTimeS >= project.durationS - 0.0001)
     if (restartFromBeginning) {
       finalFrameStateRef.current = null

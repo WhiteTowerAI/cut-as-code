@@ -410,7 +410,8 @@ export function EditorShell({ runtime }: { runtime?: RuntimeProjectStatus }) {
   const isViewerScenario = viewerScenarios.has(scenarioId)
   const isTimelineScenario = timelineScenarios.has(scenarioId)
   const isMenuFrame = scenarioId === '57-152' || scenarioId === '1-528'
-  const isWorkspaceScenario = Boolean(runtime) || scenarioId === '1-60' || scenarioId === '1-1373' || scenarioId.startsWith('review-content-cards')
+  const isWorkspaceScenario = Boolean(runtime) || scenarioId === '1-60' || scenarioId === '1-1373'
+    || scenarioId === 'cue-context-actions' || scenarioId.startsWith('review-content-cards')
   const isIconLibraryScenario = scenarioId === '76-2'
 
   if (isIconLibraryScenario) {
@@ -634,6 +635,10 @@ export function projectFromSnapshot(base: EditorProjectView | null, snapshot: Ru
     trackId: 'track-captions',
     displayName: `Caption ${cue.index ?? ''}`.trim(),
     summary: cue.text,
+    sourceText: cue.source_text,
+    decisionRationale: cue.decision_rationale,
+    reviewStatus: cue.review_status,
+    reviewEvidence: cue.review_evidence,
     sourceRange: cue.source_ranges?.[0]
       ? { startS: cue.source_ranges[0].start_s, endS: cue.source_ranges[0].end_s }
       : { startS: cue.program_range.start_s, endS: cue.program_range.end_s },
@@ -645,7 +650,16 @@ export function projectFromSnapshot(base: EditorProjectView | null, snapshot: Ru
     displayName: cue.card_type ? `Card: ${cue.card_type}` : 'Content card',
     summary: cue.copy,
     enabled: cue.enabled,
-    sourceRange: { startS: cue.program_range.start_s, endS: cue.program_range.end_s },
+    sourceText: cue.source_text,
+    decisionRationale: cue.decision_rationale,
+    evidenceRefs: cue.evidence_refs,
+    reviewStatus: cue.review_status,
+    reviewMode: cue.review_mode,
+    reviewEvidence: cue.review_evidence,
+    metadata: { layout: cue.layout, placement: cue.placement },
+    sourceRange: cue.source_range
+      ? { startS: cue.source_range.start_s, endS: cue.source_range.end_s }
+      : { startS: cue.program_range.start_s, endS: cue.program_range.end_s },
     programRange: { startS: cue.program_range.start_s, endS: cue.program_range.end_s },
   })) ?? []
   const motionClips = graphicMotionEdit?.cues.map((cue) => ({
@@ -654,7 +668,19 @@ export function projectFromSnapshot(base: EditorProjectView | null, snapshot: Ru
     displayName: cue.recipe_id ? `Motion: ${cue.recipe_id}` : 'Graphic motion',
     summary: cue.content,
     enabled: cue.enabled,
-    sourceRange: { startS: cue.program_range.start_s, endS: cue.program_range.end_s },
+    sourceText: cue.source_text,
+    decisionRationale: cue.decision_rationale,
+    reviewStatus: cue.review_status,
+    reviewMode: cue.review_mode,
+    reviewEvidence: cue.review_evidence,
+    metadata: {
+      ...(cue.recipe_id ? { recipe: cue.recipe_id } : {}),
+      ...(cue.source_status ? { source: cue.source_status } : {}),
+      ...(cue.license_status ? { license: cue.license_status } : {}),
+    },
+    sourceRange: cue.source_ranges?.[0]
+      ? { startS: cue.source_ranges[0].start_s, endS: cue.source_ranges[0].end_s }
+      : { startS: cue.program_range.start_s, endS: cue.program_range.end_s },
     programRange: { startS: cue.program_range.start_s, endS: cue.program_range.end_s },
   })) ?? []
   const tracks = [
