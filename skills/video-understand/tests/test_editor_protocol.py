@@ -217,6 +217,23 @@ class EditorProtocolFreshnessTests(unittest.TestCase):
             ),
         )
 
+    def test_editor_transform_accepts_saved_overlay_corner_positions(self):
+        self.assertEqual(
+            {"x": -0.0984375, "y": 0.40555555555555556, "scale_x": 1.0, "scale_y": 1.0},
+            projectlib._editor_transform({
+                "x": -0.0984375, "y": 0.40555555555555556,
+                "scale_x": 1.0, "scale_y": 1.0,
+            }),
+        )
+        self.assertEqual(
+            {"x": 1.1729364070960613, "y": 0.6388415615669797,
+             "scale_x": 1.4373935135257043, "scale_y": 1.4373935135257043},
+            projectlib._editor_transform({
+                "x": 1.1729364070960613, "y": 0.6388415615669797,
+                "scale_x": 1.4373935135257043, "scale_y": 1.4373935135257043,
+            }),
+        )
+
     def test_graphic_motion_render_contribution_includes_union_alpha_bounds(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

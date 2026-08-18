@@ -1361,7 +1361,7 @@ def _editor_transform(value):
     scale_y = value.get("scale_y", value.get("scale"))
     if any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in (x, y, scale_x, scale_y)):
         raise ValueError("editor_transform values must be numbers")
-    if not 0 <= x <= 1 or not 0 <= y <= 1 or not 0.1 <= scale_x <= 4 or not 0.1 <= scale_y <= 4:
+    if not -2 <= x <= 3 or not -2 <= y <= 3 or not 0.1 <= scale_x <= 4 or not 0.1 <= scale_y <= 4:
         raise ValueError("editor_transform is out of range")
     if "scale" in value:
         return {"x": float(x), "y": float(y), "scale": float(scale_x)}
