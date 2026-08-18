@@ -1,10 +1,19 @@
-import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent,
+  type ReactNode,
+} from 'react'
 import {
   ArrowUpDown,
   Copy,
   Eye,
   Gauge,
   Lock,
+  LocateFixed,
   Magnet,
   MousePointer2,
   Plus,
@@ -22,6 +31,7 @@ import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand/vanilla'
 import type { ClipView, EditorSelection, TrackView } from './editor-model'
 import type { EditorState } from './editor-store'
+import { TimelineContextMenu, type TimelineContextMenuModel } from './TimelineContextMenu'
 import {
   applyTimelineEdit,
   canSplitClip,
@@ -281,6 +291,7 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
     sourceS: number
   }>>(null)
   const [trimPreview, setTrimPreview] = useState<null | Readonly<{ project: NonNullable<typeof project>; sourceS: number }>>(null)
+  const [contextMenu, setContextMenu] = useState<Omit<TimelineContextMenuModel, 'onClose'> | null>(null)
   const presentedProject = trimPreview?.project ?? project
   const durationS = project?.durationS ?? 0
   if (viewDurationRef.current <= 0 && durationS > 0) viewDurationRef.current = durationS
@@ -414,6 +425,84 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
     }))
   }
 
+  function contextTimeFromClientX(clientX: number) {
+    const surface = surfaceRef.current
+    if (!surface) return currentTimeS
+    const rect = surface.getBoundingClientRect()
+    const pixelX = clientX - rect.left + surface.scrollLeft
+    return pxToTime(pixelX, viewDurationS, viewWidthPx, {
+      zoom: timelineZoom,
+      fps: project?.fps,
+      snapEnabled,
+    })
+  }
+
+  function zoomToTime(timeS: number) {
+    const surface = surfaceRef.current
+    const nextZoom = Math.min(MAX_ZOOM, timelineZoom + 0.5)
+    setTimelineZoom(nextZoom)
+    if (!surface || nextZoom === timelineZoom) return
+    window.requestAnimationFrame(() => {
+      const targetX = timeToPx(timeS, viewDurationS, viewWidthPx, nextZoom)
+      surface.scrollLeft = Math.max(0, targetX - surface.clientWidth / 2)
+      if (rulerScrollRef.current) rulerScrollRef.current.scrollLeft = surface.scrollLeft
+    })
+  }
+
+  function openTimelineContextMenu(event: ReactMouseEvent<HTMLElement>, timeS?: number) {
+    event.preventDefault()
+    if ((event.target as HTMLElement).closest('[data-timeline-clip], .timeline-track-header')) return
+    const contextTimeS = timeS ?? contextTimeFromClientX(event.clientX)
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      title: 'Timeline',
+      subtitle: formatPreciseTime(contextTimeS),
+      actions: [
+        {
+          id: 'move-playhead',
+          label: `Move playhead to ${formatPreciseTime(contextTimeS)}`,
+          icon: LocateFixed,
+          onSelect: () => seek(contextTimeS),
+        },
+        {
+          id: 'copy-timecode',
+          label: 'Copy timecode',
+          icon: Copy,
+          onSelect: () => { void navigator.clipboard.writeText(formatPreciseTime(contextTimeS)) },
+        },
+        {
+          id: 'zoom-here',
+          label: 'Zoom to this position',
+          icon: ZoomIn,
+          separatorBefore: true,
+          disabled: timelineZoom >= MAX_ZOOM,
+          onSelect: () => zoomToTime(contextTimeS),
+        },
+        {
+          id: 'fit-timeline',
+          label: 'Fit timeline',
+          icon: Ruler,
+          onSelect: () => setTimelineZoom(1),
+        },
+        {
+          id: 'toggle-snap',
+          label: `${snapEnabled ? 'Disable' : 'Enable'} snapping`,
+          icon: Magnet,
+          onSelect: () => setSnapEnabled(!snapEnabled),
+        },
+      ],
+    })
+  }
+
+  function handleTimelineContextKey(event: ReactKeyboardEvent<HTMLElement>) {
+    if (!(event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) return
+    event.preventDefault()
+    const rect = event.currentTarget.getBoundingClientRect()
+    openTimelineContextMenu(event as unknown as ReactMouseEvent<HTMLElement>, currentTimeS)
+    setContextMenu((menu) => menu ? { ...menu, x: rect.left + rect.width / 2, y: rect.top + Math.min(64, rect.height / 2) } : menu)
+  }
+
   function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
     if (!hasMedia || event.button !== 0) return
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -475,7 +564,7 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
         {hasMedia && (
           <>
             <div className="timeline-ruler-gutter" />
-            <div className="timeline-ruler-scroll" ref={rulerScrollRef}>
+            <div className="timeline-ruler-scroll" ref={rulerScrollRef} onContextMenu={openTimelineContextMenu}>
               <div className="timeline-ruler" style={{ width: `${contentWidth}px` }}>
                 {rulerTicks.map((tick) => (
                   <i
@@ -506,7 +595,11 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
         <div
           className="timeline-surface"
           data-timeline-surface
+          tabIndex={0}
+          aria-label="Timeline canvas"
           ref={surfaceRef}
+          onContextMenu={openTimelineContextMenu}
+          onKeyDown={handleTimelineContextKey}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={(event) => event.currentTarget.releasePointerCapture(event.pointerId)}
@@ -554,6 +647,7 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
         </div>
         {hasMedia && <output className="timeline-playhead-time" aria-label="Playhead time">{formatTimelineTime(currentTimeS)}</output>}
       </div>
+      {contextMenu ? <TimelineContextMenu {...contextMenu} onClose={() => setContextMenu(null)} /> : null}
     </section>
   )
 }

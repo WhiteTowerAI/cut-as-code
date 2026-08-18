@@ -216,6 +216,54 @@ test('timeline selection and click seek update one store playhead', async ({ pag
   await expect(clip).toHaveAttribute('aria-pressed', 'true')
 })
 
+test('timeline context menu keeps the playhead stable and supports keyboard navigation', async ({ page }) => {
+  await page.setViewportSize({ width: 1008, height: 444 })
+  await page.goto('/?scenario=timeline-editing')
+
+  const canvas = page.locator('[data-timeline-surface]')
+  const before = await page.getByLabel('Playhead time').textContent()
+  await canvas.click({ button: 'right', position: { x: 700, y: 300 } })
+
+  const menu = page.getByRole('menu', { name: 'Timeline' })
+  await expect(menu).toBeVisible()
+  await expect(page.getByLabel('Playhead time')).toHaveText(before ?? '')
+  await expect(menu.getByRole('menuitem', { name: /Move playhead/ })).toBeFocused()
+  await page.keyboard.press('End')
+  await expect(menu.getByRole('menuitem', { name: /snapping/ })).toBeFocused()
+  await page.keyboard.press('Home')
+  await page.keyboard.press('Enter')
+  await expect(menu).toHaveCount(0)
+  await expect(page.getByLabel('Playhead time')).not.toHaveText(before ?? '')
+
+  await canvas.focus()
+  await page.keyboard.press('Shift+F10')
+  await expect(page.getByRole('menu', { name: 'Timeline' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('menu', { name: 'Timeline' })).toHaveCount(0)
+  await expect(canvas).toBeFocused()
+})
+
+test('timeline context menu clamps to the viewport and copies its context timecode', async ({ page }) => {
+  await page.setViewportSize({ width: 1008, height: 444 })
+  await page.goto('/?scenario=timeline-editing')
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: (value: string) => { document.documentElement.dataset.copiedTimecode = value } },
+    })
+  })
+
+  const canvas = page.locator('[data-timeline-surface]')
+  await canvas.click({ button: 'right', position: { x: 870, y: 310 } })
+  const menu = page.getByRole('menu', { name: 'Timeline' })
+  const box = await menu.boundingBox()
+  expect(box).not.toBeNull()
+  expect(box!.x + box!.width).toBeLessThanOrEqual(1000)
+  expect(box!.y + box!.height).toBeLessThanOrEqual(436)
+  await menu.getByRole('menuitem', { name: 'Copy timecode' }).click()
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.copiedTimecode)).toMatch(/^00:\d{2}\.\d{3}$/)
+})
+
 test('timeline split, delete, keyboard undo, and redo form one edit history', async ({ page }) => {
   await page.setViewportSize({ width: 1008, height: 444 })
   await page.goto('/?scenario=timeline-editing')

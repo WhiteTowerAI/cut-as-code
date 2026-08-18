@@ -1663,6 +1663,80 @@ button {
 .timeline-trim-readout--start { left: 16px; }
 .timeline-trim-readout--end { right: 16px; }
 
+.timeline-context-menu {
+  position: fixed;
+  z-index: 40;
+  width: min(276px, calc(100vw - 16px));
+  overflow: hidden;
+  border: 1px solid #3b4147;
+  border-radius: 6px;
+  color: #e6eeec;
+  background: #17191c;
+  box-shadow: 0 14px 36px rgb(0 0 0 / 42%), 0 2px 8px rgb(0 0 0 / 30%);
+}
+
+.timeline-context-menu-header {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px 9px;
+  border-bottom: 1px solid #30353a;
+  background: #202427;
+}
+
+.timeline-context-menu-header strong {
+  overflow: hidden;
+  color: #f2f7f5;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeline-context-menu-header span {
+  overflow: hidden;
+  color: #91a39e;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeline-context-menu-items { padding: 5px; }
+
+.timeline-context-menu-item {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 4px;
+  color: #dce8e4;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.timeline-context-menu-item:hover,
+.timeline-context-menu-item:focus-visible { color: #f5fbf9; background: #2b4944; outline: 0; }
+.timeline-context-menu-item.is-danger:hover,
+.timeline-context-menu-item.is-danger:focus-visible { color: #ffe7e4; background: #4c2d30; }
+.timeline-context-menu-item:disabled { color: #687571; cursor: not-allowed; }
+.timeline-context-menu-item svg { color: #8bbcaf; }
+.timeline-context-menu-item.is-danger svg { color: #da8d8d; }
+.timeline-context-menu-item kbd {
+  color: #8b9b96;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.timeline-context-menu-icon-spacer { width: 15px; height: 15px; }
+.timeline-context-menu-separator { margin-top: 5px; padding-top: 5px; border-top: 1px solid #30353a; }
+
 .timeline-clip--video[aria-pressed='true'] { border-color: #79b7a7; background: #294e4a; }
 .timeline-clip--caption[aria-pressed='true'] { border-color: #3b3e46; box-shadow: inset 0 0 0 1px #fff; background: #294e4a; }
 .timeline-clip--audio { height: 60px; border-color: #4e776d; background: #284a43; }
