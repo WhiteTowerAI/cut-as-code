@@ -4945,6 +4945,63 @@ class SpeakerInsetTests(_BrollFixture, unittest.TestCase):
                 keyframes, 1.5, {"start_s": 1.0, "end_s": 1.5},
             )
 
+    def test_composite_frame_uses_fractional_roi_motion_without_integer_plateaus(self):
+        frame_size = (200, 320)
+        base = Image.new("RGB", frame_size, (0, 180, 0))
+        speaker = Image.new("RGB", frame_size)
+        speaker.putdata([
+            (x, x, x)
+            for y in range(frame_size[1]) for x in range(frame_size[0])
+        ])
+        style = BrollPlanTests._speaker_style()
+        style["border"]["width_px"] = 0
+        roi = {"y": 0.1, "width": 0.4, "height": 0.5}
+
+        first = speaker_inset.composite_frame(
+            base, speaker, {"x": 0.101, **roi}, style, "corner-pip", "top-left",
+        )
+        second = speaker_inset.composite_frame(
+            base, speaker, {"x": 0.103, **roi}, style, "corner-pip", "top-left",
+        )
+
+        self.assertFalse(first.tobytes() == second.tobytes())
+
+    def test_fractional_roi_cover_crop_box_preserves_aspect_centering_and_top_alignment(self):
+        self.assertTrue(hasattr(speaker_inset, "_cover_crop_box"))
+        cases = (
+            ((200, 100), {"x": 0.101, "y": 0.203, "width": 0.603, "height": 0.407},
+             (64.22, 20.3, 96.78, 61.0)),
+            ((200, 200), {"x": 0.101, "y": 0.203, "width": 0.203, "height": 0.607},
+             (20.2, 40.6, 60.8, 91.35)),
+        )
+        for source_size, roi, expected in cases:
+            with self.subTest(source_size=source_size):
+                crop_box = speaker_inset._cover_crop_box(source_size, roi, (80, 100))
+                self.assertEqual(expected, tuple(round(value, 6) for value in crop_box))
+
+    def test_fractional_roi_tolerance_stays_inside_source_frame(self):
+        frame_size = (100, 100)
+        base = Image.new("RGB", frame_size)
+        speaker = Image.new("RGB", frame_size)
+        style = BrollPlanTests._speaker_style()
+        roi = {"x": 0.9, "y": 0.0, "width": 0.1000005, "height": 0.5}
+
+        self.assertEqual([], speaker_inset._roi_errors(roi))
+        result = speaker_inset.composite_frame(
+            base, speaker, roi, style, "corner-pip", "top-left",
+        )
+        crop_box = speaker_inset._cover_crop_box(
+            frame_size, roi, speaker_inset._inset_size(frame_size, style, "top-left"),
+        )
+        left, top, right, bottom = crop_box
+        self.assertGreaterEqual(left, 0)
+        self.assertGreaterEqual(top, 0)
+        self.assertLessEqual(right, frame_size[0])
+        self.assertLessEqual(bottom, frame_size[1])
+        self.assertGreater(right, left)
+        self.assertGreater(bottom, top)
+        self.assertEqual(frame_size, result.size)
+
     def test_probe_video_accepts_ffprobe_string_duration_and_rational_fps(self):
         payload = {
             "streams": [{

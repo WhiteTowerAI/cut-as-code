@@ -984,23 +984,39 @@ def _checkpoint_times(program_range, frame_duration, motion_risk_time_s=None):
     return times
 
 
-def _cover_crop_facts(source_size, roi, output_size):
+def _cover_crop_box(source_size, roi, output_size):
     source_width, source_height = source_size
-    left = max(0, min(source_width - 1, math.floor(float(roi["x"]) * source_width)))
-    top = max(0, min(source_height - 1, math.floor(float(roi["y"]) * source_height)))
-    right = max(left + 1, min(
-        source_width, math.ceil((float(roi["x"]) + float(roi["width"])) * source_width),
-    ))
-    bottom = max(top + 1, min(
-        source_height, math.ceil((float(roi["y"]) + float(roi["height"])) * source_height),
-    ))
-    roi_width, roi_height = right - left, bottom - top
     output_width, output_height = output_size
+    roi_left = float(roi["x"]) * source_width
+    roi_top = float(roi["y"]) * source_height
+    roi_right = (float(roi["x"]) + float(roi["width"])) * source_width
+    roi_bottom = (float(roi["y"]) + float(roi["height"])) * source_height
+    roi_left = max(0.0, min(roi_left, float(source_width)))
+    roi_top = max(0.0, min(roi_top, float(source_height)))
+    roi_right = max(0.0, min(roi_right, float(source_width)))
+    roi_bottom = max(0.0, min(roi_bottom, float(source_height)))
+    if roi_right <= roi_left:
+        roi_left = min(roi_left, float(source_width) - 1.0)
+        roi_right = roi_left + 1.0
+    if roi_bottom <= roi_top:
+        roi_top = min(roi_top, float(source_height) - 1.0)
+        roi_bottom = roi_top + 1.0
+    roi_width = roi_right - roi_left
+    roi_height = roi_bottom - roi_top
     output_aspect = output_width / output_height
     if roi_width / roi_height >= output_aspect:
-        crop_width, crop_height = roi_height * output_aspect, roi_height
-    else:
-        crop_width, crop_height = roi_width, roi_width / output_aspect
+        crop_width = roi_height * output_aspect
+        left = roi_left + (roi_width - crop_width) / 2
+        return (left, roi_top, left + crop_width, roi_bottom)
+    crop_height = roi_width / output_aspect
+    return (roi_left, roi_top, roi_right, roi_top + crop_height)
+
+
+def _cover_crop_facts(source_size, roi, output_size):
+    output_width, output_height = output_size
+    crop_box = _cover_crop_box(source_size, roi, output_size)
+    crop_width = crop_box[2] - crop_box[0]
+    crop_height = crop_box[3] - crop_box[1]
     scale = output_width / crop_width
     return {
         "input_crop_px": {
@@ -1113,20 +1129,11 @@ def _paste_speaker(base, speaker, roi, style, anchor):
         raise ValueError("invalid speaker ROI: " + "; ".join(roi_validation))
     base = base.convert("RGB")
     speaker = speaker.convert("RGB")
-    source_width, source_height = speaker.size
-    left = max(0, min(source_width - 1, math.floor(float(roi["x"]) * source_width)))
-    top = max(0, min(source_height - 1, math.floor(float(roi["y"]) * source_height)))
-    right = max(left + 1, min(
-        source_width, math.ceil((float(roi["x"]) + float(roi["width"])) * source_width),
-    ))
-    bottom = max(top + 1, min(
-        source_height, math.ceil((float(roi["y"]) + float(roi["height"])) * source_height),
-    ))
     inset_width, inset_height = _inset_size(base.size, style, anchor)
     resampling = getattr(Image, "Resampling", Image).LANCZOS
-    crop = ImageOps.fit(
-        speaker.crop((left, top, right, bottom)),
-        (inset_width, inset_height), method=resampling, centering=(0.5, 0.0),
+    crop_box = _cover_crop_box(speaker.size, roi, (inset_width, inset_height))
+    crop = speaker.resize(
+        (inset_width, inset_height), resample=resampling, box=crop_box,
     )
     mask = Image.new("L", (inset_width, inset_height), 0)
     mask_draw = ImageDraw.Draw(mask)
