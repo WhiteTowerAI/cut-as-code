@@ -1667,7 +1667,7 @@ button {
   position: fixed;
   z-index: 40;
   width: min(276px, calc(100vw - 16px));
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid #3b4147;
   border-radius: 6px;
   color: #e6eeec;
@@ -1702,6 +1702,7 @@ button {
 }
 
 .timeline-context-menu-items { padding: 5px; }
+.timeline-context-menu-action { position: relative; }
 
 .timeline-context-menu-item {
   display: grid;
@@ -1736,6 +1737,65 @@ button {
 
 .timeline-context-menu-icon-spacer { width: 15px; height: 15px; }
 .timeline-context-menu-separator { margin-top: 5px; padding-top: 5px; border-top: 1px solid #30353a; }
+.timeline-context-submenu {
+  position: absolute;
+  top: -5px;
+  left: calc(100% + 4px);
+  z-index: 1;
+  width: 248px;
+  padding: 5px;
+  border: 1px solid #3b4147;
+  border-radius: 6px;
+  background: #17191c;
+  box-shadow: 0 14px 36px rgb(0 0 0 / 42%), 0 2px 8px rgb(0 0 0 / 30%);
+}
+.timeline-context-submenu.opens-left { right: calc(100% + 4px); left: auto; }
+
+.timeline-undo-toast {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 42;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 280px;
+  padding: 11px 12px;
+  border: 1px solid #3b4147;
+  border-radius: 6px;
+  color: #e6eeec;
+  background: #17191c;
+  box-shadow: 0 12px 30px rgb(0 0 0 / 38%);
+  font-size: 12px;
+}
+.timeline-undo-toast span { flex: 1; }
+.timeline-undo-toast button { padding: 3px 6px; border: 0; color: #9ed6c8; background: transparent; font-weight: 600; }
+.timeline-undo-toast button:last-child { color: #83918d; font-size: 16px; font-weight: 400; }
+
+.timeline-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 41;
+  display: grid;
+  place-items: center;
+  background: rgb(7 9 10 / 55%);
+}
+.timeline-clip-info-dialog {
+  width: min(420px, calc(100vw - 32px));
+  overflow: hidden;
+  border: 1px solid #42484e;
+  border-radius: 8px;
+  color: #e6eeec;
+  background: #202427;
+  box-shadow: 0 20px 60px rgb(0 0 0 / 50%);
+}
+.timeline-clip-info-dialog header { display: flex; align-items: center; padding: 14px 16px; border-bottom: 1px solid #343a3f; }
+.timeline-clip-info-dialog h2 { flex: 1; margin: 0; font-size: 14px; font-weight: 600; }
+.timeline-clip-info-dialog header button { border: 0; color: #93a19d; background: transparent; font-size: 20px; }
+.timeline-clip-info-dialog dl { margin: 0; padding: 10px 16px 16px; }
+.timeline-clip-info-dialog dl div { display: grid; grid-template-columns: 116px minmax(0, 1fr); gap: 12px; padding: 7px 0; border-bottom: 1px solid #2f3438; }
+.timeline-clip-info-dialog dt { color: #91a39e; font-size: 11px; }
+.timeline-clip-info-dialog dd { margin: 0; overflow-wrap: anywhere; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; }
 
 .timeline-clip--video[aria-pressed='true'] { border-color: #79b7a7; background: #294e4a; }
 .timeline-clip--caption[aria-pressed='true'] { border-color: #3b3e46; box-shadow: inset 0 0 0 1px #fff; background: #294e4a; }

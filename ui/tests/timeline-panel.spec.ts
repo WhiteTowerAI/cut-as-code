@@ -290,6 +290,55 @@ test('timeline context menu clamps to the viewport and copies its context timeco
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.copiedTimecode)).toMatch(/^00:\d{2}\.\d{3}$/)
 })
 
+test('video clip context menu uses the hit time for split and exposes range submenu', async ({ page }) => {
+  await page.setViewportSize({ width: 1008, height: 444 })
+  await page.goto('/?scenario=timeline-editing')
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: (value: string) => { document.documentElement.dataset.copiedRange = value } },
+    })
+  })
+
+  const clip = page.locator('[data-timeline-clip="edit-video-1"]')
+  const beforePlayhead = await page.getByLabel('Playhead time').textContent()
+  await clip.click({ button: 'right', position: { x: 120, y: 32 } })
+  const menu = page.getByRole('menu', { name: 'Unknown media' })
+  await expect(menu).toBeVisible()
+  await expect(page.getByLabel('Playhead time')).toHaveText(beforePlayhead ?? '')
+  await expect(menu.getByRole('menuitem', { name: /Split at/ })).toBeEnabled()
+
+  await menu.getByRole('menuitem', { name: 'Copy time range' }).click()
+  const submenu = page.getByRole('menu', { name: 'Copy time range' })
+  await expect(submenu).toBeVisible()
+  await submenu.getByRole('menuitem', { name: /Program/ }).click()
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.copiedRange)).toMatch(/^00:/)
+
+  await clip.click({ button: 'right', position: { x: 120, y: 32 } })
+  await page.getByRole('menuitem', { name: /Split at/ }).click()
+  await expect(page.locator('.timeline-clip--video')).toHaveCount(3)
+})
+
+test('video clip context menu shows clip information and ripple delete undo toast', async ({ page }) => {
+  await page.setViewportSize({ width: 1008, height: 444 })
+  await page.goto('/?scenario=timeline-editing')
+
+  const firstClip = page.locator('[data-timeline-clip="edit-video-1"]')
+  await firstClip.click({ button: 'right', position: { x: 40, y: 32 } })
+  await page.getByRole('menuitem', { name: 'View clip information' }).click()
+  await expect(page.getByRole('dialog', { name: 'Unknown media' })).toContainText('edit-video-1')
+  await page.getByRole('button', { name: 'Close clip information' }).click()
+
+  const secondClip = page.locator('[data-timeline-clip="edit-video-2"]')
+  await secondClip.click({ button: 'right', position: { x: 80, y: 32 } })
+  await page.getByRole('menuitem', { name: 'Ripple delete' }).click()
+  const toast = page.locator('.timeline-undo-toast')
+  await expect(toast).toContainText('ripple deleted')
+  await expect(page.locator('[data-timeline-clip="edit-video-2"]')).toHaveCount(0)
+  await toast.getByRole('button', { name: 'Undo' }).click()
+  await expect(page.locator('[data-timeline-clip="edit-video-2"]')).toBeVisible()
+})
+
 test('timeline split, delete, keyboard undo, and redo form one edit history', async ({ page }) => {
   await page.setViewportSize({ width: 1008, height: 444 })
   await page.goto('/?scenario=timeline-editing')

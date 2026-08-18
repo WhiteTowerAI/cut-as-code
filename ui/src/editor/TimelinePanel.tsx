@@ -12,6 +12,7 @@ import {
   Copy,
   Eye,
   Gauge,
+  Info,
   Lock,
   LocateFixed,
   Magnet,
@@ -35,6 +36,7 @@ import { TimelineContextMenu, type TimelineContextMenuModel } from './TimelineCo
 import {
   applyTimelineEdit,
   canSplitClip,
+  trimSourceBounds,
   trimSourceAtProgramDelta,
   type TimelineTrimEdge,
 } from './timeline-edit'
@@ -178,6 +180,7 @@ function Clip({
   editable,
   trimming,
   onTrimStart,
+  onContextMenu,
 }: {
   track: TrackView
   clip: ClipView
@@ -190,6 +193,7 @@ function Clip({
   editable: boolean
   trimming: TimelineTrimEdge | null
   onTrimStart: (event: PointerEvent<HTMLButtonElement>, clip: ClipView, edge: TimelineTrimEdge) => void
+  onContextMenu: (event: ReactMouseEvent<HTMLButtonElement>, track: TrackView, clip: ClipView) => void
 }) {
   const kind = track.kind
   const id = clip.id
@@ -219,6 +223,7 @@ function Clip({
         aria-label={`${track.name} ${kind === 'video' || kind === 'audio' ? 'clip' : 'cue'}`}
         aria-pressed={selected}
         onPointerDown={() => select({ kind, id })}
+        onContextMenu={(event) => onContextMenu(event, track, clip)}
       >
         {(kind === 'caption' || kind === 'card' || kind === 'graphic-motion') && (
           <span className="timeline-caption-cue">{clip.summary || clip.displayName || 'Untitled cue'}</span>
@@ -292,6 +297,8 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
   }>>(null)
   const [trimPreview, setTrimPreview] = useState<null | Readonly<{ project: NonNullable<typeof project>; sourceS: number }>>(null)
   const [contextMenu, setContextMenu] = useState<Omit<TimelineContextMenuModel, 'onClose'> | null>(null)
+  const [clipInfo, setClipInfo] = useState<ClipView | null>(null)
+  const [deleteNotice, setDeleteNotice] = useState<string | null>(null)
   const presentedProject = trimPreview?.project ?? project
   const durationS = project?.durationS ?? 0
   if (viewDurationRef.current <= 0 && durationS > 0) viewDurationRef.current = durationS
@@ -324,6 +331,12 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
   const deleteEnabled = Boolean(
     timelineEditable && selectedVideo && !timelinePending,
   )
+
+  useEffect(() => {
+    if (!deleteNotice) return
+    const timeout = window.setTimeout(() => setDeleteNotice(null), 5000)
+    return () => window.clearTimeout(timeout)
+  }, [deleteNotice])
 
   useEffect(() => {
     if (!runtime) {
@@ -495,6 +508,127 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
     })
   }
 
+  function clipSourceTimeAtProgramTime(clip: ClipView, programTimeS: number) {
+    const speed = clip.speed && clip.speed > 0 ? clip.speed : 1
+    const sourceTimeS = clip.sourceRange.startS + (programTimeS - clip.programRange.startS) * speed
+    return Math.min(Math.max(sourceTimeS, clip.sourceRange.startS), clip.sourceRange.endS)
+  }
+
+  function openClipContextMenu(event: ReactMouseEvent<HTMLButtonElement>, track: TrackView, clip: ClipView) {
+    event.preventDefault()
+    event.stopPropagation()
+    select({ kind: track.kind, id: clip.id })
+    const bounds = event.currentTarget.getBoundingClientRect()
+    const rawContextTimeS = clip.programRange.startS
+      + Math.min(Math.max((event.clientX - bounds.left) / Math.max(bounds.width, 1), 0), 1)
+      * (clip.programRange.endS - clip.programRange.startS)
+    const frameDurationS = project && project.fps.numerator > 0 && project.fps.denominator > 0
+      ? project.fps.denominator / project.fps.numerator
+      : 1 / 30
+    const contextTimeS = Math.min(
+      Math.max(Math.round(rawContextTimeS / frameDurationS) * frameDurationS, clip.programRange.startS),
+      clip.programRange.endS,
+    )
+    const sourceTimeS = clipSourceTimeAtProgramTime(clip, contextTimeS)
+    const startBounds = project ? trimSourceBounds(project, clip.id, 'start') : null
+    const endBounds = project ? trimSourceBounds(project, clip.id, 'end') : null
+    const canRestore = Boolean(startBounds && endBounds && (
+      Math.abs(clip.sourceRange.startS - startBounds.minimum) > 1e-7
+      || Math.abs(clip.sourceRange.endS - endBounds.maximum) > 1e-7
+    ))
+    const editable = track.kind === 'video' && timelineEditable && !timelinePending
+    const programDurationS = clip.programRange.endS - clip.programRange.startS
+    const copy = (value: string) => { void navigator.clipboard.writeText(value) }
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      title: clip.displayName || 'Unknown media',
+      subtitle: `${formatPreciseTime(clip.programRange.startS)} – ${formatPreciseTime(clip.programRange.endS)}`,
+      actions: [
+        {
+          id: 'split-clip',
+          label: `Split at ${formatPreciseTime(contextTimeS)}`,
+          icon: Scissors,
+          disabled: !editable || !project || !canSplitClip(project, clip.id, contextTimeS),
+          onSelect: () => { void editTimeline({ type: 'split', clipId: clip.id, atS: contextTimeS }) },
+        },
+        {
+          id: 'trim-in-here',
+          label: 'Trim in point to here',
+          icon: LocateFixed,
+          disabled: !editable || !startBounds || sourceTimeS > startBounds.maximum + 1e-7,
+          onSelect: () => { void editTimeline({ type: 'trim', clipId: clip.id, edge: 'start', sourceS: sourceTimeS }) },
+        },
+        {
+          id: 'trim-out-here',
+          label: 'Trim out point to here',
+          icon: LocateFixed,
+          disabled: !editable || !endBounds || sourceTimeS < endBounds.minimum - 1e-7,
+          onSelect: () => { void editTimeline({ type: 'trim', clipId: clip.id, edge: 'end', sourceS: sourceTimeS }) },
+        },
+        {
+          id: 'restore-bounds',
+          label: 'Restore available media bounds',
+          icon: RotateCcw,
+          disabled: !editable || !canRestore,
+          onSelect: () => { void editTimeline({ type: 'restore-bounds', clipId: clip.id }) },
+        },
+        {
+          id: 'move-playhead',
+          label: `Move playhead to ${formatPreciseTime(contextTimeS)}`,
+          icon: LocateFixed,
+          separatorBefore: true,
+          onSelect: () => seek(contextTimeS),
+        },
+        {
+          id: 'copy-range',
+          label: 'Copy time range',
+          icon: Copy,
+          submenu: [
+            {
+              id: 'copy-program-range',
+              label: `Program ${formatPreciseTime(clip.programRange.startS)} – ${formatPreciseTime(clip.programRange.endS)}`,
+              onSelect: () => copy(`${formatPreciseTime(clip.programRange.startS)} - ${formatPreciseTime(clip.programRange.endS)}`),
+            },
+            {
+              id: 'copy-source-range',
+              label: `Source ${formatPreciseTime(clip.sourceRange.startS)} – ${formatPreciseTime(clip.sourceRange.endS)}`,
+              onSelect: () => copy(`${formatPreciseTime(clip.sourceRange.startS)} - ${formatPreciseTime(clip.sourceRange.endS)}`),
+            },
+            {
+              id: 'copy-duration',
+              label: `Duration ${formatPreciseTime(programDurationS)}`,
+              onSelect: () => copy(formatPreciseTime(programDurationS)),
+            },
+          ],
+        },
+        {
+          id: 'clip-info',
+          label: 'View clip information',
+          icon: Info,
+          onSelect: () => setClipInfo(clip),
+        },
+        {
+          id: 'ripple-delete',
+          label: 'Ripple delete',
+          shortcut: 'Delete',
+          icon: Trash2,
+          separatorBefore: true,
+          danger: true,
+          disabled: !editable,
+          onSelect: () => {
+            const historyLength = store.getState().timelinePast.length
+            void editTimeline({ type: 'delete', clipId: clip.id }).then(() => {
+              if (store.getState().timelinePast.length > historyLength) {
+                setDeleteNotice(`${clip.displayName || 'Clip'} ripple deleted`)
+              }
+            })
+          },
+        },
+      ],
+    })
+  }
+
   function handleTimelineContextKey(event: ReactKeyboardEvent<HTMLElement>) {
     if (!(event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) return
     event.preventDefault()
@@ -632,6 +766,7 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
                     editable={timelineEditable && track.kind === 'video'}
                     trimming={trimDrag?.clipId === clip.id ? trimDrag.edge : null}
                     onTrimStart={startTrim}
+                    onContextMenu={openClipContextMenu}
                   />
                 ))}
               </div>
@@ -648,6 +783,27 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
         {hasMedia && <output className="timeline-playhead-time" aria-label="Playhead time">{formatTimelineTime(currentTimeS)}</output>}
       </div>
       {contextMenu ? <TimelineContextMenu {...contextMenu} onClose={() => setContextMenu(null)} /> : null}
+      {deleteNotice ? (
+        <div className="timeline-undo-toast" role="status">
+          <span>{deleteNotice}</span>
+          <button type="button" onClick={() => { void undoTimeline().then(() => setDeleteNotice(null)) }}>Undo</button>
+          <button type="button" aria-label="Dismiss delete notification" onClick={() => setDeleteNotice(null)}>×</button>
+        </div>
+      ) : null}
+      {clipInfo ? (
+        <div className="timeline-dialog-backdrop" role="presentation" onMouseDown={() => setClipInfo(null)}>
+          <section className="timeline-clip-info-dialog" role="dialog" aria-modal="true" aria-labelledby="clip-info-title" onMouseDown={(event) => event.stopPropagation()}>
+            <header><h2 id="clip-info-title">{clipInfo.displayName || 'Unknown media'}</h2><button type="button" aria-label="Close clip information" onClick={() => setClipInfo(null)}>×</button></header>
+            <dl>
+              <div><dt>Clip ID</dt><dd>{clipInfo.id}</dd></div>
+              <div><dt>Program range</dt><dd>{formatPreciseTime(clipInfo.programRange.startS)} – {formatPreciseTime(clipInfo.programRange.endS)}</dd></div>
+              <div><dt>Source range</dt><dd>{formatPreciseTime(clipInfo.sourceRange.startS)} – {formatPreciseTime(clipInfo.sourceRange.endS)}</dd></div>
+              <div><dt>Duration</dt><dd>{formatPreciseTime(clipInfo.programRange.endS - clipInfo.programRange.startS)}</dd></div>
+              <div><dt>Speed</dt><dd>{(clipInfo.speed ?? 1).toFixed(2)}×</dd></div>
+            </dl>
+          </section>
+        </div>
+      ) : null}
     </section>
   )
 }
