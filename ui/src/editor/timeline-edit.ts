@@ -11,6 +11,8 @@ export type TimelineEditCommand =
   | Readonly<{ type: 'split'; clipId: string; atS: number }>
   | Readonly<{ type: 'delete'; clipId: string }>
   | Readonly<{ type: 'trim'; clipId: string; edge: TimelineTrimEdge; sourceS: number }>
+  | Readonly<{ type: 'restore-bounds'; clipId: string }>
+  | Readonly<{ type: 'set-range'; clipId: string; startS: number; endS: number }>
   | Readonly<{ type: 'join'; leftClipId: string; rightClipId: string }>
   | Readonly<{ type: 'insert'; index: number; clip: ClipView }>
 
@@ -84,6 +86,18 @@ export function timelineRippleForCommand(project: EditorProjectView, command: Ti
     const boundaryS = clips[index]?.programRange.startS ?? project.durationS
     return rippleOrNull(boundaryS, clipDurationS(command.clip))
   }
+  if (command.type === 'restore-bounds') {
+    const clip = clips.find((candidate) => candidate.id === command.clipId)
+    const bounds = clip ? trimSourceBounds(project, clip.id, 'start') : null
+    const endBounds = clip ? trimSourceBounds(project, clip.id, 'end') : null
+    return clip && bounds && endBounds
+      ? rippleForSourceRange(clip, bounds.minimum, endBounds.maximum)
+      : null
+  }
+  if (command.type === 'set-range') {
+    const clip = clips.find((candidate) => candidate.id === command.clipId)
+    return clip ? rippleForSourceRange(clip, command.startS, command.endS) : null
+  }
   if (command.type !== 'trim') return null
 
   const clip = clips.find((candidate) => candidate.id === command.clipId)
@@ -96,6 +110,17 @@ export function timelineRippleForCommand(project: EditorProjectView, command: Ti
   const newDurationS = (sourceRange.endS - sourceRange.startS) / speed
   const deltaS = newDurationS - oldDurationS
   const boundaryS = command.edge === 'start'
+    ? clip.programRange.startS + Math.max(0, -deltaS)
+    : clip.programRange.endS
+  return rippleOrNull(boundaryS, deltaS)
+}
+
+function rippleForSourceRange(clip: ClipView, startS: number, endS: number) {
+  const oldDurationS = clipDurationS(clip)
+  const speed = clip.speed && clip.speed > 0 ? clip.speed : 1
+  const deltaS = (endS - startS) / speed - oldDurationS
+  const startChanged = Math.abs(startS - clip.sourceRange.startS) > RANGE_EPSILON
+  const boundaryS = startChanged
     ? clip.programRange.startS + Math.max(0, -deltaS)
     : clip.programRange.endS
   return rippleOrNull(boundaryS, deltaS)
@@ -290,6 +315,32 @@ export function applyTimelineEdit(project: EditorProjectView, command: TimelineE
     return {
       project: updateTracks(project, next, ripple),
       inverse: { type: 'trim', clipId: clip.id, edge: command.edge, sourceS: oldSourceS },
+      selection: { kind: 'video', id: clip.id },
+    }
+  }
+
+  if (command.type === 'restore-bounds' || command.type === 'set-range') {
+    const index = clips.findIndex((clip) => clip.id === command.clipId)
+    if (index < 0) throw new Error('The selected clip no longer exists')
+    const clip = clips[index]
+    const bounds = trimSourceBounds(project, clip.id, 'start')
+    const endBounds = trimSourceBounds(project, clip.id, 'end')
+    const sourceRange = command.type === 'restore-bounds'
+      ? { startS: bounds!.minimum, endS: endBounds!.maximum }
+      : { startS: command.startS, endS: command.endS }
+    const minimumDurationS = frameDurationS(project) * (clip.speed && clip.speed > 0 ? clip.speed : 1)
+    if (!bounds || !endBounds
+      || sourceRange.startS < bounds.minimum - RANGE_EPSILON
+      || sourceRange.endS > endBounds.maximum + RANGE_EPSILON
+      || sourceRange.endS - sourceRange.startS < minimumDurationS - RANGE_EPSILON) {
+      throw new Error('The range would overlap another source range')
+    }
+    const next = reflow(clips.map((candidate, clipIndex) => clipIndex === index
+      ? { ...candidate, sourceRange: { startS: rounded(sourceRange.startS), endS: rounded(sourceRange.endS) } }
+      : candidate))
+    return {
+      project: updateTracks(project, next, timelineRippleForCommand(project, command)),
+      inverse: { type: 'set-range', clipId: clip.id, startS: clip.sourceRange.startS, endS: clip.sourceRange.endS },
       selection: { kind: 'video', id: clip.id },
     }
   }

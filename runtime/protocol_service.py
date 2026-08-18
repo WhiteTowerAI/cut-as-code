@@ -313,6 +313,8 @@ class ProtocolService:
             "split": {"type", "clip_id", "at_s"},
             "delete": {"type", "clip_id"},
             "trim": {"type", "clip_id", "edge", "source_s"},
+            "restore-bounds": {"type", "clip_id"},
+            "set-range": {"type", "clip_id", "start_s", "end_s"},
             "join": {"type", "left_clip_id", "right_clip_id"},
             "insert": {"type", "index", "clip"},
         }
@@ -360,6 +362,21 @@ class ProtocolService:
             if source_s < minimum - 1e-7 or source_s > maximum + 1e-7:
                 raise ValueError("trim would overlap another source range")
             clip["source_range"][f"{edge}_s"] = cls._rounded(source_s)
+        elif command_type in {"restore-bounds", "set-range"}:
+            index = cls._clip_index(clips, command["clip_id"])
+            clip = clips[index]
+            minimum = float(clips[index - 1]["source_range"]["end_s"]) if index else 0.0
+            maximum = float(clips[index + 1]["source_range"]["start_s"]) if index + 1 < len(clips) else source_duration
+            if command_type == "restore-bounds":
+                start_s, end_s = minimum, maximum
+            else:
+                start_s = cls._finite_number(command["start_s"], "start_s")
+                end_s = cls._finite_number(command["end_s"], "end_s")
+            speed = float(clip["speed"])
+            if (start_s < minimum - 1e-7 or end_s > maximum + 1e-7
+                    or end_s - start_s < frame_duration * speed - 1e-7):
+                raise ValueError("range would overlap another source range")
+            clip["source_range"] = {"start_s": cls._rounded(start_s), "end_s": cls._rounded(end_s)}
         elif command_type == "join":
             index = cls._clip_index(clips, command["left_clip_id"])
             if index + 1 >= len(clips) or clips[index + 1].get("id") != command["right_clip_id"]:
@@ -417,7 +434,7 @@ class ProtocolService:
                 return None
             duration = float(clip["program_range"]["end_s"]) - float(clip["program_range"]["start_s"])
             return cls._ripple_or_none(boundary, duration)
-        if command.get("type") == "trim":
+        if command.get("type") in {"trim", "restore-bounds", "set-range"}:
             before_clip = next((item for item in before_clips if item.get("id") == command.get("clip_id")), None)
             after_clip = next((item for item in after_clips if item.get("id") == command.get("clip_id")), None)
             if not before_clip or not after_clip:
@@ -425,8 +442,12 @@ class ProtocolService:
             old_duration = float(before_clip["program_range"]["end_s"]) - float(before_clip["program_range"]["start_s"])
             new_duration = float(after_clip["program_range"]["end_s"]) - float(after_clip["program_range"]["start_s"])
             delta = new_duration - old_duration
+            start_changed = abs(
+                float(before_clip["source_range"]["start_s"])
+                - float(after_clip["source_range"]["start_s"])
+            ) > 1e-7
             boundary = (float(before_clip["program_range"]["start_s"]) + max(0.0, -delta)
-                        if command.get("edge") == "start"
+                        if start_changed
                         else float(before_clip["program_range"]["end_s"]))
             return cls._ripple_or_none(boundary, delta)
         return None

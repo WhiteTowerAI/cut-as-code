@@ -89,6 +89,10 @@ export class RuntimeApiClient {
         ? { type: command.type, clip_id: command.clipId }
         : command.type === 'trim'
           ? { type: command.type, clip_id: command.clipId, edge: command.edge, source_s: command.sourceS }
+          : command.type === 'restore-bounds'
+            ? { type: command.type, clip_id: command.clipId }
+            : command.type === 'set-range'
+              ? { type: command.type, clip_id: command.clipId, start_s: command.startS, end_s: command.endS }
           : command.type === 'join'
             ? { type: command.type, left_clip_id: command.leftClipId, right_clip_id: command.rightClipId }
             : {

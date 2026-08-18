@@ -52,6 +52,8 @@ function timelineCommandMessage(command: TimelineEditCommand) {
   if (command.type === 'split') return 'Clip split'
   if (command.type === 'delete') return 'Clip deleted'
   if (command.type === 'trim') return `${command.edge === 'start' ? 'In point' : 'Out point'} trimmed`
+  if (command.type === 'restore-bounds') return 'Media bounds restored'
+  if (command.type === 'set-range') return 'Clip range restored'
   if (command.type === 'join') return 'Split undone'
   return 'Clip restored'
 }

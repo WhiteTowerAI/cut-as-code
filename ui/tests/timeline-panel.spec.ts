@@ -188,6 +188,32 @@ test('ripple trim shifts every later track element and layer together', () => {
   expect(startTrim.project.tracks.find((track) => track.kind === 'video')!.clips![1].programRange.startS).toBe(6)
 })
 
+test('restoring media bounds is one undoable edit and ripples later elements', () => {
+  const project = getScenario('timeline-editing')!.initialState.project!
+  const trimmed = applyTimelineEdit(project, {
+    type: 'trim', clipId: 'edit-video-1', edge: 'end', sourceS: 10,
+  })
+  const restored = applyTimelineEdit(trimmed.project, {
+    type: 'restore-bounds', clipId: 'edit-video-1',
+  })
+
+  const restoredVideo = restored.project.tracks.find((track) => track.kind === 'video')!.clips!
+  expect(restoredVideo[0].sourceRange).toEqual({ startS: 0, endS: 12 })
+  expect(restoredVideo[1].programRange.startS).toBe(12)
+  expect(restored.project.tracks.find((track) => track.kind === 'card')!.clips![0].programRange).toEqual(
+    { startS: 20, endS: 22 },
+  )
+  expect(restored.project.layers![0].programRange).toEqual({ startS: 20, endS: 22 })
+
+  const undone = applyTimelineEdit(restored.project, restored.inverse)
+  expect(undone.project.tracks.find((track) => track.kind === 'video')!.clips).toEqual(
+    trimmed.project.tracks.find((track) => track.kind === 'video')!.clips,
+  )
+  expect(undone.project.tracks.find((track) => track.kind === 'card')!.clips![0].programRange).toEqual(
+    trimmed.project.tracks.find((track) => track.kind === 'card')!.clips![0].programRange,
+  )
+})
+
 test('deleting the final clip creates an undoable empty timeline', () => {
   const project = getScenario('timeline-editing')!.initialState.project!
   const firstDelete = applyTimelineEdit(project, { type: 'delete', clipId: 'edit-video-1' })

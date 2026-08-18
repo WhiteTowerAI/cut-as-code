@@ -168,6 +168,66 @@ class ProtocolServiceTests(unittest.TestCase):
         self.assertEqual(0.0, timeline["clips"][0]["program_range"]["start_s"])
         self.assertAlmostEqual(0.4, timeline["program_duration_s"])
 
+    def test_timeline_restore_bounds_is_atomic_undoable_and_ripples_downstream_cues(self):
+        self._configure_cut_project()
+        self.plan.write_text(json.dumps({
+            "schema_version": 1,
+            "cues": [{
+                "id": "cue-later",
+                "text": "Later cue",
+                "program_range": {"start_s": 0.75, "end_s": 0.9},
+            }],
+        }), encoding="utf-8")
+        opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+        split = self.service.handle_request({
+            "verb": "timeline.edit",
+            "project_id": opened["project_id"],
+            "read_set": self._timeline_read_set(opened["snapshot"]),
+            "command": {"type": "split", "clip_id": "clip-1", "at_s": 0.5},
+        })
+        right_id = json.loads(self.timeline.read_text(encoding="utf-8"))["clips"][1]["id"]
+        trimmed = self.service.handle_request({
+            "verb": "timeline.edit",
+            "project_id": opened["project_id"],
+            "read_set": self._timeline_read_set(split["snapshot"]),
+            "command": {"type": "trim", "clip_id": right_id, "edge": "start", "source_s": 0.6},
+        })
+        self.assertTrue(trimmed["ok"], trimmed)
+        self.assertEqual(
+            {"start_s": 0.65, "end_s": 0.8},
+            json.loads(self.plan.read_text(encoding="utf-8"))["cues"][0]["program_range"],
+        )
+
+        restored = self.service.handle_request({
+            "verb": "timeline.edit",
+            "project_id": opened["project_id"],
+            "read_set": self._timeline_read_set(trimmed["snapshot"]),
+            "command": {"type": "restore-bounds", "clip_id": right_id},
+        })
+        self.assertTrue(restored["ok"], restored)
+        timeline = json.loads(self.timeline.read_text(encoding="utf-8"))
+        self.assertEqual({"start_s": 0.5, "end_s": 1.0}, timeline["clips"][1]["source_range"])
+        self.assertEqual(1.0, timeline["program_duration_s"])
+        self.assertEqual(
+            {"start_s": 0.75, "end_s": 0.9},
+            json.loads(self.plan.read_text(encoding="utf-8"))["cues"][0]["program_range"],
+        )
+
+        undone = self.service.handle_request({
+            "verb": "timeline.edit",
+            "project_id": opened["project_id"],
+            "read_set": self._timeline_read_set(restored["snapshot"]),
+            "command": {"type": "set-range", "clip_id": right_id, "start_s": 0.6, "end_s": 1.0},
+        })
+        self.assertTrue(undone["ok"], undone)
+        timeline = json.loads(self.timeline.read_text(encoding="utf-8"))
+        self.assertEqual({"start_s": 0.6, "end_s": 1.0}, timeline["clips"][1]["source_range"])
+        self.assertEqual(0.9, timeline["program_duration_s"])
+        self.assertEqual(
+            {"start_s": 0.65, "end_s": 0.8},
+            json.loads(self.plan.read_text(encoding="utf-8"))["cues"][0]["program_range"],
+        )
+
     def test_timeline_trim_ripples_downstream_plan_cues_and_render_contributions(self):
         self._configure_cut_project()
         self.plan.write_text(json.dumps({
