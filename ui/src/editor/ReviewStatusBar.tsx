@@ -30,8 +30,9 @@ function operationLabel(kind: EditorOperationView['kind']) {
 
 export function ReviewStatusBar({ operation, store }: ReviewStatusBarProps) {
   const draft = useStore(store, (state) => state.getOperationDraft(operation.id))
-  const canSave = useStore(store, (state) => state.canSaveOperation(operation.id))
-  const save = useStore(store, (state) => state.saveOperationDraft)
+  const canSave = useStore(store, (state) => state.canSaveAllOperations())
+  const savingAll = useStore(store, (state) => state.exportBlockers().some((blocker) => blocker.state === 'saving'))
+  const save = useStore(store, (state) => state.saveAllOperationDrafts)
   const discard = useStore(store, (state) => state.discardOperationDraft)
   const previewStatus = reviewStatusText(operation, Boolean(draft?.conflict))
 
@@ -48,7 +49,7 @@ export function ReviewStatusBar({ operation, store }: ReviewStatusBarProps) {
         {draft?.error ? <span role="alert"> {draft.error}</span> : null}
       </output>
       <span className="review-revision">Revision {operation.revision}</span>
-      <button className="review-action-button review-action-button--primary" type="button" disabled={!canSave} onClick={() => save(operation.id)}>Save Changes</button>
+      <button className="review-action-button review-action-button--primary" type="button" disabled={!canSave} onClick={() => save()}>{savingAll ? 'Saving All…' : 'Save All'}</button>
       <button className="review-action-button" type="button" disabled={!draft || draft.pending} onClick={() => discard(operation.id)}>Discard changes</button>
     </section>
   )

@@ -100,7 +100,7 @@ test('select replaces the existing editor selection', () => {
   expect(store.getState().selection).toEqual({ kind: 'caption', id: 'caption-3' })
 })
 
-test('layer transform changes stay local until Save Changes submits the typed draft', async () => {
+test('layer transform changes stay local until the operation draft is saved', async () => {
   let submitted: ContentCardsDraftChange | undefined
   const transformedProject: EditorProjectView = {
     ...project,
@@ -204,6 +204,55 @@ test('one save preserves and submits edits for multiple cues in the same operati
   ])
   expect(store.getState().getOperationDraft('captions')).toBeNull()
   expect(store.getState().hasUnsavedChanges()).toBe(false)
+})
+
+test('Save All submits every dirty operation in canonical order and clears export blockers', async () => {
+  const projectWithMotion: EditorProjectView = {
+    ...project,
+    operations: [
+      ...project.operations!,
+      {
+        id: 'graphic-motion',
+        kind: 'graphic-motion',
+        revision: 5,
+        editable: true,
+        fields: { cues: [{ id: 'motion-001', enabled: true }] },
+        preview: {
+          status: 'current', revision: 5, reviewId: 'review-motion-r5',
+          snapshotEtag: 'snapshot-motion-r5', evidenceHashes: ['sha256:motion-preview-r5'],
+        },
+        approval: { status: 'none' },
+      },
+    ],
+  }
+  const calls: string[] = []
+  let authoritative = projectWithMotion
+  const store = createEditorStore({
+    project: projectWithMotion, activeTab: 'captions', selection: null, currentTimeS: 0,
+    isPlaying: false, timelineZoom: 1, snapEnabled: true, openMenu: null,
+  }, {
+    save: async (operationId) => {
+      calls.push(operationId)
+      authoritative = {
+        ...authoritative,
+        revision: authoritative.revision + 1,
+        operations: authoritative.operations?.map((operation) => operation.id === operationId
+          ? { ...operation, revision: operation.revision + 1 }
+          : operation),
+      }
+      return authoritative
+    },
+    review: async () => authoritative,
+  })
+  store.getState().editOperationDraft('graphic-motion', { cueId: 'motion-001', enabled: false })
+  store.getState().editOperationDraft('content-cards', { copy: 'Updated card' })
+  store.getState().editOperationDraft('captions', { cueId: 'cue-001', text: 'Updated caption' })
+
+  await store.getState().saveAllOperationDrafts()
+
+  expect(calls).toEqual(['captions', 'content-cards', 'graphic-motion'])
+  expect(store.getState().hasUnsavedChanges()).toBe(false)
+  expect(store.getState().exportBlockers()).toEqual([])
 })
 
 test('activity log records save lifecycle without draft content', async () => {

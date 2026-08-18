@@ -78,7 +78,7 @@ async function openEditor(projectRoot, openInBrowser) {
   }
   const armed = await owned.call('arm_launch')
   if (!armed.ok || typeof armed.url !== 'string') throw new Error(armed.error || 'could not arm editor launch')
-  if (openInBrowser) openBrowser(armed.url)
+  if (openInBrowser) await openBrowser(armed.url)
   return {
     pid: owned.child.pid,
     projectRoot,
@@ -94,7 +94,11 @@ function shouldOpenBrowser(value) {
 }
 
 function browserLaunchSpec(platform = process.platform) {
-  if (platform === 'win32') return { command: 'rundll32.exe', args: ['url.dll,FileProtocolHandler'], options: { detached: true, stdio: 'ignore', windowsHide: true } }
+  if (platform === 'win32') return {
+    command: 'powershell.exe',
+    args: ['-NoProfile', '-NonInteractive', '-Command', 'Start-Process -FilePath $args[0]'],
+    options: { detached: true, stdio: 'ignore', windowsHide: true },
+  }
   if (platform === 'darwin') return { command: 'open', args: [], options: { detached: true, stdio: 'ignore' } }
   return { command: 'xdg-open', args: [], options: { detached: true, stdio: 'ignore' } }
 }
@@ -102,8 +106,11 @@ function browserLaunchSpec(platform = process.platform) {
 function openBrowser(url, spawnProcess = spawn, platform = process.platform) {
   const { command, args, options } = browserLaunchSpec(platform)
   const child = spawnProcess(command, [...args, url], options)
-  child.once('error', () => {})
   child.unref()
+  return new Promise((resolve, reject) => {
+    child.once('spawn', resolve)
+    child.once('error', reject)
+  })
 }
 
 async function startSidecar(projectRoot) {
