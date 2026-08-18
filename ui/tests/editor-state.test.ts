@@ -360,7 +360,7 @@ test('layer transform drafts use value equality and reject out-of-range values',
 
   store.getState().editOperationDraft('captions', {
     cueId: 'cue-001',
-    transform: { x: 1.1, y: 0.5, scale: 1 },
+    transform: { x: 3.1, y: 0.5, scale: 1 },
   })
   expect(store.getState().getOperationDraft('captions')).toMatchObject({
     fields: { transform: { x: 0.5, y: 0.5, scale: 1 } },
@@ -1117,7 +1117,10 @@ test('runtime projection creates independent real card and motion lanes without 
     ['track-video', 'video'], ['track-audio', 'audio'], ['track-content-cards', 'card'], ['track-graphic-motion', 'graphic-motion'],
   ])
   expect(mapped.tracks[0].clips?.[0]).toMatchObject({ displayName: 'interview.mp4', trackId: 'track-video' })
-  expect(mapped.tracks[1].clips).toEqual([])
+  expect(mapped.tracks[1].clips).toEqual([expect.objectContaining({
+    id: 'clip-main:embedded-audio', linkedClipId: 'clip-main', linked: true, implicit: true,
+    trackId: 'track-audio', programRange: { startS: 0, endS: 12 },
+  })])
   expect(mapped.tracks[2].clips?.[0]).toMatchObject({ id: 'card-002', summary: 'Actual quote', programRange: { startS: 6, endS: 8 } })
   expect(mapped.tracks[3].clips?.[0]).toMatchObject({ id: 'motion-001', summary: 'Actual motion', programRange: { startS: 0, endS: 5 } })
   expect(JSON.stringify(mapped)).not.toContain('City Walk')
