@@ -345,7 +345,7 @@ test('timeline context menu keeps the playhead stable and supports keyboard navi
   await expect(page.getByLabel('Playhead time')).toHaveText(before ?? '')
   await expect(menu.getByRole('menuitem', { name: /Move playhead/ })).toBeFocused()
   await page.keyboard.press('End')
-  await expect(menu.getByRole('menuitem', { name: /snapping/ })).toBeFocused()
+  await expect(menu.getByRole('menuitem', { name: 'Add annotation' })).toBeFocused()
   await page.keyboard.press('Home')
   await page.keyboard.press('Enter')
   await expect(menu).toHaveCount(0)
@@ -359,7 +359,7 @@ test('timeline context menu keeps the playhead stable and supports keyboard navi
   await expect(canvas).toBeFocused()
 })
 
-test('timeline context menu clamps to the viewport and copies its context timecode', async ({ page }) => {
+test('timeline context menu clamps to the viewport and copies precise and frame timecodes', async ({ page }) => {
   await page.setViewportSize({ width: 1008, height: 444 })
   await page.goto('/?scenario=timeline-editing')
   await page.evaluate(() => {
@@ -377,7 +377,55 @@ test('timeline context menu clamps to the viewport and copies its context timeco
   expect(box!.x + box!.width).toBeLessThanOrEqual(1000)
   expect(box!.y + box!.height).toBeLessThanOrEqual(436)
   await menu.getByRole('menuitem', { name: 'Copy timecode' }).click()
+  await page.getByRole('menu', { name: 'Copy timecode' }).getByRole('menuitem', { name: /Precise/ }).click()
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.copiedTimecode)).toMatch(/^00:\d{2}\.\d{3}$/)
+
+  await canvas.click({ button: 'right', position: { x: 870, y: 310 } })
+  await page.getByRole('menu', { name: 'Timeline' }).getByRole('menuitem', { name: 'Copy timecode' }).click()
+  await page.getByRole('menu', { name: 'Copy timecode' }).getByRole('menuitem', { name: /Frames/ }).click()
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.copiedTimecode)).toMatch(/^\d{2}:\d{2}:\d{2}:\d{2}$/)
+})
+
+test('timeline blank-area menu splits the selected clip at its context position', async ({ page }) => {
+  await page.setViewportSize({ width: 1008, height: 444 })
+  await page.goto('/?scenario=timeline-editing')
+
+  await page.locator('[data-timeline-clip="edit-video-1"]').click()
+  const canvas = page.locator('[data-timeline-surface]')
+  await canvas.click({ button: 'right', position: { x: timeToPx(4, 20, 876), y: 300 } })
+
+  const split = page.getByRole('menu', { name: 'Timeline' }).getByRole('menuitem', { name: /Split selected clip at/ })
+  await expect(split).toBeEnabled()
+  await split.click()
+  await expect(page.locator('.timeline-clip--video')).toHaveCount(3)
+})
+
+test('timeline ruler sets a visible work area and adds a review note', async ({ page }) => {
+  await page.setViewportSize({ width: 1008, height: 444 })
+  await page.goto('/?scenario=timeline-editing')
+
+  const ruler = page.locator('.timeline-ruler')
+  await ruler.click({ button: 'right', position: { x: timeToPx(3, 20, 876), y: 12 } })
+  await page.getByRole('menu', { name: 'Timeline' }).getByRole('menuitem', { name: 'Work area' }).click()
+  await page.getByRole('menu', { name: 'Work area' }).getByRole('menuitem', { name: /Set In/ }).click()
+
+  await ruler.click({ button: 'right', position: { x: timeToPx(14, 20, 876), y: 12 } })
+  await page.getByRole('menu', { name: 'Timeline' }).getByRole('menuitem', { name: 'Work area' }).click()
+  await page.getByRole('menu', { name: 'Work area' }).getByRole('menuitem', { name: /Set Out/ }).click()
+  await expect(page.locator('[data-timeline-workspace]')).toHaveAttribute('aria-label', 'Work area 00:03.000 to 00:14.000')
+
+  await ruler.click({ button: 'right', position: { x: timeToPx(9, 20, 876), y: 12 } })
+  await page.getByRole('menu', { name: 'Timeline' }).getByRole('menuitem', { name: 'Add annotation' }).click()
+  await page.getByRole('menu', { name: 'Add annotation' }).getByRole('menuitem', { name: 'Add review note' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Add timeline annotation' })
+  await expect(dialog.getByRole('button', { name: 'Review note', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await dialog.getByLabel('Label').fill('Check the pacing here')
+  await dialog.getByRole('button', { name: 'Add review note' }).click()
+
+  const note = page.locator('[data-timeline-marker]').first()
+  await expect(note).toHaveAttribute('aria-label', 'Review note Check the pacing here at 00:09.000')
+  await note.click()
+  await expect(page.getByLabel('Playhead time')).toHaveText('00:09')
 })
 
 test('video clip context menu uses the hit time for split and exposes range submenu', async ({ page }) => {

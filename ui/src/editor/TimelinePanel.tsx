@@ -9,6 +9,7 @@ import {
 } from 'react'
 import {
   ArrowUpDown,
+  Flag,
   Copy,
   Eye,
   Gauge,
@@ -19,6 +20,7 @@ import {
   Link2Off,
   LocateFixed,
   Magnet,
+  MessageSquare,
   MousePointer2,
   Plus,
   Play,
@@ -129,6 +131,19 @@ function formatPreciseTime(timeS: number) {
   const seconds = wholeSeconds % 60
   const milliseconds = totalMilliseconds % 1000
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}`
+}
+
+function formatFrameTime(timeS: number, fps?: RationalFps) {
+  const framesPerSecond = fps && fps.numerator > 0 && fps.denominator > 0
+    ? fps.numerator / fps.denominator
+    : 30
+  const totalFrames = Math.max(0, Math.round(timeS * framesPerSecond))
+  const frames = totalFrames % Math.max(1, Math.round(framesPerSecond))
+  const totalSeconds = Math.floor(totalFrames / Math.max(1, Math.round(framesPerSecond)))
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}:${String(frames).padStart(2, '0')}`
 }
 
 function rulerLabelInterval(durationS: number, widthPx: number) {
@@ -308,10 +323,15 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
   const selection = useStore(store, (state) => state.selection)
   const timelineZoom = useStore(store, (state) => state.timelineZoom)
   const snapEnabled = useStore(store, (state) => state.snapEnabled)
+  const timelineWorkspace = useStore(store, (state) => state.timelineWorkspace)
+  const timelineMarkers = useStore(store, (state) => state.timelineMarkers)
   const seek = useStore(store, (state) => state.seek)
   const select = useStore(store, (state) => state.select)
   const setTimelineZoom = useStore(store, (state) => state.setTimelineZoom)
   const setSnapEnabled = useStore(store, (state) => state.setSnapEnabled)
+  const setTimelineWorkspaceBoundary = useStore(store, (state) => state.setTimelineWorkspaceBoundary)
+  const clearTimelineWorkspace = useStore(store, (state) => state.clearTimelineWorkspace)
+  const addTimelineMarker = useStore(store, (state) => state.addTimelineMarker)
   const editTimeline = useStore(store, (state) => state.editTimeline)
   const playRange = useStore(store, (state) => state.playRange)
   const undoTimeline = useStore(store, (state) => state.undoTimeline)
@@ -350,6 +370,11 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
     view: 'source' | 'review'
   }>>(null)
   const [deleteNotice, setDeleteNotice] = useState<string | null>(null)
+  const [markerDialog, setMarkerDialog] = useState<null | Readonly<{
+    kind: 'marker' | 'review-note'
+    timeS: number
+  }>>(null)
+  const [markerLabel, setMarkerLabel] = useState('')
   const presentedProject = trimPreview?.project ?? project
   const durationS = project?.durationS ?? 0
   if (viewDurationRef.current <= 0 && durationS > 0) viewDurationRef.current = durationS
@@ -574,12 +599,28 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
     event.preventDefault()
     if ((event.target as HTMLElement).closest('[data-timeline-clip], .timeline-track-header')) return
     const contextTimeS = timeS ?? contextTimeFromClientX(event.clientX)
+    const editable = timelineEditable && !timelinePending
+    const canSplitSelected = Boolean(
+      editable && project && selectedVideo && canSplitClip(project, selectedVideo.id, contextTimeS),
+    )
+    const copy = (value: string) => { void navigator.clipboard.writeText(value) }
+    const openMarkerDialog = (kind: 'marker' | 'review-note') => {
+      setMarkerLabel('')
+      setMarkerDialog({ kind, timeS: contextTimeS })
+    }
     setContextMenu({
       x: event.clientX,
       y: event.clientY,
       title: 'Timeline',
       subtitle: formatPreciseTime(contextTimeS),
       actions: [
+        {
+          id: 'split-selected-at-context',
+          label: `Split selected clip at ${formatPreciseTime(contextTimeS)}`,
+          icon: Scissors,
+          disabled: !canSplitSelected,
+          onSelect: () => selectedVideo && void editTimeline({ type: 'split', clipId: selectedVideo.id, atS: contextTimeS }),
+        },
         {
           id: 'move-playhead',
           label: `Move playhead to ${formatPreciseTime(contextTimeS)}`,
@@ -590,7 +631,18 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
           id: 'copy-timecode',
           label: 'Copy timecode',
           icon: Copy,
-          onSelect: () => { void navigator.clipboard.writeText(formatPreciseTime(contextTimeS)) },
+          submenu: [
+            {
+              id: 'copy-precise-timecode',
+              label: `Precise ${formatPreciseTime(contextTimeS)}`,
+              onSelect: () => copy(formatPreciseTime(contextTimeS)),
+            },
+            {
+              id: 'copy-frame-timecode',
+              label: `Frames ${formatFrameTime(contextTimeS, project?.fps)}`,
+              onSelect: () => copy(formatFrameTime(contextTimeS, project?.fps)),
+            },
+          ],
         },
         {
           id: 'zoom-here',
@@ -611,6 +663,52 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
           label: `${snapEnabled ? 'Disable' : 'Enable'} snapping`,
           icon: Magnet,
           onSelect: () => setSnapEnabled(!snapEnabled),
+        },
+        {
+          id: 'work-area',
+          label: 'Work area',
+          icon: Ruler,
+          separatorBefore: true,
+          submenu: [
+            {
+              id: 'set-work-area-in',
+              label: `Set In to ${formatPreciseTime(contextTimeS)}`,
+              icon: Flag,
+              onSelect: () => setTimelineWorkspaceBoundary('in', contextTimeS),
+            },
+            {
+              id: 'set-work-area-out',
+              label: `Set Out to ${formatPreciseTime(contextTimeS)}`,
+              icon: Flag,
+              onSelect: () => setTimelineWorkspaceBoundary('out', contextTimeS),
+            },
+            {
+              id: 'clear-work-area',
+              label: 'Clear work area',
+              icon: RotateCcw,
+              disabled: timelineWorkspace.inS === undefined && timelineWorkspace.outS === undefined,
+              onSelect: clearTimelineWorkspace,
+            },
+          ],
+        },
+        {
+          id: 'add-annotation',
+          label: 'Add annotation',
+          icon: Flag,
+          submenu: [
+            {
+              id: 'add-marker',
+              label: 'Add marker',
+              icon: Flag,
+              onSelect: () => openMarkerDialog('marker'),
+            },
+            {
+              id: 'add-review-note',
+              label: 'Add review note',
+              icon: MessageSquare,
+              onSelect: () => openMarkerDialog('review-note'),
+            },
+          ],
         },
       ],
     })
@@ -1013,6 +1111,9 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
       label: major ? formatRulerTime(second) : null,
     }
   })
+  const hasTimelineWorkspace = timelineWorkspace.inS !== undefined || timelineWorkspace.outS !== undefined
+  const workspaceStartS = timelineWorkspace.inS ?? 0
+  const workspaceEndS = timelineWorkspace.outS ?? viewDurationS
 
   return (
     <section className={`timeline-panel${hasMedia ? '' : ' timeline-panel--empty'}`} role="region" aria-label="Timeline">
@@ -1048,6 +1149,21 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
             <div className="timeline-ruler-gutter" />
             <div className="timeline-ruler-scroll" ref={rulerScrollRef} onContextMenu={openTimelineContextMenu}>
               <div className="timeline-ruler" style={{ width: `${contentWidth}px` }}>
+                {hasTimelineWorkspace ? (
+                  <div
+                    className="timeline-workspace-range"
+                    data-timeline-workspace
+                    role="img"
+                    aria-label={`Work area ${formatPreciseTime(workspaceStartS)} to ${formatPreciseTime(workspaceEndS)}`}
+                    style={{
+                      left: `${timeToPx(workspaceStartS, viewDurationS, viewWidthPx, timelineZoom)}px`,
+                      width: `${timeToPx(workspaceEndS - workspaceStartS, viewDurationS, viewWidthPx, timelineZoom)}px`,
+                    }}
+                  >
+                    {timelineWorkspace.inS !== undefined ? <span className="timeline-workspace-boundary timeline-workspace-boundary--in" aria-hidden /> : null}
+                    {timelineWorkspace.outS !== undefined ? <span className="timeline-workspace-boundary timeline-workspace-boundary--out" aria-hidden /> : null}
+                  </div>
+                ) : null}
                 {rulerTicks.map((tick) => (
                   <i
                     key={tick.second}
@@ -1057,6 +1173,23 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
                   >
                     {tick.label && <span>{tick.label}</span>}
                   </i>
+                ))}
+                {timelineMarkers.map((marker) => (
+                  <button
+                    key={marker.id}
+                    type="button"
+                    className={`timeline-marker timeline-marker--${marker.kind}`}
+                    data-timeline-marker={marker.id}
+                    aria-label={`${marker.kind === 'marker' ? 'Marker' : 'Review note'} ${marker.label} at ${formatPreciseTime(marker.timeS)}`}
+                    title={`${marker.label} · ${formatPreciseTime(marker.timeS)}`}
+                    style={{
+                      left: `${timeToPx(marker.timeS, viewDurationS, viewWidthPx, timelineZoom)}px`,
+                      transform: marker.timeS <= 0 ? 'none' : marker.timeS >= viewDurationS ? 'translateX(-100%)' : 'translateX(-50%)',
+                    }}
+                    onClick={() => seek(marker.timeS)}
+                  >
+                    {marker.kind === 'marker' ? <Flag aria-hidden size={11} /> : <MessageSquare aria-hidden size={11} />}
+                  </button>
                 ))}
               </div>
             </div>
@@ -1182,6 +1315,40 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
               )}
               {Object.entries(cueInfo.clip.metadata ?? {}).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
             </dl>
+          </section>
+        </div>
+      ) : null}
+      {markerDialog ? (
+        <div className="timeline-dialog-backdrop" role="presentation" onMouseDown={() => setMarkerDialog(null)}>
+          <section className="timeline-clip-info-dialog timeline-marker-dialog" role="dialog" aria-modal="true" aria-labelledby="timeline-marker-title" onMouseDown={(event) => event.stopPropagation()}>
+            <header>
+              <h2 id="timeline-marker-title">Add timeline annotation</h2>
+              <button type="button" aria-label="Close timeline annotation" onClick={() => setMarkerDialog(null)}>×</button>
+            </header>
+            <form onSubmit={(event) => {
+              event.preventDefault()
+              addTimelineMarker(markerDialog.kind, markerDialog.timeS, markerLabel)
+              setMarkerDialog(null)
+            }}>
+              <div className="timeline-marker-kind" role="group" aria-label="Annotation type">
+                <button type="button" className={markerDialog.kind === 'marker' ? 'is-active' : ''} aria-pressed={markerDialog.kind === 'marker'} onClick={() => setMarkerDialog({ ...markerDialog, kind: 'marker' })}><Flag aria-hidden size={14} />Marker</button>
+                <button type="button" className={markerDialog.kind === 'review-note' ? 'is-active' : ''} aria-pressed={markerDialog.kind === 'review-note'} onClick={() => setMarkerDialog({ ...markerDialog, kind: 'review-note' })}><MessageSquare aria-hidden size={14} />Review note</button>
+              </div>
+              <label htmlFor="timeline-marker-label">Label</label>
+              <input
+                id="timeline-marker-label"
+                autoFocus
+                maxLength={160}
+                value={markerLabel}
+                placeholder={markerDialog.kind === 'marker' ? 'Marker' : 'Review note'}
+                onChange={(event) => setMarkerLabel(event.currentTarget.value)}
+              />
+              <p className="timeline-marker-time">{formatPreciseTime(markerDialog.timeS)} · {formatFrameTime(markerDialog.timeS, project?.fps)}</p>
+              <footer>
+                <button type="button" onClick={() => setMarkerDialog(null)}>Cancel</button>
+                <button type="submit">Add {markerDialog.kind === 'marker' ? 'marker' : 'review note'}</button>
+              </footer>
+            </form>
           </section>
         </div>
       ) : null}

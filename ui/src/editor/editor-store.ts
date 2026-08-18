@@ -54,6 +54,18 @@ export type PlaybackRange = Readonly<{
   requestId: number
 }>
 
+export type TimelineWorkspace = Readonly<{
+  inS?: number
+  outS?: number
+}>
+
+export type TimelineMarker = Readonly<{
+  id: string
+  timeS: number
+  kind: 'marker' | 'review-note'
+  label: string
+}>
+
 function timelineCommandMessage(command: TimelineEditCommand) {
   if (command.type === 'split') return 'Clip split'
   if (command.type === 'delete') return 'Clip deleted'
@@ -275,6 +287,8 @@ export type EditorState = {
   currentTimeS: number
   isPlaying: boolean
   playbackRange: PlaybackRange | null
+  timelineWorkspace: TimelineWorkspace
+  timelineMarkers: readonly TimelineMarker[]
   timelineZoom: number
   snapEnabled: boolean
   openMenu: MenuId
@@ -289,6 +303,9 @@ export type EditorState = {
   setPlaying: (isPlaying: boolean) => void
   playRange: (startS: number, endS: number) => void
   clearPlaybackRange: () => void
+  setTimelineWorkspaceBoundary: (edge: 'in' | 'out', timeS: number) => void
+  clearTimelineWorkspace: () => void
+  addTimelineMarker: (kind: TimelineMarker['kind'], timeS: number, label: string) => void
   select: (selection: EditorSelection) => void
   setActiveTab: (tab: LibraryTab) => void
   setTimelineZoom: (zoom: number) => void
@@ -329,6 +346,9 @@ export type EditorInitialState = Omit<
   | 'setPlaying'
   | 'playRange'
   | 'clearPlaybackRange'
+  | 'setTimelineWorkspaceBoundary'
+  | 'clearTimelineWorkspace'
+  | 'addTimelineMarker'
   | 'select'
   | 'setActiveTab'
   | 'setTimelineZoom'
@@ -356,11 +376,14 @@ export type EditorInitialState = Omit<
   | 'timelineFuture'
   | 'timelinePending'
   | 'timelineError'
+  | 'timelineWorkspace'
+  | 'timelineMarkers'
 >
 
 export function createEditorStore(initialState: EditorInitialState, runtime?: EditorRuntimeAdapter) {
   let nextActivityId = 1
   let nextPlaybackRequestId = 1
+  let nextTimelineMarkerId = 1
   return createStore<EditorState>()((set, get) => ({
     ...initialState,
     operationDrafts: {},
@@ -369,6 +392,8 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
     timelineFuture: [],
     timelinePending: false,
     playbackRange: null,
+    timelineWorkspace: {},
+    timelineMarkers: [],
     addActivity: (entry) => set((state) => ({
       activityLog: [...state.activityLog, {
         ...entry,
@@ -410,6 +435,35 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
       })
     },
     clearPlaybackRange: () => set({ playbackRange: null }),
+    setTimelineWorkspaceBoundary: (edge, timeS) => {
+      const state = get()
+      const durationS = state.project?.durationS ?? 0
+      const fps = state.project?.fps
+      const frameDurationS = fps && fps.numerator > 0 && fps.denominator > 0
+        ? fps.denominator / fps.numerator
+        : 1 / 30
+      const snapped = Math.min(Math.max(Math.round(timeS / frameDurationS) * frameDurationS, 0), durationS)
+      const workspace = { ...state.timelineWorkspace, [`${edge}S`]: snapped }
+      if (edge === 'in' && workspace.outS !== undefined && workspace.outS <= snapped) delete workspace.outS
+      if (edge === 'out' && workspace.inS !== undefined && workspace.inS >= snapped) delete workspace.inS
+      set({ timelineWorkspace: workspace })
+    },
+    clearTimelineWorkspace: () => set({ timelineWorkspace: {} }),
+    addTimelineMarker: (kind, timeS, label) => {
+      const state = get()
+      const durationS = state.project?.durationS ?? 0
+      const fps = state.project?.fps
+      const frameDurationS = fps && fps.numerator > 0 && fps.denominator > 0
+        ? fps.denominator / fps.numerator
+        : 1 / 30
+      const marker: TimelineMarker = {
+        id: `timeline-${kind}-${nextTimelineMarkerId++}`,
+        timeS: Math.min(Math.max(Math.round(timeS / frameDurationS) * frameDurationS, 0), durationS),
+        kind,
+        label: label.trim() || (kind === 'marker' ? 'Marker' : 'Review note'),
+      }
+      set({ timelineMarkers: [...state.timelineMarkers, marker] })
+    },
     select: (selection) => set({ selection }),
     setActiveTab: (activeTab) => set({ activeTab }),
     setTimelineZoom: (zoom) => {

@@ -91,6 +91,25 @@ test('seek normalizes a non-finite time to zero', () => {
   expect(store.getState().currentTimeS).toBe(0)
 })
 
+test('timeline work area and annotations snap to project frames', () => {
+  const store = createStateStore()
+
+  store.getState().setTimelineWorkspaceBoundary('in', 1.018)
+  store.getState().setTimelineWorkspaceBoundary('out', 4.014)
+  store.getState().addTimelineMarker('marker', 2.018, '  First review beat  ')
+  store.getState().addTimelineMarker('review-note', 3.014, '')
+
+  expect(store.getState().timelineWorkspace.inS).toBeCloseTo(31 / 30)
+  expect(store.getState().timelineWorkspace.outS).toBeCloseTo(4)
+  expect(store.getState().timelineMarkers).toEqual([
+    { id: 'timeline-marker-1', timeS: 61 / 30, kind: 'marker', label: 'First review beat' },
+    { id: 'timeline-review-note-2', timeS: 3, kind: 'review-note', label: 'Review note' },
+  ])
+
+  store.getState().clearTimelineWorkspace()
+  expect(store.getState().timelineWorkspace).toEqual({})
+})
+
 test('select replaces the existing editor selection', () => {
   const store = createStateStore()
 
