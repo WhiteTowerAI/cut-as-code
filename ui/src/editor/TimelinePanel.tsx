@@ -15,6 +15,8 @@ import {
   Info,
   FileText,
   Lock,
+  Link,
+  Link2Off,
   LocateFixed,
   Magnet,
   MousePointer2,
@@ -29,6 +31,7 @@ import {
   Trash2,
   Undo2,
   VolumeX,
+  Volume2,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react'
@@ -41,7 +44,9 @@ import {
   applyTimelineEdit,
   canSplitClip,
   trimSourceBounds,
+  trimAudioSourceAtProgramDelta,
   trimSourceAtProgramDelta,
+  moveAudioStartAtProgramDelta,
   type TimelineTrimEdge,
 } from './timeline-edit'
 
@@ -184,6 +189,7 @@ function Clip({
   editable,
   trimming,
   onTrimStart,
+  onAudioMoveStart,
   onContextMenu,
 }: {
   track: TrackView
@@ -196,7 +202,8 @@ function Clip({
   select: (selection: EditorSelection) => void
   editable: boolean
   trimming: TimelineTrimEdge | null
-  onTrimStart: (event: PointerEvent<HTMLButtonElement>, clip: ClipView, edge: TimelineTrimEdge) => void
+  onTrimStart: (event: PointerEvent<HTMLButtonElement>, clip: ClipView, edge: TimelineTrimEdge, kind?: 'video' | 'audio') => void
+  onAudioMoveStart: (event: PointerEvent<HTMLButtonElement>, clip: ClipView) => void
   onContextMenu: (event: ReactMouseEvent<HTMLButtonElement>, track: TrackView, clip: ClipView) => void
 }) {
   const kind = track.kind
@@ -224,9 +231,13 @@ function Clip({
         type="button"
         className={`timeline-clip timeline-clip--${kind}`}
         data-timeline-clip={id}
+        {...(kind === 'audio' && !clip.implicit ? { 'data-linked': String(Boolean(clip.linked)) } : {})}
         aria-label={`${track.name} ${kind === 'video' || kind === 'audio' ? 'clip' : 'cue'}`}
         aria-pressed={selected}
         onPointerDown={() => select({ kind, id })}
+        onPointerDownCapture={(event) => {
+          if (kind === 'audio' && !clip.implicit && !clip.linked && event.button === 0) onAudioMoveStart(event, clip)
+        }}
         onContextMenu={(event) => onContextMenu(event, track, clip)}
       >
         {(kind === 'caption' || kind === 'card' || kind === 'graphic-motion') && (
@@ -256,6 +267,28 @@ function Clip({
             onPointerDown={(event) => onTrimStart(event, clip, 'end')}
           ><span aria-hidden /></button>
         </>
+      )}
+      {kind === 'audio' && selected && editable && !clip.implicit && !clip.linked && (
+        <>
+          <button
+            type="button"
+            className="timeline-trim-handle timeline-trim-handle--start"
+            aria-label="Trim audio start"
+            onPointerDown={(event) => onTrimStart(event, clip, 'start', 'audio')}
+          ><span aria-hidden /></button>
+          <button
+            type="button"
+            className="timeline-trim-handle timeline-trim-handle--end"
+            aria-label="Trim audio end"
+            onPointerDown={(event) => onTrimStart(event, clip, 'end', 'audio')}
+          ><span aria-hidden /></button>
+        </>
+      )}
+      {kind === 'audio' && !clip.implicit && (
+        <span className="timeline-audio-state" aria-hidden>
+          {clip.linked ? <Link size={12} /> : <Link2Off size={12} />}
+          {clip.muted ? <VolumeX size={12} /> : null}
+        </span>
       )}
       {kind === 'video' && trimming && (
         <output className={`timeline-trim-readout timeline-trim-readout--${trimming}`} aria-live="polite">
@@ -291,6 +324,7 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
   const gutterRef = useRef<HTMLDivElement>(null)
   const rulerScrollRef = useRef<HTMLDivElement>(null)
   const trimSourceRef = useRef<number | null>(null)
+  const audioMoveStartRef = useRef<number | null>(null)
   const [runtimeTimelineWidthPx, setRuntimeTimelineWidthPx] = useState(TIMELINE_WIDTH_PX)
   const viewDurationRef = useRef(project?.durationS ?? 0)
   const [trimDrag, setTrimDrag] = useState<null | Readonly<{
@@ -299,6 +333,13 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
     edge: TimelineTrimEdge
     startClientX: number
     sourceS: number
+    kind: 'video' | 'audio'
+  }>>(null)
+  const [audioMoveDrag, setAudioMoveDrag] = useState<null | Readonly<{
+    pointerId: number
+    clipId: string
+    startClientX: number
+    startS: number
   }>>(null)
   const [trimPreview, setTrimPreview] = useState<null | Readonly<{ project: NonNullable<typeof project>; sourceS: number }>>(null)
   const [contextMenu, setContextMenu] = useState<Omit<TimelineContextMenuModel, 'onClose'> | null>(null)
@@ -388,13 +429,15 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
     const handlePointerMove = (event: globalThis.PointerEvent) => {
       if (event.pointerId !== trimDrag.pointerId) return
       const deltaProgramS = (event.clientX - trimDrag.startClientX) / (viewWidthPx * timelineZoom) * viewDurationS
-      const sourceS = trimSourceAtProgramDelta(project, trimDrag.clipId, trimDrag.edge, deltaProgramS)
+      const sourceS = trimDrag.kind === 'audio'
+        ? trimAudioSourceAtProgramDelta(project, trimDrag.clipId, trimDrag.edge, deltaProgramS)
+        : trimSourceAtProgramDelta(project, trimDrag.clipId, trimDrag.edge, deltaProgramS)
       if (sourceS === null) return
       trimSourceRef.current = sourceS
       try {
-        const preview = applyTimelineEdit(project, {
-          type: 'trim', clipId: trimDrag.clipId, edge: trimDrag.edge, sourceS,
-        }).project
+        const preview = applyTimelineEdit(project, trimDrag.kind === 'audio'
+          ? { type: 'trim-audio', audioClipId: trimDrag.clipId, edge: trimDrag.edge, sourceS }
+          : { type: 'trim', clipId: trimDrag.clipId, edge: trimDrag.edge, sourceS }).project
         setTrimPreview({ project: preview, sourceS })
       } catch {
         setTrimPreview(null)
@@ -407,7 +450,9 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
       setTrimDrag(null)
       setTrimPreview(null)
       if (Math.abs(sourceS - trimDrag.sourceS) > 1e-7) {
-        void editTimeline({ type: 'trim', clipId: trimDrag.clipId, edge: trimDrag.edge, sourceS })
+        void editTimeline(trimDrag.kind === 'audio'
+          ? { type: 'trim-audio', audioClipId: trimDrag.clipId, edge: trimDrag.edge, sourceS }
+          : { type: 'trim', clipId: trimDrag.clipId, edge: trimDrag.edge, sourceS })
       }
     }
     const handlePointerCancel = (event: globalThis.PointerEvent) => {
@@ -426,14 +471,67 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
     }
   }, [editTimeline, project, timelineZoom, trimDrag, viewDurationS, viewWidthPx])
 
-  function startTrim(event: PointerEvent<HTMLButtonElement>, clip: ClipView, edge: TimelineTrimEdge) {
+  useEffect(() => {
+    if (!audioMoveDrag || !project) return
+    const handlePointerMove = (event: globalThis.PointerEvent) => {
+      if (event.pointerId !== audioMoveDrag.pointerId) return
+      const deltaProgramS = (event.clientX - audioMoveDrag.startClientX) / (viewWidthPx * timelineZoom) * viewDurationS
+      const startS = moveAudioStartAtProgramDelta(project, audioMoveDrag.clipId, deltaProgramS)
+      if (startS === null) return
+      audioMoveStartRef.current = startS
+      try {
+        setTrimPreview({ project: applyTimelineEdit(project, {
+          type: 'move-audio', audioClipId: audioMoveDrag.clipId, startS,
+        }).project, sourceS: startS })
+      } catch {
+        setTrimPreview(null)
+      }
+    }
+    const finish = (event: globalThis.PointerEvent, commit: boolean) => {
+      if (event.pointerId !== audioMoveDrag.pointerId) return
+      const startS = audioMoveStartRef.current ?? audioMoveDrag.startS
+      audioMoveStartRef.current = null
+      setAudioMoveDrag(null)
+      setTrimPreview(null)
+      if (commit && Math.abs(startS - audioMoveDrag.startS) > 1e-7) {
+        void editTimeline({ type: 'move-audio', audioClipId: audioMoveDrag.clipId, startS })
+      }
+    }
+    const handlePointerUp = (event: globalThis.PointerEvent) => finish(event, true)
+    const handlePointerCancel = (event: globalThis.PointerEvent) => finish(event, false)
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp)
+    window.addEventListener('pointercancel', handlePointerCancel)
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+      window.removeEventListener('pointercancel', handlePointerCancel)
+    }
+  }, [audioMoveDrag, editTimeline, project, timelineZoom, viewDurationS, viewWidthPx])
+
+  function startTrim(event: PointerEvent<HTMLButtonElement>, clip: ClipView, edge: TimelineTrimEdge, kind: 'video' | 'audio' = 'video') {
     event.preventDefault()
     event.stopPropagation()
     if (!timelineEditable || timelinePending) return
     const sourceS = edge === 'start' ? clip.sourceRange.startS : clip.sourceRange.endS
     trimSourceRef.current = sourceS
-    setTrimDrag({ pointerId: event.pointerId, clipId: clip.id, edge, startClientX: event.clientX, sourceS })
+    setTrimDrag({ pointerId: event.pointerId, clipId: clip.id, edge, startClientX: event.clientX, sourceS, kind })
     setTrimPreview({ project: project!, sourceS })
+  }
+
+  function startAudioMove(event: PointerEvent<HTMLButtonElement>, clip: ClipView) {
+    event.preventDefault()
+    event.stopPropagation()
+    if (!timelineEditable || timelinePending || clip.implicit || clip.linked) return
+    audioMoveStartRef.current = clip.programRange.startS
+    select({ kind: 'audio', id: clip.id })
+    setAudioMoveDrag({
+      pointerId: event.pointerId,
+      clipId: clip.id,
+      startClientX: event.clientX,
+      startS: clip.programRange.startS,
+    })
+    setTrimPreview({ project: project!, sourceS: clip.programRange.startS })
   }
 
   function seekFromPointer(event: PointerEvent<HTMLDivElement>) {
@@ -544,6 +642,10 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
       openCueContextMenu(event, track, clip)
       return
     }
+    if (track.kind === 'audio') {
+      openAudioContextMenu(event, clip, contextTimeS, sourceTimeS)
+      return
+    }
     const startBounds = project ? trimSourceBounds(project, clip.id, 'start') : null
     const endBounds = project ? trimSourceBounds(project, clip.id, 'end') : null
     const canRestore = Boolean(startBounds && endBounds && (
@@ -551,6 +653,8 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
       || Math.abs(clip.sourceRange.endS - endBounds.maximum) > 1e-7
     ))
     const editable = track.kind === 'video' && timelineEditable && !timelinePending
+    const associatedAudio = project?.tracks.find((candidate) => candidate.kind === 'audio')?.clips
+      ?.find((candidate) => candidate.linkedClipId === clip.id && !candidate.implicit)
     const programDurationS = clip.programRange.endS - clip.programRange.startS
     const copy = (value: string) => { void navigator.clipboard.writeText(value) }
     setContextMenu({
@@ -587,6 +691,46 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
           disabled: !editable || !canRestore,
           onSelect: () => { void editTimeline({ type: 'restore-bounds', clipId: clip.id }) },
         },
+        ...(clip.audioMode === 'detached' ? [
+          {
+            id: 'locate-audio',
+            label: 'Locate associated audio',
+            icon: LocateFixed,
+            disabled: !associatedAudio,
+            onSelect: () => associatedAudio && select({ kind: 'audio', id: associatedAudio.id }),
+          },
+          {
+            id: 'unlink-audio',
+            label: associatedAudio?.linked ? 'Unlink audio and video' : 'Relink audio and video',
+            icon: associatedAudio?.linked ? Link2Off : Link,
+            disabled: !editable || !associatedAudio,
+            onSelect: () => associatedAudio && void editTimeline(associatedAudio.linked
+              ? { type: 'unlink-audio', audioClipId: associatedAudio.id }
+              : { type: 'link-audio', audioClipId: associatedAudio.id }),
+          },
+          {
+            id: 'attach-audio',
+            label: 'Attach audio back to video',
+            icon: Link,
+            disabled: !editable || !associatedAudio?.linked,
+            onSelect: () => { void editTimeline({ type: 'attach-audio', clipId: clip.id }) },
+          },
+        ] : [
+          {
+            id: 'detach-audio',
+            label: 'Detach audio',
+            icon: Link2Off,
+            disabled: !editable,
+            onSelect: () => { void editTimeline({ type: 'detach-audio', clipId: clip.id }) },
+          },
+          {
+            id: 'mute-video-audio',
+            label: clip.audioMode === 'muted' ? 'Unmute original audio' : 'Mute original audio',
+            icon: clip.audioMode === 'muted' ? Volume2 : VolumeX,
+            disabled: !editable,
+            onSelect: () => { void editTimeline({ type: 'mute-video-audio', clipId: clip.id, muted: clip.audioMode !== 'muted' }) },
+          },
+        ]),
         {
           id: 'move-playhead',
           label: `Move playhead to ${formatPreciseTime(contextTimeS)}`,
@@ -639,6 +783,112 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
             })
           },
         },
+      ],
+    })
+  }
+
+  function openAudioContextMenu(
+    event: ReactMouseEvent<HTMLButtonElement>,
+    clip: ClipView,
+    contextTimeS: number,
+    sourceTimeS: number,
+  ) {
+    const video = project?.tracks.find((track) => track.kind === 'video')?.clips
+      ?.find((candidate) => candidate.id === clip.linkedClipId)
+    const editable = timelineEditable && !timelinePending
+    const detached = !clip.implicit
+    const canEditIndependently = detached && !clip.linked && editable
+    const copy = (value: string) => { void navigator.clipboard.writeText(value) }
+    const programDurationS = clip.programRange.endS - clip.programRange.startS
+    const startTrimEnabled = canEditIndependently && sourceTimeS < clip.sourceRange.endS - 1e-7
+    const endTrimEnabled = canEditIndependently && sourceTimeS > clip.sourceRange.startS + 1e-7
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      title: clip.displayName || 'Audio',
+      subtitle: `${formatPreciseTime(clip.programRange.startS)} – ${formatPreciseTime(clip.programRange.endS)}`,
+      actions: [
+        {
+          id: 'select-video',
+          label: 'Select associated video clip',
+          icon: LocateFixed,
+          disabled: !video,
+          onSelect: () => video && select({ kind: 'video', id: video.id }),
+        },
+        {
+          id: 'go-to-audio-start',
+          label: 'Go to clip start',
+          icon: LocateFixed,
+          onSelect: () => seek(clip.programRange.startS),
+        },
+        ...(clip.implicit ? [{
+          id: 'detach-audio',
+          label: 'Detach audio',
+          icon: Link2Off,
+          disabled: !editable || !video,
+          onSelect: () => video && void editTimeline({ type: 'detach-audio', clipId: video.id }),
+        }] : [{
+          id: 'toggle-link',
+          label: clip.linked ? 'Unlink audio and video' : 'Relink audio to video',
+          icon: clip.linked ? Link2Off : Link,
+          disabled: !editable || !video,
+          onSelect: () => { void editTimeline(clip.linked
+            ? { type: 'unlink-audio', audioClipId: clip.id }
+            : { type: 'link-audio', audioClipId: clip.id }) },
+        }]),
+        ...(canEditIndependently ? [
+          {
+            id: 'trim-audio-in',
+            label: 'Trim audio in point to here',
+            icon: LocateFixed,
+            disabled: !startTrimEnabled,
+            onSelect: () => { void editTimeline({ type: 'trim-audio', audioClipId: clip.id, edge: 'start', sourceS: sourceTimeS }) },
+          },
+          {
+            id: 'trim-audio-out',
+            label: 'Trim audio out point to here',
+            icon: LocateFixed,
+            disabled: !endTrimEnabled,
+            onSelect: () => { void editTimeline({ type: 'trim-audio', audioClipId: clip.id, edge: 'end', sourceS: sourceTimeS }) },
+          },
+        ] : []),
+        {
+          id: 'mute-audio',
+          label: clip.muted ? 'Unmute audio' : 'Mute audio',
+          icon: clip.muted ? Volume2 : VolumeX,
+          disabled: !editable,
+          onSelect: () => {
+            if (clip.implicit && video) void editTimeline({ type: 'mute-video-audio', clipId: video.id, muted: !clip.muted })
+            else void editTimeline({ type: 'mute-audio', audioClipId: clip.id, muted: !clip.muted })
+          },
+        },
+        {
+          id: 'copy-audio-range',
+          label: 'Copy time range',
+          icon: Copy,
+          separatorBefore: true,
+          onSelect: () => copy(`${formatPreciseTime(clip.programRange.startS)} - ${formatPreciseTime(clip.programRange.endS)}`),
+        },
+        {
+          id: 'audio-info',
+          label: 'View media information',
+          icon: Info,
+          onSelect: () => setClipInfo(clip),
+        },
+        ...(canEditIndependently ? [{
+          id: 'ripple-delete-audio',
+          label: 'Ripple delete audio',
+          shortcut: 'Delete',
+          icon: Trash2,
+          separatorBefore: true,
+          danger: true,
+          onSelect: () => {
+            const historyLength = store.getState().timelinePast.length
+            void editTimeline({ type: 'delete-audio', audioClipId: clip.id }).then(() => {
+              if (store.getState().timelinePast.length > historyLength) setDeleteNotice(`${clip.displayName || 'Audio'} ripple deleted`)
+            })
+          },
+        }] : []),
       ],
     })
   }
@@ -861,9 +1111,13 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
                     presentationInsetPx={presentationInsetPx}
                     selection={selection}
                     select={select}
-                    editable={timelineEditable && track.kind === 'video'}
+                    editable={timelineEditable && (
+                      track.kind === 'video'
+                      || (track.kind === 'audio' && !clip.implicit && !clip.linked)
+                    )}
                     trimming={trimDrag?.clipId === clip.id ? trimDrag.edge : null}
                     onTrimStart={startTrim}
+                    onAudioMoveStart={startAudioMove}
                     onContextMenu={openClipContextMenu}
                   />
                 ))}

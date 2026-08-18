@@ -406,7 +406,7 @@ export function EditorShell({ runtime }: { runtime?: RuntimeProjectStatus }) {
     store.getState().setProject(projectFromSnapshot(null, runtime.snapshot))
   }, [bridge, runtime, scenario.initialState.project, store])
   const viewerScenarios = new Set(['1-282', '57-152', '1-1026', '1-528', '123-79'])
-  const timelineScenarios = new Set(['1-324', '1-1115', '1-754', '123-167', 'timeline-editing'])
+  const timelineScenarios = new Set(['1-324', '1-1115', '1-754', '123-167', 'timeline-editing', 'audio-context-actions'])
   const isViewerScenario = viewerScenarios.has(scenarioId)
   const isTimelineScenario = timelineScenarios.has(scenarioId)
   const isMenuFrame = scenarioId === '57-152' || scenarioId === '1-528'
@@ -614,22 +614,38 @@ export function projectFromSnapshot(base: EditorProjectView | null, snapshot: Ru
     decisionRef: clip.decision_ref,
     displayName: sourceAsset?.name ?? 'Unknown source',
     speed: clip.speed,
+    audioMode: clip.audio_mode ?? 'embedded',
     sourceRange: { startS: clip.source_range.start_s, endS: clip.source_range.end_s },
     programRange: { startS: clip.program_range.start_s, endS: clip.program_range.end_s },
   })) ?? []
   const hasVideo = assets.some((asset) => asset.kind === 'video')
   const hasAudio = snapshot.view.source_media?.has_audio
     ?? (assets.some((asset) => asset.kind === 'audio') || hasVideo)
-  const audioSource = sourceAsset?.kind === 'audio' ? sourceAsset : undefined
-  const audioClips = audioSource ? timeline?.clips.map((clip) => ({
-    id: `${clip.id}:audio`,
+  const detachedAudioIds = new Set(timeline?.audio_clips?.map((clip) => clip.source_video_clip_id) ?? [])
+  const detachedAudioClips = timeline?.audio_clips?.map((clip) => ({
+    id: clip.id,
     trackId: 'track-audio',
-    sourceAssetId: audioSource.id,
-    displayName: audioSource.name,
+    sourceAssetId: clip.source_asset_id ?? sourceAsset?.id,
+    displayName: sourceAsset?.name ?? 'Source audio',
     speed: clip.speed,
     sourceRange: { startS: clip.source_range.start_s, endS: clip.source_range.end_s },
     programRange: { startS: clip.program_range.start_s, endS: clip.program_range.end_s },
-  })) ?? [] : []
+    linkedClipId: clip.source_video_clip_id,
+    linked: clip.linked,
+    muted: clip.muted,
+    implicit: false,
+  })) ?? []
+  const implicitAudioClips = hasAudio ? videoClips.filter((clip) => !detachedAudioIds.has(clip.id)).map((clip) => ({
+    ...clip,
+    id: `${clip.id}:embedded-audio`,
+    trackId: 'track-audio',
+    displayName: sourceAsset?.name ?? 'Source audio',
+    linkedClipId: clip.id,
+    linked: true,
+    muted: clip.audioMode === 'muted',
+    implicit: true,
+  })) : []
+  const audioClips = [...implicitAudioClips, ...detachedAudioClips]
   const captionClips = captionsEdit?.cues.map((cue) => ({
     id: cue.id,
     trackId: 'track-captions',

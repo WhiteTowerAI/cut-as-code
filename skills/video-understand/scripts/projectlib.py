@@ -1981,6 +1981,8 @@ def validate_timeline(timeline, decision_ids=None):
         decision_ref = clip.get("decision_ref")
         if decision_ids is not None and decision_ref not in decision_ids:
             errors.append(f"{clip_id} decision_ref does not resolve: {decision_ref}")
+        if clip.get("audio_mode", "embedded") not in {"embedded", "detached", "muted"}:
+            errors.append(f"{clip_id} audio_mode is invalid")
 
         previous_source_start = source_start
         previous_source_end = source_end
@@ -1988,6 +1990,53 @@ def validate_timeline(timeline, decision_ids=None):
 
     if abs(expected_program_start - program_duration) > frame_tolerance:
         errors.append("program_duration_s does not match final program range")
+    audio_clips = timeline.get("audio_clips", [])
+    if not isinstance(audio_clips, list):
+        errors.append("timeline audio_clips must be a list")
+        return errors
+    video_by_id = {clip.get("id"): clip for clip in clips if isinstance(clip, dict)}
+    audio_ids = set()
+    program_ranges = []
+    for index, audio in enumerate(audio_clips, 1):
+        audio_id = audio.get("id") if isinstance(audio, dict) else None
+        if not isinstance(audio_id, str) or not audio_id.strip():
+            errors.append(f"audio clip {index} id must be nonblank")
+            continue
+        if audio_id in audio_ids:
+            errors.append(f"duplicate audio clip id: {audio_id}")
+        audio_ids.add(audio_id)
+        try:
+            source_start = float(audio["source_range"]["start_s"])
+            source_end = float(audio["source_range"]["end_s"])
+            program_start = float(audio["program_range"]["start_s"])
+            program_end = float(audio["program_range"]["end_s"])
+            speed = float(audio["speed"])
+        except (KeyError, TypeError, ValueError):
+            errors.append(f"{audio_id} audio ranges and speed must be numeric")
+            continue
+        if source_start < 0 or source_end <= source_start or source_end > source_duration + frame_tolerance:
+            errors.append(f"{audio_id} audio source range is invalid")
+        if program_start < -frame_tolerance or program_end <= program_start or program_end > program_duration + frame_tolerance:
+            errors.append(f"{audio_id} audio program range is invalid")
+        if speed <= 0 or abs((program_end - program_start) - (source_end - source_start) / speed) > frame_tolerance:
+            errors.append(f"{audio_id} audio duration does not match speed")
+        if not isinstance(audio.get("linked"), bool) or not isinstance(audio.get("muted"), bool):
+            errors.append(f"{audio_id} linked and muted must be boolean")
+        source_video_id = audio.get("source_video_clip_id")
+        source_video = video_by_id.get(source_video_id)
+        if not isinstance(source_video_id, str) or not source_video:
+            errors.append(f"{audio_id} source_video_clip_id does not resolve")
+        elif audio.get("linked"):
+            if source_video.get("audio_mode") != "detached":
+                errors.append(f"{audio_id} linked video must use detached audio_mode")
+            if (audio.get("source_range") != source_video.get("source_range")
+                    or audio.get("program_range") != source_video.get("program_range")):
+                errors.append(f"{audio_id} linked ranges must match its video clip")
+        program_ranges.append((program_start, program_end, audio_id))
+    program_ranges.sort()
+    for previous, current in zip(program_ranges, program_ranges[1:]):
+        if current[0] < previous[1] - frame_tolerance:
+            errors.append(f"{current[2]} audio program range overlaps {previous[2]}")
     return errors
 
 

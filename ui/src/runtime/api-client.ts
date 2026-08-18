@@ -83,35 +83,9 @@ export class RuntimeApiClient {
   }
 
   async editTimeline(readSet: RuntimeTimelineReadSet, command: TimelineEditCommand) {
-    const serialized = command.type === 'split'
-      ? { type: command.type, clip_id: command.clipId, at_s: command.atS }
-      : command.type === 'delete'
-        ? { type: command.type, clip_id: command.clipId }
-        : command.type === 'trim'
-          ? { type: command.type, clip_id: command.clipId, edge: command.edge, source_s: command.sourceS }
-          : command.type === 'restore-bounds'
-            ? { type: command.type, clip_id: command.clipId }
-            : command.type === 'set-range'
-              ? { type: command.type, clip_id: command.clipId, start_s: command.startS, end_s: command.endS }
-          : command.type === 'join'
-            ? { type: command.type, left_clip_id: command.leftClipId, right_clip_id: command.rightClipId }
-            : {
-                type: command.type,
-                index: command.index,
-                clip: {
-                  id: command.clip.id,
-                  source_range: {
-                    start_s: command.clip.sourceRange.startS,
-                    end_s: command.clip.sourceRange.endS,
-                  },
-                  speed: command.clip.speed ?? 1,
-                  ...(command.clip.decisionRef ? { decision_ref: command.clip.decisionRef } : {}),
-                  ...(command.clip.sourceAssetId ? { source_asset_id: command.clip.sourceAssetId } : {}),
-                },
-              }
     return this.mutate(`/v1/projects/${encodeURIComponent(this.projectId)}/timeline/edits`, {
       readSet,
-      command: serialized,
+      command: timelineCommand(command),
     })
   }
 
@@ -148,5 +122,92 @@ export class RuntimeApiClient {
     const value = await response.json() as RuntimeExportResponse
     if (!response.ok || !value.ok) throw new Error(value.error ?? 'Video export failed')
     return value.job
+  }
+}
+
+function audioClip(clip: import('../editor/editor-model').ClipView) {
+  return {
+    id: clip.id,
+    source_range: { start_s: clip.sourceRange.startS, end_s: clip.sourceRange.endS },
+    program_range: { start_s: clip.programRange.startS, end_s: clip.programRange.endS },
+    speed: clip.speed ?? 1,
+    source_video_clip_id: clip.linkedClipId,
+    linked: Boolean(clip.linked),
+    muted: Boolean(clip.muted),
+    ...(clip.sourceAssetId ? { source_asset_id: clip.sourceAssetId } : {}),
+  }
+}
+
+function timelineCommand(command: TimelineEditCommand): Record<string, unknown> {
+  switch (command.type) {
+    case 'split':
+      return { type: command.type, clip_id: command.clipId, at_s: command.atS }
+    case 'delete':
+    case 'restore-bounds':
+    case 'detach-audio':
+    case 'attach-audio':
+      return { type: command.type, clip_id: command.clipId }
+    case 'trim':
+      return { type: command.type, clip_id: command.clipId, edge: command.edge, source_s: command.sourceS }
+    case 'set-range':
+      return { type: command.type, clip_id: command.clipId, start_s: command.startS, end_s: command.endS }
+    case 'join':
+      return { type: command.type, left_clip_id: command.leftClipId, right_clip_id: command.rightClipId }
+    case 'insert':
+      return {
+        type: command.type,
+        index: command.index,
+        clip: {
+          id: command.clip.id,
+          source_range: {
+            start_s: command.clip.sourceRange.startS,
+            end_s: command.clip.sourceRange.endS,
+          },
+          speed: command.clip.speed ?? 1,
+          ...(command.clip.decisionRef ? { decision_ref: command.clip.decisionRef } : {}),
+          ...(command.clip.sourceAssetId ? { source_asset_id: command.clip.sourceAssetId } : {}),
+          ...(command.clip.audioMode ? { audio_mode: command.clip.audioMode } : {}),
+        },
+      }
+    case 'insert-with-audio':
+      return {
+        type: command.type,
+        index: command.index,
+        clip: {
+          id: command.clip.id,
+          source_range: {
+            start_s: command.clip.sourceRange.startS,
+            end_s: command.clip.sourceRange.endS,
+          },
+          speed: command.clip.speed ?? 1,
+          ...(command.clip.decisionRef ? { decision_ref: command.clip.decisionRef } : {}),
+          ...(command.clip.sourceAssetId ? { source_asset_id: command.clip.sourceAssetId } : {}),
+          ...(command.clip.audioMode ? { audio_mode: command.clip.audioMode } : {}),
+        },
+        audio_clip: audioClip(command.audioClip),
+      }
+    case 'mute-video-audio':
+      return { type: command.type, clip_id: command.clipId, muted: command.muted }
+    case 'unlink-audio':
+    case 'link-audio':
+    case 'delete-audio':
+      return { type: command.type, audio_clip_id: command.audioClipId }
+    case 'mute-audio':
+      return { type: command.type, audio_clip_id: command.audioClipId, muted: command.muted }
+    case 'move-audio':
+      return { type: command.type, audio_clip_id: command.audioClipId, start_s: command.startS }
+    case 'trim-audio':
+      return { type: command.type, audio_clip_id: command.audioClipId, edge: command.edge, source_s: command.sourceS }
+    case 'insert-audio':
+      return { type: command.type, index: command.index, clip: audioClip(command.clip) }
+    case 'set-audio-state':
+      return {
+        type: command.type,
+        clip_id: command.clipId,
+        audio_mode: command.audioMode,
+        ...(command.audioClip ? { audio_clip: audioClip(command.audioClip) } : {}),
+      }
+    case 'set-audio-clip':
+      return { type: command.type, clip: audioClip(command.clip) }
   }
 }

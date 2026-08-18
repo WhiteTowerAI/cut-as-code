@@ -234,11 +234,12 @@ class ProtocolService:
             return {"ok": False, "error": f"invalid timeline edit: {exc}"}
         if updated_timeline == timeline:
             return {"ok": True, "result": "no_change", "snapshot": self._public_snapshot(snapshot)}
+        ripple = self._timeline_ripple(timeline, updated_timeline, command)
+        updated_timeline = self._sync_audio_timeline(timeline, updated_timeline, command, ripple)
         timeline_errors = projectlib.validate_timeline(updated_timeline)
         if timeline_errors:
             return {"ok": False, "error": "invalid timeline edit: " + "; ".join(timeline_errors)}
 
-        ripple = self._timeline_ripple(timeline, updated_timeline, command)
         plan_writes = []
         shifted_operation_ids = set()
         if ripple:
@@ -306,7 +307,7 @@ class ProtocolService:
             raise ValueError("command must be an object with a type")
         updated = copy.deepcopy(timeline)
         clips = updated.get("clips")
-        if not isinstance(clips, list) or (not clips and command.get("type") != "insert"):
+        if not isinstance(clips, list) or (not clips and command.get("type") not in {"insert", "insert-with-audio"}):
             raise ValueError("timeline clips are unavailable")
         command_type = command["type"]
         allowed = {
@@ -317,13 +318,35 @@ class ProtocolService:
             "set-range": {"type", "clip_id", "start_s", "end_s"},
             "join": {"type", "left_clip_id", "right_clip_id"},
             "insert": {"type", "index", "clip"},
+            "insert-with-audio": {"type", "index", "clip", "audio_clip"},
+            "detach-audio": {"type", "clip_id"},
+            "attach-audio": {"type", "clip_id"},
+            "unlink-audio": {"type", "audio_clip_id"},
+            "link-audio": {"type", "audio_clip_id"},
+            "mute-audio": {"type", "audio_clip_id", "muted"},
+            "mute-video-audio": {"type", "clip_id", "muted"},
+            "trim-audio": {"type", "audio_clip_id", "edge", "source_s"},
+            "move-audio": {"type", "audio_clip_id", "start_s"},
+            "delete-audio": {"type", "audio_clip_id"},
+            "insert-audio": {"type", "index", "clip"},
+            "set-audio-state": {"type", "clip_id", "audio_mode"},
+            "set-audio-state-with-clip": {"type", "clip_id", "audio_mode", "audio_clip"},
+            "set-audio-clip": {"type", "clip"},
         }
+        if command_type == "set-audio-state" and "audio_clip" in command:
+            command_type = "set-audio-state-with-clip"
         if command_type not in allowed or set(command) != allowed[command_type]:
             raise ValueError("command fields do not match its type")
         fps = updated.get("fps", {})
         frame_duration = float(fps.get("den")) / float(fps.get("num"))
         source_duration = float(updated["source_duration_s"])
 
+        if command_type in {
+            "detach-audio", "attach-audio", "unlink-audio", "link-audio", "mute-audio",
+            "mute-video-audio", "trim-audio", "move-audio", "delete-audio", "insert-audio",
+            "set-audio-state", "set-audio-state-with-clip", "set-audio-clip",
+        }:
+            return cls._apply_audio_command(updated, command, command_type, frame_duration, source_duration)
         if command_type == "split":
             index = cls._clip_index(clips, command["clip_id"])
             clip = clips[index]
@@ -392,7 +415,7 @@ class ProtocolService:
             candidate = command["clip"]
             if (not isinstance(index, int) or isinstance(index, bool) or index < 0 or index > len(clips)
                     or not isinstance(candidate, dict)
-                    or set(candidate) - {"id", "source_range", "speed", "decision_ref", "source_asset_id"}
+                    or set(candidate) - {"id", "source_range", "speed", "decision_ref", "source_asset_id", "audio_mode"}
                     or set(candidate) < {"id", "source_range", "speed"}):
                 raise ValueError("insert command is invalid")
             if not isinstance(candidate.get("id"), str) or not candidate["id"].strip():
@@ -407,9 +430,199 @@ class ProtocolService:
             speed = cls._finite_number(candidate["speed"], "speed")
             if start < 0 or end <= start or end > source_duration + frame_duration or speed <= 0:
                 raise ValueError("insert clip range is invalid")
+            if candidate.get("audio_mode", "embedded") not in {"embedded", "detached", "muted"}:
+                raise ValueError("insert clip audio_mode is invalid")
             clips.insert(index, copy.deepcopy(candidate))
 
-        return cls._reflow_timeline(updated)
+        reflowed = cls._reflow_timeline(updated)
+        if command_type == "insert-with-audio":
+            restored_audio = cls._audio_payload(command["audio_clip"])
+            source = next(clip for clip in reflowed["clips"] if clip.get("id") == candidate["id"])
+            restored_audio.update({
+                "source_range": copy.deepcopy(source["source_range"]),
+                "program_range": copy.deepcopy(source["program_range"]),
+                "speed": source.get("speed", 1.0),
+                "source_video_clip_id": source["id"],
+                "linked": True,
+            })
+            reflowed.setdefault("audio_clips", []).append(restored_audio)
+        return reflowed
+
+    @classmethod
+    def _apply_audio_command(cls, timeline, command, command_type, frame_duration, source_duration):
+        clips = timeline["clips"]
+        audio_clips = timeline.setdefault("audio_clips", [])
+        if not isinstance(audio_clips, list):
+            raise ValueError("timeline audio_clips are unavailable")
+
+        def video(clip_id):
+            index = cls._clip_index(clips, clip_id)
+            return clips[index]
+
+        def audio_index(clip_id):
+            return cls._clip_index(audio_clips, clip_id)
+
+        audio_payload = cls._audio_payload
+
+        if command_type == "detach-audio":
+            source = video(command["clip_id"])
+            if source.get("audio_mode", "embedded") == "detached":
+                raise ValueError("audio is already detached")
+            source["audio_mode"] = "detached"
+            audio_clips.append({
+                "id": f"{source['id']}:audio",
+                "source_range": copy.deepcopy(source["source_range"]),
+                "program_range": copy.deepcopy(source["program_range"]),
+                "speed": source.get("speed", 1.0),
+                "source_video_clip_id": source["id"],
+                "linked": True,
+                "muted": False,
+                **({"source_asset_id": source["source_asset_id"]} if source.get("source_asset_id") else {}),
+            })
+        elif command_type == "attach-audio":
+            source = video(command["clip_id"])
+            matches = [item for item in audio_clips if item.get("source_video_clip_id") == source["id"]]
+            if source.get("audio_mode") != "detached" or len(matches) != 1 or not matches[0].get("linked"):
+                raise ValueError("only linked detached audio can be attached")
+            audio_clips.remove(matches[0])
+            source["audio_mode"] = "embedded"
+        elif command_type == "mute-video-audio":
+            source = video(command["clip_id"])
+            if source.get("audio_mode") == "detached" or not isinstance(command["muted"], bool):
+                raise ValueError("embedded video audio mute is invalid")
+            source["audio_mode"] = "muted" if command["muted"] else "embedded"
+        elif command_type in {"unlink-audio", "link-audio", "mute-audio"}:
+            item = audio_clips[audio_index(command["audio_clip_id"])]
+            if command_type == "unlink-audio":
+                if not item.get("linked"):
+                    raise ValueError("audio is already unlinked")
+                item["linked"] = False
+            elif command_type == "link-audio":
+                source = video(item.get("source_video_clip_id"))
+                item.update({
+                    "linked": True,
+                    "source_range": copy.deepcopy(source["source_range"]),
+                    "program_range": copy.deepcopy(source["program_range"]),
+                    "speed": source.get("speed", 1.0),
+                })
+            else:
+                if not isinstance(command["muted"], bool):
+                    raise ValueError("muted must be boolean")
+                item["muted"] = command["muted"]
+        elif command_type == "move-audio":
+            index = audio_index(command["audio_clip_id"])
+            item = audio_clips[index]
+            if item.get("linked"):
+                raise ValueError("unlink audio before moving it")
+            start = cls._rounded(int(cls._finite_number(command["start_s"], "start_s") / frame_duration + 0.5) * frame_duration)
+            duration = float(item["program_range"]["end_s"]) - float(item["program_range"]["start_s"])
+            item["program_range"] = {"start_s": start, "end_s": cls._rounded(start + duration)}
+        elif command_type == "trim-audio":
+            item = audio_clips[audio_index(command["audio_clip_id"])]
+            if item.get("linked") or command["edge"] not in {"start", "end"}:
+                raise ValueError("unlink audio before trimming it")
+            source_s = cls._finite_number(command["source_s"], "source_s")
+            speed = float(item.get("speed", 1.0))
+            source_range = item["source_range"]
+            source_range[f"{command['edge']}_s"] = cls._rounded(source_s)
+            if (float(source_range["start_s"]) < 0 or float(source_range["end_s"]) > source_duration
+                    or float(source_range["end_s"]) - float(source_range["start_s"]) < frame_duration * speed - 1e-7):
+                raise ValueError("audio trim is outside source media")
+            duration = (float(source_range["end_s"]) - float(source_range["start_s"])) / speed
+            if command["edge"] == "start":
+                item["program_range"]["start_s"] = cls._rounded(float(item["program_range"]["end_s"]) - duration)
+            else:
+                item["program_range"]["end_s"] = cls._rounded(float(item["program_range"]["start_s"]) + duration)
+        elif command_type == "delete-audio":
+            index = audio_index(command["audio_clip_id"])
+            item = audio_clips[index]
+            if item.get("linked"):
+                raise ValueError("unlink audio before deleting it")
+            duration = float(item["program_range"]["end_s"]) - float(item["program_range"]["start_s"])
+            boundary = float(item["program_range"]["end_s"])
+            audio_clips.pop(index)
+            for candidate in audio_clips:
+                if not candidate.get("linked") and float(candidate["program_range"]["start_s"]) >= boundary - 1e-7:
+                    candidate["program_range"] = {
+                        "start_s": cls._rounded(float(candidate["program_range"]["start_s"]) - duration),
+                        "end_s": cls._rounded(float(candidate["program_range"]["end_s"]) - duration),
+                    }
+        elif command_type == "insert-audio":
+            index = command["index"]
+            item = audio_payload(command["clip"])
+            if not isinstance(index, int) or isinstance(index, bool) or not 0 <= index <= len(audio_clips):
+                raise ValueError("audio insert index is invalid")
+            if any(candidate.get("id") == item["id"] for candidate in audio_clips):
+                raise ValueError("audio clip already exists")
+            duration = float(item["program_range"]["end_s"]) - float(item["program_range"]["start_s"])
+            boundary = float(item["program_range"]["start_s"])
+            for candidate in audio_clips:
+                if not candidate.get("linked") and float(candidate["program_range"]["start_s"]) >= boundary - 1e-7:
+                    candidate["program_range"] = {
+                        "start_s": cls._rounded(float(candidate["program_range"]["start_s"]) + duration),
+                        "end_s": cls._rounded(float(candidate["program_range"]["end_s"]) + duration),
+                    }
+            audio_clips.insert(index, item)
+        elif command_type in {"set-audio-state", "set-audio-state-with-clip"}:
+            source = video(command["clip_id"])
+            mode = command["audio_mode"]
+            if mode not in {"embedded", "detached", "muted"}:
+                raise ValueError("audio_mode is invalid")
+            audio_clips[:] = [item for item in audio_clips if item.get("source_video_clip_id") != source["id"]]
+            source["audio_mode"] = mode
+            if command_type == "set-audio-state-with-clip":
+                audio_clips.append(audio_payload(command["audio_clip"]))
+        else:
+            item = audio_payload(command["clip"])
+            index = audio_index(item["id"])
+            audio_clips[index] = item
+
+        return timeline
+
+    @classmethod
+    def _sync_audio_timeline(cls, before, after, command, ripple):
+        if command.get("type") not in {
+            "split", "delete", "trim", "restore-bounds", "set-range", "join", "insert", "insert-with-audio",
+        }:
+            return after
+        previous_videos = before.get("clips", [])
+        next_videos = after.get("clips", [])
+        output = []
+        for audio in before.get("audio_clips", []):
+            if not isinstance(audio, dict):
+                continue
+            if not audio.get("linked"):
+                item = copy.deepcopy(audio)
+                if ripple and float(item["program_range"]["start_s"]) >= ripple[0] - 1e-7:
+                    item["program_range"] = {
+                        "start_s": cls._rounded(float(item["program_range"]["start_s"]) + ripple[1]),
+                        "end_s": cls._rounded(float(item["program_range"]["end_s"]) + ripple[1]),
+                    }
+                output.append(item)
+                continue
+            previous = next((item for item in previous_videos if item.get("id") == audio.get("source_video_clip_id")), None)
+            if not previous:
+                continue
+            candidates = [item for item in next_videos
+                          if float(item["source_range"]["start_s"]) >= float(previous["source_range"]["start_s"]) - 1e-7
+                          and float(item["source_range"]["end_s"]) <= float(previous["source_range"]["end_s"]) + 1e-7]
+            for candidate in candidates:
+                output.append({
+                    **{key: copy.deepcopy(value) for key, value in audio.items()
+                       if key not in {"id", "source_range", "program_range", "speed", "source_video_clip_id"}},
+                    "id": audio["id"] if candidate.get("id") == previous.get("id") else f"{candidate['id']}:audio",
+                    "source_range": copy.deepcopy(candidate["source_range"]),
+                    "program_range": copy.deepcopy(candidate["program_range"]),
+                    "speed": candidate.get("speed", 1.0),
+                    "source_video_clip_id": candidate["id"],
+                })
+        if command.get("type") == "insert-with-audio":
+            restored_id = command.get("audio_clip", {}).get("id")
+            restored = next((item for item in after.get("audio_clips", []) if item.get("id") == restored_id), None)
+            if restored and not any(item.get("id") == restored_id for item in output):
+                output.append(copy.deepcopy(restored))
+        after["audio_clips"] = output
+        return after
 
     @classmethod
     def _timeline_ripple(cls, before, after, command):
@@ -425,7 +638,7 @@ class ProtocolService:
             boundary = float(clip["program_range"]["end_s"])
             duration = (float(clip["source_range"]["end_s"]) - float(clip["source_range"]["start_s"])) / float(clip["speed"])
             return cls._ripple_or_none(boundary, -duration)
-        if command.get("type") == "insert":
+        if command.get("type") in {"insert", "insert-with-audio"}:
             index = command.get("index")
             boundary = (float(before_clips[index]["program_range"]["start_s"])
                         if index < len(before_clips) else float(before.get("program_duration_s", 0)))
@@ -553,6 +766,15 @@ class ProtocolService:
         if index is None:
             raise ValueError("clip does not exist")
         return index
+
+    @staticmethod
+    def _audio_payload(value):
+        if not isinstance(value, dict):
+            raise ValueError("audio clip must be an object")
+        required = {"id", "source_range", "program_range", "speed", "source_video_clip_id", "linked", "muted"}
+        if set(value) - (required | {"source_asset_id"}) or not required.issubset(value):
+            raise ValueError("audio clip fields are invalid")
+        return copy.deepcopy(value)
 
     @staticmethod
     def _finite_number(value, name):

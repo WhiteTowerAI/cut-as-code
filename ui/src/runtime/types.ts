@@ -107,7 +107,18 @@ export type RuntimeTimeline = Readonly<{
     source_range: Readonly<{ start_s: number; end_s: number }>
     program_range: Readonly<{ start_s: number; end_s: number }>
     speed?: number
+    audio_mode?: 'embedded' | 'detached' | 'muted'
     decision_ref?: string
+    source_asset_id?: string
+  }>[]
+  audio_clips?: readonly Readonly<{
+    id: string
+    source_range: Readonly<{ start_s: number; end_s: number }>
+    program_range: Readonly<{ start_s: number; end_s: number }>
+    speed?: number
+    source_video_clip_id: string
+    linked: boolean
+    muted: boolean
     source_asset_id?: string
   }>[]
 }>

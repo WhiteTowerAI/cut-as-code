@@ -23,6 +23,7 @@ export const scenarioIds = [
   'review-content-cards-conflict',
   'timeline-editing',
   'cue-context-actions',
+  'audio-context-actions',
 ] as const
 
 export type ScenarioId = (typeof scenarioIds)[number]
@@ -279,6 +280,37 @@ const editableTimelineProject: EditorProjectView = {
   }],
 }
 
+const audioContextProject: EditorProjectView = {
+  ...editableTimelineProject,
+  durationS: 24,
+  tracks: editableTimelineProject.tracks.map((track) => {
+    if (track.kind === 'video') return {
+      ...track,
+      clips: track.clips?.map((clip, index) => ({
+        ...clip,
+        displayName: 'Interview.mp4',
+        audioMode: 'embedded' as const,
+        ...(index === 1 ? { programRange: { startS: 12, endS: 24 } } : {}),
+      })),
+    }
+    if (track.kind === 'audio') return {
+      ...track,
+      clips: editableTimelineProject.tracks.find((candidate) => candidate.kind === 'video')!.clips!.map((clip, index) => ({
+        ...clip,
+        id: `${clip.id}:embedded-audio`,
+        trackId: track.id,
+        displayName: 'Interview audio',
+        linkedClipId: clip.id,
+        linked: true,
+        muted: false,
+        implicit: true,
+        ...(index === 1 ? { programRange: { startS: 12, endS: 24 } } : {}),
+      })),
+    }
+    return track
+  }),
+}
+
 function state(overrides: Partial<EditorInitialState> = {}): EditorInitialState {
   return {
     project: populatedProject,
@@ -353,6 +385,10 @@ const scenarios: readonly EditorScenario[] = [
   {
     id: 'cue-context-actions',
     initialState: state({ project: cueContextProject, currentTimeS: 0 }),
+  },
+  {
+    id: 'audio-context-actions',
+    initialState: state({ project: audioContextProject, currentTimeS: 0 }),
   },
 ]
 

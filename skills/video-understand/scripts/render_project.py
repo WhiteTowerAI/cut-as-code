@@ -148,7 +148,10 @@ def _build(plan, project_root, plan_dir):
     graph = []
     fps = timeline["fps"]
     fps_text = f"{fps['num']}/{fps['den']}"
-    audio_filtered = bool(transforms)
+    audio_edited = bool(timeline.get("audio_clips")) or any(
+        clip.get("audio_mode", "embedded") != "embedded" for clip in timeline.get("clips", [])
+    )
+    audio_filtered = False
 
     if transforms:
         clips = timeline["clips"]
@@ -163,17 +166,13 @@ def _build(plan, project_root, plan_dir):
             graph.append(
                 f"[{index}:v:0]setpts=(PTS-STARTPTS)/{speed:.8f},fps={fps_text},settb=AVTB[v{index}]"
             )
-            audio_chain = "" if abs(speed - 1.0) < 1e-9 else atempo_chain(speed) + ","
-            graph.append(
-                f"[{index}:a:0]{audio_chain}aresample=48000,asetpts=N/SR/TB[a{index}]"
-            )
-            concat_inputs.append(f"[v{index}][a{index}]")
+            concat_inputs.append(f"[v{index}]")
         graph.append(
             "".join(concat_inputs)
-            + f"concat=n={len(clips)}:v=1:a=1[base-video][program-audio]"
+            + f"concat=n={len(clips)}:v=1:a=0[base-video]"
         )
         video_label = "base-video"
-        audio_label = "program-audio"
+        audio_label = None
         next_input = len(clips)
     else:
         command += ["-i", str(source)]
@@ -181,6 +180,56 @@ def _build(plan, project_root, plan_dir):
         video_label = "base-video"
         audio_label = None
         next_input = 1
+
+    if transforms or audio_edited:
+        audio_segments = [
+            {
+                "source_range": clip["source_range"],
+                "program_range": clip["program_range"],
+                "speed": clip.get("speed", 1.0),
+            }
+            for clip in timeline.get("clips", [])
+            if clip.get("audio_mode", "embedded") == "embedded"
+        ]
+        audio_segments.extend(
+            {
+                "source_range": clip["source_range"],
+                "program_range": clip["program_range"],
+                "speed": clip.get("speed", 1.0),
+            }
+            for clip in timeline.get("audio_clips", [])
+            if not clip.get("muted", False)
+        )
+        segment_labels = []
+        for segment_index, segment in enumerate(audio_segments):
+            start = float(segment["source_range"]["start_s"])
+            duration = float(segment["source_range"]["end_s"]) - start
+            speed = float(segment.get("speed", 1.0))
+            command += ["-ss", f"{start:.6f}", "-t", f"{duration:.6f}", "-i", str(source)]
+            audio_chain = "" if abs(speed - 1.0) < 1e-9 else atempo_chain(speed) + ","
+            label = f"timeline-audio-{segment_index}"
+            graph.append(
+                f"[{next_input}:a:0]{audio_chain}aresample=48000,asetpts=PTS-STARTPTS+"
+                f"{float(segment['program_range']['start_s']):.9f}/TB[{label}]"
+            )
+            segment_labels.append(label)
+            next_input += 1
+        duration = float(timeline["program_duration_s"])
+        if segment_labels:
+            mixed = "".join(f"[{label}]" for label in segment_labels)
+            if len(segment_labels) > 1:
+                graph.append(
+                    f"{mixed}amix=inputs={len(segment_labels)}:duration=longest:normalize=0:dropout_transition=0"
+                    f",apad,atrim=duration={duration:.9f}[program-audio]"
+                )
+            else:
+                graph.append(f"{mixed}apad,atrim=duration={duration:.9f}[program-audio]")
+        else:
+            graph.append(
+                f"anullsrc=r=48000:cl=stereo,atrim=duration={duration:.9f},asetpts=N/SR/TB[program-audio]"
+            )
+        audio_label = "program-audio"
+        audio_filtered = True
 
     base_filters = []
     composite_filters = []

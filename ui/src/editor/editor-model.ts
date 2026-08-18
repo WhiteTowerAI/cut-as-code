@@ -85,6 +85,11 @@ export type ClipView = Readonly<{
   reviewMode?: string
   reviewEvidence?: readonly string[]
   metadata?: Readonly<Record<string, string>>
+  audioMode?: 'embedded' | 'detached' | 'muted'
+  linkedClipId?: string
+  linked?: boolean
+  muted?: boolean
+  implicit?: boolean
   sourceRange: Readonly<{ startS: number; endS: number }>
   programRange: Readonly<{ startS: number; endS: number }>
 }>

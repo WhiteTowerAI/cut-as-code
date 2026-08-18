@@ -60,6 +60,14 @@ function timelineCommandMessage(command: TimelineEditCommand) {
   if (command.type === 'trim') return `${command.edge === 'start' ? 'In point' : 'Out point'} trimmed`
   if (command.type === 'restore-bounds') return 'Media bounds restored'
   if (command.type === 'set-range') return 'Clip range restored'
+  if (command.type === 'detach-audio') return 'Audio detached'
+  if (command.type === 'attach-audio') return 'Audio attached'
+  if (command.type === 'unlink-audio') return 'Audio and video unlinked'
+  if (command.type === 'link-audio') return 'Audio and video linked'
+  if (command.type === 'move-audio') return 'Audio moved'
+  if (command.type === 'trim-audio') return 'Audio trimmed'
+  if (command.type === 'delete-audio') return 'Audio ripple deleted'
+  if (command.type === 'mute-audio' || command.type === 'mute-video-audio') return 'Audio mute changed'
   if (command.type === 'join') return 'Split undone'
   return 'Clip restored'
 }

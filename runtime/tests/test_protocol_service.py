@@ -374,6 +374,79 @@ class ProtocolServiceTests(unittest.TestCase):
         self.assertEqual(["clip-1"], [clip["id"] for clip in timeline["clips"]])
         self.assertEqual({"start_s": 0.0, "end_s": 1.0}, timeline["clips"][0]["program_range"])
 
+    def test_detached_audio_commands_are_atomic_and_linked_edits_sync(self):
+        self._configure_cut_project()
+        timeline = json.loads(self.timeline.read_text(encoding="utf-8"))
+        timeline["clips"] = [
+            {"id": "clip-1", "source_range": {"start_s": 0.0, "end_s": 1.0}, "program_range": {"start_s": 0.0, "end_s": 2.0}, "speed": 0.5},
+        ]
+        timeline["program_duration_s"] = 2.0
+        self.timeline.write_text(json.dumps(timeline), encoding="utf-8")
+        opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+        self.assertFalse(opened["snapshot"]["read_only"], opened)
+
+        detached = self.service.handle_request({
+            "verb": "timeline.edit", "project_id": opened["project_id"],
+            "read_set": self._timeline_read_set(opened["snapshot"]),
+            "command": {"type": "detach-audio", "clip_id": "clip-1"},
+        })
+        self.assertTrue(detached["ok"], detached)
+        current = json.loads(self.timeline.read_text(encoding="utf-8"))
+        self.assertEqual("detached", current["clips"][0]["audio_mode"])
+        self.assertEqual("clip-1:audio", current["audio_clips"][0]["id"])
+
+        unlinked = self.service.handle_request({
+            "verb": "timeline.edit", "project_id": opened["project_id"],
+            "read_set": self._timeline_read_set(detached["snapshot"]),
+            "command": {"type": "unlink-audio", "audio_clip_id": "clip-1:audio"},
+        })
+        trimmed = self.service.handle_request({
+            "verb": "timeline.edit", "project_id": opened["project_id"],
+            "read_set": self._timeline_read_set(unlinked["snapshot"]),
+            "command": {"type": "trim-audio", "audio_clip_id": "clip-1:audio", "edge": "end", "source_s": 0.5},
+        })
+        moved = self.service.handle_request({
+            "verb": "timeline.edit", "project_id": opened["project_id"],
+            "read_set": self._timeline_read_set(trimmed["snapshot"]),
+            "command": {"type": "move-audio", "audio_clip_id": "clip-1:audio", "start_s": 1.0},
+        })
+        self.assertTrue(moved["ok"], moved)
+        current = json.loads(self.timeline.read_text(encoding="utf-8"))
+        self.assertEqual({"start_s": 1.0, "end_s": 2.0}, current["audio_clips"][0]["program_range"])
+
+        relinked = self.service.handle_request({
+            "verb": "timeline.edit", "project_id": opened["project_id"],
+            "read_set": self._timeline_read_set(moved["snapshot"]),
+            "command": {"type": "link-audio", "audio_clip_id": "clip-1:audio"},
+        })
+        self.assertTrue(relinked["ok"], relinked)
+        current = json.loads(self.timeline.read_text(encoding="utf-8"))
+        self.assertEqual({"start_s": 0.0, "end_s": 2.0}, current["audio_clips"][0]["program_range"])
+
+        deleted = self.service.handle_request({
+            "verb": "timeline.edit", "project_id": opened["project_id"],
+            "read_set": self._timeline_read_set(relinked["snapshot"]),
+            "command": {"type": "delete", "clip_id": "clip-1"},
+        })
+        self.assertTrue(deleted["ok"], deleted)
+        current = json.loads(self.timeline.read_text(encoding="utf-8"))
+        self.assertEqual([], current["clips"])
+        self.assertEqual([], current["audio_clips"])
+
+        restored = self.service.handle_request({
+            "verb": "timeline.edit", "project_id": opened["project_id"],
+            "read_set": self._timeline_read_set(deleted["snapshot"]),
+            "command": {
+                "type": "insert-with-audio", "index": 0,
+                "clip": {"id": "clip-1", "source_range": {"start_s": 0.0, "end_s": 1.0}, "speed": 0.5, "audio_mode": "detached"},
+                "audio_clip": {"id": "clip-1:audio", "source_range": {"start_s": 0.0, "end_s": 1.0}, "program_range": {"start_s": 0.0, "end_s": 2.0}, "speed": 0.5, "source_video_clip_id": "clip-1", "linked": True, "muted": False},
+            },
+        })
+        self.assertTrue(restored["ok"], restored)
+        current = json.loads(self.timeline.read_text(encoding="utf-8"))
+        self.assertEqual("clip-1:audio", current["audio_clips"][0]["id"])
+        self.assertEqual("detached", current["clips"][0]["audio_mode"])
+
     def test_content_cards_update_targets_the_second_card_by_id(self):
         self._configure_content_cards_project()
         plan = json.loads(self.plan.read_text(encoding="utf-8"))

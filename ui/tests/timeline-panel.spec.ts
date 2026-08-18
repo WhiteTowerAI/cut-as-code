@@ -20,6 +20,96 @@ test('Timeline fixture keeps visual inset out of protocol clip ranges', () => {
   expect(audio?.clips?.[0].sourceRange.startS).toBe(0)
 })
 
+test('detached audio supports unlink, trim, move, mute, relink, and attach', () => {
+  const project = getScenario('audio-context-actions')!.initialState.project!
+  const detached = applyTimelineEdit(project, { type: 'detach-audio', clipId: 'edit-video-1' })
+  let audio = detached.project.tracks.find((track) => track.kind === 'audio')!.clips!
+    .find((clip) => clip.id === 'edit-video-1:audio')!
+  expect(audio).toMatchObject({ linkedClipId: 'edit-video-1', linked: true, implicit: false, muted: false })
+
+  const unlinked = applyTimelineEdit(detached.project, { type: 'unlink-audio', audioClipId: audio.id })
+  const trimmed = applyTimelineEdit(unlinked.project, {
+    type: 'trim-audio', audioClipId: audio.id, edge: 'end', sourceS: 4,
+  })
+  const moved = applyTimelineEdit(trimmed.project, { type: 'move-audio', audioClipId: audio.id, startS: 2 })
+  const muted = applyTimelineEdit(moved.project, { type: 'mute-audio', audioClipId: audio.id, muted: true })
+  audio = muted.project.tracks.find((track) => track.kind === 'audio')!.clips!.find((clip) => clip.id === audio.id)!
+  expect(audio.programRange).toEqual({ startS: 2, endS: 6 })
+  expect(audio.muted).toBe(true)
+
+  const relinked = applyTimelineEdit(muted.project, { type: 'link-audio', audioClipId: audio.id })
+  audio = relinked.project.tracks.find((track) => track.kind === 'audio')!.clips!.find((clip) => clip.id === audio.id)!
+  expect(audio.programRange).toEqual({ startS: 0, endS: 8 })
+  expect(audio.sourceRange).toEqual({ startS: 0, endS: 8 })
+  const attached = applyTimelineEdit(relinked.project, { type: 'attach-audio', clipId: 'edit-video-1' })
+  expect(attached.project.tracks.find((track) => track.kind === 'video')!.clips![0].audioMode).toBe('embedded')
+  expect(attached.project.tracks.find((track) => track.kind === 'audio')!.clips![0].implicit).toBe(true)
+})
+
+test('linked detached audio follows video edits and survives delete undo', () => {
+  const project = getScenario('audio-context-actions')!.initialState.project!
+  const detached = applyTimelineEdit(project, { type: 'detach-audio', clipId: 'edit-video-1' })
+  const trimmed = applyTimelineEdit(detached.project, {
+    type: 'trim', clipId: 'edit-video-1', edge: 'end', sourceS: 10,
+  })
+  let audio = trimmed.project.tracks.find((track) => track.kind === 'audio')!.clips!
+    .find((clip) => clip.linkedClipId === 'edit-video-1')!
+  expect(audio.sourceRange).toEqual({ startS: 0, endS: 10 })
+  expect(audio.programRange).toEqual({ startS: 0, endS: 10 })
+
+  const deleted = applyTimelineEdit(trimmed.project, { type: 'delete', clipId: 'edit-video-1' })
+  expect(deleted.inverse.type).toBe('insert-with-audio')
+  expect(deleted.project.tracks.find((track) => track.kind === 'audio')!.clips)
+    .not.toContainEqual(expect.objectContaining({ id: audio.id }))
+
+  const restored = applyTimelineEdit(deleted.project, deleted.inverse)
+  audio = restored.project.tracks.find((track) => track.kind === 'audio')!.clips!
+    .find((clip) => clip.id === audio.id)!
+  expect(audio).toMatchObject({ linked: true, linkedClipId: 'edit-video-1' })
+  expect(audio.programRange).toEqual({ startS: 0, endS: 10 })
+})
+
+test('audio context menu exposes separation and independent editing controls', async ({ page }) => {
+  await page.setViewportSize({ width: 1100, height: 700 })
+  await page.goto('/?scenario=audio-context-actions')
+
+  const video = page.locator('[data-timeline-clip="edit-video-1"]')
+  await video.click({ button: 'right' })
+  await expect(page.getByRole('menu', { name: 'Interview.mp4' })).toContainText('Detach audio')
+  await page.getByRole('menuitem', { name: 'Detach audio' }).click()
+
+  const detachedAudio = page.locator('[data-timeline-clip="edit-video-1:audio"]')
+  await expect(detachedAudio).toHaveAttribute('data-linked', 'true')
+  await detachedAudio.click({ button: 'right' })
+  await expect(page.getByRole('menu', { name: 'Interview audio' })).toContainText('Unlink audio and video')
+  await page.getByRole('menuitem', { name: 'Unlink audio and video' }).click()
+  await expect(detachedAudio).toHaveAttribute('data-linked', 'false')
+
+  const before = await detachedAudio.boundingBox()
+  expect(before).not.toBeNull()
+  await page.mouse.move(before!.x + before!.width / 2, before!.y + before!.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(before!.x + before!.width / 2 + 64, before!.y + before!.height / 2)
+  await page.mouse.up()
+  const moved = await detachedAudio.boundingBox()
+  expect(moved).not.toBeNull()
+  expect(moved!.x).toBeGreaterThan(before!.x + 20)
+
+  await detachedAudio.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Mute audio' }).click()
+  await detachedAudio.click({ button: 'right' })
+  await expect(page.getByRole('menuitem', { name: 'Unmute audio' })).toBeVisible()
+  await page.getByRole('menuitem', { name: 'Relink audio to video' }).click()
+  await expect(detachedAudio).toHaveAttribute('data-linked', 'true')
+  const relinked = await detachedAudio.boundingBox()
+  expect(relinked!.x).toBeCloseTo(before!.x, 1)
+
+  await video.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Attach audio back to video' }).click()
+  await expect(detachedAudio).toHaveCount(0)
+  await expect(page.locator('[data-timeline-clip="edit-video-1:embedded-audio"]')).toBeVisible()
+})
+
 test('Timeline renders scenario program ranges with a zoomed presentation inset', async ({ page }) => {
   const project = getScenario('1-324')?.initialState.project
   expect(project).toBeDefined()

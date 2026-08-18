@@ -1,4 +1,5 @@
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -30,7 +31,78 @@ def _frame_pixel(path, frame):
     return tuple(result.stdout[center:center + 3])
 
 
+def _tone_video(path):
+    subprocess.run([
+        "ffmpeg", "-y", "-v", "error",
+        "-f", "lavfi", "-i", "color=c=black:s=64x64:r=30:d=1",
+        "-f", "lavfi", "-i", "sine=frequency=1000:sample_rate=48000:duration=1",
+        "-shortest", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", str(path),
+    ], check=True)
+
+
+def _mean_volume(path):
+    result = subprocess.run([
+        "ffmpeg", "-hide_banner", "-i", str(path), "-af", "volumedetect", "-f", "null", "-",
+    ], capture_output=True, text=True, encoding="utf-8", errors="replace")
+    match = re.search(r"mean_volume:\s*(-?[0-9.]+) dB", result.stderr)
+    if not match:
+        raise AssertionError(f"mean volume was not reported: {result.stderr}")
+    return float(match.group(1))
+
+
 class OverlayFrameBoundaryTests(unittest.TestCase):
+    def test_detached_audio_renders_once_without_embedded_audio_doubling(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            render_dir = root / "work" / "render"
+            render_dir.mkdir(parents=True)
+            (root / "final").mkdir()
+            source = root / "source.mp4"
+            output = root / "final" / "output.mp4"
+            _tone_video(source)
+            timeline = {
+                "schema_version": 1,
+                "timeline_id": "source",
+                "source_asset_id": "source",
+                "fps": {"num": 30, "den": 1},
+                "source_duration_s": 1.0,
+                "program_duration_s": 1.0,
+                "clips": [{
+                    "id": "clip-001",
+                    "source_range": {"start_s": 0.0, "end_s": 1.0},
+                    "program_range": {"start_s": 0.0, "end_s": 1.0},
+                    "speed": 1.0,
+                    "audio_mode": "detached",
+                }],
+                "audio_clips": [{
+                    "id": "clip-001:audio",
+                    "source_range": {"start_s": 0.0, "end_s": 1.0},
+                    "program_range": {"start_s": 0.0, "end_s": 1.0},
+                    "speed": 1.0,
+                    "source_video_clip_id": "clip-001",
+                    "linked": True,
+                    "muted": False,
+                }],
+            }
+            (root / "work" / "timeline.json").write_text(json.dumps(timeline), encoding="utf-8")
+            plan = {
+                "schema_version": 1,
+                "sequence": "main",
+                "source": "../../source.mp4",
+                "timeline": "../timeline.json",
+                "contributions": [],
+                "output": "../../final/output.mp4",
+            }
+
+            command = render_project.build_command(plan, root)
+            graph = command[command.index("-filter_complex") + 1]
+            self.assertEqual(2, graph.count("[timeline-audio-0]"))
+            self.assertNotIn("timeline-audio-1", graph)
+            self.assertNotIn("amix=", graph)
+            render_project.render(plan, root)
+            self.assertTrue(output.is_file())
+            self.assertLess(abs(_mean_volume(output) - _mean_volume(source)), 1.5)
+
     def test_overlay_editor_transform_scales_and_positions_from_normalized_center(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

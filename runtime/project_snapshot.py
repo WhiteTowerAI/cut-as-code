@@ -153,6 +153,7 @@ def build_snapshot(project_root):
         }
     if isinstance(timeline, dict):
         clips = timeline.get("clips") if isinstance(timeline.get("clips"), list) else []
+        audio_clips = timeline.get("audio_clips") if isinstance(timeline.get("audio_clips"), list) else []
         fps = timeline.get("fps") if isinstance(timeline.get("fps"), dict) else {}
         view["timeline"] = {
             "duration_s": timeline.get("program_duration_s", 0),
@@ -166,8 +167,22 @@ def build_snapshot(project_root):
                     "speed": clip.get("speed"),
                     "decision_ref": clip.get("decision_ref"),
                     "source_asset_id": clip.get("source_asset_id"),
+                    "audio_mode": clip.get("audio_mode", "embedded"),
                 }
                 for clip in clips if isinstance(clip, dict)
+            ],
+            "audio_clips": [
+                {
+                    "id": clip.get("id"),
+                    "source_range": clip.get("source_range"),
+                    "program_range": clip.get("program_range"),
+                    "speed": clip.get("speed"),
+                    "source_video_clip_id": clip.get("source_video_clip_id"),
+                    "linked": clip.get("linked", True),
+                    "muted": clip.get("muted", False),
+                    "source_asset_id": clip.get("source_asset_id"),
+                }
+                for clip in audio_clips if isinstance(clip, dict)
             ],
         }
     cards = next((node for node in operations if isinstance(node, dict) and node.get("id") == "content-cards"), None)
