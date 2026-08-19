@@ -475,6 +475,7 @@ const root = process.argv[2];
                 "runtime/mcp.cjs",
                 "runtime/project_snapshot.py",
                 "runtime/protocol_service.py",
+                "runtime/reconcile_manual_timeline.py",
                 "runtime/sequence_bounds.py",
                 "runtime/sidecar.cjs",
                 "ui/dist/index.html",
@@ -568,6 +569,7 @@ const root = process.argv[2];
                 "runtime/mcp.cjs",
                 "runtime/project_snapshot.py",
                 "runtime/protocol_service.py",
+                "runtime/reconcile_manual_timeline.py",
                 "runtime/sequence_bounds.py",
                 "runtime/sidecar.cjs",
             })
