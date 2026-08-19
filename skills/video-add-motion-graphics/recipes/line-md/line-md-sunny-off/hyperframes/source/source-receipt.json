@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-sunny-off",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "cf4c2fe6e168b40a003e55256ed0c69934be92fb033851a1cc915183f1e73992",
+    "icon.svg": "de5665fb90781524b2f677c45a88db3891f446e716ccb8ed08022e030ae731b7",
+    "upstream-icon.json": "ded5caab4eea14dd2909311a217ba8061436fb36047d5739149045b2e673913c"
+  }
+}

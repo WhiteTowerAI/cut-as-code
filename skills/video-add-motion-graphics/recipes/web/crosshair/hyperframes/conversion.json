@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "crosshair",
+  "surface": "web",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "58b2964532911922061c6c8a8a9cce6c018c54b6e97af76db64bbdb89dd27a3a"
+}

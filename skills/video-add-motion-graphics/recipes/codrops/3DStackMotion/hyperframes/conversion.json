@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "project_id": "3DStackMotion",
+  "demo_url": "https://tympanus.net/Development/3DStackMotion/",
+  "article_url": "https://tympanus.net/codrops/2024/03/06/on-scroll-3d-stack-motion-effect/",
+  "source_url": "https://github.com/codrops/3DStackMotion/",
+  "source_commit": "75cbda91ed26d31aeeb5a5b9887848e5a7005c7f",
+  "license": {
+    "type": "MIT",
+    "evidence": "repository-file",
+    "file": "LICENSE",
+    "sha256": "a5ad4d98a7970bd09ba775c7e237fb93c60139f8e0e261ebb470e580b213c226"
+  },
+  "source_copy": "source",
+  "variants": [
+    {
+      "name": "index",
+      "composition_id": "codrops-3dstackmotion-index",
+      "source_entry": "index.html",
+      "runtime_entry": "index.html",
+      "source_sha256": "cbec5f95bc95398594f84e50a3ff4dc581a36ee8af212f497599d617da50c9ba",
+      "runtime_sha256": "cbec5f95bc95398594f84e50a3ff4dc581a36ee8af212f497599d617da50c9ba",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index/index.html"
+    }
+  ]
+}

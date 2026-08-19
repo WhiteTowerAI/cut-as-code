@@ -1,0 +1,75 @@
+spec_version: 1
+id: "codrops-onscrolltypographyanimations-index"
+name: "On-Scroll Typography Animations"
+description: "Bold full-screen type animates across graphic color fields."
+surfaces: [video]
+category: "fullscreen-typography"
+tech: [html, css, js]
+canvas: [video]
+target: [fullscreen]
+intent: "fullscreen-typography"
+runtime: [css, js]
+export: [skill, html]
+dependencies: []
+tags:
+  - "codrops"
+  - "typography"
+  - "kinetic"
+  - "color"
+  - "experimental"
+  - "opener"
+  - "fullscreen"
+intent_keywords:
+  - "bold kinetic typography"
+  - "graphic title transition"
+  - "experimental type opener"
+  - "粗体动态排版"
+  - "图形标题转场"
+best_for:
+  - "An opener, chapter, or interstitial for music, technology, youth-culture, and energetic explainers"
+  - "A fullscreen message with a few large readable words"
+avoid_when:
+  - "The production requires quiet luxury, documentary naturalism, or long text"
+  - "The title would collide with required captions or visible footage"
+structural_roles:
+  - "opener"
+  - "chapter"
+  - "interstitial"
+motion_functions:
+  - "reveal"
+  - "build"
+  - "transition"
+visual_language:
+  - "typographic"
+  - "experimental"
+  - "futuristic"
+mechanisms:
+  - "kinetic-type"
+  - "color-field"
+  - "scroll"
+rhythm_energy: "high"
+information_density: "balanced"
+frame_relationship: "fullscreen"
+color_tendency: "flexible"
+style_rationale: "The purple reviewed frame is a complete color-and-type environment, with kinetic lettering providing the primary visual rhythm."
+restraint:
+  max_per_view: 1
+  notes: "Use as one frame-dominant designed cutaway; adapt content, palette, typography, framing, and timing instead of running an unchanged source showcase."
+motion:
+  duration_ms: 8000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: "index/index.html"
+implementations:
+  - tech: js
+    files: ["index/index.html", "index/hf-recipe.js", "index/hf-adapter.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/codrops/OnScrollTypographyAnimations/tree/af28d61d1f8d3d117f5d1e9b09d5209e20a1a212"
+  attribution_required: true
+author:
+  name: "codrops"
+  url: "https://github.com/codrops"
+version: 0.1.0

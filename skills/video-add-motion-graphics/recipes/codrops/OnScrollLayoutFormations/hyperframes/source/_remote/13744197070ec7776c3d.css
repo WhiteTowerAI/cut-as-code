@@ -1,0 +1,68 @@
+/*
+ * The Typekit service used to deliver this font or fonts for use on websites
+ * is provided by Adobe and is subject to these Terms of Use
+ * http://www.adobe.com/products/eulas/tou_typekit. For font license
+ * information, see the list below.
+ *
+ * area-normal:
+ *   - http://typekit.com/eulas/0000000000000000774b9fc0
+ *   - http://typekit.com/eulas/0000000000000000774b9fbd
+ *   - http://typekit.com/eulas/0000000000000000774b9fc8
+ * area-variable:
+ *   - http://typekit.com/eulas/0000000000000000774ee012
+ * bricolage-grotesque-48:
+ *   - http://typekit.com/eulas/000000000000000077565332
+ *   - http://typekit.com/eulas/000000000000000077565327
+ *   - http://typekit.com/eulas/000000000000000077565352
+ *
+ * © 2009-2026 Adobe Systems Incorporated. All Rights Reserved.
+ */
+/*{"last_published":"2024-09-01 12:31:23 UTC"}*/
+
+@import url("0f0d4640d9a6a21e14ab.css");
+
+@font-face {
+font-family:"area-normal";
+src:url("9c891e63463c8552eb59.woff2") format("woff2"),url("64cb3fc1a7b52fb394fa.woff") format("woff"),url("7eb18ec5f3802b942c54.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:700;font-stretch:normal;
+}
+
+@font-face {
+font-family:"area-normal";
+src:url("5a096bd99817957b190b.woff2") format("woff2"),url("d7fe4fe375a41b8f2bca.woff") format("woff"),url("94f41d05f2a934d7202f.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"area-normal";
+src:url("55ba35b083a83bc3c8e3.woff2") format("woff2"),url("baf8745dfacbae658fc7.woff") format("woff"),url("df559b9f2d9c7aa1205e.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:600;font-stretch:normal;
+}
+
+@font-face {
+font-family:"area-variable";
+src:url("43db19a44563be70b4c8.woff2") format("woff2"),url("0eaa8ea98a0d0665a9f0.woff") format("woff"),url("11d87dda1d72370d7c2a.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"bricolage-grotesque-48";
+src:url("d5f73e896f6477e3c4b1.woff2") format("woff2"),url("8128e14da3530883e797.woff") format("woff"),url("a38f20fab000111ffcfb.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:500;font-stretch:normal;
+}
+
+@font-face {
+font-family:"bricolage-grotesque-48";
+src:url("2894b87ab6922d4a3a6b.woff2") format("woff2"),url("a3f2ed0a8fcf0d94f62f.woff") format("woff"),url("317f0e32edd00eaeb6f1.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:600;font-stretch:normal;
+}
+
+@font-face {
+font-family:"bricolage-grotesque-48";
+src:url("5376f262d102c2c2dffe.woff2") format("woff2"),url("d5b826e9fef1c0469a63.woff") format("woff"),url("b391fea080bfc489b576.otf") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+.tk-area-normal { font-family: "area-normal",sans-serif; }
+.tk-area-variable { font-family: "area-variable",sans-serif; }
+.tk-bricolage-grotesque-48 { font-family: "bricolage-grotesque-48",sans-serif; }

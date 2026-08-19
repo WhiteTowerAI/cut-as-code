@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-cookie-remove-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "58bf4c72f1467746c29326d0560e88478c577a84dc53ad46c962471aaa6ede86",
+    "icon.svg": "2f991053d98834687945cbfca5fc987f6e63ff93206cdf5234467a4c3a9c2679",
+    "upstream-icon.json": "7ca33311e19ed5edcb60d462c51ba1ffd3211966693968a5cd5dcc39d9fa8926"
+  }
+}

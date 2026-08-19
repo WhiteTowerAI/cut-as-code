@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-map-marker-remove-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "dab1262e8a834980ab67b2ae712fe9a3318158e5d101cbc70f6ad010303b6378",
+    "icon.svg": "ff0f98ef864d95edfff39018782250df0c6871c00a872c22684006b352a034e4",
+    "upstream-icon.json": "fcc89ac21f7cd0f23338f97824fd0b28c8503dc57231519d304eee1ca4eb5dfe"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-beer-alt-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "c2a8fe3768e8d79c8f1fdba85a816e0a2aba5a3fd21ca51f21f26aa556a3228c",
+    "icon.svg": "30761ec41426b4af39520a00c4306bce8081374de365ce4490a803630cd229d3",
+    "upstream-icon.json": "151186d8c02ec0ca12b6d4fb6738182ded9ae06812643dd9be8fa7480561524f"
+  }
+}

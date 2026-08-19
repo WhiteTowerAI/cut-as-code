@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-reddit-circle",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "59da529d33d899041fb4c703c306ed297b6c13861f563dbe2ae65252e4b128ea",
+    "icon.svg": "58bebc9d7b8295d65022cad72dfabb24035564822f129d552facd5a4e2b0b118",
+    "upstream-icon.json": "52eb4b9ce626a4f5c4163ece81bc4c4fadaa7fc6ba592989251b707613786862"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-hazard-lights-off-twotone-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "48aa8ea809c8cd6a9a6db77da9909aee326859ec1600edc195ee3e73620a02e1",
+    "icon.svg": "f795030619f8ec7908b5209c3d8d07184967b4bc5ad8114ee400bcebdcba5215",
+    "upstream-icon.json": "a212b027717c7a972e220805bb4fae0443a3a4006a27b86add844a33d0716a87"
+  }
+}

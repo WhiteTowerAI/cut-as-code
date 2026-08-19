@@ -1,0 +1,75 @@
+spec_version: 1
+id: "codrops-imageexpansiontypography-index"
+name: "On-Scroll Expanding Image Animation within Typography"
+description: "An image expands inside oversized typography and editorial copy."
+surfaces: [video]
+category: "fullscreen-typography"
+tech: [html, css, js]
+canvas: [video]
+target: [fullscreen]
+intent: "fullscreen-typography"
+runtime: [css, js]
+export: [skill, html]
+dependencies: []
+tags:
+  - "codrops"
+  - "typography"
+  - "image-mask"
+  - "editorial"
+  - "fashion"
+  - "opener"
+  - "fullscreen"
+intent_keywords:
+  - "image inside typography"
+  - "editorial title reveal"
+  - "fashion opening title"
+  - "文字图片遮罩"
+  - "时尚标题开场"
+best_for:
+  - "An opener, chapter, or interstitial for fashion, beauty, culture, and cinematic commentary"
+  - "A fullscreen title treatment that can use an object, landscape, or non-face image inside the type"
+avoid_when:
+  - "The title must remain small, utilitarian, or highly detailed"
+  - "The selected image loses essential information when masked by letters"
+structural_roles:
+  - "opener"
+  - "chapter"
+  - "interstitial"
+motion_functions:
+  - "reveal"
+  - "build"
+  - "settle"
+visual_language:
+  - "editorial"
+  - "typographic"
+  - "fashion"
+mechanisms:
+  - "type-mask"
+  - "image-expansion"
+  - "scale"
+rhythm_energy: "medium"
+information_density: "balanced"
+frame_relationship: "fullscreen"
+color_tendency: "image-led"
+style_rationale: "The visible title is inseparable from its imagery: large words and a framed image form a refined editorial reveal."
+restraint:
+  max_per_view: 1
+  notes: "Use as one frame-dominant designed cutaway; adapt content, palette, typography, framing, and timing instead of running an unchanged source showcase."
+motion:
+  duration_ms: 8000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: "index/index.html"
+implementations:
+  - tech: js
+    files: ["index/index.html", "index/hf-recipe.js", "index/hf-adapter.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/codrops/ImageExpansionTypography/tree/0d614791f94198bcab655762b26a3cb85da851f4"
+  attribution_required: true
+author:
+  name: "codrops"
+  url: "https://github.com/codrops"
+version: 0.1.0

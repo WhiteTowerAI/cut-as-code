@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-github-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "7e73d2f3d98617a220182e43bb7f9fd92176edc96bcc6f025e748d8a8fdfedb6",
+    "icon.svg": "b09539b330ad847fda53b078f78788a7df70185114c3cb23e168b395925e216a",
+    "upstream-icon.json": "e1542b8c63115b1ee1fe9f016ff21fdad57500d2f44fc36c644029c3c7d5cc1b"
+  }
+}

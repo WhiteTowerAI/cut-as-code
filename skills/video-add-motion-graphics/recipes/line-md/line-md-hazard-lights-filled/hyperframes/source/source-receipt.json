@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-hazard-lights-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "cc5d2ed6f3bd72294a7c29caaf4582589353b038b88a913a9ceb49d47b3b8af5",
+    "icon.svg": "f9e06f2fcd2466e237830f53ee0bc2bdec76898c4d631159105bd56e7ea9518b",
+    "upstream-icon.json": "56712604690bd5f0bf0eb8bf3fb2aed4f0673283beca550f09e80e99658a2789"
+  }
+}

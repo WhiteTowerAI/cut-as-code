@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-chat-round-alert-off",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "1e413cc4eac5a0b943b61e1d5e56c3fd1aefb6cb4fcb601da398ef9bb4d9baf6",
+    "icon.svg": "b76c89f4dff2e08ca7b663cc2e8115e680b21ae34fe343d662e4b5558ec1374c",
+    "upstream-icon.json": "8f5515fd3dba8a14d9b76c4291967860adaf9de12e7b93235978088d2722952b"
+  }
+}

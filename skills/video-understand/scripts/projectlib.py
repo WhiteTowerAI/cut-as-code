@@ -19,11 +19,12 @@ CONTRIBUTION_KINDS = {
     "video-filter",
     "audio-filter",
     "overlay",
+    "timeline-insert",
     "precomputed-asset",
     "output-constraint",
 }
 CANONICAL_PIXEL_ORDER = (
-    "cut", "color-grade", "b-roll", "captions", "content-cards", "graphic-motion",
+    "cut", "color-grade", "b-roll", "captions", "content-cards", "motion-graphics",
 )
 POINT_WORD_DURATION_S = 0.001
 
@@ -1112,25 +1113,25 @@ def _validate_image_sequence(contribution, asset_path, expected_fps, operation_i
             errors.append(f"{operation_id} image-sequence first frame is missing")
 
 
-def _graphic_motion_module():
-    module = sys.modules.get("graphic_motion_plan")
+def _motion_graphics_module():
+    module = sys.modules.get("motion_graphics_plan")
     if module is not None and hasattr(module, "validate_plan"):
         return module
-    path = Path(__file__).resolve().parents[2] / "video-add-graphic-motion/scripts/graphic_motion_plan.py"
-    spec = importlib.util.spec_from_file_location("_projectlib_graphic_motion_plan", path)
+    path = Path(__file__).resolve().parents[2] / "video-add-motion-graphics/scripts/motion_graphics_plan.py"
+    spec = importlib.util.spec_from_file_location("_projectlib_motion_graphics_plan", path)
     if spec is None or spec.loader is None:
-        raise ImportError(f"cannot load graphic-motion validator: {path}")
+        raise ImportError(f"cannot load motion-graphics validator: {path}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
-def _validate_graphic_motion_plan(
+def _validate_motion_graphics_plan(
     plan, operation, contributions, timeline, errors, project_root, *, project=None,
 ):
     """Recheck the immutable plan and file bindings at delivery compilation."""
     operation_id = operation.get("id") if isinstance(operation, dict) else None
-    operation_id = operation_id or "graphic-motion"
+    operation_id = operation_id or "motion-graphics"
     prefix = f"{operation_id} "
     if not isinstance(plan, dict):
         errors.append(prefix + "plan must be an object")
@@ -1139,7 +1140,7 @@ def _validate_graphic_motion_plan(
         errors.append(prefix + "compiler inputs are invalid")
         return
     try:
-        domain_errors = _graphic_motion_module().validate_plan(
+        domain_errors = _motion_graphics_module().validate_plan(
             plan, timeline, project=project, project_root=project_root, verify_files=True,
         )
     except Exception as exc:
@@ -1254,13 +1255,13 @@ def build_render_plan(project, project_root):
             continue
         contributions = declared if isinstance(declared, list) else [declared]
         if (
-            operation_id == "graphic-motion"
-            or operation.get("skill") == "video-add-graphic-motion"
+            operation_id == "motion-graphics"
+            or operation.get("skill") == "video-add-motion-graphics"
         ):
             before = len(errors)
-            if operation_id != "graphic-motion":
+            if operation_id != "motion-graphics":
                 errors.append(f"{operation_id} operation id is invalid")
-            if operation.get("skill") != "video-add-graphic-motion":
+            if operation.get("skill") != "video-add-motion-graphics":
                 errors.append(f"{operation_id} operation skill is invalid")
             target = operation.get("target")
             if not isinstance(target, dict) or target.get("sequence") != sequence_name:
@@ -1286,7 +1287,7 @@ def build_render_plan(project, project_root):
                 except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
                     errors.append(f"{operation_id} invalid plan: {exc}")
                 else:
-                    _validate_graphic_motion_plan(
+                    _validate_motion_graphics_plan(
                         motion_plan, operation, contributions, timeline, errors, project_root,
                         project=project,
                     )
@@ -1357,6 +1358,7 @@ def build_render_plan(project, project_root):
                 "timeline-transform": "input",
                 "video-filter": "plan",
                 "overlay": "asset",
+                "timeline-insert": "asset",
                 "precomputed-asset": "asset",
             }.get(kind)
             resolved_paths = {}
@@ -1373,7 +1375,7 @@ def build_render_plan(project, project_root):
                 errors.append(f"{operation_id} {kind} requires {required_path}")
             elif required_path:
                 required = resolved_paths[required_path]
-                if kind == "overlay" and contribution.get("asset_type") == "image-sequence":
+                if kind in {"overlay", "timeline-insert"} and contribution.get("asset_type") == "image-sequence":
                     _validate_image_sequence(
                         contribution,
                         required,
@@ -1385,6 +1387,23 @@ def build_render_plan(project, project_root):
                     errors.append(
                         f"{operation_id} missing {required_path}: {contribution[required_path]}"
                     )
+
+            if kind == "timeline-insert":
+                anchor_s = contribution.get("anchor_s")
+                duration_s = contribution.get("duration_s")
+                base_duration_s = timeline.get("program_duration_s") if timeline else None
+                if (
+                    isinstance(anchor_s, bool)
+                    or not isinstance(anchor_s, (int, float))
+                    or isinstance(duration_s, bool)
+                    or not isinstance(duration_s, (int, float))
+                    or duration_s <= 0
+                    or base_duration_s is None
+                    or anchor_s < 0
+                    or anchor_s > base_duration_s
+                    or contribution.get("audio") != {"mode": "silence"}
+                ):
+                    errors.append(f"{operation_id} timeline-insert contract is invalid")
 
             if kind == "video-filter":
                 if contribution.get("target") not in ("base-video", "composite"):

@@ -1,0 +1,75 @@
+spec_version: 1
+id: "codrops-introgridmotiontransition-index"
+name: "Hover Motion Intro Animation"
+description: "A lush image grid uses motion and depth to introduce a new visual world."
+surfaces: [video]
+category: "fullscreen-opener"
+tech: [html, css, js]
+canvas: [video]
+target: [fullscreen]
+intent: "fullscreen-opener"
+runtime: [css, js]
+export: [skill, html]
+dependencies: []
+tags:
+  - "codrops"
+  - "grid"
+  - "images"
+  - "intro"
+  - "depth"
+  - "opener"
+  - "fullscreen"
+intent_keywords:
+  - "image grid opener"
+  - "cinematic visual introduction"
+  - "gallery chapter transition"
+  - "图片网格开场"
+  - "视觉章节转场"
+best_for:
+  - "An opener, chapter, or interstitial in travel, nature, design, and visual-essay videos"
+  - "A fullscreen introduction built from a coherent set of scenery or object images"
+avoid_when:
+  - "The cue needs restrained corporate styling or only a plain title"
+  - "The images are unrelated, face-dependent, or too detailed at grid scale"
+structural_roles:
+  - "opener"
+  - "chapter"
+  - "interstitial"
+motion_functions:
+  - "reveal"
+  - "transition"
+  - "build"
+visual_language:
+  - "playful"
+  - "cinematic"
+  - "editorial"
+mechanisms:
+  - "image-grid"
+  - "depth"
+  - "motion-intro"
+rhythm_energy: "medium-high"
+information_density: "dense"
+frame_relationship: "fullscreen"
+color_tendency: "image-led"
+style_rationale: "The reviewed frame is an immersive field of images with clear depth and motion, a strong entry into a visual chapter."
+restraint:
+  max_per_view: 1
+  notes: "Use as one frame-dominant designed cutaway; adapt content, palette, typography, framing, and timing instead of running an unchanged source showcase."
+motion:
+  duration_ms: 8000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: "index/index.html"
+implementations:
+  - tech: js
+    files: ["index/index.html", "index/hf-recipe.js", "index/hf-adapter.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/codrops/IntroGridMotionTransition/tree/07ec3988e873e1710fb65b9d921c3aa6c05b16eb"
+  attribution_required: true
+author:
+  name: "codrops"
+  url: "https://github.com/codrops"
+version: 0.1.0

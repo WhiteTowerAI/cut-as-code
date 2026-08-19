@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "recipe_id": "meteocons-snow",
+  "source_id": "meteocons",
+  "upstream_asset": "fill/snow.svg",
+  "source_files": {
+    "preview.html": "82fe9913d03e298814d6ce1a8868aa75b7541c644938db4439cfd70bad8b8148",
+    "icon.svg": "799097a25ec08f10e66a69bbbdf9b49a8fa19c5b09855d2ccdc49300e71309c3"
+  }
+}

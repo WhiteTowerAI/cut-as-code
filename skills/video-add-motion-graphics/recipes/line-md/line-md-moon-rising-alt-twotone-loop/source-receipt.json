@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-moon-rising-alt-twotone-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "253659635dce7ba4b579523d9dd7a6ada41a985e1a9f0038373c1f52367cc781",
+    "icon.svg": "c5dc89034fcd860a0e85bf9d059bbcf8e6c0190b43f8dcf686c137b2eab56f92",
+    "upstream-icon.json": "e0c1eeee05a11f839429c8c4d24c935ee54ba2f3847fe851311dc8683925f6fa"
+  }
+}

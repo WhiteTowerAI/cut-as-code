@@ -1,0 +1,240 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-07T05:07:07.562Z",
+  "imports_root": "D:\\Users\\Charles Kang\\Desktop\\temp\\cut-as-code\\skills\\video-add-motion-graphics\\recipes\\codrops",
+  "total_variants": 5,
+  "visual": [
+    {
+      "key": "RotatingOnScrollAnimations/index",
+      "times": [
+        0.1,
+        4,
+        7.9
+      ],
+      "frames": [
+        {
+          "hash": "93e54213cd36fb7631299c9c9db66670d2bf303851accfbb2151e2c67233e653",
+          "range": 210,
+          "paintedRatio": 0.468038,
+          "time": 0.1
+        },
+        {
+          "hash": "f3411d289cb069264891d2dfc18c16f73193d4717cbc5a0ea6e29d6d2944ae4f",
+          "range": 216,
+          "paintedRatio": 0.52974,
+          "time": 4
+        },
+        {
+          "hash": "e247674f21ed5f30b4e09293df92f988093b70f1c94a25dd8f99affa44b5fea4",
+          "range": 196,
+          "paintedRatio": 0.554149,
+          "time": 7.9
+        }
+      ],
+      "repeatHash": "f3411d289cb069264891d2dfc18c16f73193d4717cbc5a0ea6e29d6d2944ae4f",
+      "repeatChangedPixelRatio": 0,
+      "changedPixelRatios": [
+        0.427517,
+        0.556198
+      ],
+      "errors": [],
+      "requestFailures": [],
+      "cursorHidden": true,
+      "visibleTextFlags": [],
+      "visibleControls": [],
+      "nonblank": true,
+      "changed": true,
+      "deterministic": true,
+      "runtimeClean": true,
+      "chromeClean": true,
+      "ok": true
+    },
+    {
+      "key": "RotatingOnScrollAnimations/index2",
+      "times": [
+        0.1,
+        4,
+        7.9
+      ],
+      "frames": [
+        {
+          "hash": "a199823e81ada0385e899d61770b3699099581d7045d0d0b8efebfceb99b8cd3",
+          "range": 190,
+          "paintedRatio": 0.516979,
+          "time": 0.1
+        },
+        {
+          "hash": "737c8dd7e49c952e46f68922182489035e0910c4514b3ef62b2639679db05fe0",
+          "range": 196,
+          "paintedRatio": 0.529705,
+          "time": 4
+        },
+        {
+          "hash": "06470ed75c56d5f1bae1ce2e5806d1aeeffdfe933a0a6f2ab29ddbaf89ab440c",
+          "range": 196,
+          "paintedRatio": 0.512413,
+          "time": 7.9
+        }
+      ],
+      "repeatHash": "fa367a8b114a404278cfe06840a2692ee2bc62b170df5beb3b2d374631fa58e1",
+      "repeatChangedPixelRatio": 0.000347,
+      "changedPixelRatios": [
+        0.18717,
+        0.194444
+      ],
+      "errors": [],
+      "requestFailures": [],
+      "cursorHidden": true,
+      "visibleTextFlags": [],
+      "visibleControls": [],
+      "nonblank": true,
+      "changed": true,
+      "deterministic": false,
+      "runtimeClean": true,
+      "chromeClean": true,
+      "ok": false
+    },
+    {
+      "key": "RotatingOnScrollAnimations/index3",
+      "times": [
+        0.1,
+        4,
+        7.9
+      ],
+      "frames": [
+        {
+          "hash": "e4bb9a2c010ec6e4beb6fe2a3668a2bd370f79d61e86c79b1ceeaa784ca31033",
+          "range": 193,
+          "paintedRatio": 0.050382,
+          "time": 0.1
+        },
+        {
+          "hash": "5db4a54f3ca803e7c75a2a40448b8b8ace73c0cd1a2d400cde019d85adbc6955",
+          "range": 192,
+          "paintedRatio": 0.074722,
+          "time": 4
+        },
+        {
+          "hash": "c0fd3c4871e99a3d3ca74658d7a0f06b27fda369eec2ececd1c0a7fb49f4fd36",
+          "range": 177,
+          "paintedRatio": 0.058785,
+          "time": 7.9
+        }
+      ],
+      "repeatHash": "f812d18cf88138515bc5f8d89e6ea4f751d070c9023ecf32e51cbdcd83c88394",
+      "repeatChangedPixelRatio": 0,
+      "changedPixelRatios": [
+        0.097847,
+        0.096267
+      ],
+      "errors": [],
+      "requestFailures": [],
+      "cursorHidden": true,
+      "visibleTextFlags": [],
+      "visibleControls": [],
+      "nonblank": true,
+      "changed": true,
+      "deterministic": true,
+      "runtimeClean": true,
+      "chromeClean": true,
+      "ok": true
+    },
+    {
+      "key": "RotatingOnScrollAnimations/index4",
+      "times": [
+        0.1,
+        4,
+        7.9
+      ],
+      "frames": [
+        {
+          "hash": "1e106b24baec62b884ff9ebec633b009f6ce965822f1f04fecd728d5b4b5a88f",
+          "range": 240,
+          "paintedRatio": 1,
+          "time": 0.1
+        },
+        {
+          "hash": "2885d9db05e12b66f34d8e235acc35e9be735b6eb35072f7c469a1c8440453af",
+          "range": 236,
+          "paintedRatio": 1,
+          "time": 4
+        },
+        {
+          "hash": "e65cb70a90a09ab98877fad359474aa8350bdc4bdf417a8f14a3a78f5947338f",
+          "range": 237,
+          "paintedRatio": 1,
+          "time": 7.9
+        }
+      ],
+      "repeatHash": "958e1ec99fcf91c6dbfae6a198af5660af2314dad6273f65474e74df992d7c87",
+      "repeatChangedPixelRatio": 0,
+      "changedPixelRatios": [
+        0.16191,
+        0.20658
+      ],
+      "errors": [],
+      "requestFailures": [],
+      "cursorHidden": true,
+      "visibleTextFlags": [],
+      "visibleControls": [],
+      "nonblank": true,
+      "changed": true,
+      "deterministic": true,
+      "runtimeClean": true,
+      "chromeClean": true,
+      "ok": true
+    },
+    {
+      "key": "RotatingOnScrollAnimations/index5",
+      "times": [
+        0.1,
+        4,
+        7.9
+      ],
+      "frames": [
+        {
+          "hash": "09e69d716ced444bc2508e91e396d3d7f55202370afc26a7161b084de8f327d1",
+          "range": 180,
+          "paintedRatio": 0.462014,
+          "time": 0.1
+        },
+        {
+          "hash": "8c2b0fcccc5c12d456b1b02afeecc6caa46a945f17deba9daba7b53cdaa04c78",
+          "range": 201,
+          "paintedRatio": 0.458628,
+          "time": 4
+        },
+        {
+          "hash": "c797b94a8e1abd7ed1ac6981749002a50fa24ba8fc1f04f997bad318c22b0ae9",
+          "range": 179,
+          "paintedRatio": 0.464687,
+          "time": 7.9
+        }
+      ],
+      "repeatHash": "517c4e3e20c3f916222ab74126be3cc1865f09d937c79e105fa352f1c85286b2",
+      "repeatChangedPixelRatio": 0,
+      "changedPixelRatios": [
+        0.092205,
+        0.108698
+      ],
+      "errors": [],
+      "requestFailures": [],
+      "cursorHidden": true,
+      "visibleTextFlags": [],
+      "visibleControls": [],
+      "nonblank": true,
+      "changed": true,
+      "deterministic": true,
+      "runtimeClean": true,
+      "chromeClean": true,
+      "ok": true
+    }
+  ],
+  "cli": [],
+  "summary": {
+    "visual_passed": 4,
+    "visual_failed": 1,
+    "cli_passed": 0,
+    "cli_failed": 0
+  }
+}

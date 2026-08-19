@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "meteocons-rain",
+  "surface": "meteocons",
+  "runtime": [
+    "svg-smil"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "svg-smil",
+  "source_manifest_sha256": "c3abd39f2f92d7a43b9da92c6c6772cc053b332368485be627d1948054fbef08"
+}

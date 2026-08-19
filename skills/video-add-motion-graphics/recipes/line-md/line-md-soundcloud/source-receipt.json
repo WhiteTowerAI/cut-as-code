@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-soundcloud",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "1e9d48cb17bbe187a8b00b0f9a61e5f99fdb6e515212b0c9d77b277548135ca1",
+    "icon.svg": "ec6e411af70555bd4c80f825e906a85d57c304eeabad20a2facdfebd11857888",
+    "upstream-icon.json": "14a0f827d215aeeac8e0d54702eb7639a3887a79bd8bddf04616894a92011528"
+  }
+}

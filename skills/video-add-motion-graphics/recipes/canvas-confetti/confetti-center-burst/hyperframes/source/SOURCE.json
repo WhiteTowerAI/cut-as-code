@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "source_id": "canvas-confetti",
+  "display_name": "canvas-confetti",
+  "website": "https://catdad.github.io/canvas-confetti/",
+  "repository": "https://github.com/catdad/canvas-confetti",
+  "revision": "20eebad51dde793070c373d594099a7ed8d96e22",
+  "package": {
+    "name": "canvas-confetti",
+    "version": "1.9.4",
+    "tarball_file": "canvas-confetti-1.9.4.tgz",
+    "tarball_sha256": "c7c7d003c8b444d4f8e340e0b2c2a474abf2803ce34d184f783c1107217853e2"
+  },
+  "license": {
+    "spdx": "ISC",
+    "file": "LICENSE.canvas-confetti"
+  },
+  "selection_count": 10,
+  "conversion": "Original implementation or SVG preserved and wrapped for deterministic HyperFrames seeking."
+}

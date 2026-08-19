@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-lightbulb-off-filled-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "85d4cf6f00867976ac9327140c738a02bf84bfd9d8769a44f98014b8974c4da4",
+    "icon.svg": "2723be67e012bdcab1d5e606af6b54da7410f14847fb2a07b462ae071ae35add",
+    "upstream-icon.json": "c8929f38dfe99edfee14f4a8b7d143811f878ff7e6e4893024878da154e841a1"
+  }
+}

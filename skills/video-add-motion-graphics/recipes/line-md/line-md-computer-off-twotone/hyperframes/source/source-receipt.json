@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-computer-off-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "0a585552736a2ada3a6372ffacf07d655b60a254143d16592408f64432f45d07",
+    "icon.svg": "6cdf6a197152ff13e1333f4062593457a6eeaae89083bf9a60e90b563f3dc763",
+    "upstream-icon.json": "dbf8b755cd8d5f33ed838c2d37c7a08f6295558f8450a1c41554546d17599814"
+  }
+}

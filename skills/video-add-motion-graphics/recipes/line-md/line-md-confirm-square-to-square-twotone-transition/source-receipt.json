@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-confirm-square-to-square-twotone-transition",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "9d0e50e94b6b13a380157e7c9bb23459a85e006c242ae9c9621043c01e024fbc",
+    "icon.svg": "0d0797fa567d50fbe29f3aeaeba4ecd056d7f421e66daa901c8c069cae0d055f",
+    "upstream-icon.json": "e89977a62de16e1fd1146828ea36892c69297d4ca65d9799878ad939d1fbe616"
+  }
+}

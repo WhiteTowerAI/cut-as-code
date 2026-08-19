@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "xyz-fade-down",
+  "surface": "animxyz",
+  "runtime": [
+    "css"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "css",
+  "source_manifest_sha256": "7a8658a8c2cf55839fc3ec10f5ff58ee69ce951db96c93d8cdaeb0ec6fc72eaf"
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-gauge-low-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "94e944e43e147a9fe03aaa4943cb76549a7952101cc0b895b107ca6dfb013fad",
+    "icon.svg": "9b1c8133e7c14e7a8506931eedd2ed07d1ed034598f390d5c6137ba37802edb2",
+    "upstream-icon.json": "e2936e08149a0eb320685ba52c4757c746e7b7be22cea2f07bcae698c9cde26f"
+  }
+}

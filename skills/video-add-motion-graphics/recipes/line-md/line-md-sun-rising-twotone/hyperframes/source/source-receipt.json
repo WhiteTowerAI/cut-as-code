@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-sun-rising-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "7410aecd558476fcef662409f389a9e63b2456b179960aeee38b376236a96d85",
+    "icon.svg": "a148ac114dffd2b256d87636b3bcbc682850a2983bb618faada18729aac35ebe",
+    "upstream-icon.json": "270e5dece1e45a960db486a1183e0dfeb5f4b9cd071335a22f68ec527b5e1c3d"
+  }
+}

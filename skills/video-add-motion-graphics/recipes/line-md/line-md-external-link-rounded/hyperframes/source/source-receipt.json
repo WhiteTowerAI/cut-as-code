@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-external-link-rounded",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "dd7d171973908eff99aca6ebadfbcf301a6a6c4d4b213029c8b4cfb249ac7b5a",
+    "icon.svg": "561f0fce5d40906876feb13d13b6e0751f48d01b6315a741b0985d6782be0d21",
+    "upstream-icon.json": "0c0f2a1b579779733efc67b33a5aeb1f8e447203b4cddc4af1363fb83f801c42"
+  }
+}

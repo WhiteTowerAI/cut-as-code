@@ -44,7 +44,7 @@ slash-command trigger for that skill.
 | `video-edit-compare` | Original versus actual final pixels projected onto the source clock | Python · ffmpeg · Pillow |
 | `video-color-grade` | Assess footage → corrective base + named looks → human picks → bake `.cube` LUT + apply | Python · ffmpeg · numpy · Pillow |
 | `video-add-b-roll` | Selective transcript-timed visual cutaways from local media or Pexels, with provenance, review, and normalized overlays | Python · ffmpeg · Pillow · Pexels API |
-| `video-add-graphic-motion` | Add selective licensed web-sourced motion graphics as deterministic overlays | HyperFrames · Python · Pillow |
+| `video-add-motion-graphics` | Add selective licensed web-sourced motion graphics as deterministic overlays | HyperFrames · Python · Pillow |
 | `video-add-captions` | Preset-driven, word-timed captions with optional karaoke | HyperFrames · ffmpeg |
 | `video-add-content-cards` | Add selective transcript-timed titles, lower-thirds, statistics, quotes, and chapter cards | HyperFrames · ffmpeg |
 | `video-to-shorts` | Find, review, and render short vertical clips from long-form video | Python · ffmpeg |
@@ -65,15 +65,15 @@ slash-command trigger for that skill.
   `overlay`, `precomputed-asset`, and `output-constraint`.
 - Domain decisions remain in `work/cut/edit-plan.json`,
   `work/color-grade/grade-plan.json`, `work/b-roll/broll-plan.json`,
-  `work/graphic-motion/graphic-motion-plan.json`,
+  `work/motion-graphics/motion-graphics-plan.json`,
   `work/content-cards/cards-plan.json`, `work/captions/captions-plan.json`, and
   `work/shorts/shorts-plan.json`.
 - When several pixel operations are active on one sequence, the canonical order is
-  `cut -> color-grade -> b-roll -> captions -> content-cards -> graphic-motion`.
+  `cut -> color-grade -> b-roll -> captions -> content-cards -> motion-graphics`.
   This relative order applies to every selected pair among captions, content cards,
-  and graphic motion. Captions establish a reserved subtitle region that neither
+  and motion graphics. Captions establish a reserved subtitle region that neither
   downstream operation may occupy.
-- For content cards and graphic motion, the visible face and head silhouette of every
+- For content cards and motion graphics, the visible face and head silhouette of every
   primary or foreground person, speaker, presenter, interviewee, or semantically important
   person is a hard exclusion zone throughout the complete cue. An incidental background-only
   person who is not a narrative or visual focus is exempt; when classification is uncertain,
@@ -88,7 +88,7 @@ slash-command trigger for that skill.
 - Caption cues use program time mapped from the canonical source transcript through
   `timeline.json`; they preserve source evidence and contribute a transparent PNG sequence
   overlay at the exact rational timeline FPS. Browser runtime assets must be local and hashed.
-- Graphic-motion cues require verified video understanding, exact permissive source licenses,
+- Motion-graphics cues require verified video understanding, exact permissive source licenses,
   frozen local source/port/review hashes, deterministic native HyperFrames time, and transparent
   PNG sequence overlays at the exact rational timeline FPS. The shared compiler revalidates
   the plan and every delivery binding before rendering.
@@ -154,7 +154,7 @@ These conventions are shared and load-bearing — match them in any new skill:
   - *ffmpeg/Python* standalone operations copy audio when they do not change time. The
     shared delivery renderer encodes audio after cuts, concatenation, varispeed, or an
     audio filter; otherwise it uses `-c:a copy`.
-  - *HyperFrames* (`video-add-captions`, `video-add-content-cards`, `video-add-graphic-motion`) renders transparent
+  - *HyperFrames* (`video-add-captions`, `video-add-content-cards`, `video-add-motion-graphics`) renders transparent
     overlays at the source dimensions, then ffmpeg-composites them onto the source.
 
 - **Review before delivery.** Color grade records a human or delegated agent look choice;
@@ -195,7 +195,7 @@ needed. There is no discover root that covers them all — run them per skill:
 
 ```bash
 python -m unittest skills/video-add-b-roll/tests/test_broll.py          # 155 tests, ~50s
-python -m unittest skills/video-add-graphic-motion/tests/test_graphic_motion_plan.py
+python -m unittest skills/video-add-motion-graphics/tests/test_motion_graphics_plan.py
 python -m unittest skills/video-cut/tests/test_inspect_bounds.py
 python -m unittest skills/video-edit-compare/tests/test_make_compare.py
 

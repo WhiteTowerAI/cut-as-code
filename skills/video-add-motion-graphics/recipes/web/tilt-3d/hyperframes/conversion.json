@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "recipe_id": "tilt-3d",
+  "surface": "web",
+  "runtime": [
+    "css",
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "7ef0fb834f220e643355b37c62c14640144e14be051bf6f2143009ba1dfd4b3b"
+}

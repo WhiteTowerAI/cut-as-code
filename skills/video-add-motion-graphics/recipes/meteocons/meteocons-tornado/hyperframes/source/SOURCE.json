@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "source_id": "meteocons",
+  "display_name": "Meteocons",
+  "website": "https://meteocons.com/",
+  "repository": "https://github.com/basmilius/weather-icons",
+  "revision": "70dfb1d6e30dc9e791cfb0e4c5b5e5e60e972aa0",
+  "package": {
+    "name": "@meteocons/svg",
+    "version": "0.1.0",
+    "tarball_file": "meteocons-svg-0.1.0.tgz",
+    "tarball_sha256": "91b48d1f8497d9e8f4ed1d5bcc32d306aaa5050de99c38467c2a58f7add5a501"
+  },
+  "license": {
+    "spdx": "MIT",
+    "file": "LICENSE.meteocons"
+  },
+  "selection_count": 12,
+  "conversion": "Original implementation or SVG preserved and wrapped for deterministic HyperFrames seeking."
+}

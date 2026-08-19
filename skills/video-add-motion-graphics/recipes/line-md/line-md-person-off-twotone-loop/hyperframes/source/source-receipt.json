@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-person-off-twotone-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "ea0d1260ea4a7bc63f6425bb1359c39ca9f81b57d03bffdbff5f7f457321d0f5",
+    "icon.svg": "ee6730a01b98586d0996a00d604b4c91bbb1327fef7bd6d23534808a652fba9e",
+    "upstream-icon.json": "d1ad5767bf1aa108c79f472f634d909d1f99075cecd4e0d4d1d8352817d2943b"
+  }
+}

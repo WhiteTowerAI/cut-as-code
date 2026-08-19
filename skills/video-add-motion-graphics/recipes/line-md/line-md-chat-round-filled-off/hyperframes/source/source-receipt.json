@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-chat-round-filled-off",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "363f3134f48146896c53e218d0be795e7cd082e24f89191736d09e1f17c5e7d9",
+    "icon.svg": "62d5c118787276d48b1af782ab2807cb9861832dce2018b2ec3c287d2bfa95fa",
+    "upstream-icon.json": "00f63e62afb32b8bf514a48db69e1c89b0720daf03b4d740e20aa4b7e326c40c"
+  }
+}

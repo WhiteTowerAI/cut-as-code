@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-pixelfed-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "301be594472d7419c6dafad79266e7aedba90fe75b4f5bd7dfe676006583920a",
+    "icon.svg": "39fdc25e5495d139015d877df3d7a6a26ea9ebd9e2fc4327e347842aabecb76a",
+    "upstream-icon.json": "b8bb36c25ede8810cac186540bc0a4eb5bfab77ef9a9751e29330e3144b31b58"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-sun-rising",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "b20f780143ba26eb50ace94f7540d5ede89769e6f57602b95d92e4210c4a01e6",
+    "icon.svg": "148277f763ab6e1e419a3812fdff92569e8bd1d8071cf80da0f85cf13d233d1c",
+    "upstream-icon.json": "8e735418672a5ed8a4a79f41d772e9abfd4a052d0130205631e31dc936484a49"
+  }
+}

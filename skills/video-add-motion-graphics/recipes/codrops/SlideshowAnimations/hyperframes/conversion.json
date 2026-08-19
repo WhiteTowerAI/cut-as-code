@@ -1,0 +1,353 @@
+{
+  "schema_version": 1,
+  "project_id": "SlideshowAnimations",
+  "demo_url": "http://tympanus.net/Development/SlideshowAnimations/",
+  "article_url": "https://tympanus.net/codrops/2023/09/27/some-ideas-for-fullscreen-image-slideshow-animations/",
+  "source_url": "https://github.com/codrops/SlideshowAnimations/",
+  "source_commit": "8f9ee4001e0c786ec617f7f729272c4d5a0830a2",
+  "license": {
+    "type": "MIT",
+    "evidence": "repository-file",
+    "file": "LICENSE",
+    "sha256": "85131f2bb7714dc895ff5d7d68db65acc5ad0e5dfd72162869fc8d63dec06056"
+  },
+  "source_copy": "source",
+  "variants": [
+    {
+      "name": "index",
+      "composition_id": "codrops-slideshowanimations-index",
+      "source_entry": "index.html",
+      "runtime_entry": "index.html",
+      "source_sha256": "3bd0faf274f8da049ac4c52a340b9229ae777dc7932b71768811cf94461d7fdc",
+      "runtime_sha256": "3bd0faf274f8da049ac4c52a340b9229ae777dc7932b71768811cf94461d7fdc",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".slides-nav__item--next"
+          }
+        ]
+      },
+      "output": "index/index.html"
+    },
+    {
+      "name": "index2",
+      "composition_id": "codrops-slideshowanimations-index2",
+      "source_entry": "index2.html",
+      "runtime_entry": "index2.html",
+      "source_sha256": "c24c0793f37dee9800dcad3d47e4cd0e2aa42b1cea04482c944be1558b370997",
+      "runtime_sha256": "c24c0793f37dee9800dcad3d47e4cd0e2aa42b1cea04482c944be1558b370997",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".slides-nav__item--next"
+          }
+        ]
+      },
+      "output": "index2/index.html"
+    },
+    {
+      "name": "index3",
+      "composition_id": "codrops-slideshowanimations-index3",
+      "source_entry": "index3.html",
+      "runtime_entry": "index3.html",
+      "source_sha256": "dbf40299ed81bb5423cb33e93eb89ffeef016c4bff9c1f8d88239f0da37f2164",
+      "runtime_sha256": "dbf40299ed81bb5423cb33e93eb89ffeef016c4bff9c1f8d88239f0da37f2164",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".slides-nav__item--next"
+          }
+        ]
+      },
+      "output": "index3/index.html"
+    },
+    {
+      "name": "index4",
+      "composition_id": "codrops-slideshowanimations-index4",
+      "source_entry": "index4.html",
+      "runtime_entry": "index4.html",
+      "source_sha256": "95e814f4b56646f328c0deb833982fce7e54f98267be022c1d41debe484ef342",
+      "runtime_sha256": "95e814f4b56646f328c0deb833982fce7e54f98267be022c1d41debe484ef342",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".slides-nav__item--next"
+          }
+        ]
+      },
+      "output": "index4/index.html"
+    },
+    {
+      "name": "index5",
+      "composition_id": "codrops-slideshowanimations-index5",
+      "source_entry": "index5.html",
+      "runtime_entry": "index5.html",
+      "source_sha256": "1c98e18967ba1d2f59708f95d39e53dd15776a647e6b57e0864f5dc3f26c95b8",
+      "runtime_sha256": "1c98e18967ba1d2f59708f95d39e53dd15776a647e6b57e0864f5dc3f26c95b8",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".slides-nav__item--next"
+          }
+        ]
+      },
+      "output": "index5/index.html"
+    },
+    {
+      "name": "index6",
+      "composition_id": "codrops-slideshowanimations-index6",
+      "source_entry": "index6.html",
+      "runtime_entry": "index6.html",
+      "source_sha256": "1d084a8e7cb9be91d28d9a2b2490ed01348c77deb914fb74c5e938daa0d24edf",
+      "runtime_sha256": "1d084a8e7cb9be91d28d9a2b2490ed01348c77deb914fb74c5e938daa0d24edf",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".slides-nav__item--next"
+          }
+        ]
+      },
+      "output": "index6/index.html"
+    },
+    {
+      "name": "index7",
+      "composition_id": "codrops-slideshowanimations-index7",
+      "source_entry": "index7.html",
+      "runtime_entry": "index7.html",
+      "source_sha256": "43c17bb147ec49f8b047ae4e2bfe11da10fac5b182e649a753ee28ec81e06d45",
+      "runtime_sha256": "43c17bb147ec49f8b047ae4e2bfe11da10fac5b182e649a753ee28ec81e06d45",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".slides-nav__item--next"
+          }
+        ]
+      },
+      "output": "index7/index.html"
+    },
+    {
+      "name": "index8",
+      "composition_id": "codrops-slideshowanimations-index8",
+      "source_entry": "index8.html",
+      "runtime_entry": "index8.html",
+      "source_sha256": "b936c06c8bdad77de82846f702cf3e086cf97abef7acdbf4521c0d6823e46ff4",
+      "runtime_sha256": "b936c06c8bdad77de82846f702cf3e086cf97abef7acdbf4521c0d6823e46ff4",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".slides-nav__item--next"
+          }
+        ]
+      },
+      "output": "index8/index.html"
+    },
+    {
+      "name": "index9",
+      "composition_id": "codrops-slideshowanimations-index9",
+      "source_entry": "index9.html",
+      "runtime_entry": "index9.html",
+      "source_sha256": "5868fdfcbf0c93dd40192e09351bd5deebb6449fcffa0a5c9f5814287998294e",
+      "runtime_sha256": "5868fdfcbf0c93dd40192e09351bd5deebb6449fcffa0a5c9f5814287998294e",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".slides-nav__item--next"
+          }
+        ]
+      },
+      "output": "index9/index.html"
+    },
+    {
+      "name": "index10",
+      "composition_id": "codrops-slideshowanimations-index10",
+      "source_entry": "index10.html",
+      "runtime_entry": "index10.html",
+      "source_sha256": "a8c490a84cef25d81ae1182fa7641cb2d80077347d49dc83d8be10b215c73048",
+      "runtime_sha256": "a8c490a84cef25d81ae1182fa7641cb2d80077347d49dc83d8be10b215c73048",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".slides-nav__item--next"
+          }
+        ]
+      },
+      "output": "index10/index.html"
+    },
+    {
+      "name": "index11",
+      "composition_id": "codrops-slideshowanimations-index11",
+      "source_entry": "index11.html",
+      "runtime_entry": "index11.html",
+      "source_sha256": "4fa37cab95ad51e86523e7e2be421b8e837a753ce3e7e12a4bfe5cb1eca8ec85",
+      "runtime_sha256": "4fa37cab95ad51e86523e7e2be421b8e837a753ce3e7e12a4bfe5cb1eca8ec85",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".slides-nav__item--next"
+          }
+        ]
+      },
+      "output": "index11/index.html"
+    },
+    {
+      "name": "index12",
+      "composition_id": "codrops-slideshowanimations-index12",
+      "source_entry": "index12.html",
+      "runtime_entry": "index12.html",
+      "source_sha256": "0db37a27182a2525c85567039e6001d595f467021553826836a428b44dc4e489",
+      "runtime_sha256": "0db37a27182a2525c85567039e6001d595f467021553826836a428b44dc4e489",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".slides-nav__item--next"
+          }
+        ]
+      },
+      "output": "index12/index.html"
+    },
+    {
+      "name": "index13",
+      "composition_id": "codrops-slideshowanimations-index13",
+      "source_entry": "index13.html",
+      "runtime_entry": "index13.html",
+      "source_sha256": "5e647f2eda555375d0113988c18466fefe7d2eb667db93fa6d69d49cdf2e39a3",
+      "runtime_sha256": "5e647f2eda555375d0113988c18466fefe7d2eb667db93fa6d69d49cdf2e39a3",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".slides-nav__item--next"
+          }
+        ]
+      },
+      "output": "index13/index.html"
+    },
+    {
+      "name": "index14",
+      "composition_id": "codrops-slideshowanimations-index14",
+      "source_entry": "index14.html",
+      "runtime_entry": "index14.html",
+      "source_sha256": "6583a75872a072d710338b866d8c951c28daaf6e019a532b29d74ac471c5d384",
+      "runtime_sha256": "6583a75872a072d710338b866d8c951c28daaf6e019a532b29d74ac471c5d384",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".slides-nav__item--next"
+          }
+        ]
+      },
+      "output": "index14/index.html"
+    },
+    {
+      "name": "index15",
+      "composition_id": "codrops-slideshowanimations-index15",
+      "source_entry": "index15.html",
+      "runtime_entry": "index15.html",
+      "source_sha256": "ec9c8383ae07d82d1c5197d742c02c16f949503ebeb4385a07157b6069720ea4",
+      "runtime_sha256": "ec9c8383ae07d82d1c5197d742c02c16f949503ebeb4385a07157b6069720ea4",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".slides-nav__item--next"
+          }
+        ]
+      },
+      "output": "index15/index.html"
+    },
+    {
+      "name": "index16",
+      "composition_id": "codrops-slideshowanimations-index16",
+      "source_entry": "index16.html",
+      "runtime_entry": "index16.html",
+      "source_sha256": "3d72003c3aa3ba88d3206e92c7fb891861010a47050b7ec2ca2a01afc57f48c1",
+      "runtime_sha256": "3d72003c3aa3ba88d3206e92c7fb891861010a47050b7ec2ca2a01afc57f48c1",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".slides-nav__item--next"
+          }
+        ]
+      },
+      "output": "index16/index.html"
+    }
+  ]
+}

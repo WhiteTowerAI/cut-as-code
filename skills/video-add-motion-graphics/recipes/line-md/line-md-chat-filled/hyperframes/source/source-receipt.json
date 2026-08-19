@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-chat-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "ad11c21b807a0f97bb0cd70207b31afd70d515fb1ca7654dfca880e2663cea71",
+    "icon.svg": "fd9aa2422dd8ce203138c0966946458657fadc1c644949066c930a91103145a1",
+    "upstream-icon.json": "fb37cf6025a2f6a39161f678b804d29a02394cef9bba9b539f9b0d3cb9dc9fb8"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-bell-alert-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "b1a0b11b60d2843d2e8ac9cd2a47f9ba9b9d24a5aa9b699b2edf11917c468b1f",
+    "icon.svg": "a37f868c39c694344674f6395786b68993b46a3462c9a3fc264166709731b8ad",
+    "upstream-icon.json": "65c74600a64b3d021e320d53a5f1a87c2a7a65c3b1b4184d4b84f122f62e59d9"
+  }
+}

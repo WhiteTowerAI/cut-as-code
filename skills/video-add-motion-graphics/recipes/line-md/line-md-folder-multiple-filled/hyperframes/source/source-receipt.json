@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-folder-multiple-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "b3e0dfc04187e954de3be6bae03fa5a932514fb13dfa51edfda95df4a12ef45d",
+    "icon.svg": "75bbca2d0c895b3a7968b0de119415159ad3bcdaa0d6ecd5b88395c9a3c1424a",
+    "upstream-icon.json": "7a8c736ea88fb886882337b89e6e2b460f722d7357866c0166e2ec3373ac1cb5"
+  }
+}

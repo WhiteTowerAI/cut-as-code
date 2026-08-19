@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-chevron-double-right",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "135ce07a2f614f097cddb4f199fef98b0667b850d2c68af8b37c05076fa96e2f",
+    "icon.svg": "dac17723f5b5da3be64a11830d9e8774638e82778ae89cf276c5a5999904325b",
+    "upstream-icon.json": "8877a25d4bbc2981ccf959efad0c02f64e1e1c24e840a3d842d3a2d9c6a54f85"
+  }
+}

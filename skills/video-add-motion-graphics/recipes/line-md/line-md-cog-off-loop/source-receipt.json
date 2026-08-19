@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-cog-off-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "8cc7e75090922398030a9a2fde73d8f20b2be01dccdc28fe9fa24071b0ae5b18",
+    "icon.svg": "e9844fb478f3f60a51ff957811a525978744e9f28070ea7e4bea6003eee459bb",
+    "upstream-icon.json": "17a493c38cee8f7f9bca611f155eafd6b0c41d0f2d0a314d5fcc23a122fd4fc9"
+  }
+}

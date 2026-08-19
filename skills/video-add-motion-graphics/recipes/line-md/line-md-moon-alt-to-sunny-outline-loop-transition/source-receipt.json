@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-moon-alt-to-sunny-outline-loop-transition",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "348f9dccb5269857911c21d223ce8cf2b98aee1e1a56fbb84f67759e18f3adc1",
+    "icon.svg": "52fa5920ba193ddef121abca37afba029c552e3f78984c5cb3f5e515aac55827",
+    "upstream-icon.json": "5ddab898a9d49a3ac96fd1f6b72c6fd1654d4cfabbf8b5273126ea3d3a81b832"
+  }
+}

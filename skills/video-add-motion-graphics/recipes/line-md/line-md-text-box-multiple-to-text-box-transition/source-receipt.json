@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-text-box-multiple-to-text-box-transition",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "83a0e9a80bd42ae9f63745e3a9b914bd4106ce6ec67e0c6c4beed0d7ab3c738a",
+    "icon.svg": "abd42b7c90673fb21cee35cc470d51eb5d4314da223aecdbfd5fbda21d8957c5",
+    "upstream-icon.json": "02d3f9090fc1d93d0a719ca87a41c6a4892b507283ba96f0508aeecb40e3511d"
+  }
+}

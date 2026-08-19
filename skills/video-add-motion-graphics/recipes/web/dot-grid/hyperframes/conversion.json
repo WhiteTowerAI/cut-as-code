@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "dot-grid",
+  "surface": "web",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "afefd6a6320ae8c8a20058528fa97b7982a1c473983ac662d8f4d1c994642d9c"
+}

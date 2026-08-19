@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-phone-call-twotone-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "1118855ca47eb755d1c374e30b36f5278ac1a992447d660699317ae44e161f1d",
+    "icon.svg": "aeff1a4b94b9da1b9a3b4e6e7fa88ef481363056f6afca24d481bac56dd6a22f",
+    "upstream-icon.json": "0ded441324bf0068171c9d1c87c364927067e417c7eb7baa300d467bfec96f7f"
+  }
+}

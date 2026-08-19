@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-car-light",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "4a322944a211a2439971a6af597edf62d8970341e6aa58bb2cdc6688f9213968",
+    "icon.svg": "67c92bd548fe356258fe2875d428a609e4f136762b2bb94ebd93c6384044b309",
+    "upstream-icon.json": "073e489a3468e02d7253b0a1d14746ff96134a0ab782360bb69ff0abf85abf24"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-computer-off-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "55847e9c4abdd6da5a8b46b9ebf0c0abf6c2f644528795c8e1af3838fafe9071",
+    "icon.svg": "df8c3bd62aee15c697bd5b58708ffb85f0da6de5118b0372c9dbf6e7c5b57d65",
+    "upstream-icon.json": "fab88767027a4921f2be868766927ba2d879d3a9e29e36356326512fc876027b"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-brake-hold",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "fcf0efcacfe2d570cc9dd802b925f5278da64e776e998ab3fb9bd55b8b7ae1c5",
+    "icon.svg": "4cb5d7cafaf7eeb5f135418d157b0e8ad3db1f7ce77935928fab3b7a3d86f799",
+    "upstream-icon.json": "ad2ae6d2f146836d3ba0e4b812397b02e451f04736d90c6634b93417dbcb4d79"
+  }
+}

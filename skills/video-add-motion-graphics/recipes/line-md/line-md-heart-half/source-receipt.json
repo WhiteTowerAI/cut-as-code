@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-heart-half",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "c3b3b614bd4be8e252bb54714f06095694e8c0e3f943e3c51599e3478b62b24e",
+    "icon.svg": "41b44ad8e8a3af4e56c14091f0cc4a211e112ed3322d59f8a56e93170aa7ffce",
+    "upstream-icon.json": "2a9d8a21e790af5b9e6bbd1e7f974b0c2f336c927d8bdc452c622277f0539dd5"
+  }
+}

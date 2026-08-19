@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "meteocons-lightning-bolt",
+  "surface": "meteocons",
+  "runtime": [
+    "svg-smil"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "svg-smil",
+  "source_manifest_sha256": "9c0bbaeb3cdd291e832b08f3dd0191eae779c91022c8ebae278bb07bed156cba"
+}

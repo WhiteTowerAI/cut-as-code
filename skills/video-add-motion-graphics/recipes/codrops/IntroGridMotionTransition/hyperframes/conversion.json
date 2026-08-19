@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "project_id": "IntroGridMotionTransition",
+  "demo_url": "https://tympanus.net/Development/IntroGridMotionTransition",
+  "article_url": "https://tympanus.net/codrops/2024/05/29/hover-motion-intro-animation/",
+  "source_url": "https://github.com/codrops/IntroGridMotionTransition",
+  "source_commit": "07ec3988e873e1710fb65b9d921c3aa6c05b16eb",
+  "license": {
+    "type": "MIT",
+    "evidence": "repository-file",
+    "file": "LICENSE",
+    "sha256": "a5ad4d98a7970bd09ba775c7e237fb93c60139f8e0e261ebb470e580b213c226"
+  },
+  "source_copy": "source",
+  "variants": [
+    {
+      "name": "index",
+      "composition_id": "codrops-introgridmotiontransition-index",
+      "source_entry": "index.html",
+      "runtime_entry": "index.html",
+      "source_sha256": "0e2b2a8d8ee05c9afe435f592268031a57bc8197704ee4fb7bfc88fc070f1fbc",
+      "runtime_sha256": "0e2b2a8d8ee05c9afe435f592268031a57bc8197704ee4fb7bfc88fc070f1fbc",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "pointer",
+        "duration": 8,
+        "actions": [
+          {
+            "at": 2.4,
+            "type": "click",
+            "selector": ".enter"
+          }
+        ]
+      },
+      "output": "index/index.html"
+    }
+  ]
+}

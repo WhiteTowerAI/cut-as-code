@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-backup-restore",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "0358a0ef162c41b9953efe8479fd197e5c98838a7763024728f793bb67dbfd06",
+    "icon.svg": "92d14e2a389ca32bd5768c748c39930303fd5efb549146c0192056d6ef5dac0a",
+    "upstream-icon.json": "910a74da4fc2006f8f315f2e23dfc68bc9e066b756457bb545392f018c5cf8d1"
+  }
+}

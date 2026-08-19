@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-compass-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "b39aa00e72b9d4eb8a7f957ff0e11c22e80f3f55b42d06f6bbbdd360a13f4284",
+    "icon.svg": "bb24c3d165057d9a2219d6fe42b59b3e83582abce129063e748370ee209dbfef",
+    "upstream-icon.json": "b03d85d6c71af6b6809c0e6d8c33962fd508fbdb2b3a42adc1b86b8086265bb3"
+  }
+}

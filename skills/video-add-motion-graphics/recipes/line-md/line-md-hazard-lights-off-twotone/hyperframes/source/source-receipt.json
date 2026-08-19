@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-hazard-lights-off-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "19f30e40f349aff9bf46cb8c90837c5cfa85e304ee9b69f5d56b0c5b90bb5c70",
+    "icon.svg": "6855e75732f7295b78d006c1aa2c92800be0dd2414c20f1eb21a4d165297468a",
+    "upstream-icon.json": "b56667dfeb44410581818bb886bfaa54453b530f15f2954e055c1510c3f21a23"
+  }
+}

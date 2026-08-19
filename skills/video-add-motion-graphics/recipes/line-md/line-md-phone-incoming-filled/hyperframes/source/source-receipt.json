@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-phone-incoming-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "48a950e7d46f87480aa4c7934793d8c1c67682116a94c94438022fec43ea4105",
+    "icon.svg": "c833d3b7e356deeda1411e0350b1689e6c9a139ce21572b32b927649a8845b6e",
+    "upstream-icon.json": "1aa2cdc8618c7a69a4b42da8ef8cb695ca183395e7231b0033d66faa8d35194e"
+  }
+}

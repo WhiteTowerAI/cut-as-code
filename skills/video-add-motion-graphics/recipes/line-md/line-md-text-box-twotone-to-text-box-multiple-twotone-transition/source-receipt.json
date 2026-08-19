@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-text-box-twotone-to-text-box-multiple-twotone-transition",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "da03fde37a25f350a2c2ba2b006b04bba8fd61f58ddd8b78c9d3b30ac0fadf56",
+    "icon.svg": "4751fe73542175c1296a4b4fddb89fc40b3e4a6e8747081b6e3b2044a8069fc9",
+    "upstream-icon.json": "1a3eb498547fbbe73164d15c52776c89ae1c673eb2fb0db10bcbe81ef9154666"
+  }
+}

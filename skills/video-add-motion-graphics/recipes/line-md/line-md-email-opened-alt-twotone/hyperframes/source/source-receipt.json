@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-email-opened-alt-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "7e7a91ca17963704321359c6de83f303f707b121a862e57f81e417baaeaa6370",
+    "icon.svg": "fe4bd45070c50b175020bf27564ba467f56ab41fee649be1257b12d041cc9c80",
+    "upstream-icon.json": "a7d5f479f16b3701f4c08cd8c68efb091117e50aed08836996f75fc5cbcd10b9"
+  }
+}

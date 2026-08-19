@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "recipe_id": "stagger-list",
+  "surface": "web",
+  "runtime": [
+    "css",
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "4a5f0f625c794df91849c098f2e4a3e8bd7bd4752cb9c7fa94d40d44a198acfe"
+}

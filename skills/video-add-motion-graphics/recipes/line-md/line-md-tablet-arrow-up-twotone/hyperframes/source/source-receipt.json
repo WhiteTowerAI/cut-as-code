@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-tablet-arrow-up-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "c3ed94da2fbf0a892915dca469ebeaf168c7ad761f70da7fb8d994fa06d5c133",
+    "icon.svg": "5aa1cf4c7ca2897f16ac13c1190a4baf699c02b4e246c7fba118105b1f54b850",
+    "upstream-icon.json": "e7f7c9c8b63bc5cd9075251c0c2f4e75d307c5f88d957ae70f665ba4f9639db4"
+  }
+}

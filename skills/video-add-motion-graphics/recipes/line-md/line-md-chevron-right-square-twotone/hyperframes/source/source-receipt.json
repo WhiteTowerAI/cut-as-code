@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-chevron-right-square-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "8177297739240f7d4271299036b8a00a00f596c3068075f53735eadddc909bb2",
+    "icon.svg": "e5eb7a5e3ec5559efc1f7a3557c8921be4f075c27a6731ebb9e95e17fca83b7f",
+    "upstream-icon.json": "4e27b267f7368ecca945625562626a5a60a67e4a641eadec0924c8d7fa9613bb"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-mastodon",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "26e26be62c74c6fd7d04c65111eab0613aeef5fd452c8c6118445408dacd681e",
+    "icon.svg": "809db40324b9d319144c8326faa6be7bfb2baf08334553c637d5616e1376742c",
+    "upstream-icon.json": "53fc37d838d50e70eb3f009144d0f614e6d8715aa43ec7a9ae1acf112237893d"
+  }
+}

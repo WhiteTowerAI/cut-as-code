@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "project_id": "ScrollBasedLayoutAnimations",
+  "demo_url": "http://tympanus.net/Development/ScrollBasedLayoutAnimations/",
+  "article_url": "https://tympanus.net/codrops/2023/07/20/scroll-based-layout-animations/",
+  "source_url": "https://github.com/codrops/ScrollBasedLayoutAnimations/",
+  "source_commit": "ade47c56f8f2f756e7e6df8e578407690b2fb782",
+  "license": {
+    "type": "MIT",
+    "evidence": "repository-file",
+    "file": "LICENSE",
+    "sha256": "85131f2bb7714dc895ff5d7d68db65acc5ad0e5dfd72162869fc8d63dec06056"
+  },
+  "source_copy": "source",
+  "variants": [
+    {
+      "name": "index",
+      "composition_id": "codrops-scrollbasedlayoutanimations-index",
+      "source_entry": "index.html",
+      "runtime_entry": "index.html",
+      "source_sha256": "ce5a55e937a36b755721107eb89d16dc975b132eca1687aafd447a8c4ab2f298",
+      "runtime_sha256": "ce5a55e937a36b755721107eb89d16dc975b132eca1687aafd447a8c4ab2f298",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index/index.html"
+    }
+  ]
+}

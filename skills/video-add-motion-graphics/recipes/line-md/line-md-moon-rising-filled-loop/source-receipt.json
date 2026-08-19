@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-moon-rising-filled-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "687bdbbfbb4d613a7952c582275d7f97470777b2b27ac83a0d023004516cd3da",
+    "icon.svg": "9b6dfb66d8eccb695b752d68188981a0f879837c4db4535603c0e294405c857e",
+    "upstream-icon.json": "ca035d4a6c2d61f4ff349af440a2c7a30de83ea238147d9417fb1bc370a4706a"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-map-marker-multiple-alt-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "fad26dda9e44a39755f661488e3474f490d4f8b932b5ea2755b9e6f5517ae6d2",
+    "icon.svg": "acc850ab51a8b7dfeeacf8298eb034bbadb9032019a5b5cb0ef9a96c0482fe43",
+    "upstream-icon.json": "110a76d9719fdb53ea9a7fb7847b45f2f6adbc406e8e900ba98b41adccb283fb"
+  }
+}

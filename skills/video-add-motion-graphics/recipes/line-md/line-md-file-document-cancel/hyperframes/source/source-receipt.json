@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-file-document-cancel",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "6447ee3b2c0a7559040a88740a0768cc00f143ce8309ea0f604b159709920cf4",
+    "icon.svg": "36f29ec6d09f42dca422be3a45237023884debf7eb3576c919ec0deafaa00317",
+    "upstream-icon.json": "7ce5c2090e819d0f6b83803eb285c570fc3d0932052270a6241d21e59c37f407"
+  }
+}

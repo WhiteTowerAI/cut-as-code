@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "project_id": "Scroll3DGrid",
+  "demo_url": "http://tympanus.net/Development/Scroll3DGrid/",
+  "article_url": "https://tympanus.net/codrops/2023/08/03/on-scroll-perspective-grid-animations/",
+  "source_url": "https://github.com/codrops/Scroll3DGrid/",
+  "source_commit": "69718a2eff87b32ab19764b3a6d7b3773dab6af3",
+  "license": {
+    "type": "MIT",
+    "evidence": "repository-file",
+    "file": "LICENSE",
+    "sha256": "85131f2bb7714dc895ff5d7d68db65acc5ad0e5dfd72162869fc8d63dec06056"
+  },
+  "source_copy": "source",
+  "variants": [
+    {
+      "name": "index",
+      "composition_id": "codrops-scroll3dgrid-index",
+      "source_entry": "index.html",
+      "runtime_entry": "index.html",
+      "source_sha256": "6a55e93e7c11c92039b624d36c94cb509f5e0407c36adba5e351dca0e520763f",
+      "runtime_sha256": "6a55e93e7c11c92039b624d36c94cb509f5e0407c36adba5e351dca0e520763f",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index/index.html"
+    }
+  ]
+}

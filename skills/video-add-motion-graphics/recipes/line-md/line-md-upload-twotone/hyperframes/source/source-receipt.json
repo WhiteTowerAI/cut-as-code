@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-upload-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "5fbc329e468150dc50df16c2bc97d102ce78b2b4da6aeaf5dac89b56435cbc59",
+    "icon.svg": "92ddd3d01ab0fe992ae631c629b399ce8b154252b721e709a8c6beae656a4cff",
+    "upstream-icon.json": "0010008287ce736d53e6a873781872267804b804bc394847f0ca57e3a9ce548c"
+  }
+}

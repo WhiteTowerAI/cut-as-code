@@ -1,0 +1,53 @@
+spec_version: 1
+id: line-md-computer-off-twotone
+name: "Computer Off (Twotone)"
+description: "A compact computer off icon uses draw-in motion to illustrate software, devices, cloud systems, files, data, or digital infrastructure."
+surfaces: [video]
+category: sticker-technology
+tech: [svg]
+canvas: [video]
+target: [overlay]
+intent: sticker-technology
+runtime: ["svg-smil"]
+export: [skill, html]
+dependencies: []
+tags: ["computer", "off", "draw-in", "technology", "digital", "system", "compact", "twotone"]
+intent_keywords:
+  - "computer off"
+  - "computer off icon"
+  - "computer off symbol"
+  - "computer off animation"
+  - "computer off visual cue"
+  - "show computer off"
+  - "animated computer off"
+  - "云计算"
+  - "云计算图标"
+  - "云计算动画"
+  - "云计算提示"
+best_for:
+  - "A spoken reference to computer off needs a compact, immediately recognizable cue"
+  - "The narration names a digital system, device, file, cloud service, or technical process"
+avoid_when:
+  - "The spoken meaning does not refer to computer off or a close synonym"
+  - "A similarly named object is being discussed in a physical or weather context"
+restraint:
+  max_per_view: 1
+  notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."
+motion:
+  duration_ms: 6000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: preview.html
+implementations:
+  - tech: svg-smil
+    files: ["icon.svg", "upstream-icon.json"]
+    usage: "Materialize the converted HyperFrames directory, then adapt placement, scale, palette, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/cyberalien/line-md/blob/2ed22555cee9c1e50d4269865681d01ee8cffd7c/line-md.json"
+  attribution_required: true
+author:
+  name: "Vjacheslav Trushkin"
+  url: "https://github.com/cyberalien/line-md"
+version: 3.0.5
