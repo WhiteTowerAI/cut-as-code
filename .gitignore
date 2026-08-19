@@ -11,7 +11,7 @@ work/
 docs/
 /tests/
 /TEST/
-skills/video-add-graphic-motion/tests/
+skills/video-add-motion-graphics/tests/
 
 .claude/worktrees/
 .worktree/
@@ -22,4 +22,4 @@ skills/video-add-graphic-motion/tests/
 # snapshots/
 # gallery.html
 
-video-add-graphic-motion_bak/
+video-add-motion-graphics_bak/

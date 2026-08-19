@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Motion Graphics Port Contract Fixture</title>
+    <style>
+      html,
+      body {
+        width: 960px;
+        height: 540px;
+        margin: 0;
+        overflow: hidden;
+        background: transparent;
+      }
+
+      #stage {
+        position: relative;
+        width: 960px;
+        height: 540px;
+        overflow: hidden;
+        background: transparent;
+      }
+
+      .signal-field {
+        position: absolute;
+        inset: 0;
+      }
+
+      .rail {
+        position: absolute;
+        left: 160px;
+        top: 269px;
+        width: 640px;
+        height: 2px;
+        background: rgba(223, 255, 72, 0.72);
+        transform-origin: center;
+        animation-name: rail-build;
+        animation-duration: 1800ms;
+        animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+        animation-iteration-count: 1;
+        animation-fill-mode: both;
+      }
+
+      .ring {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 250px;
+        height: 250px;
+        margin: -125px 0 0 -125px;
+        border: 3px solid rgba(56, 224, 255, 0.82);
+        border-radius: 50%;
+        box-sizing: border-box;
+        animation-name: ring-converge;
+        animation-duration: 1600ms;
+        animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+        animation-iteration-count: 1;
+        animation-fill-mode: both;
+      }
+
+      .ring-b {
+        width: 330px;
+        height: 330px;
+        margin: -165px 0 0 -165px;
+        border-color: rgba(255, 82, 145, 0.68);
+        animation-delay: 120ms;
+      }
+
+      .node {
+        position: absolute;
+        width: 22px;
+        height: 22px;
+        border: 3px solid rgba(242, 247, 255, 0.92);
+        border-radius: 50%;
+        box-sizing: border-box;
+        background: rgba(10, 18, 26, 0.94);
+        animation-name: node-lock;
+        animation-duration: 1400ms;
+        animation-timing-function: cubic-bezier(0.18, 0.89, 0.32, 1.28);
+        animation-iteration-count: 1;
+        animation-fill-mode: both;
+      }
+
+      .node-a { left: 130px; top: 150px; --x: 330px; --y: 110px; }
+      .node-b { left: 790px; top: 150px; --x: -330px; --y: 110px; animation-delay: 90ms; }
+      .node-c { left: 130px; top: 370px; --x: 330px; --y: -110px; animation-delay: 180ms; }
+      .node-d { left: 790px; top: 370px; --x: -330px; --y: -110px; animation-delay: 270ms; }
+
+      .lock-panel {
+        position: absolute;
+        left: 350px;
+        top: 204px;
+        width: 260px;
+        height: 132px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid rgba(56, 224, 255, 0.92);
+        background: rgba(8, 16, 24, 0.96);
+        box-shadow: 0 0 32px rgba(56, 224, 255, 0.32), 12px 12px 0 rgba(255, 82, 145, 0.26);
+        color: #f2f7ff;
+        animation-name: panel-resolve;
+        animation-duration: 2000ms;
+        animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+        animation-iteration-count: 1;
+        animation-fill-mode: both;
+      }
+
+      .status-mark {
+        width: 28px;
+        height: 28px;
+        border: 4px solid #dfff48;
+        box-sizing: border-box;
+        transform: rotate(45deg);
+      }
+
+      .status-lines {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 20px;
+      }
+
+      .status-line {
+        width: 156px;
+        height: 8px;
+        background: #f2f7ff;
+      }
+
+      .status-line-short {
+        width: 104px;
+        background: #38e0ff;
+      }
+
+      @keyframes rail-build {
+        0% { opacity: 0; transform: scaleX(0.04); }
+        55% { opacity: 1; transform: scaleX(1); }
+        100% { opacity: 0.7; transform: scaleX(0.32); }
+      }
+
+      @keyframes ring-converge {
+        0% { opacity: 0; transform: scale(1.55) rotate(-18deg); }
+        45% { opacity: 1; }
+        100% { opacity: 0.42; transform: scale(0.58) rotate(0deg); }
+      }
+
+      @keyframes node-lock {
+        0% { opacity: 0; transform: translate(0, 0) scale(0.64); }
+        28% { opacity: 1; }
+        100% { opacity: 1; transform: translate(var(--x), var(--y)) scale(0.72); }
+      }
+
+      @keyframes panel-resolve {
+        0%, 48% { opacity: 0; transform: scale(0.72) rotate(-3deg); }
+        72% { opacity: 1; transform: scale(1.06) rotate(0deg); }
+        100% { opacity: 1; transform: scale(1) rotate(0deg); }
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="stage"
+      data-composition-id="motion-graphics-port-fixture"
+      data-no-timeline
+      data-start="0"
+      data-duration="2"
+      data-fps="30000/1001"
+      data-width="960"
+      data-height="540"
+    >
+      <div id="signal-field" class="clip signal-field" data-start="0" data-duration="2" data-track-index="1">
+        <div class="rail"></div>
+        <div class="ring ring-a"></div>
+        <div class="ring ring-b"></div>
+        <div class="node node-a"></div>
+        <div class="node node-b"></div>
+        <div class="node node-c"></div>
+        <div class="node node-d"></div>
+        <div class="lock-panel" aria-label="resolved signal state">
+          <div class="status-mark"></div>
+          <div class="status-lines">
+            <div class="status-line"></div>
+            <div class="status-line status-line-short"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

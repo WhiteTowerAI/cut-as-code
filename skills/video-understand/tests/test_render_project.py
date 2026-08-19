@@ -159,7 +159,7 @@ class TimelineInsertTests(unittest.TestCase):
                 "source": "../../source.mp4",
                 "timeline": "../timeline.json",
                 "contributions": [{
-                    "operation": "graphic-motion",
+                    "operation": "motion-graphics",
                     "kind": "timeline-insert",
                     "asset": "../../yellow.mp4",
                     "asset_type": "file",

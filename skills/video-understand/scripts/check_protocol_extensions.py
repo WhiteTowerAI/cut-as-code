@@ -897,10 +897,10 @@ def check_caption_reserved_pixel_order():
         }
 
     valid_orders = (
-        ("captions", "content-cards", "graphic-motion"),
+        ("captions", "content-cards", "motion-graphics"),
         ("captions", "content-cards"),
-        ("captions", "graphic-motion"),
-        ("content-cards", "graphic-motion"),
+        ("captions", "motion-graphics"),
+        ("content-cards", "motion-graphics"),
     )
     for order in valid_orders:
         errors = projectlib.validate_project(project_for(order), Path("."), check_files=False)
@@ -908,8 +908,8 @@ def check_caption_reserved_pixel_order():
 
     for order in (
         ("content-cards", "captions"),
-        ("graphic-motion", "captions"),
-        ("graphic-motion", "content-cards"),
+        ("motion-graphics", "captions"),
+        ("motion-graphics", "content-cards"),
     ):
         errors = projectlib.validate_project(project_for(order), Path("."), check_files=False)
         assert "active sequence operations violate canonical pixel order" in errors, (order, errors)
@@ -986,19 +986,19 @@ def check_verified_durable_outputs():
         assert not [error for error in errors if "output" in error]
 
 
-def check_graphic_motion_compiler_consistency():
+def check_motion_graphics_compiler_consistency():
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
-        source = root / "work/cache/graphic-motion/source/gm-001/original.html"
+        source = root / "work/cache/motion-graphics/source/gm-001/original.html"
         source.parent.mkdir(parents=True)
         source.write_text("<div class='signal'></div>", encoding="utf-8")
         binding = {
-            "path": "work/cache/graphic-motion/source/gm-001/original.html",
+            "path": "work/cache/motion-graphics/source/gm-001/original.html",
             "sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
         }
         render = {
             "kind": "overlay",
-            "asset": "cache/graphic-motion/rendered/gm-001",
+            "asset": "cache/motion-graphics/rendered/gm-001",
             "asset_type": "image-sequence",
             "pattern": "frame_%06d.png",
             "start_number": 1,
@@ -1017,7 +1017,7 @@ def check_graphic_motion_compiler_consistency():
         }
         payload = json.dumps(plan, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
         operation = {
-            "id": "graphic-motion",
+            "id": "motion-graphics",
             "depends_on": ["understanding"],
             "based_on": {"understanding": 1},
             "plan_sha256": hashlib.sha256(payload.encode("utf-8")).hexdigest(),
@@ -1029,21 +1029,21 @@ def check_graphic_motion_compiler_consistency():
             "fps": {"num": 30, "den": 1},
         }
         errors = []
-        projectlib._validate_graphic_motion_plan(
+        projectlib._validate_motion_graphics_plan(
             plan, operation, [render], timeline, errors, root, project={},
         )
         assert (
-            "graphic-motion plan schema_version must be 3; regenerate schema v2 plans"
+            "motion-graphics plan schema_version must be 3; regenerate schema v2 plans"
             in errors
         ), errors
-        assert "graphic-motion decision receipt is invalid" in errors, errors
+        assert "motion-graphics decision receipt is invalid" in errors, errors
 
         source.write_text("mutated", encoding="utf-8")
         errors = []
-        projectlib._validate_graphic_motion_plan(
+        projectlib._validate_motion_graphics_plan(
             plan, operation, [render], timeline, errors, root, project={},
         )
-        assert "graphic-motion bound file SHA-256 is stale" in errors
+        assert "motion-graphics bound file SHA-256 is stale" in errors
 
 
 def main():
@@ -1051,7 +1051,7 @@ def main():
     check_image_sequence_overlay()
     check_precomputed_overlay_compatibility()
     check_broll_compiler_consistency()
-    check_graphic_motion_compiler_consistency()
+    check_motion_graphics_compiler_consistency()
     check_dependency_revision_coverage()
     check_caption_reserved_pixel_order()
     check_verified_durable_outputs()
@@ -1059,7 +1059,7 @@ def main():
     print("[protocol-extensions] image-sequence overlay passed")
     print("[protocol-extensions] precomputed overlay compatibility passed")
     print("[protocol-extensions] B-roll compiler consistency passed")
-    print("[protocol-extensions] graphic-motion compiler consistency passed")
+    print("[protocol-extensions] motion-graphics compiler consistency passed")
     print("[protocol-extensions] dependency revision coverage passed")
     print("[protocol-extensions] caption-reserved pixel order passed")
     print("[protocol-extensions] verified durable outputs passed")

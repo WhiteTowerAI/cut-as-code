@@ -2250,13 +2250,13 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
                 with self.assertRaises(ValueError): broll_plan.register_operation(project, plan)
 
     def test_register_operation_stays_before_downstream_overlays_without_upstream_anchors(self):
-        project = self._registration_project(["captions", "content-cards", "graphic-motion"])
+        project = self._registration_project(["captions", "content-cards", "motion-graphics"])
         result = broll_plan.register_operation(
             project,
             self._registered_plan((2, 3), dependencies=["understanding"]),
         )
         self.assertEqual(
-            ["b-roll", "captions", "content-cards", "graphic-motion"],
+            ["b-roll", "captions", "content-cards", "motion-graphics"],
             result["sequences"]["main"]["operations"],
         )
 
