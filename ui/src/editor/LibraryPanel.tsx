@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Search, Upload } from 'lucide-react'
 import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand/vanilla'
 import type { AssetView, EditorOperationView, EditorSelection, LibraryTab } from './editor-model'
@@ -69,29 +69,51 @@ const motionRecipes: readonly TileItem[] = [
   { id: 'xyz-fade-small', label: 'XYZ Fade Small', preview: 'city', previewText: 'Fade small', accent: 'green' },
 ]
 
-function SearchField({ placeholder, compact = false }: { placeholder: string; compact?: boolean }) {
+function SearchField({
+  placeholder,
+  compact = false,
+  value,
+  onChange,
+}: {
+  placeholder: string
+  compact?: boolean
+  value?: string
+  onChange?: (value: string) => void
+}) {
   return (
     <label className={compact ? 'library-search library-search--compact' : 'library-search'}>
-      <img className="library-control-icon" src="/assets/editor/icon-search.svg" alt="" />
-      <input aria-label={placeholder} placeholder={placeholder} />
+      <Search className="library-control-icon" aria-hidden="true" />
+      <input
+        aria-label={placeholder}
+        placeholder={placeholder}
+        {...(value === undefined ? {} : { value })}
+        onChange={onChange ? (event) => onChange(event.currentTarget.value) : undefined}
+      />
     </label>
   )
 }
 
-function AssetControls({ onImport, disabled }: { onImport?: (files: readonly File[]) => void; disabled?: boolean }) {
+function AssetControls({
+  onImport,
+  disabled,
+  query,
+  onQueryChange,
+}: {
+  onImport?: (files: readonly File[]) => void
+  disabled?: boolean
+  query: string
+  onQueryChange: (value: string) => void
+}) {
   const inputRef = useRef<HTMLInputElement>(null)
   return (
-    <div className="library-controls">
-      <SearchField placeholder="Search assets" compact />
+    <div className="library-controls" role="search">
+      <SearchField placeholder="Search assets" compact value={query} onChange={onQueryChange} />
       <input ref={inputRef} className="asset-file-input" type="file" accept="video/mp4,video/quicktime,video/webm,audio/mpeg,audio/wav,image/jpeg,image/png,image/webp,image/gif" multiple onChange={(event) => {
         onImport?.([...event.currentTarget.files ?? []])
         event.currentTarget.value = ''
       }} />
       <button className="library-icon-button" type="button" aria-label="Import assets" title="Import assets" disabled={disabled} onClick={() => inputRef.current?.click()}>
-        <img className="library-control-icon" src="/assets/editor/icon-upload.svg" alt="" />
-      </button>
-      <button className="library-icon-button" type="button" aria-label="Filter assets" title="Filter assets">
-        <img className="library-control-icon" src="/assets/editor/icon-filter.svg" alt="" />
+        <Upload className="library-control-icon" aria-hidden="true" />
       </button>
     </div>
   )
@@ -171,7 +193,12 @@ function AssetsPanel({ store, importAssets }: LibraryPanelProps) {
   const runtime = Boolean(project?.runtime)
   const assetTiles = project?.assets.map((asset) => tileForAsset(asset, runtime)) ?? []
   const [importError, setImportError] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
   const importInputRef = useRef<HTMLInputElement>(null)
+  const normalizedQuery = query.trim().toLocaleLowerCase()
+  const visibleAssetTiles = normalizedQuery
+    ? assetTiles.filter((asset) => asset.label.toLocaleLowerCase().includes(normalizedQuery))
+    : assetTiles
   const importFiles = async (files: readonly File[]) => {
     if (!importAssets || !files.length) return
     setImportError(null)
@@ -192,10 +219,17 @@ function AssetsPanel({ store, importAssets }: LibraryPanelProps) {
 
   return (
     <>
-      <AssetControls onImport={(files) => { void importFiles(files) }} disabled={!importAssets} />
+      <AssetControls
+        onImport={(files) => { void importFiles(files) }}
+        disabled={!importAssets}
+        query={query}
+        onQueryChange={setQuery}
+      />
       <input ref={importInputRef} className="asset-file-input" type="file" accept="video/mp4,video/quicktime,video/webm,audio/mpeg,audio/wav,image/jpeg,image/png,image/webp,image/gif" multiple onChange={importFromInput} />
-      {assetTiles.length ? (
-        <TileGrid items={assetTiles} kind="asset" selectedId={selection?.id} onSelect={select} assetSize />
+      {visibleAssetTiles.length ? (
+        <TileGrid items={visibleAssetTiles} kind="asset" selectedId={selection?.id} onSelect={select} assetSize />
+      ) : assetTiles.length ? (
+        <RuntimeEmpty>No assets match "{query.trim()}"</RuntimeEmpty>
       ) : (
         <div onDrop={importFromDrop} onDragOver={(event) => event.preventDefault()}>
           <EmptyAssets onImport={() => importInputRef.current?.click()} disabled={!importAssets} />

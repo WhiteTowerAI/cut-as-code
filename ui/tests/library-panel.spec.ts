@@ -56,6 +56,35 @@ test('selects a project-backed asset by its canonical ID', async ({ page }) => {
   await expect(asset).toHaveAttribute('aria-pressed', 'true')
 })
 
+test('filters My Assets by file name as the query changes', async ({ page }) => {
+  await page.goto('/?scenario=1-84')
+
+  const search = page.getByLabel('Search assets')
+  await search.fill('FOUNDER')
+
+  await expect(page.getByText('Founder interview.mp4', { exact: true })).toBeVisible()
+  await expect(page.getByText('Product teaser.mov', { exact: true })).toHaveCount(0)
+
+  await search.fill('missing asset')
+  await expect(page.getByRole('status')).toHaveText('No assets match "missing asset"')
+
+  await search.fill('')
+  await expect(page.locator('[data-asset-id]')).toHaveCount(4)
+})
+
+test('renders only the My Assets search and import controls as inline icons', async ({ page }) => {
+  await page.goto('/?scenario=1-84')
+
+  const search = page.getByLabel('Search assets')
+  const searchControl = page.locator('label').filter({ has: search })
+  const importButton = page.getByRole('button', { name: 'Import assets' })
+
+  await expect(searchControl.locator('svg')).toBeVisible()
+  await expect(importButton.locator('svg')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Filter assets' })).toHaveCount(0)
+  await expect(page.locator('.library-controls img.library-control-icon')).toHaveCount(0)
+})
+
 test.skip('project-backed previews use nonblank frozen local artwork', async ({ page }) => {
   await page.goto('/?scenario=1-84')
 
