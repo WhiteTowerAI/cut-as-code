@@ -119,7 +119,7 @@ class ProtocolServiceTests(unittest.TestCase):
         self.assertNotEqual(plan_before["etag"], plan_after["etag"])
         self.assertEqual(plan_before["id"], plan_after["id"])
 
-    def test_timeline_edits_split_trim_delete_and_invalidate_active_dependents(self):
+    def test_timeline_edits_are_authoritative_and_keep_active_dependents_current(self):
         self._configure_cut_project()
         opened = self.service.handle_request(
             {"verb": "open_project", "project_root": str(self.root)}
@@ -141,8 +141,14 @@ class ProtocolServiceTests(unittest.TestCase):
         right_id = timeline["clips"][1]["id"]
         project = json.loads(self.project_path.read_text(encoding="utf-8"))
         cut, captions = project["operations"]
-        self.assertEqual((2, "stale"), (cut["revision"], cut["status"]))
-        self.assertEqual("stale", captions["status"])
+        self.assertEqual((2, "approved"), (cut["revision"], cut["status"]))
+        self.assertEqual(("approved", {"cut": 2}), (captions["status"], captions["based_on"]))
+        self.assertEqual(
+            [],
+            protocol_service.projectlib.validate_project(
+                project, self.root, check_files=True, dependency_mode="require_current"
+            ),
+        )
         self.assertEqual("draft", project["render"]["status"])
 
         trim = self.service.handle_request({
@@ -260,6 +266,13 @@ class ProtocolServiceTests(unittest.TestCase):
             }],
             "outputs": [],
         })
+        project["reviews"] = [{
+            "id": "captions-review", "revision": 1, "status": "approved",
+            "depends_on": ["captions"], "based_on": {"captions": 1},
+            "snapshot_etag": "pending", "evidence_hashes": [],
+        }]
+        self.project_path.write_text(json.dumps(project), encoding="utf-8")
+        project["reviews"][0]["snapshot_etag"] = build_snapshot(self.root)["snapshot_etag"]
         self.project_path.write_text(json.dumps(project), encoding="utf-8")
         opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
 
@@ -282,14 +295,134 @@ class ProtocolServiceTests(unittest.TestCase):
         self.assertEqual({"start_s": 0.65, "end_s": 0.8}, plan["cues"][0]["program_range"])
         project = json.loads(self.project_path.read_text(encoding="utf-8"))
         captions = next(item for item in project["operations"] if item["id"] == "captions")
-        self.assertEqual((2, "stale"), (captions["revision"], captions["status"]))
+        self.assertEqual((2, "approved", {"cut": 3}), (
+            captions["revision"], captions["status"], captions["based_on"],
+        ))
         self.assertEqual(0.65, captions["render"][0]["start_s"])
         shorts = next(item for item in project["operations"] if item["id"] == "shorts")
-        self.assertEqual((1, "stale", 0.75), (
-            shorts["revision"], shorts["status"], shorts["render"][0]["start_s"],
+        self.assertEqual((1, "approved", {"cut": 3}, 0.75), (
+            shorts["revision"], shorts["status"], shorts["based_on"], shorts["render"][0]["start_s"],
+        ))
+        self.assertEqual(
+            [],
+            protocol_service.projectlib.validate_project(
+                project, self.root, check_files=True, dependency_mode="require_current"
+            ),
+        )
+        review = project["reviews"][0]
+        self.assertEqual(("approved", {"captions": 2}, trimmed["snapshot"]["snapshot_etag"]), (
+            review["status"], review["based_on"], review["snapshot_etag"],
         ))
         layer = trimmed["snapshot"]["view"]["layers"][0]
         self.assertEqual({"start_s": 0.65, "end_s": 0.8}, layer["program_range"])
+
+    def test_timeline_trim_removes_and_restore_bounds_recovers_caption_words(self):
+        self._configure_cut_project()
+        self.plan.write_text(json.dumps({
+            "schema_version": 1,
+            "cues": [{
+                "id": "cue-1", "index": 1, "text": "one two three", "lines": ["one two three"],
+                "start": 0.2, "end": 0.8,
+                "program_range": {"start_s": 0.2, "end_s": 0.8},
+                "source_ranges": [{"start_s": 0.2, "end_s": 0.8}],
+                "words": [
+                    {"word": "one", "start": 0.2, "end": 0.4,
+                     "source_range": {"start_s": 0.2, "end_s": 0.4},
+                     "program_range": {"start_s": 0.2, "end_s": 0.4}, "clip_id": "clip-1"},
+                    {"word": "two", "start": 0.4, "end": 0.6,
+                     "source_range": {"start_s": 0.4, "end_s": 0.6},
+                     "program_range": {"start_s": 0.4, "end_s": 0.6}, "clip_id": "clip-1"},
+                    {"word": "three", "start": 0.6, "end": 0.8,
+                     "source_range": {"start_s": 0.6, "end_s": 0.8},
+                     "program_range": {"start_s": 0.6, "end_s": 0.8}, "clip_id": "clip-1"},
+                ],
+            }],
+        }), encoding="utf-8")
+        opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+
+        trimmed = self.service.handle_request({
+            "verb": "timeline.edit", "project_id": opened["project_id"],
+            "read_set": self._timeline_read_set(opened["snapshot"]),
+            "command": {"type": "trim", "clip_id": "clip-1", "edge": "end", "source_s": 0.5},
+        })
+        self.assertTrue(trimmed["ok"], trimmed)
+        cue = json.loads(self.plan.read_text(encoding="utf-8"))["cues"][0]
+        self.assertEqual(("one", 0.2, 0.4), (cue["text"], cue["start"], cue["end"]))
+        self.assertEqual(["two", "three"], [word["word"] for word in cue["editor_removed_words"]])
+
+        restored = self.service.handle_request({
+            "verb": "timeline.edit", "project_id": opened["project_id"],
+            "read_set": self._timeline_read_set(trimmed["snapshot"]),
+            "command": {"type": "restore-bounds", "clip_id": "clip-1"},
+        })
+        self.assertTrue(restored["ok"], restored)
+        cue = json.loads(self.plan.read_text(encoding="utf-8"))["cues"][0]
+        self.assertEqual(["one", "two", "three"], [word["word"] for word in cue["words"]])
+        self.assertNotIn("editor_removed_words", cue)
+
+    def test_audio_only_edit_keeps_visual_plan_and_review_approved(self):
+        self._configure_cut_project()
+        project = json.loads(self.project_path.read_text(encoding="utf-8"))
+        project["reviews"] = [{
+            "id": "captions-review", "revision": 1, "status": "approved",
+            "depends_on": ["captions"], "based_on": {"captions": 1},
+            "snapshot_etag": "pending", "evidence_hashes": [],
+        }]
+        self.project_path.write_text(json.dumps(project), encoding="utf-8")
+        project["reviews"][0]["snapshot_etag"] = build_snapshot(self.root)["snapshot_etag"]
+        self.project_path.write_text(json.dumps(project), encoding="utf-8")
+        opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+
+        detached = self.service.handle_request({
+            "verb": "timeline.edit", "project_id": opened["project_id"],
+            "read_set": self._timeline_read_set(opened["snapshot"]),
+            "command": {"type": "detach-audio", "clip_id": "clip-1"},
+        })
+        self.assertTrue(detached["ok"], detached)
+        saved = json.loads(self.project_path.read_text(encoding="utf-8"))
+        captions = next(item for item in saved["operations"] if item["id"] == "captions")
+        review = saved["reviews"][0]
+        self.assertEqual((1, "approved", {"cut": 2}), (
+            captions["revision"], captions["status"], captions["based_on"],
+        ))
+        self.assertEqual(("approved", detached["snapshot"]["snapshot_etag"]), (
+            review["status"], review["snapshot_etag"],
+        ))
+        self.assertEqual(
+            [],
+            protocol_service.projectlib.validate_project(
+                saved, self.root, check_files=True, dependency_mode="require_current"
+            ),
+        )
+
+    def test_render_plan_compiles_immediately_after_manual_timeline_edit(self):
+        self._configure_cut_project()
+        overlay = self.root / "work" / "cache" / "caption.mov"
+        overlay.parent.mkdir(parents=True)
+        overlay.write_bytes(b"overlay")
+        project = json.loads(self.project_path.read_text(encoding="utf-8"))
+        project["operations"][0]["render"] = {
+            "kind": "timeline-transform", "input": "timeline.json",
+        }
+        project["operations"][1]["render"] = {
+            "kind": "overlay", "asset": "cache/caption.mov", "start_s": 0.6, "duration_s": 0.2,
+        }
+        project["render"] = {
+            "status": "verified", "plan": "render/render-plan.json", "output": "../final/final.mp4",
+        }
+        self.project_path.write_text(json.dumps(project), encoding="utf-8")
+        opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+
+        edited = self.service.handle_request({
+            "verb": "timeline.edit", "project_id": opened["project_id"],
+            "read_set": self._timeline_read_set(opened["snapshot"]),
+            "command": {"type": "trim", "clip_id": "clip-1", "edge": "start", "source_s": 0.1},
+        })
+        self.assertTrue(edited["ok"], edited)
+        saved = json.loads(self.project_path.read_text(encoding="utf-8"))
+        compiled = protocol_service.projectlib.build_render_plan(saved, self.root)
+        self.assertEqual(["cut", "captions"], [item["operation"] for item in compiled["contributions"]])
+        self.assertEqual(0.5, compiled["contributions"][1]["start_s"])
 
     def test_timeline_edit_rejects_stale_etag_and_noncanonical_trim(self):
         self._configure_cut_project()

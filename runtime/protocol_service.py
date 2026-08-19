@@ -10,7 +10,7 @@ import tempfile
 import uuid
 from pathlib import Path
 
-from project_snapshot import build_snapshot, canonical_project_root, load_resource
+from project_snapshot import build_snapshot, canonical_project_root, load_resource, snapshot_binding
 
 
 CARDS_SCRIPTS = (
@@ -204,11 +204,10 @@ class ProtocolService:
         if "cut" not in sequence.get("operations", []):
             return {"ok": False, "error": "cut is not active on the current sequence"}
         plan_files = []
-        active_operation_ids = set(sequence.get("operations", []))
         for operation in project.get("operations", []):
             operation_id = operation.get("id") if isinstance(operation, dict) else None
             plan_value = operation.get("plan") if isinstance(operation, dict) else None
-            if (operation_id in active_operation_ids and operation_id != "cut"
+            if (operation_id != "cut"
                     and isinstance(plan_value, str) and plan_value.strip()):
                 path = projectlib.resolve_project_path(root, plan_value)
                 try:
@@ -240,65 +239,141 @@ class ProtocolService:
         if timeline_errors:
             return {"ok": False, "error": "invalid timeline edit: " + "; ".join(timeline_errors)}
 
-        plan_writes = []
-        shifted_operation_ids = set()
-        if ripple:
-            boundary_s, delta_s = ripple
-            for entry in plan_files:
-                shifted = self._shift_operation_plan(
-                    entry["operation_id"], entry["plan"], boundary_s, delta_s
-                )
-                if shifted != entry["plan"]:
-                    plan_writes.append((entry["path"], self._json_bytes(shifted), entry["etag"]))
-                    shifted_operation_ids.add(entry["operation_id"])
-
         updated_project = copy.deepcopy(project)
         active_sequence = updated_project.get("active_sequence")
         active_operation_ids = set(
             updated_project.get("sequences", {}).get(active_sequence, {}).get("operations", [])
         )
-        if ripple:
-            boundary_s, delta_s = ripple
-            for operation in updated_project.get("operations", []):
-                if (isinstance(operation, dict)
-                        and operation.get("id") in active_operation_ids
-                        and operation.get("id") != "cut"
-                        and "render" in operation):
-                    shifted_render = self._shift_render_timing(operation["render"], boundary_s, delta_s)
-                    if shifted_render != operation["render"]:
-                        shifted_operation_ids.add(operation.get("id"))
-                        operation["render"] = shifted_render
         cut = next(item for item in updated_project["operations"] if item.get("id") == "cut")
         cut["revision"] += 1
-        cut.update({"status": "stale", "outputs": []})
-        if isinstance(cut.get("check"), dict):
-            cut["check"] = {**cut["check"], "status": "pending"}
-        stale_operation_ids = set(active_operation_ids)
+        cut["status"] = "approved"
+
+        audio_only = command.get("type") in {
+            "detach-audio", "attach-audio", "unlink-audio", "link-audio", "mute-audio",
+            "mute-video-audio", "trim-audio", "move-audio", "delete-audio", "insert-audio",
+            "set-audio-state", "set-audio-state-with-clip", "set-audio-clip",
+        }
+        affected_operation_ids = {"cut"}
         changed = True
         while changed:
             changed = False
             for operation in updated_project.get("operations", []):
-                if not isinstance(operation, dict) or operation.get("id") in stale_operation_ids:
+                if not isinstance(operation, dict) or operation.get("id") in affected_operation_ids:
                     continue
                 dependencies = set(operation.get("depends_on", [])) | set(operation.get("based_on", {}))
-                if dependencies.intersection(stale_operation_ids):
-                    stale_operation_ids.add(operation.get("id"))
+                if dependencies.intersection(affected_operation_ids):
+                    affected_operation_ids.add(operation.get("id"))
                     changed = True
-        for operation in updated_project.get("operations", []):
-            if operation.get("id") in stale_operation_ids and operation.get("id") != "cut":
-                operation.update({"status": "stale", "outputs": []})
-                if operation.get("id") in shifted_operation_ids:
-                    operation["revision"] = int(operation.get("revision", 0)) + 1
-                if isinstance(operation.get("check"), dict):
-                    operation["check"] = {**operation["check"], "status": "pending"}
+
+        plan_writes = []
+        changed_operation_ids = set()
+        plan_by_id = {entry["operation_id"]: entry for entry in plan_files}
+        if not audio_only:
+            for operation_id in affected_operation_ids - {"cut"}:
+                entry = plan_by_id.get(operation_id)
+                if not entry:
+                    continue
+                try:
+                    remapped = self._remap_operation_plan(
+                        operation_id, entry["plan"], timeline, updated_timeline
+                    )
+                except ValueError as exc:
+                    return {"ok": False, "error": f"timeline edit cannot remap {operation_id}: {exc}"}
+                if remapped != entry["plan"]:
+                    entry["updated"] = remapped
+                    changed_operation_ids.add(operation_id)
+
+        operations = {
+            item.get("id"): item for item in updated_project.get("operations", [])
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        }
+        for operation_id in changed_operation_ids:
+            operation = operations[operation_id]
+            operation["revision"] = int(operation.get("revision", 0)) + 1
+
+        # Rebind in dependency order. Repeating is intentional because Protocol V1 graphs are small.
+        for _ in range(len(operations) + 1):
+            dependency_changed = False
+            for operation_id in affected_operation_ids - {"cut"}:
+                operation = operations.get(operation_id)
+                if not operation:
+                    continue
+                based_on = operation.get("based_on")
+                if not isinstance(based_on, dict):
+                    continue
+                for dependency in list(based_on):
+                    revision = operations.get(dependency, {}).get("revision")
+                    if dependency in affected_operation_ids and based_on.get(dependency) != revision:
+                        based_on[dependency] = revision
+                        dependency_changed = True
+            if not dependency_changed:
+                break
+
+        timeline_bytes = self._json_bytes(updated_timeline)
+        timeline_sha256 = self._hash(timeline_bytes)
+        for operation_id, entry in plan_by_id.items():
+            plan = copy.deepcopy(entry.get("updated", entry["plan"]))
+            operation = operations.get(operation_id)
+            if not operation or operation_id not in affected_operation_ids:
+                continue
+            self._rebind_operation_plan(plan, operation, updated_timeline, timeline_sha256)
+            if operation_id == "graphic-motion":
+                operation["render"] = [
+                    copy.deepcopy(cue["render"])
+                    for cue in plan.get("cues", [])
+                    if isinstance(cue, dict) and cue.get("status") == "verified"
+                    and isinstance(cue.get("render"), dict)
+                ]
+            elif not audio_only and ripple and operation_id in active_operation_ids and "render" in operation:
+                operation["render"] = self._remap_render_timing(
+                    operation["render"], timeline, updated_timeline
+                )
+            if "plan_sha256" in operation:
+                operation["plan_sha256"] = self._canonical_hash(plan)
+            data = self._json_bytes(plan)
+            if data != self._json_bytes(entry["plan"]):
+                plan_writes.append((entry["path"], data, entry["etag"]))
+
+        revision_by_id = {
+            operation_id: operation.get("revision") for operation_id, operation in operations.items()
+        }
         for review in updated_project.get("reviews", []):
-            dependencies = set(review.get("depends_on", [])) | set(review.get("based_on", {}))
-            if dependencies.intersection(stale_operation_ids):
-                review["status"] = "stale"
+            based_on = review.get("based_on")
+            if not isinstance(review, dict) or not isinstance(based_on, dict):
+                continue
+            for dependency in list(based_on):
+                if dependency in affected_operation_ids and dependency in revision_by_id:
+                    based_on[dependency] = revision_by_id[dependency]
+            dependencies = set(review.get("depends_on", [])) | set(based_on)
+            if dependencies.intersection(affected_operation_ids):
+                review["editor_rebase"] = {
+                    "kind": "deterministic-timeline-remap",
+                    "cut_revision": cut["revision"],
+                    "command_sha256": self._canonical_hash(command),
+                }
         revision = updated_project.get("revision")
         if isinstance(revision, int) and not isinstance(revision, bool):
             updated_project["revision"] = revision + 1
         updated_project.setdefault("render", {})["status"] = "draft"
+
+        plan_etags = {
+            operation_id: self._hash(data)
+            for operation_id, entry in plan_by_id.items()
+            for path, data, _old_hash in plan_writes
+            if path == entry["path"]
+        }
+        rebased_snapshot = snapshot_binding(
+            updated_project,
+            [
+                timeline_sha256 if item.get("kind") == "timeline"
+                else plan_etags.get(item.get("operation_id"), item["etag"])
+                for item in snapshot["resources"] if item.get("kind") != "project"
+            ],
+        )
+        for review in updated_project.get("reviews", []):
+            dependencies = set(review.get("depends_on", [])) | set(review.get("based_on", {}))
+            if dependencies.intersection(affected_operation_ids):
+                review["snapshot_etag"] = rebased_snapshot
         return self._commit_timeline(root, timeline_path, updated_timeline, updated_project, expected, plan_writes)
 
     @classmethod
@@ -694,6 +769,431 @@ class ProtocolService:
                     for segment in shot.get("segments", []):
                         cls._shift_program_range(segment, boundary, delta)
         return shifted
+
+    @classmethod
+    def _remap_operation_plan(cls, operation_id, plan, before, after):
+        remapped = copy.deepcopy(plan)
+        if not isinstance(remapped, dict):
+            raise ValueError("plan must be an object")
+        if operation_id == "captions":
+            remapped = cls._remap_caption_plan(remapped, before, after)
+        else:
+            collection = {
+                "content-cards": "cards",
+                "graphic-motion": "cues",
+                "b-roll": "shots",
+            }.get(operation_id)
+            if collection and isinstance(remapped.get(collection), list):
+                tombstones = remapped.get("editor_tombstones", {}).get(collection, [])
+                candidates = [*remapped[collection], *(
+                    tombstones if isinstance(tombstones, list) else []
+                )]
+                items = []
+                next_tombstones = []
+                seen = set()
+                for item in candidates:
+                    if not isinstance(item, dict):
+                        items.append(item)
+                        continue
+                    item_id = item.get("id")
+                    if isinstance(item_id, str) and item_id in seen:
+                        continue
+                    if isinstance(item_id, str):
+                        seen.add(item_id)
+                    updated = cls._remap_timed_item(item, before, after)
+                    if updated is None:
+                        next_tombstones.append(copy.deepcopy(item))
+                        continue
+                    if operation_id == "b-roll" and isinstance(updated.get("segments"), list):
+                        updated["segments"] = [
+                            segment
+                            for value in updated["segments"]
+                            if isinstance(value, dict)
+                            for segment in [cls._remap_timed_item(value, before, after)]
+                            if segment is not None
+                        ]
+                    updated = cls._remap_nested_timing(updated, before, after)
+                    updated.pop("_editor_clip_id", None)
+                    items.append(updated)
+                remapped[collection] = items
+                cls._set_plan_tombstones(remapped, collection, next_tombstones)
+        if "program_duration_s" in remapped:
+            remapped["program_duration_s"] = after.get("program_duration_s")
+        return remapped
+
+    @classmethod
+    def _remap_caption_plan(cls, plan, before, after):
+        cues = plan.get("cues")
+        if not isinstance(cues, list):
+            return plan
+        tombstones = plan.get("editor_tombstones", {}).get("captions", [])
+        candidates = [*cues, *(tombstones if isinstance(tombstones, list) else [])]
+        remapped_cues = []
+        next_tombstones = []
+        cue_ids = {}
+        seen = set()
+        for cue in candidates:
+            if not isinstance(cue, dict):
+                continue
+            original_id = cue.get("id")
+            if isinstance(original_id, str) and original_id in seen:
+                continue
+            if isinstance(original_id, str):
+                seen.add(original_id)
+            words = cue.get("words")
+            if not isinstance(words, list) or not words:
+                updated = cls._remap_timed_item(cue, before, after, allow_partial=True)
+                if updated is not None:
+                    updated.pop("_editor_clip_id", None)
+                    remapped_cues.append(updated)
+                    if isinstance(cue.get("id"), str):
+                        cue_ids[cue["id"]] = [cue["id"]]
+                else:
+                    next_tombstones.append(copy.deepcopy(cue))
+                continue
+
+            surviving = []
+            removed_words = cue.get("editor_removed_words", [])
+            word_candidates = [*words, *(removed_words if isinstance(removed_words, list) else [])]
+            word_candidates.sort(key=lambda word: (
+                cls._numeric_range(word.get("source_range"))[0]
+                if isinstance(word, dict) and cls._numeric_range(word.get("source_range")) else float("inf")
+            ))
+            next_removed_words = []
+            for word in word_candidates:
+                if not isinstance(word, dict):
+                    continue
+                updated = cls._remap_timed_item(word, before, after)
+                if updated is not None:
+                    surviving.append(updated)
+                else:
+                    next_removed_words.append(copy.deepcopy(word))
+            if not surviving:
+                if isinstance(cue.get("id"), str):
+                    cue_ids[cue["id"]] = []
+                restored = copy.deepcopy(cue)
+                restored["words"] = word_candidates
+                restored.pop("editor_removed_words", None)
+                next_tombstones.append(restored)
+                continue
+
+            groups = []
+            for word in surviving:
+                clip_id = word.pop("_editor_clip_id", None)
+                word["clip_id"] = clip_id
+                if not groups or groups[-1][0] != clip_id:
+                    groups.append((clip_id, [word]))
+                else:
+                    groups[-1][1].append(word)
+            generated_ids = []
+            for group_position, (_clip_id, group) in enumerate(groups, 1):
+                updated = copy.deepcopy(cue)
+                updated["words"] = group
+                if isinstance(original_id, str) and original_id.strip():
+                    generated_id = original_id if group_position == 1 else f"{original_id}:part-{group_position}"
+                    updated["id"] = generated_id
+                    generated_ids.append(generated_id)
+                start = float(group[0]["program_range"]["start_s"])
+                end = float(group[-1]["program_range"]["end_s"])
+                updated["start"] = cls._rounded(start)
+                updated["end"] = cls._rounded(end)
+                updated["program_range"] = {"start_s": cls._rounded(start), "end_s": cls._rounded(end)}
+                updated["source_ranges"] = [{
+                    "start_s": group[0]["source_range"]["start_s"],
+                    "end_s": group[-1]["source_range"]["end_s"],
+                }]
+                if len(group) != len(words) or len(groups) > 1:
+                    text = " ".join(str(word.get("word", "")).strip() for word in group).strip()
+                    updated["text"] = text
+                    updated["lines"] = [text]
+                if next_removed_words:
+                    updated["editor_removed_words"] = copy.deepcopy(next_removed_words)
+                else:
+                    updated.pop("editor_removed_words", None)
+                remapped_cues.append(updated)
+            if isinstance(cue.get("id"), str):
+                cue_ids[cue["id"]] = generated_ids
+
+        for index, cue in enumerate(remapped_cues, 1):
+            if "index" in cue:
+                cue["index"] = index
+        plan["cues"] = remapped_cues
+        cls._set_plan_tombstones(plan, "captions", next_tombstones)
+        presentation = plan.get("presentation")
+        if isinstance(presentation, dict) and isinstance(presentation.get("layout_beats"), list):
+            beats = presentation["layout_beats"]
+            evidence = plan.get("review", {}).get("evidence")
+            next_beats = []
+            kept_positions = []
+            cue_by_id = {
+                cue.get("id"): cue for cue in remapped_cues
+                if isinstance(cue, dict) and isinstance(cue.get("id"), str)
+            }
+            for beat_position, beat in enumerate(beats):
+                if not isinstance(beat, dict) or not isinstance(beat.get("cue_ids"), list):
+                    continue
+                ids = [mapped for cue_id in beat["cue_ids"] for mapped in cue_ids.get(cue_id, [])]
+                if not ids:
+                    continue
+                updated = copy.deepcopy(beat)
+                updated["cue_ids"] = ids
+                updated["program_range"] = {
+                    "start_s": cue_by_id[ids[0]]["program_range"]["start_s"],
+                    "end_s": cue_by_id[ids[-1]]["program_range"]["end_s"],
+                }
+                next_beats.append(updated)
+                kept_positions.append(beat_position)
+            presentation["layout_beats"] = next_beats
+            if isinstance(evidence, list) and len(evidence) == len(beats) + 1:
+                plan["review"]["evidence"] = [evidence[0], *[evidence[index + 1] for index in kept_positions]]
+        if "program_duration_s" in plan:
+            plan["program_duration_s"] = after.get("program_duration_s")
+        return plan
+
+    @staticmethod
+    def _set_plan_tombstones(plan, collection, values):
+        tombstones = plan.get("editor_tombstones")
+        if values:
+            if not isinstance(tombstones, dict):
+                tombstones = {}
+                plan["editor_tombstones"] = tombstones
+            tombstones[collection] = values
+        elif isinstance(tombstones, dict):
+            tombstones.pop(collection, None)
+            if not tombstones:
+                plan.pop("editor_tombstones", None)
+
+    @classmethod
+    def _remap_nested_timing(cls, value, before, after):
+        if isinstance(value, list):
+            return [cls._remap_nested_timing(item, before, after) for item in value]
+        if not isinstance(value, dict):
+            return value
+        output = copy.deepcopy(value)
+        for key, child in list(output.items()):
+            if key in {
+                "program_range", "program_start_s", "duration_s", "start", "end",
+                "source_range", "source_ranges", "render",
+            }:
+                continue
+            if isinstance(child, (dict, list)):
+                if isinstance(child, dict) and cls._timing_range(child) is not None:
+                    mapped = cls._remap_timed_item(child, before, after, allow_partial=True)
+                    if isinstance(mapped, dict):
+                        mapped.pop("_editor_clip_id", None)
+                    output[key] = mapped if mapped is not None else child
+                else:
+                    output[key] = cls._remap_nested_timing(child, before, after)
+        if isinstance(output.get("render"), dict):
+            render = copy.deepcopy(output["render"])
+            timing = cls._timing_range(output)
+            if timing and isinstance(render.get("start_s"), (int, float)):
+                render["start_s"] = timing[0]
+                if isinstance(render.get("duration_s"), (int, float)):
+                    render["duration_s"] = cls._rounded(timing[1] - timing[0])
+            output["render"] = render
+        return output
+
+    @classmethod
+    def _remap_timed_item(cls, value, before, after, allow_partial=False):
+        if not isinstance(value, dict):
+            return None
+        source_ranges = cls._source_ranges_for_item(value, before)
+        if not source_ranges:
+            raise ValueError("timed item has no deterministic source mapping")
+        mapped = cls._map_source_ranges(source_ranges, after)
+        if not mapped:
+            return None
+        expected_duration = sum(end - start for start, end in source_ranges)
+        retained_duration = sum(
+            segment["source_range"]["end_s"] - segment["source_range"]["start_s"]
+            for segment in mapped
+        )
+        if retained_duration < expected_duration - 1e-7 and not allow_partial:
+            return None
+        output = copy.deepcopy(value)
+        start = mapped[0]["program_range"]["start_s"]
+        end = mapped[-1]["program_range"]["end_s"]
+        if isinstance(output.get("program_range"), dict):
+            output["program_range"] = {"start_s": start, "end_s": end}
+        if isinstance(output.get("program_start_s"), (int, float)):
+            output["program_start_s"] = start
+        if isinstance(output.get("start_s"), (int, float)):
+            output["start_s"] = start
+        if isinstance(output.get("duration_s"), (int, float)):
+            output["duration_s"] = cls._rounded(end - start)
+        if isinstance(output.get("start"), (int, float)):
+            output["start"] = start
+        if isinstance(output.get("end"), (int, float)):
+            output["end"] = end
+        if isinstance(output.get("source_range"), dict):
+            if len(mapped) != 1 and not allow_partial:
+                return None
+            output["source_range"] = {
+                "start_s": mapped[0]["source_range"]["start_s"],
+                "end_s": mapped[-1]["source_range"]["end_s"],
+            }
+        if isinstance(output.get("source_ranges"), list):
+            include_clip = any(
+                isinstance(item, dict) and "clip_id" in item for item in output["source_ranges"]
+            )
+            output["source_ranges"] = [
+                {
+                    **({"clip_id": segment["clip_id"]} if include_clip else {}),
+                    **segment["source_range"],
+                }
+                for segment in mapped
+            ]
+        output["_editor_clip_id"] = mapped[0]["clip_id"] if len(mapped) == 1 else None
+        if isinstance(output.get("render"), dict):
+            output["render"] = {
+                **output["render"],
+                "start_s": start,
+                "duration_s": cls._rounded(end - start),
+            }
+        return output
+
+    @classmethod
+    def _source_ranges_for_item(cls, value, timeline):
+        declared = value.get("source_ranges")
+        if isinstance(declared, list) and declared:
+            ranges = [cls._numeric_range(item) for item in declared]
+            if all(item is not None for item in ranges):
+                return ranges
+        declared = cls._numeric_range(value.get("source_range"))
+        if declared is not None:
+            return [declared]
+        timing = cls._timing_range(value)
+        return cls._program_to_source_ranges(timeline, *timing) if timing else []
+
+    @classmethod
+    def _program_to_source_ranges(cls, timeline, start, end):
+        ranges = []
+        for clip in timeline.get("clips", []):
+            program = cls._numeric_range(clip.get("program_range"))
+            source = cls._numeric_range(clip.get("source_range"))
+            if not program or not source:
+                continue
+            intersection_start = max(start, program[0])
+            intersection_end = min(end, program[1])
+            if intersection_end <= intersection_start + 1e-7:
+                continue
+            speed = float(clip.get("speed", 1.0))
+            ranges.append((
+                cls._rounded(source[0] + (intersection_start - program[0]) * speed),
+                cls._rounded(source[0] + (intersection_end - program[0]) * speed),
+            ))
+        return ranges
+
+    @classmethod
+    def _map_source_ranges(cls, source_ranges, timeline):
+        mapped = []
+        for start, end in source_ranges:
+            for clip in timeline.get("clips", []):
+                source = cls._numeric_range(clip.get("source_range"))
+                program = cls._numeric_range(clip.get("program_range"))
+                if not source or not program:
+                    continue
+                intersection_start = max(start, source[0])
+                intersection_end = min(end, source[1])
+                if intersection_end <= intersection_start + 1e-7:
+                    continue
+                speed = float(clip.get("speed", 1.0))
+                mapped.append({
+                    "clip_id": clip.get("id"),
+                    "source_range": {
+                        "start_s": cls._rounded(intersection_start),
+                        "end_s": cls._rounded(intersection_end),
+                    },
+                    "program_range": {
+                        "start_s": cls._rounded(program[0] + (intersection_start - source[0]) / speed),
+                        "end_s": cls._rounded(program[0] + (intersection_end - source[0]) / speed),
+                    },
+                })
+        return sorted(mapped, key=lambda item: item["program_range"]["start_s"])
+
+    @staticmethod
+    def _numeric_range(value):
+        if not isinstance(value, dict):
+            return None
+        start, end = value.get("start_s"), value.get("end_s")
+        if (isinstance(start, bool) or not isinstance(start, (int, float))
+                or isinstance(end, bool) or not isinstance(end, (int, float))
+                or float(end) <= float(start)):
+            return None
+        return float(start), float(end)
+
+    @classmethod
+    def _timing_range(cls, value):
+        program = cls._numeric_range(value.get("program_range"))
+        if program:
+            return program
+        start, end = value.get("start"), value.get("end")
+        if (isinstance(start, (int, float)) and not isinstance(start, bool)
+                and isinstance(end, (int, float)) and not isinstance(end, bool)
+                and end > start):
+            return float(start), float(end)
+        start, duration = value.get("program_start_s"), value.get("duration_s")
+        if (isinstance(start, (int, float)) and not isinstance(start, bool)
+                and isinstance(duration, (int, float)) and not isinstance(duration, bool)
+                and duration > 0):
+            return float(start), float(start + duration)
+        start, duration = value.get("start_s"), value.get("duration_s")
+        if (isinstance(start, (int, float)) and not isinstance(start, bool)
+                and isinstance(duration, (int, float)) and not isinstance(duration, bool)
+                and duration > 0):
+            return float(start), float(start + duration)
+        return None
+
+    @classmethod
+    def _remap_render_timing(cls, value, before, after):
+        if isinstance(value, list):
+            output = []
+            for item in value:
+                remapped = cls._remap_render_timing(item, before, after)
+                if remapped is not None:
+                    output.append(remapped)
+            return output
+        if not isinstance(value, dict):
+            return value
+        if cls._timing_range(value):
+            remapped = cls._remap_timed_item(value, before, after, allow_partial=True)
+            if remapped is None:
+                return None
+            remapped.pop("_editor_clip_id", None)
+            return remapped
+        return {key: cls._remap_render_timing(child, before, after) for key, child in value.items()}
+
+    @classmethod
+    def _rebind_operation_plan(cls, plan, operation, timeline, timeline_sha256):
+        if not isinstance(plan, dict):
+            return
+        if "program_duration_s" in plan:
+            plan["program_duration_s"] = timeline.get("program_duration_s")
+        if isinstance(plan.get("based_on"), dict) and isinstance(operation.get("based_on"), dict):
+            for dependency in list(plan["based_on"]):
+                if dependency in operation["based_on"]:
+                    plan["based_on"][dependency] = operation["based_on"][dependency]
+        hashes = plan.get("input_hashes")
+        if isinstance(hashes, dict) and "timeline_sha256" in hashes:
+            hashes["timeline_sha256"] = timeline_sha256
+        if operation.get("id") == "graphic-motion":
+            bindings = list(graphic_motion_plan._input_bindings(plan))
+            for cue in plan.get("cues", []):
+                if isinstance(cue, dict) and cue.get("status") == "verified":
+                    bindings.extend(graphic_motion_plan._cue_bindings(cue))
+            plan["delivery_bindings"] = bindings
+        bindings = plan.get("delivery_bindings")
+        if isinstance(bindings, list):
+            for binding in bindings:
+                if isinstance(binding, dict) and binding.get("path") == "work/timeline.json":
+                    binding["sha256"] = timeline_sha256
+            operation["delivery_bindings"] = copy.deepcopy(bindings)
+
+    @staticmethod
+    def _canonical_hash(value):
+        payload = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
     @staticmethod
     def _shift_program_range(value, boundary, delta):
@@ -1391,7 +1891,7 @@ class ProtocolService:
     def _commit_timeline(self, root, timeline_path, timeline, project, expected, plan_writes=()):
         project_path = root / "work" / "project.json"
         validation_errors = projectlib.validate_project(
-            project, root, check_files=True, dependency_mode="allow_stale"
+            project, root, check_files=True, dependency_mode="require_current"
         )
         if validation_errors:
             return {"ok": False, "error": "invalid committed project: " + "; ".join(validation_errors)}

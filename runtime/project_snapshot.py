@@ -365,12 +365,20 @@ def _node_view(node):
 
 
 def _snapshot_binding(project, resources):
+    return snapshot_binding(
+        project,
+        [item["etag"] for item in resources if item.get("kind") != "project"],
+    )
+
+
+def snapshot_binding(project, resource_etags):
+    """Bind review evidence to authoritative project state and non-project resources."""
     stable_project = dict(project)
     stable_project["reviews"] = []
     value = json.dumps(
         {
             "project": stable_project,
-            "resources": [item["etag"] for item in resources if item.get("kind") != "project"],
+            "resources": list(resource_etags),
         },
         ensure_ascii=False,
         sort_keys=True,
