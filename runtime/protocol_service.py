@@ -65,6 +65,8 @@ class ProtocolService:
             return self._update_plan(request)
         if verb == "timeline.edit":
             return self._edit_timeline(request)
+        if verb == "timeline.reconcile-manual":
+            return self._reconcile_manual_timeline(request)
         if verb == "review.record":
             return self._record_review(request)
         return {"ok": False, "error": "unknown verb"}
@@ -168,6 +170,202 @@ class ProtocolService:
             return {"ok": False, "error": "project entered recovery quarantine"}
         finally:
             self._release_lease(lease)
+
+    def _reconcile_manual_timeline(self, request):
+        if set(request) != {"verb", "project_id", "read_set", "acknowledge_manual_edits"}:
+            return {"ok": False, "error": "manual reconciliation accepts only a typed acknowledgement"}
+        if request.get("acknowledge_manual_edits") is not True:
+            return {"ok": False, "error": "manual reconciliation requires explicit acknowledgement"}
+        project_id = request.get("project_id")
+        invalid = self._validate_id("project_id", project_id)
+        if invalid:
+            return invalid
+        registered = self._projects.get(project_id)
+        if registered is None:
+            return {"ok": False, "error": "unknown project_id"}
+        if registered["quarantine"]:
+            return {"ok": False, "error": "project is in recovery quarantine"}
+        root = registered["root"]
+        lease = self._acquire_lease(root)
+        if lease is None:
+            return {"ok": False, "status": 409, "error": "project mutation is busy"}
+        try:
+            context = self._timeline_mutation_context(request)
+            if isinstance(context, dict) and "error" in context:
+                return context
+            return self._apply_manual_reconciliation(context)
+        except PreparedTransactionError:
+            registered["quarantine"] = "pending transaction requires recovery"
+            return {"ok": False, "error": "project entered recovery quarantine"}
+        finally:
+            self._release_lease(lease)
+
+    def _apply_manual_reconciliation(self, context):
+        root, snapshot, project, timeline_path, timeline, expected, plan_files = context
+        operations = {
+            item.get("id"): item for item in project.get("operations", [])
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        }
+        cut = operations.get("cut")
+        if not cut:
+            return {"ok": False, "error": "manual reconciliation requires a cut operation"}
+        affected = {"cut"}
+        changed = True
+        while changed:
+            changed = False
+            for operation_id, operation in operations.items():
+                if operation_id in affected:
+                    continue
+                dependencies = set(operation.get("depends_on", [])) | set(operation.get("based_on", {}))
+                if dependencies.intersection(affected):
+                    affected.add(operation_id)
+                    changed = True
+        if not any(operations[item].get("status") == "stale" for item in affected):
+            return {"ok": True, "result": "no_change", "snapshot": self._public_snapshot(snapshot)}
+
+        updated_project = copy.deepcopy(project)
+        updated_operations = {
+            item.get("id"): item for item in updated_project.get("operations", [])
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        }
+        plan_by_id = {entry["operation_id"]: entry for entry in plan_files}
+        sequence = updated_project.get("sequences", {}).get(updated_project.get("active_sequence"), {})
+        active_ids = list(sequence.get("operations", []))
+        for operation_id in affected:
+            operation = updated_operations[operation_id]
+            if operation.get("status") == "stale":
+                operation["status"] = "approved"
+            based_on = operation.get("based_on")
+            if isinstance(based_on, dict):
+                for dependency in list(based_on):
+                    if dependency in updated_operations:
+                        based_on[dependency] = updated_operations[dependency].get("revision")
+            if operation_id == "cut":
+                continue
+            entry = plan_by_id.get(operation_id)
+            if not entry:
+                continue
+            plan = entry["plan"]
+            if any(field in plan for field in ("based_on", "input_hashes", "delivery_bindings")):
+                return {
+                    "ok": False,
+                    "error": f"manual reconciliation cannot safely rebind complex {operation_id} evidence",
+                }
+            try:
+                render = self._render_from_reconciled_plan(operation_id, plan, operation.get("render"))
+            except ValueError as exc:
+                return {"ok": False, "error": f"manual reconciliation failed for {operation_id}: {exc}"}
+            if render:
+                operation["render"] = render
+            else:
+                operation.pop("render", None)
+                active_ids = [item for item in active_ids if item != operation_id]
+        sequence["operations"] = active_ids
+        updated_project.setdefault("render", {})["status"] = "draft"
+
+        revisions = {item: operation.get("revision") for item, operation in updated_operations.items()}
+        for review in updated_project.get("reviews", []):
+            based_on = review.get("based_on")
+            if not isinstance(review, dict) or not isinstance(based_on, dict):
+                continue
+            dependencies = set(review.get("depends_on", [])) | set(based_on)
+            if not dependencies.intersection(affected):
+                continue
+            for dependency in list(based_on):
+                if dependency in revisions:
+                    based_on[dependency] = revisions[dependency]
+            if review.get("status") == "stale":
+                review["status"] = "approved"
+            review["editor_rebase"] = {
+                "kind": "legacy-manual-timeline-reconciliation",
+                "cut_revision": cut.get("revision"),
+            }
+
+        rebased_snapshot = snapshot_binding(
+            updated_project,
+            [item["etag"] for item in snapshot["resources"] if item.get("kind") != "project"],
+        )
+        for review in updated_project.get("reviews", []):
+            dependencies = set(review.get("depends_on", [])) | set(review.get("based_on", {}))
+            if dependencies.intersection(affected):
+                review["snapshot_etag"] = rebased_snapshot
+
+        validation_errors = projectlib.validate_project(
+            updated_project, root, check_files=True, dependency_mode="require_current"
+        )
+        if validation_errors:
+            return {"ok": False, "error": "manual reconciliation is invalid: " + "; ".join(validation_errors)}
+        try:
+            compiled = projectlib.build_render_plan(updated_project, root)
+        except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            return {"ok": False, "error": f"manual reconciliation cannot compile delivery: {exc}"}
+        render_path = projectlib.resolve_project_path(root, updated_project["render"]["plan"])
+        if not render_path.is_file():
+            return {"ok": False, "error": "manual reconciliation requires an existing render plan"}
+        render_write = (
+            render_path, self._json_bytes(compiled), self._hash(render_path.read_bytes())
+        )
+        return self._commit_timeline(
+            root, timeline_path, timeline, updated_project, expected, (render_write,)
+        )
+
+    @classmethod
+    def _render_from_reconciled_plan(cls, operation_id, plan, declared):
+        if operation_id == "content-cards":
+            items = plan.get("cards")
+            asset_field = lambda item: item.get("renderer", {}).get("asset")
+            start_field = lambda item: item.get("program_start_s")
+            duration_field = lambda item: item.get("duration_s")
+        elif operation_id == "captions":
+            items = plan.get("cues")
+            if not isinstance(items, list) or not items:
+                return []
+            return copy.deepcopy(declared) if declared else []
+        elif operation_id == "graphic-motion":
+            items = [
+                item for item in plan.get("cues", [])
+                if isinstance(item, dict) and item.get("status") == "verified"
+            ]
+            return [copy.deepcopy(item["render"]) for item in items if isinstance(item.get("render"), dict)]
+        elif operation_id == "b-roll":
+            items = [
+                item for item in plan.get("shots", [])
+                if isinstance(item, dict) and item.get("status") == "verified"
+            ]
+            return [
+                {
+                    "kind": "overlay",
+                    "asset": item.get("normalized", {}).get("path"),
+                    "start_s": item.get("program_range", {}).get("start_s"),
+                    "duration_s": cls._rounded(
+                        float(item.get("program_range", {}).get("end_s"))
+                        - float(item.get("program_range", {}).get("start_s"))
+                    ),
+                }
+                for item in items
+            ]
+        else:
+            return copy.deepcopy(declared) if declared else []
+        if not isinstance(items, list):
+            raise ValueError("plan item collection is missing")
+        declared_items = declared if isinstance(declared, list) else ([declared] if declared else [])
+        by_asset = {
+            item.get("asset"): item for item in declared_items
+            if isinstance(item, dict) and isinstance(item.get("asset"), str)
+        }
+        output = []
+        for item in items:
+            if not isinstance(item, dict):
+                raise ValueError("plan item is invalid")
+            asset, start, duration = asset_field(item), start_field(item), duration_field(item)
+            if (not isinstance(asset, str) or not asset.strip()
+                    or isinstance(start, bool) or not isinstance(start, (int, float))
+                    or isinstance(duration, bool) or not isinstance(duration, (int, float)) or duration <= 0):
+                raise ValueError("plan item render timing is incomplete")
+            contribution = copy.deepcopy(by_asset.get(asset, {"kind": "overlay", "asset": asset}))
+            contribution.update({"start_s": cls._rounded(start), "duration_s": cls._rounded(duration)})
+            output.append(contribution)
+        return output
 
     def _timeline_mutation_context(self, request):
         root = self._projects[request["project_id"]]["root"]
@@ -800,7 +998,9 @@ class ProtocolService:
                         continue
                     if isinstance(item_id, str):
                         seen.add(item_id)
-                    updated = cls._remap_timed_item(item, before, after)
+                    updated = cls._remap_timed_item(
+                        item, before, after, prefer_program=operation_id == "content-cards"
+                    )
                     if updated is None:
                         next_tombstones.append(copy.deepcopy(item))
                         continue
@@ -995,10 +1195,12 @@ class ProtocolService:
         return output
 
     @classmethod
-    def _remap_timed_item(cls, value, before, after, allow_partial=False):
+    def _remap_timed_item(
+        cls, value, before, after, allow_partial=False, prefer_program=False,
+    ):
         if not isinstance(value, dict):
             return None
-        source_ranges = cls._source_ranges_for_item(value, before)
+        source_ranges = cls._source_ranges_for_item(value, before, prefer_program=prefer_program)
         if not source_ranges:
             raise ValueError("timed item has no deterministic source mapping")
         mapped = cls._map_source_ranges(source_ranges, after)
@@ -1054,7 +1256,10 @@ class ProtocolService:
         return output
 
     @classmethod
-    def _source_ranges_for_item(cls, value, timeline):
+    def _source_ranges_for_item(cls, value, timeline, prefer_program=False):
+        timing = cls._timing_range(value)
+        if prefer_program and timing:
+            return cls._program_to_source_ranges(timeline, *timing)
         declared = value.get("source_ranges")
         if isinstance(declared, list) and declared:
             ranges = [cls._numeric_range(item) for item in declared]
@@ -1063,7 +1268,6 @@ class ProtocolService:
         declared = cls._numeric_range(value.get("source_range"))
         if declared is not None:
             return [declared]
-        timing = cls._timing_range(value)
         return cls._program_to_source_ranges(timeline, *timing) if timing else []
 
     @classmethod
@@ -2071,6 +2275,9 @@ class ProtocolService:
                     if (isinstance(candidate, dict) and candidate.get("id") in active_operation_ids
                             and candidate.get("id") != "cut" and isinstance(candidate.get("plan"), str)):
                         allowed.add(projectlib.resolve_project_path(root, candidate["plan"]).resolve())
+                render_plan = current_project.get("render", {}).get("plan")
+                if isinstance(render_plan, str) and render_plan.strip():
+                    allowed.add(projectlib.resolve_project_path(root, render_plan).resolve())
             elif intent["verb"] == "plan.update":
                 plan_path = projectlib.resolve_project_path(root, operation["plan"])
                 required_targets.add(plan_path.resolve())

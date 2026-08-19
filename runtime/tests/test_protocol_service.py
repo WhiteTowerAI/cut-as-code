@@ -424,6 +424,64 @@ class ProtocolServiceTests(unittest.TestCase):
         self.assertEqual(["cut", "captions"], [item["operation"] for item in compiled["contributions"]])
         self.assertEqual(0.5, compiled["contributions"][1]["start_s"])
 
+    def test_manual_reconciliation_repairs_legacy_stale_bindings_and_orphan_render(self):
+        self._configure_cut_project()
+        project = json.loads(self.project_path.read_text(encoding="utf-8"))
+        cut, captions = project["operations"]
+        cut.update({
+            "revision": 5, "status": "stale",
+            "render": {"kind": "timeline-transform", "input": "timeline.json"},
+        })
+        captions.update({
+            "revision": 3, "status": "stale", "based_on": {"cut": 1},
+            "render": [{
+                "kind": "overlay", "asset": "cache/orphan.mov", "start_s": 0.4, "duration_s": 0.2,
+            }],
+        })
+        project["render"] = {
+            "status": "draft", "plan": "render/render-plan.json", "output": "../final/final.mp4",
+        }
+        render_plan = self.root / "work" / "render" / "render-plan.json"
+        render_plan.parent.mkdir(parents=True)
+        render_plan.write_text('{"schema_version": 1}\n', encoding="utf-8")
+        self.project_path.write_text(json.dumps(project), encoding="utf-8")
+        opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+
+        repaired = self.service.handle_request({
+            "verb": "timeline.reconcile-manual", "project_id": opened["project_id"],
+            "read_set": self._timeline_read_set(opened["snapshot"]),
+            "acknowledge_manual_edits": True,
+        })
+        self.assertTrue(repaired["ok"], repaired)
+        saved = json.loads(self.project_path.read_text(encoding="utf-8"))
+        cut, captions = saved["operations"]
+        self.assertEqual(("approved", "approved", {"cut": 5}), (
+            cut["status"], captions["status"], captions["based_on"],
+        ))
+        self.assertNotIn("render", captions)
+        self.assertEqual(["cut"], saved["sequences"]["main"]["operations"])
+        self.assertEqual(
+            [],
+            protocol_service.projectlib.validate_project(
+                saved, self.root, check_files=True, dependency_mode="require_current"
+            ),
+        )
+        render_plan = json.loads((self.root / "work" / "render" / "render-plan.json").read_text(encoding="utf-8"))
+        self.assertEqual(["cut"], [item["operation"] for item in render_plan["contributions"]])
+
+    def test_manual_reconciliation_requires_an_explicit_acknowledgement(self):
+        self._configure_cut_project()
+        opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+        response = self.service.handle_request({
+            "verb": "timeline.reconcile-manual", "project_id": opened["project_id"],
+            "read_set": self._timeline_read_set(opened["snapshot"]),
+            "acknowledge_manual_edits": False,
+        })
+        self.assertEqual(
+            {"ok": False, "error": "manual reconciliation requires explicit acknowledgement"},
+            response,
+        )
+
     def test_timeline_edit_rejects_stale_etag_and_noncanonical_trim(self):
         self._configure_cut_project()
         opened = self.service.handle_request(
