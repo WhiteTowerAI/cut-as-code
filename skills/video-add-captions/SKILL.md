@@ -51,6 +51,7 @@ retained words move to program time, and cues always break at clip boundaries.
 ```text
 work/captions/
 |-- captions-plan.json
+|-- caption-spatial-context.json (only for eligible B-roll composites)
 `-- caption-interaction.json
 work/cache/captions/
 |-- preview-project/
@@ -71,7 +72,8 @@ review/05-captions/
 ```
 
 Generated HTML, copied runtime files, extracted source frames, and overlay frames
-are cache. The plan, SRT, decision receipt, and review evidence are durable.
+are cache. The plan, optional spatial context, SRT, decision receipt, and review
+evidence are durable.
 
 ## Caption Plan
 
@@ -102,6 +104,27 @@ Expressive supports only `bottom-standard` and `center-emphasis`. Read
 `reference/caption-rules.md` before filling the shell. The
 existing renderer consumes only completed `presentation.layout_beats`; it does not
 infer positions or change layout inside a beat.
+
+Expressive cues may also define one contiguous phrase-level `hero_line`.
+Use canonical `level: hero`; it renders the phrase gold on its own line at
+`1.5x`. Legacy `level: strong` remains accepted as an input alias and renders
+identically, but new Agent-authored plans must not emit it. The maintained word roles `keyword`, `number`, and
+`contrast` each use `1.22x`; `normal` remains `1.0x`. These treatments are
+orthogonal to presets and do not create new style IDs. Read
+`reference/caption-rules.md` for the schema, overflow policy, and Karaoke rules.
+
+When an active, review-approved B-roll operation contains approved or verified
+speaker-inset composites, captions may derive `caption-spatial-context.json` from
+the frozen upstream plan, evidence, normalized composites, and explicit subshot
+`display_mode`. This does not modify or reselect the B-roll layout. It aligns cue
+boundaries before Expressive planning and resolves only the maintained
+`preset-bottom`, `frame-center`, `panel-center`, and boundary-only `panel-bottom`
+placements. `panel-bottom` is allowed only for an `unsplittable_word_boundary`
+adjacent to a lower-center focused panel; it centers the stable cue inside the
+reserved strip below the structured speaker rect. Such a cue is checked against
+every visual context it intersects, not only the context containing the word
+midpoint. Without this context, all existing Standard and Expressive placement
+behavior remains unchanged.
 
 ## Styles
 
@@ -138,16 +161,21 @@ Read:
 
 Two honest modes share the same hash-bound state machine:
 
-- `human`: record the user's exact gallery response with `select`, show all real
-  preview evidence, and record the exact confirmation response with `confirm`.
+- `human`: pass the exact copied gallery summary to `select`, show all real
+  preview evidence, and pass the exact copied approval or revision summary to
+  `confirm` or `adjust`. Review-page-bound commands do not accept bare approval
+  phrases.
 - `agent`: use only when the user explicitly delegates caption decisions. Start
   with a non-empty delegation note, then use `agent-select` and `agent-confirm`
   with non-empty rationales.
 
-Human commands fail in agent mode and agent commands fail in human mode. Both
-modes require four existing source-backed images before approval. A change to the
-source, plan, timeline, style, override, project metadata, review page, or evidence
-invalidates approval; rebuild the affected artifacts and review them again.
+Human commands fail in agent mode and agent commands fail in human mode. Standard
+without spatial context requires the four maintained source-backed images;
+Expressive and composite-aware reviews use their dynamic evidence contracts. A
+change to the source, plan, timeline, style, override, project metadata,
+review page, or evidence invalidates approval; spatial context, upstream B-roll revision,
+or bound-composite changes do the same. Rebuild the affected artifacts and review
+them again.
 
 ## Canonical Workflow
 
@@ -160,6 +188,9 @@ $ProjectRoot = (Resolve-Path "<project-root>").Path
 $Work = Join-Path $ProjectRoot "work"
 $SourceVideo = "<absolute path from work/project.json>"
 $Plan = Join-Path $Work "captions\captions-plan.json"
+$SpatialContext = Join-Path $Work "captions\caption-spatial-context.json"
+$SpatialArgs = @()
+$SpatialReviewArgs = @()
 $Receipt = Join-Path $Work "captions\caption-interaction.json"
 $Review = Join-Path $ProjectRoot "review\05-captions"
 $Cache = Join-Path $Work "cache\captions"
@@ -209,6 +240,35 @@ plan. After the user selects Expressive, run the same command with:
   --presentation-mode expressive
 ```
 
+After draft cue generation, inspect the active B-roll operation and its bound plan
+read-only. Enable composite-aware placement only when the operation is active, its
+status is `approved` or `verified`, `review.status` is `approved`, the
+speaker-inset analysis/agent-input/preview/clearance bindings are complete, and at
+least one verified or normalized shot has a maintained composite layout. The
+spatial builder uses explicit subshot `display_mode: enabled` for speaker geometry;
+`pure_broll` and missing speaker evidence never imply a speaker rectangle.
+
+When eligible, align draft cues to every B-roll visual boundary before filling any
+Expressive `layout_beats` or `hero_line`. Alignment splits only at word gaps and
+writes back atomically; a boundary inside a word keeps the word whole and records
+mandatory review evidence:
+
+```powershell
+python "$SkillRoot\scripts\caption_spatial_context.py" align `
+  --project-root $ProjectRoot --plan $Plan --out-plan $Plan
+```
+
+For an eligible project, prepare the optional arguments used by every later gate:
+
+```powershell
+$SpatialArgs = @("--spatial-context", $SpatialContext)
+$SpatialReviewArgs = @("--spatial-context", $SpatialContext, "--project-root", $ProjectRoot)
+```
+
+When no eligible composite exists, skip all four spatial commands and leave
+`$SpatialArgs` and `$SpatialReviewArgs` empty. Do not create or attach an empty
+context.
+
 Before starting style selection or generating a preview, the Agent must plan the
 entire Expressive program in one pass:
 
@@ -216,7 +276,9 @@ entire Expressive program in one pass:
    generated caption cues, and any real source-frame evidence needed to justify
    layout changes.
 2. Fill all `presentation.layout_beats`, annotate exceptional word
-   `semantic_role` values, write one rationale per beat, and write the overall
+   `semantic_role` values, add at most one contiguous `hero_line` with canonical
+   `level: hero` to a cue when
+   warranted, write one rationale per beat/hero line, and write the overall
    `presentation.planner.rationale`.
 3. Set `presentation.planning_status` to `complete` only after every cue is covered
    exactly once.
@@ -224,6 +286,25 @@ entire Expressive program in one pass:
 
 ```powershell
 python "$SkillRoot\scripts\build_captions.py" --validate-plan $Plan
+```
+
+For an eligible composite, build, validate, and attach the context only after the
+final cue IDs and Expressive candidates are complete. This preserves the upstream
+layout and binds its current revision and hashes into the caption plan:
+
+```powershell
+python "$SkillRoot\scripts\caption_spatial_context.py" build `
+  --project-root $ProjectRoot --plan $Plan --out $SpatialContext
+```
+
+```powershell
+python "$SkillRoot\scripts\caption_spatial_context.py" validate `
+  --project-root $ProjectRoot --plan $Plan --context $SpatialContext
+```
+
+```powershell
+python "$SkillRoot\scripts\caption_spatial_context.py" attach `
+  --project-root $ProjectRoot --plan $Plan --context $SpatialContext
 ```
 
 Do not ask the user to choose a position cue by cue. The user reviews the existing
@@ -236,7 +317,7 @@ into the project review directory without asking the user to locate a file:
 ```powershell
 $StartOutput = node "$SkillRoot\scripts\caption_interaction.mjs" start `
   --state $Receipt --source $SourceVideo --captions $Plan `
-  --review-dir $Review --no-open true
+  --review-dir $Review --no-open true @SpatialArgs
 $StartOutput | Write-Host
 ```
 
@@ -305,7 +386,7 @@ $StartOutput = node "$SkillRoot\scripts\caption_interaction.mjs" start `
   --review-dir $Review `
   --decision-mode agent `
   --delegation-note "User delegated caption style and preview approval." `
-  --no-open true
+  --no-open true @SpatialArgs
 $StartOutput | Write-Host
 
 node "$SkillRoot\scripts\caption_interaction.mjs" agent-select `
@@ -322,7 +403,7 @@ and font files and preserves rational FPS in `project-meta.json`:
 ```powershell
 node "$SkillRoot\scripts\generate_caption_project.mjs" `
   --video $SourceVideo --captions $Plan --out $PreviewProject `
-  --interaction-state $Receipt --project-root $ProjectRoot --mode preview
+  --interaction-state $Receipt --project-root $ProjectRoot --mode preview @SpatialArgs
 
 npx.cmd hyperframes check $PreviewProject --at 1 --timeout 10000 --no-contrast
 ```
@@ -335,7 +416,7 @@ only the output directory and appending `--karaoke true`:
 node "$SkillRoot\scripts\generate_caption_project.mjs" `
   --video $SourceVideo --captions $Plan --out $ComparisonProject `
   --interaction-state $Receipt --project-root $ProjectRoot `
-  --karaoke true --mode preview
+  --karaoke true --mode preview @SpatialArgs
 ```
 
 For Standard, build mapped early/middle/late/no-caption evidence. This command captures
@@ -347,23 +428,29 @@ two with Pillow:
 python "$SkillRoot\scripts\build_caption_review.py" `
   --source $SourceVideo --timeline "$Work\timeline.json" --plan $Plan `
   --project $PreviewProject --cache "$Cache\review-cache" --out $Review `
-  --interaction-state $Receipt
+  --interaction-state $Receipt @SpatialReviewArgs
 ```
 
-For Expressive, the same builder emits one primary midpoint sample per layout beat,
-one no-caption sample, and a separately bound semantic-only/Karaoke comparison:
+For Expressive, the same builder emits exhaustive machine samples, a compact
+human-review index, and a separately bound semantic-only/Karaoke comparison:
 
 ```powershell
 python "$SkillRoot\scripts\build_caption_review.py" `
   --source $SourceVideo --timeline "$Work\timeline.json" --plan $Plan `
   --project $PreviewProject --comparison-project $ComparisonProject `
-  --cache "$Cache\review-cache" --out $Review --interaction-state $Receipt
+  --cache "$Cache\review-cache" --out $Review --interaction-state $Receipt `
+  @SpatialReviewArgs
 ```
 
-The builder writes `captions-review.html` as the one authoritative page. Standard contains
-exactly the four maintained evidence labels. Expressive contains the dynamic layout
-beat evidence, filter controls, image enlargement, no-caption evidence, and the
-separately bound coexistence comparison outside the primary approval count. The
+The builder writes `captions-review.html` as the one authoritative page. Standard
+without spatial context contains exactly the four maintained evidence labels. For
+Expressive or composite-aware review, `captions-evidence.json.samples` retains all
+dense machine evidence while `review_samples` contains at most one representative
+for each category actually present: `bottom-standard`, `center-emphasis`,
+`preset-bottom`, `frame-center`, `panel-center`, and `Hero 1.5x`. One PNG may carry
+multiple category labels; absent categories are not fabricated. `no-caption`
+remains machine evidence, and the Karaoke comparison remains separate from the
+representative count. The
 Agent must open that page with the native command for the host OS; for example,
 set `$EvidenceReviewPage = "$Review\captions-review.html"` and run one of:
 
@@ -379,9 +466,11 @@ open "$EvidenceReviewPage"
 xdg-open "$EvidenceReviewPage"
 ```
 
-If opening fails, diagnose and retry. Inspect every primary image for readability,
+If opening fails, diagnose and retry. Inspect every representative primary image for readability,
 safe-area placement, clipping, word wrapping, stable beat placement, and unwanted
-pixels in `preview-no-caption.png`. Standard binds the maintained four images:
+pixels. Machine validation must already have passed every dense sample, including
+`no-caption`, before this gate. Standard without spatial context binds the
+maintained four images:
 
 ```powershell
 $Evidence = @(
@@ -397,12 +486,34 @@ node "$SkillRoot\scripts\caption_interaction.mjs" preview-ready `
   --timeline "$Work\timeline.json"
 ```
 
-Expressive binds the dynamic primary count and the separate coexistence pair from
-`captions-evidence.json`:
+With spatial context, keep those maintained Standard samples and add dense
+start/25%/50%/75%/end evidence only for placement beats that carry a composite
+background. Do not add dense evidence for A-roll placement beats.
+
+Use that fixed four-image command only when Standard has no spatial context. For
+Standard with a bound spatial context, bind only the representative PNGs and bind
+the complete machine evidence document separately. Standard has no coexistence comparison, so do not pass
+`--comparison-evidence`:
+
+```powershell
+$StandardSpatialEvidenceDocument = Get-Content "$Review\captions-evidence.json" -Raw | ConvertFrom-Json
+$Evidence = @($StandardSpatialEvidenceDocument.review_samples | ForEach-Object {
+  Join-Path $Review $_.preview
+}) -join ","
+
+node "$SkillRoot\scripts\caption_interaction.mjs" preview-ready `
+  --state $Receipt --project-meta "$PreviewProject\project-meta.json" `
+  --evidence $Evidence --evidence-document "$Review\captions-evidence.json" `
+  --review-page "$Review\captions-review.html" `
+  --timeline "$Work\timeline.json"
+```
+
+Expressive binds the representative PNGs, complete machine document, and separate
+coexistence pair from `captions-evidence.json`:
 
 ```powershell
 $EvidenceDocument = Get-Content "$Review\captions-evidence.json" -Raw | ConvertFrom-Json
-$Evidence = @($EvidenceDocument.samples | ForEach-Object {
+$Evidence = @($EvidenceDocument.review_samples | ForEach-Object {
   Join-Path $Review $_.preview
 }) -join ","
 $ComparisonEvidence = @($EvidenceDocument.experimental_comparison.samples | ForEach-Object {
@@ -411,7 +522,8 @@ $ComparisonEvidence = @($EvidenceDocument.experimental_comparison.samples | ForE
 
 node "$SkillRoot\scripts\caption_interaction.mjs" preview-ready `
   --state $Receipt --project-meta "$PreviewProject\project-meta.json" `
-  --evidence $Evidence --comparison-evidence $ComparisonEvidence `
+  --evidence $Evidence --evidence-document "$Review\captions-evidence.json" `
+  --comparison-evidence $ComparisonEvidence `
   --review-page "$Review\captions-review.html" --timeline "$Work\timeline.json"
 ```
 
@@ -433,6 +545,18 @@ Caption preview review
 Review: <UUID from the opened page>
 Decision: approve
 Evidence: expressive-layout-beats
+Karaoke: on|off
+```
+
+When `caption-spatial-context.json` is bound, the authoritative page emits the
+composite-aware token. Standard uses the same block without the Karaoke line;
+Expressive requires the explicit Karaoke choice:
+
+```text
+Caption preview review
+Review: <UUID from the opened page>
+Decision: approve
+Evidence: composite-aware
 Karaoke: on|off
 ```
 
@@ -491,10 +615,17 @@ finalizes `style`, `review`, and hashed runtime assets in the canonical plan.
 Expressive overlay generation uses the preview-approved Karaoke choice; an
 explicit `--karaoke` value must match that approval:
 
+For Expressive, formal overlay generation stores the Human-visible representative
+PNGs in `review.representative_evidence`. It keeps `review.evidence` as the shared
+delivery compiler compatibility set: one already-bound machine sample per layout beat
+plus `no-caption`, selected from `captions-evidence.json`. This does not add cards to
+the human review or claim that the user inspected machine-only samples; the complete
+document path, hash, and sample count remain in `review.machine_evidence_document`.
+
 ```powershell
 node "$SkillRoot\scripts\generate_caption_project.mjs" `
   --video $SourceVideo --captions $Plan --out $OverlayProject `
-  --interaction-state $Receipt --project-root $ProjectRoot --mode overlay
+  --interaction-state $Receipt --project-root $ProjectRoot --mode overlay @SpatialArgs
 
 npx.cmd hyperframes check $OverlayProject --at 1 --timeout 10000 --no-contrast
 
@@ -520,7 +651,7 @@ After cache deletion, rebuild the composition without replaying approval:
 ```powershell
 node "$SkillRoot\scripts\generate_caption_project.mjs" `
   --video $SourceVideo --captions $Plan --out $OverlayProject `
-  --approved-plan true --mode overlay
+  --approved-plan true --project-root $ProjectRoot --mode overlay @SpatialArgs
 ```
 
 The command verifies that the frozen runtime hashes still match.
@@ -529,15 +660,18 @@ The command verifies that the frozen runtime hashes still match.
 
 Add or revise one `captions` operation in `work/project.json`. Depend on
 `understanding`; also depend on the active `cut` operation when it exists.
-`based_on` must equal the current dependency revisions.
+When active B-roll supplied the spatial context, also add `b-roll` to
+`depends_on`; its `based_on` value must equal the bound active B-roll revision.
+When there is no spatial context, omit `b-roll` from `depends_on` and
+`based_on`. All `based_on` values must equal the current dependency revisions.
 
 ```json
 {
   "id": "captions",
   "skill": "video-add-captions",
   "revision": 1,
-  "depends_on": ["understanding", "cut"],
-  "based_on": {"understanding": 1, "cut": 1},
+  "depends_on": ["understanding", "cut", "b-roll"],
+  "based_on": {"understanding": 1, "cut": 1, "b-roll": 4},
   "status": "verified",
   "plan": "captions/captions-plan.json",
   "outputs": ["cache/captions/overlay-frames"],
@@ -582,7 +716,10 @@ overrides that decision.
 
 Without `--timeline`, `build_captions.py` still writes the old cue array.
 `generate_caption_project.mjs` accepts that array with the interaction receipt.
-Standalone exact ID and skip responses are legacy compatibility only.
+Standalone exact ID and skip responses are legacy compatibility only. Standalone
+`approve` is also a legacy compatibility response. Historical non-English aliases
+remain accepted as input compatibility but are never emitted or documented as
+user instructions.
 `composite_caption_overlay.ps1` accepts an overlay video or `frame_%06d.png`
 directory and writes compatible H.264/yuv420p while copying source audio. Use this
 standalone path only when no active operation changes time; canonical projects use
@@ -595,6 +732,9 @@ Run before declaring the operation verified:
 ```powershell
 python "$SkillRoot\scripts\check_project_protocol.py"
 node "$SkillRoot\scripts\check_caption_style_config.mjs"
+python "$SkillRoot\scripts\check_caption_spatial_context.py"
+python "$SkillRoot\scripts\check_caption_review.py"
+node "$SkillRoot\scripts\check_caption_interaction.mjs"
 powershell.exe -ExecutionPolicy Bypass -File "$SkillRoot\scripts\check_structure.ps1"
 node "$SkillRoot\scripts\caption_interaction.mjs" status --state $Receipt
 ```

@@ -8,6 +8,7 @@ import inspect
 import json
 import math
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -29,6 +30,33 @@ import build_review_page
 import normalize_broll
 import check_broll
 import speaker_inset
+
+
+def _final_size_clearance_fields(plan, analysis, agent_input, preview,
+                                 shot_id, subshot_id):
+    budget = speaker_inset.build_pixel_budget(
+        plan, analysis, agent_input, preview, shot_id, subshot_id,
+    )
+    checks = [
+        {
+            "role": item["role"],
+            "program_time_s": item["program_time_s"],
+            "preview_sha256": plan["speaker_inset"]["preview"]["sha256"],
+            "observation": "The complete speaker silhouette remains readable at final size.",
+        }
+        for item in budget["checkpoints"]
+    ]
+    checks.append({
+        "role": "motion_risk",
+        "status": "not_applicable",
+        "preview_sha256": plan["speaker_inset"]["preview"]["sha256"],
+        "reason": "No additional motion-risk frame exists in this stable subshot.",
+    })
+    return {
+        "legibility_rationale": "The speaker remains immediately recognizable at final size.",
+        "pixel_budget": budget,
+        "legibility_checks": checks,
+    }
 
 
 class _BrollFixture:
@@ -95,6 +123,34 @@ class _BrollFixture:
         return broll_plan.record_chat_presentation_decision(
             plan, decision, project_root=self.root,
         )
+
+    def publish_review_page(self, review_id="123e4567-e89b-12d3-a456-426614174000", *, plan=None):
+        plan = self.plan if plan is None else plan
+        page = self.root / "review/03-b-roll" / f"b-roll-review-{review_id}.html"
+        page.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "review_id": review_id,
+            "review_mode": (
+                "selection"
+                if plan.get("presentation", {}).get("mode") == "speaker-inset"
+                else "standard"
+            ),
+            "plan_sha256": broll_plan.canonical_sha256(
+                broll_plan.review_subject(plan)
+            ),
+            "candidate_manifest_sha256": broll_plan.canonical_sha256(
+                broll_plan.candidate_manifest(plan)
+            ),
+            "review_video_sha256": plan["input_hashes"]["review_video_sha256"],
+            "timeline": {
+                "fps": copy.deepcopy(self.timeline["fps"]),
+                "program_duration_s": self.timeline["program_duration_s"],
+                "clips": copy.deepcopy(self.timeline["clips"]),
+            },
+        }
+        encoded = base64.b64encode(json.dumps(payload).encode("utf-8")).decode("ascii")
+        page.write_text(f"<script>const data=JSON.parse(atob('{encoded}'));</script>", encoding="utf-8")
+        return page
 
     def pexels_candidate(self):
         candidate = copy.deepcopy(self.plan["shots"][0]["candidates"][0])
@@ -303,7 +359,11 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         self.assertEqual("speaker-inset", updated["presentation"]["mode"])
         self.assertEqual(BrollPlanTests._speaker_style(), updated["speaker_inset_style"])
 
-    def test_prepare_composite_requires_chat_speaker_presentation_decision(self):
+    def test_approve_selection_requires_chat_speaker_presentation_decision(self):
+        self.assertTrue(hasattr(broll_plan, "approve_selection"))
+        selection_rationale = (
+            "Explicit user action approved the exact B-roll selection shown in this review."
+        )
         candidates = self._canonical_candidates(1)
         segment = {
             "candidate_id": candidates[0]["id"],
@@ -312,18 +372,19 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             "playback_rate": 1.0,
         }
         self.plan["speaker_inset_style"] = self._speaker_style()
-        selection = self._canonical_review([segment], intent="prepare_composite")
+        selection = self._canonical_review([segment], intent="approve_selection")
         selection.update({
-            "rationale": broll_plan.HUMAN_PREPARE_COMPOSITE_RATIONALE,
+            "rationale": selection_rationale,
             "rationale_source": "review_ui_explicit_action",
         })
 
         with self.assertRaisesRegex(ValueError, "agent-chat presentation decision is required"):
-            broll_plan.prepare_composite(
+            broll_plan.approve_selection(
                 self.plan, selection,
                 mode="human", actor="Actual user",
-                rationale=broll_plan.HUMAN_PREPARE_COMPOSITE_RATIONALE,
+                rationale=selection_rationale,
                 project_root=self.root, timeline=self.timeline,
+                transcript=self.transcript,
             )
 
     def test_speaker_inset_skill_docs_and_example_match_delivery_contract(self):
@@ -335,13 +396,23 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         style = example["speaker_inset_style"]
         self.assertEqual(self._speaker_style(), style)
         for text in (skill, rules):
+            normalized = " ".join(text.split())
             for value in (
                     "focused-panel", "full-bleed-wash", "corner-pip",
                     "project_layout_strategy", "layout_recommendation",
                     "top-left", "top-right", "width_ratio", "0.39",
                     "agent_chat_explicit_action", "presentation-decision.json",
-                    "ordinary", "speaker-inset"):
+                    "ordinary", "speaker-inset", "approve_selection",
+                    "b-roll-selection", "Copy", "Download JSON",
+                    "read-only", "collapsed", "final visual"):
                 self.assertIn(value, text)
+            self.assertIn("consumed as immutable evidence", normalized)
+            self.assertIn("must not present it again", normalized)
+            self.assertIn("ROI", text)
+            self.assertIn("layout", text)
+            self.assertIn("composite", text)
+            self.assertNotIn("prepare_composite", text)
+            self.assertNotIn("only to freeze exact B-roll selections", normalized)
             self.assertNotIn("size_candidates", text)
             self.assertNotIn("bottom-left", text)
             self.assertNotIn("bottom-right", text)
@@ -354,6 +425,47 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         self.assertEqual("chosen", example["presentation"]["status"])
         self.assertEqual("speaker-inset", example["presentation"]["mode"])
         self.assertEqual("b-roll/presentation-decision.json", example["presentation"]["path"])
+        self.assertEqual("approved", example["selection"]["status"])
+        self.assertEqual("approve_selection", example["selection"]["submission_intent"])
+        self.assertEqual("b-roll-selection", example["selection"]["approval_scope"])
+        self.assertTrue(example["selection"]["consumed"])
+
+    def test_candidate_review_docs_allow_direct_approval_of_page_edits(self):
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        rules = (ROOT / "reference/broll-rules.md").read_text(encoding="utf-8")
+
+        for text in (skill, rules):
+            normalized = " ".join(text.split()).lower()
+            self.assertIn("current exact configuration", normalized)
+            self.assertIn("non-empty natural-language", normalized)
+            self.assertIn("empty request changes", normalized)
+            self.assertIn("page controls cannot express", normalized)
+            self.assertIn("candidate selection and speaker composite approval remain separate", normalized)
+            self.assertIn(
+                "do not ask the user to choose ordinary or speaker-inset again",
+                normalized,
+            )
+            self.assertIn(
+                "`presentation-decision.json` receipt remains unchanged",
+                normalized,
+            )
+            self.assertNotIn(
+                "changed program timing, a changed prefilled segment, non-empty notes",
+                normalized,
+            )
+
+        self.assertIn(
+            "timeline=timeline,transcript=transcript,project_root=root",
+            skill,
+        )
+        self.assertIn(
+            "project_root=root,timeline=timeline,transcript=transcript",
+            skill,
+        )
+        self.assertNotIn(
+            "A changed candidate, plan, or review video requires a new chat choice",
+            skill,
+        )
 
     def test_dynamic_social_docs_and_example_define_search_context_and_semantic_ranking_contract(self):
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
@@ -395,7 +507,71 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             for shot in example["shots"]
         ))
 
-    def test_prepare_composite_writes_non_approval_selection_snapshot(self):
+    def test_approve_selection_writes_consumed_authoritative_selection(self):
+        self.assertTrue(hasattr(broll_plan, "approve_selection"))
+        selection_rationale = (
+            "Explicit user action approved the exact B-roll selection shown in this review."
+        )
+        candidates = self._canonical_candidates(1)
+        segment = {
+            "candidate_id": candidates[0]["id"],
+            "source_range": {"start_s": 0.0, "end_s": 1.0},
+            "program_range": copy.deepcopy(self.plan["shots"][0]["program_range"]),
+            "playback_rate": 1.0,
+        }
+        self.plan["speaker_inset_style"] = self._speaker_style()
+        self.plan = self.record_presentation(self.plan, "speaker-inset")
+        selection = self._canonical_review([segment], intent="approve_selection")
+        selection.update({
+            "rationale": selection_rationale,
+            "rationale_source": "review_ui_explicit_action",
+        })
+        review_page = self.publish_review_page(selection["review_id"])
+
+        prepared = broll_plan.approve_selection(
+            self.plan, selection,
+            mode="human", actor="Actual user",
+            rationale=selection_rationale,
+            project_root=self.root, timeline=self.timeline,
+            transcript=self.transcript,
+        )
+
+        self.assertEqual("composite_pending", prepared["shots"][0]["status"])
+        self.assertEqual({"segments": [segment]}, prepared["shots"][0]["selected"])
+        self.assertNotIn("review_status", prepared)
+        self.assertIsNone(prepared["decision"])
+        self.assertIsNone(prepared["review"])
+        binding = prepared["selection"]
+        self.assertEqual("approved", binding["status"])
+        self.assertEqual("approve_selection", binding["submission_intent"])
+        self.assertEqual("b-roll-selection", binding["approval_scope"])
+        self.assertTrue(binding["consumed"])
+        self.assertEqual(broll_plan.sha256_file(review_page), binding["review_page_sha256"])
+        self.assertEqual("b-roll/broll-selection.json", binding["path"])
+        selection_path = self.root / "work" / binding["path"]
+        self.assertTrue(selection_path.is_file())
+        self.assertEqual(binding["sha256"], broll_plan.sha256_file(selection_path))
+        receipt = projectlib.load_json(selection_path)
+        self.assertEqual("approved", receipt["status"])
+        self.assertEqual("b-roll-selection", receipt["approval_scope"])
+        self.assertEqual([segment], prepared["shots"][0]["selected"]["segments"])
+        self.assertEqual(
+            [prepared["shots"][0]["candidates"][0]["sha256"]],
+            receipt["selected_asset_sha256"],
+        )
+        self.assertEqual(selection["review_id"], receipt["source_review"]["review_id"])
+        self.assertEqual(
+            review_page.relative_to(self.root).as_posix(),
+            receipt["source_review"]["path"],
+        )
+        self.assertEqual(broll_plan.sha256_file(review_page), receipt["source_review"]["sha256"])
+        self.assertTrue(receipt["source_review"]["consumed"])
+        self.assertEqual([], broll_plan.validate_plan(
+            prepared, self.timeline, self.transcript,
+            project_root=self.root, verify_files=True,
+        ))
+
+    def test_prepare_composite_legacy_export_is_canonicalized(self):
         candidates = self._canonical_candidates(1)
         segment = {
             "candidate_id": candidates[0]["id"],
@@ -418,24 +594,68 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             project_root=self.root, timeline=self.timeline,
         )
 
-        self.assertEqual("composite_pending", prepared["shots"][0]["status"])
-        self.assertEqual({"segments": [segment]}, prepared["shots"][0]["selected"])
-        self.assertNotIn("review_status", prepared)
-        self.assertIsNone(prepared["decision"])
-        self.assertIsNone(prepared["review"])
-        receipt = prepared["selection"]
-        self.assertEqual("prepared", receipt["status"])
-        self.assertEqual("prepare_composite", receipt["submission_intent"])
-        self.assertEqual("b-roll/broll-selection.json", receipt["path"])
-        selection_path = self.root / "work" / receipt["path"]
-        self.assertTrue(selection_path.is_file())
-        self.assertEqual(receipt["sha256"], broll_plan.sha256_file(selection_path))
+        self.assertEqual("approved", prepared["selection"]["status"])
+        self.assertEqual("approve_selection", prepared["selection"]["submission_intent"])
+        self.assertEqual("b-roll-selection", prepared["selection"]["approval_scope"])
+        receipt = projectlib.load_json(
+            self.root / "work" / prepared["selection"]["path"]
+        )
+        self.assertEqual("approve_selection", receipt["submission_intent"])
+        self.assertEqual("approved", receipt["status"])
+
+    def test_approve_selection_all_skipped_is_an_approved_no_op(self):
+        selection_rationale = (
+            "Explicit user action approved the exact B-roll selection shown in this review."
+        )
+        self.plan["speaker_inset_style"] = self._speaker_style()
+        self.plan = self.record_presentation(self.plan, "speaker-inset")
+        selection = self.review_for(
+            self.plan, [{"id": "shot", "decision": "skip"}],
+            rationale=selection_rationale,
+            submission_intent="approve_selection",
+            approval_scope="b-roll-selection",
+            explicit_user_action=True,
+            revision_notes="",
+            rationale_source="review_ui_explicit_action",
+            timeline_fps=copy.deepcopy(self.timeline["fps"]),
+        )
+        self.publish_review_page(selection["review_id"])
+
+        approved = broll_plan.approve_selection(
+            self.plan, selection,
+            mode="human", actor="Actual user", rationale=selection_rationale,
+            project_root=self.root, timeline=self.timeline,
+            transcript=self.transcript,
+        )
+
+        self.assertEqual("skipped", approved["shots"][0]["status"])
+        self.assertIn("review_status", approved)
+        self.assertEqual("approved", approved["review_status"])
+        self.assertEqual("b-roll-selection", approved["review"]["approval_scope"])
+        self.assertEqual("approve_selection", approved["review"]["submission_intent"])
         self.assertEqual([], broll_plan.validate_plan(
-            prepared, self.timeline, self.transcript,
+            approved, self.timeline, self.transcript,
             project_root=self.root, verify_files=True,
+        ))
+        registered = broll_plan.register_operation(self.project, approved)
+        self.assertNotIn("b-roll", registered["sequences"]["main"]["operations"])
+        self.assertFalse(any(
+            item.get("id") == "b-roll" for item in registered["operations"]
+        ))
+        self.publish_review_page(selection["review_id"]).write_bytes(b"tampered")
+        self.assertTrue(any(
+            "review page is missing or stale" in error
+            for error in broll_plan.validate_plan(
+                approved, self.timeline, self.transcript,
+                project_root=self.root, verify_files=True,
+            )
         ))
 
     def test_composite_review_binds_all_speaker_artifacts_and_cannot_change_selection(self):
+        self.assertTrue(hasattr(broll_plan, "approve_selection"))
+        selection_rationale = (
+            "Explicit user action approved the exact B-roll selection shown in this review."
+        )
         candidates = self._canonical_candidates(1)
         segment = {
             "candidate_id": candidates[0]["id"],
@@ -443,18 +663,32 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             "program_range": copy.deepcopy(self.plan["shots"][0]["program_range"]),
             "playback_rate": 1.0,
         }
+        skipped = copy.deepcopy(self.plan["shots"][0])
+        skipped.update({
+            "id": "pre-skipped",
+            "program_range": {"start_s": 2.0, "end_s": 3.0},
+            "source_ranges": [{"clip_id": "one", "start_s": 2.0, "end_s": 3.0}],
+            "transcript_evidence": {"words": [self.mapped_words[1]]},
+            "candidates": [],
+            "selected": None,
+            "status": "skipped",
+        })
+        self.plan["shots"].append(skipped)
         self.plan["speaker_inset_style"] = self._speaker_style()
         self.plan = self.record_presentation(self.plan, "speaker-inset")
-        selection = self._canonical_review([segment], intent="prepare_composite")
+        selection = self._canonical_review([segment], intent="approve_selection")
+        selection["shots"].append({"id": "pre-skipped", "decision": "skip"})
         selection.update({
-            "rationale": broll_plan.HUMAN_PREPARE_COMPOSITE_RATIONALE,
+            "rationale": selection_rationale,
             "rationale_source": "review_ui_explicit_action",
         })
-        prepared = broll_plan.prepare_composite(
+        self.publish_review_page(selection["review_id"])
+        prepared = broll_plan.approve_selection(
             self.plan, selection,
             mode="human", actor="Actual user",
-            rationale=broll_plan.HUMAN_PREPARE_COMPOSITE_RATIONALE,
+            rationale=selection_rationale,
             project_root=self.root, timeline=self.timeline,
+            transcript=self.transcript,
         )
         prepared["speaker_inset"] = {
             "analysis": {
@@ -470,11 +704,11 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
                 "path": "b-roll/speaker-inset-clearance.json", "sha256": "d" * 64,
             },
         }
-        decisions = broll_plan._decision_manifest(prepared["shots"])
         review = self.review_for(
-            prepared, decisions,
+            prepared, [],
             rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
             submission_intent="approve",
+            approval_scope="speaker-inset-composite",
             review_stage="composite",
             explicit_user_action=True,
             revision_notes="",
@@ -487,6 +721,7 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             clearance_sha256=prepared["speaker_inset"]["clearance"]["sha256"],
             style_sha256=broll_plan.canonical_sha256(prepared["speaker_inset_style"]),
         )
+        review.pop("shots")
         approved = broll_plan.apply_review(
             prepared, review,
             mode="human", actor="Actual user",
@@ -494,6 +729,7 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             timeline=self.timeline,
         )
         self.assertEqual("selected", approved["shots"][0]["status"])
+        self.assertEqual("skipped", approved["shots"][1]["status"])
         self.assertEqual("composite", approved["review"]["review_stage"])
         self.assertEqual(
             prepared["speaker_inset"]["clearance"]["sha256"],
@@ -513,14 +749,18 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
                 timeline=self.timeline,
             )
         changed = copy.deepcopy(review)
+        changed["shots"] = broll_plan._decision_manifest(prepared["shots"])
         changed["shots"][0]["segments"][0]["source_range"]["start_s"] = 0.25
-        with self.assertRaisesRegex(ValueError, "locked selection"):
+        interaction_path = self.root / "work/b-roll/broll-interaction.json"
+        with self.assertRaisesRegex(ValueError, "must not include candidate shots"):
             broll_plan.apply_review(
                 prepared, changed,
                 mode="human", actor="Actual user",
                 rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
+                interaction_path=interaction_path,
                 timeline=self.timeline,
             )
+        self.assertFalse(interaction_path.exists())
 
     def _canonical_candidates(self, count=3):
         shot = self.plan["shots"][0]
@@ -554,7 +794,7 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         return candidates
 
     def _canonical_review(self, segments, *, intent="approve"):
-        return self.review_for(
+        review = self.review_for(
             self.plan,
             [{
                 "id": "shot", "decision": "select",
@@ -568,9 +808,456 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             rationale_source="review_ui_explicit_action",
             timeline_fps=copy.deepcopy(self.timeline["fps"]),
         )
+        if intent == "approve_selection":
+            review["approval_scope"] = "b-roll-selection"
+        return review
+
+    def _edited_review_configuration(self):
+        candidates = self._canonical_candidates(2)
+        program_range = {"start_s": 1.5, "end_s": 3.5}
+        segments = [
+            {
+                "candidate_id": candidates[1]["id"],
+                "source_range": {"start_s": 0.5, "end_s": 2.0},
+                "program_range": {"start_s": 1.5, "end_s": 2.5},
+                "playback_rate": 1.5,
+            },
+            {
+                "candidate_id": candidates[0]["id"],
+                "source_range": {"start_s": 0.0, "end_s": 1.0},
+                "program_range": {"start_s": 2.5, "end_s": 3.5},
+                "playback_rate": 1.0,
+            },
+        ]
+        return candidates, program_range, segments
+
+    def test_apply_review_accepts_edited_page_configuration_without_rebuild(self):
+        self.assertIn("transcript", inspect.signature(broll_plan.apply_review).parameters)
+        self.assertIn("project_root", inspect.signature(broll_plan.apply_review).parameters)
+        candidates, program_range, segments = self._edited_review_configuration()
+        self.plan["shots"][0]["review_default"] = {
+            "decision": "select",
+            "segments": [{
+                "candidate_id": candidates[0]["id"],
+                "source_range": {"start_s": 0.0, "end_s": 1.0},
+                "program_range": {"start_s": 1.0, "end_s": 2.0},
+                "playback_rate": 1.0,
+            }],
+        }
+        self.plan = self.record_presentation(self.plan, "ordinary")
+        presentation = copy.deepcopy(self.plan["presentation"])
+        presentation_path = self.root / "work/b-roll/presentation-decision.json"
+        presentation_sha256 = broll_plan.sha256_file(presentation_path)
+        review = self._canonical_review(segments)
+        review["shots"][0]["program_range"] = copy.deepcopy(program_range)
+        review_page = self.publish_review_page(review["review_id"])
+        review_page_sha256 = broll_plan.sha256_file(review_page)
+        interaction_path = self.root / "work/b-roll/broll-interaction.json"
+
+        with mock.patch.object(
+                broll_plan, "rebuild_plan_from_revision",
+                side_effect=AssertionError("edited approval must not rebuild")):
+            approved = broll_plan.apply_review(
+                self.plan, review,
+                mode="human", actor="Actual user",
+                rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
+                interaction_path=interaction_path,
+                timeline=self.timeline, transcript=self.transcript,
+                project_root=self.root,
+            )
+
+        shot = approved["shots"][0]
+        self.assertEqual("selected", shot["status"])
+        self.assertEqual(program_range, shot["program_range"])
+        self.assertEqual([{"clip_id": "one", **program_range}], shot["source_ranges"])
+        self.assertEqual([self.mapped_words[1]], shot["transcript_evidence"]["words"])
+        self.assertEqual(segments, shot["selected"]["segments"])
+        self.assertNotIn("review_default", shot)
+        self.assertEqual(presentation, approved["presentation"])
+        self.assertEqual(presentation_sha256, broll_plan.sha256_file(presentation_path))
+        self.assertEqual(review_page_sha256, broll_plan.sha256_file(review_page))
+        self.assertTrue(interaction_path.is_file())
+        self.assertEqual({
+            "review_id": review["review_id"],
+            "path": review_page.relative_to(self.root).as_posix(),
+            "sha256": review_page_sha256,
+            "consumed": True,
+        }, approved["review"]["source_review"])
+        self.assertEqual([], broll_plan.validate_plan(
+            approved, self.timeline, self.transcript,
+            project_root=self.root, verify_files=True,
+        ))
+        self.assertEqual(
+            sorted(candidate["sha256"] for candidate in candidates),
+            approved["review"]["selected_asset_sha256"],
+        )
+        review_page.write_bytes(b"tampered review page")
+        self.assertIn(
+            "approved review page is missing or stale",
+            broll_plan.validate_plan(
+                approved, self.timeline, self.transcript,
+                project_root=self.root, verify_files=True,
+            ),
+        )
+
+    def test_approve_selection_accepts_edited_page_configuration_and_preserves_route(self):
+        self.assertIn("transcript", inspect.signature(broll_plan.approve_selection).parameters)
+        candidates, program_range, segments = self._edited_review_configuration()
+        self.plan["shots"][0]["review_default"] = {
+            "decision": "select",
+            "segments": [{
+                "candidate_id": candidates[0]["id"],
+                "source_range": {"start_s": 0.0, "end_s": 1.0},
+                "program_range": {"start_s": 1.0, "end_s": 2.0},
+                "playback_rate": 1.0,
+            }],
+        }
+        self.plan = self.record_presentation(self.plan, "speaker-inset")
+        presentation = copy.deepcopy(self.plan["presentation"])
+        speaker_style = copy.deepcopy(self.plan["speaker_inset_style"])
+        presentation_path = self.root / "work/b-roll/presentation-decision.json"
+        presentation_sha256 = broll_plan.sha256_file(presentation_path)
+        selection = self._canonical_review(segments, intent="approve_selection")
+        selection["shots"][0]["program_range"] = copy.deepcopy(program_range)
+        selection.update({
+            "rationale": broll_plan.HUMAN_SELECTION_APPROVAL_RATIONALE,
+            "rationale_source": "review_ui_explicit_action",
+        })
+        review_page = self.publish_review_page(selection["review_id"])
+        review_page_sha256 = broll_plan.sha256_file(review_page)
+        candidate_pages = sorted((self.root / "review/03-b-roll").glob("b-roll-review-*.html"))
+
+        with mock.patch.object(
+                broll_plan, "rebuild_plan_from_revision",
+                side_effect=AssertionError("edited approval must not rebuild")):
+            approved = broll_plan.approve_selection(
+                self.plan, selection,
+                mode="human", actor="Actual user",
+                rationale=broll_plan.HUMAN_SELECTION_APPROVAL_RATIONALE,
+                project_root=self.root, timeline=self.timeline,
+                transcript=self.transcript,
+            )
+
+        shot = approved["shots"][0]
+        self.assertEqual("composite_pending", shot["status"])
+        self.assertEqual(program_range, shot["program_range"])
+        self.assertEqual([{"clip_id": "one", **program_range}], shot["source_ranges"])
+        self.assertEqual([self.mapped_words[1]], shot["transcript_evidence"]["words"])
+        self.assertEqual(segments, shot["selected"]["segments"])
+        self.assertNotIn("review_default", shot)
+        carried_presentation = copy.deepcopy(approved["presentation"])
+        carried_from = carried_presentation.pop("carried_from_plan_sha256")
+        self.assertEqual(presentation, carried_presentation)
+        self.assertEqual(
+            projectlib.load_json(presentation_path)["plan_sha256"], carried_from,
+        )
+        self.assertEqual(speaker_style, approved["speaker_inset_style"])
+        self.assertEqual(presentation_sha256, broll_plan.sha256_file(presentation_path))
+        self.assertEqual(review_page_sha256, broll_plan.sha256_file(review_page))
+        self.assertEqual(
+            candidate_pages,
+            sorted((self.root / "review/03-b-roll").glob("b-roll-review-*.html")),
+        )
+        self.assertEqual("approved", approved["selection"]["status"])
+        self.assertFalse((self.root / "work/b-roll/broll-interaction.json").exists())
+        self.assertNotIn("review_status", approved)
+        self.assertEqual(
+            sorted(candidate["sha256"] for candidate in candidates),
+            projectlib.load_json(
+                self.root / "work/b-roll/broll-selection.json"
+            )["selected_asset_sha256"],
+        )
+
+    def test_edited_approval_rejects_invalid_page_configuration_without_writes(self):
+        self._canonical_candidates(2)
+        self.plan = self.record_presentation(self.plan, "ordinary")
+        original = copy.deepcopy(self.plan)
+        review_page = self.publish_review_page()
+        presentation_path = self.root / "work/b-roll/presentation-decision.json"
+        interaction_path = self.root / "work/b-roll/broll-interaction.json"
+        interaction_path.write_bytes(b"existing interaction")
+        immutable_hashes = {
+            "page": broll_plan.sha256_file(review_page),
+            "presentation": broll_plan.sha256_file(presentation_path),
+            "interaction": broll_plan.sha256_file(interaction_path),
+        }
+
+        def review_with(program_range, segments):
+            review = self._canonical_review(segments)
+            review["shots"][0]["program_range"] = copy.deepcopy(program_range)
+            return review
+
+        valid_segments = self._edited_review_configuration()[2]
+        cases = []
+        outside = review_with(
+            {"start_s": 1.5, "end_s": 4.033333333}, valid_segments,
+        )
+        cases.append(("outside bounds", outside, "allowed bounds"))
+        unaligned = review_with(
+            {"start_s": 1.51, "end_s": 3.5}, valid_segments,
+        )
+        cases.append(("frame alignment", unaligned, "timeline frames"))
+        no_words = review_with(
+            {"start_s": 0.0, "end_s": 0.5},
+            [{
+                "candidate_id": self.plan["shots"][0]["candidates"][0]["id"],
+                "source_range": {"start_s": 0.0, "end_s": 0.5},
+                "program_range": {"start_s": 0.0, "end_s": 0.5},
+                "playback_rate": 1.0,
+            }],
+        )
+        cases.append(("complete transcript word", no_words, "complete transcript word"))
+        unknown = review_with(
+            {"start_s": 1.5, "end_s": 3.5}, valid_segments,
+        )
+        unknown["shots"][0]["segments"][0]["candidate_id"] = "unknown"
+        cases.append(("unknown candidate", unknown, "does not belong"))
+        duplicate = review_with(
+            {"start_s": 1.5, "end_s": 3.5}, valid_segments,
+        )
+        duplicate["shots"][0]["segments"][1]["candidate_id"] = (
+            duplicate["shots"][0]["segments"][0]["candidate_id"]
+        )
+        cases.append(("duplicate candidate", duplicate, "unique"))
+
+        for label, review, message in cases:
+            with self.subTest(label=label), self.assertRaisesRegex(ValueError, message):
+                broll_plan.apply_review(
+                    self.plan, review,
+                    mode="human", actor="Actual user",
+                    rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
+                    interaction_path=interaction_path,
+                    timeline=self.timeline, transcript=self.transcript,
+                    project_root=self.root,
+                )
+            self.assertEqual(original, self.plan)
+            self.assertEqual(immutable_hashes["page"], broll_plan.sha256_file(review_page))
+            self.assertEqual(
+                immutable_hashes["presentation"],
+                broll_plan.sha256_file(presentation_path),
+            )
+            self.assertEqual(
+                immutable_hashes["interaction"],
+                broll_plan.sha256_file(interaction_path),
+            )
+
+    def test_explicit_approval_rejects_stale_evidence_before_writing_receipts(self):
+        candidates, program_range, segments = self._edited_review_configuration()
+        self.plan = self.record_presentation(self.plan, "speaker-inset")
+        selection = self._canonical_review(segments, intent="approve_selection")
+        selection["shots"][0]["program_range"] = copy.deepcopy(program_range)
+        selection.update({
+            "rationale": broll_plan.HUMAN_SELECTION_APPROVAL_RATIONALE,
+            "rationale_source": "review_ui_explicit_action",
+        })
+        review_page = self.publish_review_page(selection["review_id"])
+        presentation_path = self.root / "work/b-roll/presentation-decision.json"
+        selection_path = self.root / "work/b-roll/broll-selection.json"
+        selection_path.write_bytes(b"existing selection")
+        original = copy.deepcopy(self.plan)
+        original_page = review_page.read_bytes()
+        original_presentation = presentation_path.read_bytes()
+        original_selection = selection_path.read_bytes()
+
+        candidate_path = self.root / "work" / candidates[0]["cache_path"]
+        candidate_bytes = candidate_path.read_bytes()
+        candidate_path.write_bytes(b"tampered candidate")
+        with self.assertRaisesRegex(ValueError, "candidate .*SHA-256 is stale"):
+            broll_plan.approve_selection(
+                self.plan, selection,
+                mode="human", actor="Actual user",
+                rationale=broll_plan.HUMAN_SELECTION_APPROVAL_RATIONALE,
+                project_root=self.root, timeline=self.timeline,
+                transcript=self.transcript,
+            )
+        candidate_path.write_bytes(candidate_bytes)
+
+        review_page.unlink()
+        with self.assertRaisesRegex(ValueError, "immutable candidate review page is missing"):
+            broll_plan.approve_selection(
+                self.plan, selection,
+                mode="human", actor="Actual user",
+                rationale=broll_plan.HUMAN_SELECTION_APPROVAL_RATIONALE,
+                project_root=self.root, timeline=self.timeline,
+                transcript=self.transcript,
+            )
+        review_page.write_bytes(original_page)
+
+        presentation_path.write_bytes(b"tampered presentation")
+        with self.assertRaisesRegex(ValueError, "presentation decision"):
+            broll_plan.approve_selection(
+                self.plan, selection,
+                mode="human", actor="Actual user",
+                rationale=broll_plan.HUMAN_SELECTION_APPROVAL_RATIONALE,
+                project_root=self.root, timeline=self.timeline,
+                transcript=self.transcript,
+            )
+        presentation_path.write_bytes(original_presentation)
+
+        self.assertEqual(original, self.plan)
+        self.assertEqual(original_page, review_page.read_bytes())
+        self.assertEqual(original_presentation, presentation_path.read_bytes())
+        self.assertEqual(original_selection, selection_path.read_bytes())
+
+    def test_explicit_approval_rejects_misbound_review_page_before_writing_receipts(self):
+        candidates, program_range, segments = self._edited_review_configuration()
+        self.plan = self.record_presentation(self.plan, "speaker-inset")
+        selection = self._canonical_review(segments, intent="approve_selection")
+        selection["shots"][0]["program_range"] = copy.deepcopy(program_range)
+        selection.update({
+            "rationale": broll_plan.HUMAN_SELECTION_APPROVAL_RATIONALE,
+            "rationale_source": "review_ui_explicit_action",
+        })
+        review_page = self.publish_review_page(selection["review_id"])
+        page_text = review_page.read_text(encoding="utf-8")
+        encoded = build_review_page.PAYLOAD_RE.search(page_text).group(1)
+        payload = json.loads(base64.b64decode(encoded))
+        payload["candidate_manifest_sha256"] = "0" * 64
+        stale_encoded = base64.b64encode(
+            json.dumps(payload).encode("utf-8")
+        ).decode("ascii")
+        review_page.write_text(
+            page_text.replace(encoded, stale_encoded), encoding="utf-8",
+        )
+        selection_path = self.root / "work/b-roll/broll-selection.json"
+
+        with self.assertRaisesRegex(ValueError, "review page .*binding"):
+            broll_plan.approve_selection(
+                self.plan, selection,
+                mode="human", actor="Actual user",
+                rationale=broll_plan.HUMAN_SELECTION_APPROVAL_RATIONALE,
+                project_root=self.root, timeline=self.timeline,
+                transcript=self.transcript,
+            )
+
+        self.assertFalse(selection_path.exists())
+
+    def test_explicit_approval_requires_canonical_project_inputs_without_writes(self):
+        candidates = self._canonical_candidates(1)
+        self.plan = self.record_presentation(self.plan, "ordinary")
+        segment = {
+            "candidate_id": candidates[0]["id"],
+            "source_range": {"start_s": 0.0, "end_s": 1.0},
+            "program_range": {"start_s": 1.0, "end_s": 2.0},
+            "playback_rate": 1.0,
+        }
+        review = self._canonical_review([segment])
+        self.publish_review_page(review["review_id"])
+        interaction_path = self.root / "work/b-roll/broll-interaction.json"
+        original = copy.deepcopy(self.plan)
+        altered_transcript = copy.deepcopy(self.transcript)
+        altered_transcript["segments"][0]["words"].append({
+            "word": "injected", "start": 1.25, "end": 1.5,
+        })
+        cases = (
+            ({"timeline": None, "transcript": self.transcript, "project_root": self.root}, "canonical timeline"),
+            ({"timeline": self.timeline, "transcript": None, "project_root": self.root}, "canonical transcript"),
+            ({"timeline": self.timeline, "transcript": self.transcript, "project_root": None}, "project root"),
+            ({"timeline": self.timeline, "transcript": altered_transcript, "project_root": self.root}, "transcript does not match project file"),
+        )
+        for arguments, message in cases:
+            with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                broll_plan.apply_review(
+                    self.plan, review,
+                    mode="human", actor="Actual user",
+                    rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
+                    interaction_path=interaction_path,
+                    **arguments,
+                )
+            self.assertEqual(original, self.plan)
+            self.assertFalse(interaction_path.exists())
+
+    def test_approve_selection_requires_canonical_timeline_and_transcript(self):
+        candidates = self._canonical_candidates(1)
+        self.plan = self.record_presentation(self.plan, "speaker-inset")
+        segment = {
+            "candidate_id": candidates[0]["id"],
+            "source_range": {"start_s": 0.0, "end_s": 1.0},
+            "program_range": {"start_s": 1.0, "end_s": 2.0},
+            "playback_rate": 1.0,
+        }
+        selection = self._canonical_review([segment], intent="approve_selection")
+        selection.update({
+            "rationale": broll_plan.HUMAN_SELECTION_APPROVAL_RATIONALE,
+            "rationale_source": "review_ui_explicit_action",
+        })
+        self.publish_review_page(selection["review_id"])
+        for arguments, message in (
+                ({"timeline": None, "transcript": self.transcript}, "canonical timeline"),
+                ({"timeline": self.timeline, "transcript": None}, "canonical transcript")):
+            with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                broll_plan.approve_selection(
+                    self.plan, selection,
+                    mode="human", actor="Actual user",
+                    rationale=broll_plan.HUMAN_SELECTION_APPROVAL_RATIONALE,
+                    project_root=self.root, **arguments,
+                )
+        self.assertFalse((self.root / "work/b-roll/broll-selection.json").exists())
+
+    def test_explicit_page_approval_accepts_skip_and_image_ken_burns(self):
+        base_plan = copy.deepcopy(self.plan)
+        self.plan["shots"][0]["review_default"] = {
+            "decision": "select",
+            "segments": [{
+                "candidate_id": "asset",
+                "source_range": {"start_s": 0.0, "end_s": 1.0},
+                "program_range": {"start_s": 1.0, "end_s": 2.0},
+                "playback_rate": 1.0,
+            }],
+        }
+        self.plan = self.record_presentation(self.plan, "ordinary")
+        skip = self.review_for(
+            self.plan, [{"id": "shot", "decision": "skip"}],
+            rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
+            submission_intent="approve", explicit_user_action=True,
+            revision_notes="", rationale_source="review_ui_explicit_action",
+            timeline_fps=copy.deepcopy(self.timeline["fps"]),
+        )
+        self.publish_review_page(skip["review_id"])
+        skipped = broll_plan.apply_review(
+            self.plan, skip, mode="human", actor="Actual user",
+            rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
+            timeline=self.timeline, transcript=self.transcript,
+            project_root=self.root,
+        )
+        self.assertEqual("skipped", skipped["shots"][0]["status"])
+        self.assertNotIn("review_default", skipped["shots"][0])
+
+        image_plan = base_plan
+        image_plan["shots"][0]["candidates"][0]["media_type"] = "image"
+        image_plan["shots"][0]["candidates"][0].pop("duration_s")
+        image_plan["shots"][0]["candidates"][0].pop("probe")
+        image_plan = self.record_presentation(image_plan, "ordinary")
+        image_review = self.review_for(
+            image_plan,
+            [{
+                "id": "shot", "decision": "select",
+                "program_range": {"start_s": 1.0, "end_s": 2.0},
+                "candidate_id": "asset",
+                "ken_burns": {"direction": "pan-right"},
+            }],
+            rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
+            submission_intent="approve", explicit_user_action=True,
+            revision_notes="", rationale_source="review_ui_explicit_action",
+            timeline_fps=copy.deepcopy(self.timeline["fps"]),
+        )
+        self.publish_review_page(image_review["review_id"], plan=image_plan)
+        image = broll_plan.apply_review(
+            image_plan, image_review, mode="human", actor="Actual user",
+            rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
+            timeline=self.timeline, transcript=self.transcript,
+            project_root=self.root,
+        )
+        self.assertEqual("selected", image["shots"][0]["status"])
+        self.assertEqual(
+            {"candidate_id": "asset", "ken_burns": {"direction": "pan-right"}},
+            image["shots"][0]["selected"],
+        )
 
     def test_canonical_segments_allow_fixed_rates_and_one_to_three_unique_candidates(self):
         candidates = self._canonical_candidates()
+        self.plan = self.record_presentation(self.plan, "ordinary")
+        self.publish_review_page()
         segments = [
             {
                 "candidate_id": candidates[0]["id"],
@@ -587,7 +1274,9 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         ]
         approved = broll_plan.apply_review(
             self.plan, self._canonical_review(segments), mode="human", actor="User",
-            rationale=broll_plan.HUMAN_APPROVAL_RATIONALE, timeline=self.timeline,
+            rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
+            timeline=self.timeline, transcript=self.transcript,
+            project_root=self.root,
         )
         self.assertEqual(segments, approved["shots"][0]["selected"]["segments"])
         self.assertEqual(
@@ -610,12 +1299,16 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             with self.subTest(rate=rate):
                 result = broll_plan.apply_review(
                     self.plan, self._canonical_review(single), mode="human", actor="User",
-                    rationale=broll_plan.HUMAN_APPROVAL_RATIONALE, timeline=self.timeline,
+                    rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
+                    timeline=self.timeline, transcript=self.transcript,
+                    project_root=self.root,
                 )
                 self.assertEqual(rate, result["shots"][0]["selected"]["segments"][0]["playback_rate"])
 
     def test_canonical_segments_reject_bad_rates_cardinality_identity_and_program_coverage(self):
         candidates = self._canonical_candidates()
+        self.plan = self.record_presentation(self.plan, "ordinary")
+        self.publish_review_page()
         base = {
             "candidate_id": candidates[0]["id"],
             "source_range": {"start_s": 0.0, "end_s": 1.0},
@@ -628,7 +1321,9 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             with self.subTest(rate=rate), self.assertRaisesRegex(ValueError, "playback_rate"):
                 broll_plan.apply_review(
                     self.plan, self._canonical_review([segment]), mode="human", actor="User",
-                    rationale=broll_plan.HUMAN_APPROVAL_RATIONALE, timeline=self.timeline,
+                    rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
+                    timeline=self.timeline, transcript=self.transcript,
+                    project_root=self.root,
                 )
 
         cases = []
@@ -659,7 +1354,9 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
                 broll_plan.apply_review(
                     self.plan, self._canonical_review(segments), mode="human", actor="User",
-                    rationale=broll_plan.HUMAN_APPROVAL_RATIONALE, timeline=self.timeline,
+                    rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
+                    timeline=self.timeline, transcript=self.transcript,
+                    project_root=self.root,
                 )
 
     def test_equal_program_frame_allocation_covers_range_and_last_absorbs_remainder(self):
@@ -748,6 +1445,7 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
         self.assertFalse(interaction.exists())
 
     def test_canonical_single_segment_approve_requires_fixed_rate_and_frame_match(self):
+        self.plan = self.record_presentation(self.plan, "ordinary")
         segment = {
             "candidate_id": "asset",
             "source_range": {"start_s": 0.25, "end_s": 1.25},
@@ -768,10 +1466,12 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             rationale_source="review_ui_explicit_action",
             timeline_fps=copy.deepcopy(self.timeline["fps"]),
         )
+        self.publish_review_page(review["review_id"])
         approved = broll_plan.apply_review(
             self.plan, review, mode="human", actor="User",
             rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
-            timeline=self.timeline,
+            timeline=self.timeline, transcript=self.transcript,
+            project_root=self.root,
         )
         self.assertEqual({"segments": [segment]}, approved["shots"][0]["selected"])
         self.assertEqual("review_ui_explicit_action", approved["review"]["rationale_source"])
@@ -796,7 +1496,8 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
                 broll_plan.apply_review(
                     self.plan, invalid, mode="human", actor="User",
                     rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
-                    timeline=self.timeline,
+                    timeline=self.timeline, transcript=self.transcript,
+                    project_root=self.root,
                 )
 
         multiple = copy.deepcopy(review)
@@ -805,7 +1506,8 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             broll_plan.apply_review(
                 self.plan, multiple, mode="human", actor="User",
                 rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
-                timeline=self.timeline,
+                timeline=self.timeline, transcript=self.transcript,
+                project_root=self.root,
             )
 
     def test_revision_request_validates_bounds_and_rebuilds_unapproved_plan(self):
@@ -865,8 +1567,127 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
                                 self.plan, out_of_bounds, self.timeline, self.transcript,
                             )))
 
-    def test_revision_rebuild_clears_stale_presentation_route(self):
+    def test_revision_request_rejects_empty_notes(self):
+        request = self.review_for(
+            self.plan,
+            [{
+                "id": "shot", "decision": "select",
+                "requested_program_range": {"start_s": 1.0, "end_s": 3.0},
+                "segments": [{
+                    "candidate_id": "asset",
+                    "source_range": {"start_s": 0.0, "end_s": 2.0},
+                    "program_range": {"start_s": 1.0, "end_s": 3.0},
+                    "playback_rate": 1.0,
+                }],
+            }],
+            submission_intent="request_revision",
+            explicit_user_action=True,
+            revision_notes="Required natural-language change.",
+        )
+        request.pop("rationale")
+
+        for notes in ("", "   "):
+            with self.subTest(notes=repr(notes)):
+                invalid = copy.deepcopy(request)
+                invalid["revision_notes"] = notes
+                self.assertIn(
+                    "revision_notes must be non-empty",
+                    broll_plan.validate_revision_request(
+                        self.plan, invalid, self.timeline, self.transcript,
+                    ),
+                )
+
+    def test_revision_rebuild_preserves_the_original_presentation_route(self):
+        for mode in ("ordinary", "speaker-inset"):
+            with self.subTest(mode=mode):
+                presented = self.record_presentation(copy.deepcopy(self.plan), mode)
+                original_subject_sha256 = broll_plan.canonical_sha256(
+                    broll_plan.presentation_subject(presented)
+                )
+                receipt_path = self.root / "work/b-roll/presentation-decision.json"
+                original_receipt = receipt_path.read_bytes()
+                original_receipt_sha256 = broll_plan.sha256_file(receipt_path)
+                request = self.review_for(
+                    presented,
+                    [{
+                        "id": "shot", "decision": "select",
+                        "requested_program_range": {"start_s": 1.0, "end_s": 3.0},
+                        "segments": [{
+                            "candidate_id": "asset",
+                            "source_range": {"start_s": 0.0, "end_s": 2.0},
+                            "program_range": {"start_s": 1.0, "end_s": 3.0},
+                            "playback_rate": 1.0,
+                        }],
+                    }],
+                    submission_intent="request_revision",
+                    explicit_user_action=True,
+                    revision_notes="Use the revised range.",
+                )
+                request.pop("rationale")
+
+                rebuilt = broll_plan.rebuild_plan_from_revision(
+                    presented, request, self.timeline, self.transcript,
+                )
+
+                self.assertEqual(mode, rebuilt["presentation"]["mode"])
+                self.assertEqual(
+                    original_subject_sha256,
+                    rebuilt["presentation"]["carried_from_plan_sha256"],
+                )
+                self.assertEqual(
+                    mode == "speaker-inset",
+                    "speaker_inset_style" in rebuilt,
+                )
+                self.assertEqual([], broll_plan.presentation_errors(
+                    rebuilt, project_root=self.root, required=True,
+                ))
+                self.assertEqual(original_receipt, receipt_path.read_bytes())
+                self.assertEqual(
+                    original_receipt_sha256, broll_plan.sha256_file(receipt_path),
+                )
+                other_mode = "ordinary" if mode == "speaker-inset" else "speaker-inset"
+                with self.assertRaisesRegex(ValueError, "already recorded"):
+                    self.record_presentation(rebuilt, other_mode)
+
+    def test_presentation_route_survives_multiple_revisions(self):
         presented = self.record_presentation(self.plan, "speaker-inset")
+
+        def revise(plan, notes):
+            request = self.review_for(
+                plan,
+                [{
+                    "id": "shot", "decision": "select",
+                    "requested_program_range": {"start_s": 1.0, "end_s": 3.0},
+                    "segments": [{
+                        "candidate_id": "asset",
+                        "source_range": {"start_s": 0.0, "end_s": 2.0},
+                        "program_range": {"start_s": 1.0, "end_s": 3.0},
+                        "playback_rate": 1.0,
+                    }],
+                }],
+                submission_intent="request_revision",
+                explicit_user_action=True,
+                revision_notes=notes,
+            )
+            request.pop("rationale")
+            return broll_plan.rebuild_plan_from_revision(
+                plan, request, self.timeline, self.transcript,
+            )
+
+        first = revise(presented, "Use the revised range.")
+        second = revise(first, "Keep this route and candidate timing.")
+
+        self.assertEqual("speaker-inset", second["presentation"]["mode"])
+        self.assertEqual(
+            first["presentation"]["carried_from_plan_sha256"],
+            second["presentation"]["carried_from_plan_sha256"],
+        )
+        self.assertEqual([], broll_plan.presentation_errors(
+            second, project_root=self.root, required=True,
+        ))
+
+    def test_carried_presentation_still_rejects_stale_artifact_bindings(self):
+        presented = self.record_presentation(self.plan, "ordinary")
         request = self.review_for(
             presented,
             [{
@@ -884,14 +1705,71 @@ class BrollPlanTests(_BrollFixture, unittest.TestCase):
             revision_notes="Use the revised range.",
         )
         request.pop("rationale")
-
         rebuilt = broll_plan.rebuild_plan_from_revision(
             presented, request, self.timeline, self.transcript,
         )
 
-        self.assertNotIn("presentation", rebuilt)
-        self.assertNotIn("speaker_inset_style", rebuilt)
-        self.assertEqual("ordinary", self.record_presentation(rebuilt, "ordinary")["presentation"]["mode"])
+        stale_candidate = copy.deepcopy(rebuilt)
+        stale_candidate["shots"][0]["candidates"][0]["provenance"]["creator"] = "changed"
+        self.assertTrue(any(
+            "candidate_manifest_sha256" in error
+            for error in broll_plan.presentation_errors(
+                stale_candidate, project_root=self.root, required=True,
+            )
+        ))
+
+        stale_video = copy.deepcopy(rebuilt)
+        stale_video["input_hashes"]["review_video_sha256"] = "c" * 64
+        self.assertTrue(any(
+            "review_video_sha256" in error
+            for error in broll_plan.presentation_errors(
+                stale_video, project_root=self.root, required=True,
+            )
+        ))
+
+        stale_style = copy.deepcopy(rebuilt)
+        stale_style["speaker_inset_style"] = self._speaker_style()
+        self.assertIn(
+            "ordinary presentation must not enable speaker_inset_style",
+            broll_plan.presentation_errors(
+                stale_style, project_root=self.root, required=True,
+            ),
+        )
+
+        invalid_carry = copy.deepcopy(rebuilt)
+        invalid_carry["presentation"]["carried_from_plan_sha256"] = "invalid"
+        self.assertIn(
+            "presentation carried plan SHA-256 is invalid",
+            broll_plan.presentation_errors(
+                invalid_carry, project_root=self.root, required=True,
+            ),
+        )
+
+        receipt_path = self.root / "work/b-roll/presentation-decision.json"
+        original_receipt = receipt_path.read_bytes()
+        receipt_path.write_bytes(b"tampered")
+        self.assertIn(
+            "presentation decision artifact is missing or stale",
+            broll_plan.presentation_errors(
+                rebuilt, project_root=self.root, required=True,
+            ),
+        )
+        receipt_path.write_bytes(original_receipt)
+
+    def test_presentation_receipt_requires_a_plan_hash_without_revision_carry(self):
+        presented = self.record_presentation(self.plan, "ordinary")
+        receipt_path = self.root / "work/b-roll/presentation-decision.json"
+        receipt = projectlib.load_json(receipt_path)
+        receipt.pop("plan_sha256")
+        projectlib.write_json(receipt_path, receipt)
+        presented["presentation"]["sha256"] = broll_plan.sha256_file(receipt_path)
+
+        self.assertIn(
+            "presentation decision plan_sha256 does not match",
+            broll_plan.presentation_errors(
+                presented, project_root=self.root, required=True,
+            ),
+        )
 
     def test_legacy_long_trim_exposes_requested_and_effective_ranges(self):
         review = self.review_for(self.plan, [{
@@ -2415,6 +3293,133 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
     def _frame(video, time_s, output):
         Image.new("RGB", (960, 540), "white").save(output, "JPEG")
 
+    def _bind_composite_artifacts(self, plan):
+        cache = self.root / "work/cache/b-roll/speaker-inset"
+        cache.mkdir(parents=True)
+        evidence = cache / "evidence.jpg"
+        Image.new("RGB", (160, 90), "navy").save(evidence, "JPEG")
+        base = cache / "base.mp4"
+        context = cache / "context.mp4"
+        base.write_bytes(b"base-preview")
+        context.write_bytes(b"context-preview")
+        alternates = {}
+        for anchor in speaker_inset.PRESET_ANCHORS["corner-pip"]:
+            path = cache / f"context-{anchor}.mp4"
+            path.write_bytes(f"context-{anchor}".encode("ascii"))
+            alternates[anchor] = {
+                "path": path.relative_to(self.root / "work").as_posix(),
+                "sha256": broll_plan.sha256_file(path),
+            }
+        start_s = plan["shots"][0]["program_range"]["start_s"]
+        analysis = {
+            "schema_version": 1,
+            "shots": [{
+                "shot_id": "shot",
+                "subshots": [{
+                    "id": "shot-subshot-001",
+                    "program_range": copy.deepcopy(plan["shots"][0]["program_range"]),
+                    "evidence_points": [{
+                        "frames": [{
+                            "program_time_s": start_s,
+                            "path": evidence.relative_to(self.root / "work").as_posix(),
+                            "sha256": broll_plan.sha256_file(evidence),
+                        }],
+                    }],
+                }],
+            }],
+        }
+        analysis_path = self.root / "work/b-roll/speaker-inset-analysis.json"
+        projectlib.write_json(analysis_path, analysis)
+        agent_input = {
+            "schema_version": 1, "actor": "Codex",
+            "project_layout_strategy": SpeakerInsetTests._layout_strategy(),
+            "shots": [{
+                "shot_id": "shot",
+                "layout_recommendation": SpeakerInsetTests._layout_recommendation(),
+                "subshots": [{
+                    "id": "shot-subshot-001", "speaker_status": "confirmed",
+                    "display_mode": "enabled", "anchor": "top-left",
+                    "rationale": "One current speaker is visible.",
+                    "keyframes": [{
+                        "program_time_s": start_s,
+                        "roi": {"x": 0.1, "y": 0.1, "width": 0.3, "height": 0.6},
+                    }],
+                }],
+            }],
+        }
+        agent_path = self.root / "work/b-roll/speaker-inset-agent-input.json"
+        projectlib.write_json(agent_path, agent_input)
+        preview = {
+            "schema_version": 1,
+            "shots": [{
+                "shot_id": "shot",
+                "base_broll": {
+                    "path": base.relative_to(self.root / "work").as_posix(),
+                    "sha256": broll_plan.sha256_file(base),
+                },
+                "preview": {
+                    "path": context.relative_to(self.root / "work").as_posix(),
+                    "sha256": broll_plan.sha256_file(context),
+                },
+                "anchor_previews": alternates,
+            }],
+        }
+        preview_path = self.root / "work/b-roll/speaker-inset-preview.json"
+        projectlib.write_json(preview_path, preview)
+        clearance = {
+            "schema_version": 1, "actor": "Codex",
+            "shots": [{
+                "shot_id": "shot",
+                "continuity": {
+                    "risk": "none",
+                    "decision": "continuous",
+                    "rationale": "The inset remains enabled for the complete shot.",
+                },
+                "subshots": [{
+                    "id": "shot-subshot-001", "display_mode": "enabled",
+                    "anchor": "top-left", "clearance_status": "pass",
+                    "checked_anchors": ["top-left"],
+                    "subject_legibility": "pass",
+                    "legibility_rationale": "The speaker remains readable at final size.",
+                    "pixel_budget": {
+                        "pixel_risk": "medium", "max_scale_factor": 1.75,
+                        "checkpoints": [{
+                            "role": "entry", "program_time_s": start_s,
+                            "input_crop_px": {"width": 200, "height": 300},
+                            "output_content_px": {"width": 350, "height": 525},
+                            "scale_factor": 1.75,
+                        }],
+                    },
+                    "legibility_checks": [{
+                        "role": "entry", "program_time_s": start_s,
+                        "preview_sha256": "c" * 64,
+                        "observation": "The complete speaker silhouette is readable.",
+                    }],
+                    "rationale": "The inset does not cover the B-roll focal action.",
+                }],
+            }],
+        }
+        clearance_path = self.root / "work/b-roll/speaker-inset-clearance.json"
+        projectlib.write_json(clearance_path, clearance)
+        plan["speaker_inset"] = {
+            "analysis": {
+                "path": "b-roll/speaker-inset-analysis.json",
+                "sha256": broll_plan.sha256_file(analysis_path),
+            },
+            "agent_input": {
+                "path": "b-roll/speaker-inset-agent-input.json",
+                "sha256": broll_plan.sha256_file(agent_path),
+            },
+            "preview": {
+                "path": "b-roll/speaker-inset-preview.json",
+                "sha256": broll_plan.sha256_file(preview_path),
+            },
+            "clearance": {
+                "path": "b-roll/speaker-inset-clearance.json",
+                "sha256": broll_plan.sha256_file(clearance_path),
+            },
+        }
+
     def test_build_review_page_publishes_local_payload_and_immutable_assets(self):
         review_id = "123e4567-e89b-12d3-a456-426614174000"
         with mock.patch.object(build_review_page, "_extract_frame", side_effect=self._frame):
@@ -2458,6 +3463,150 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
                     review_id="123e4567-e89b-12d3-a456-426614174010",
                 )
 
+    def test_build_review_page_reuses_the_original_route_after_revision(self):
+        for index, mode in enumerate(("ordinary", "speaker-inset"), 11):
+            with self.subTest(mode=mode):
+                plan = copy.deepcopy(self.plan)
+                if mode == "speaker-inset":
+                    plan.pop("presentation")
+                    plan = self.record_presentation(plan, mode)
+                request = self.review_for(
+                    plan,
+                    [{
+                        "id": "shot", "decision": "select",
+                        "requested_program_range": {"start_s": 1.0, "end_s": 3.0},
+                        "segments": [{
+                            "candidate_id": "asset",
+                            "source_range": {"start_s": 0.0, "end_s": 2.0},
+                            "program_range": {"start_s": 1.0, "end_s": 3.0},
+                            "playback_rate": 1.0,
+                        }],
+                    }],
+                    submission_intent="request_revision",
+                    explicit_user_action=True,
+                    revision_notes="Use the revised range.",
+                )
+                request.pop("rationale")
+                rebuilt = broll_plan.rebuild_plan_from_revision(
+                    plan, request, self.timeline, self.transcript,
+                )
+
+                review_id = f"123e4567-e89b-12d3-a456-4266141740{index}"
+                with mock.patch.object(
+                        build_review_page, "_extract_frame", side_effect=self._frame):
+                    result = build_review_page.build_review_page(
+                        rebuilt, self.timeline, self.transcript, self.video,
+                        self.review_dir, project_root=self.root, review_id=review_id,
+                    )
+                payload = json.loads(base64.b64decode(
+                    build_review_page.PAYLOAD_RE.search(
+                        result["page"].read_text(encoding="utf-8")
+                    ).group(1)
+                ))
+                self.assertEqual(
+                    "selection" if mode == "speaker-inset" else "standard",
+                    payload["review_mode"],
+                )
+
+    def test_approve_selection_carries_presentation_route_into_composite_review(self):
+        plan = copy.deepcopy(self.plan)
+        plan.pop("presentation")
+        plan["shots"][0]["review_default"] = {
+            "decision": "select",
+            "segments": [{
+                "candidate_id": "asset",
+                "source_range": {"start_s": 0.0, "end_s": 1.0},
+                "program_range": {"start_s": 1.0, "end_s": 2.0},
+                "playback_rate": 1.0,
+            }],
+        }
+        plan = self.record_presentation(plan, "speaker-inset")
+        presentation_path = self.root / "work/b-roll/presentation-decision.json"
+        original_presentation = presentation_path.read_bytes()
+        original_presentation_sha256 = broll_plan.sha256_file(presentation_path)
+        original_presentation_plan_sha256 = projectlib.load_json(
+            presentation_path
+        )["plan_sha256"]
+
+        with mock.patch.object(build_review_page, "_extract_frame", side_effect=self._frame):
+            selection_result = build_review_page.build_review_page(
+                plan, self.timeline, self.transcript, self.video, self.review_dir,
+                project_root=self.root,
+                review_id="123e4567-e89b-12d3-a456-426614174030",
+            )
+        selection_payload = json.loads(base64.b64decode(
+            build_review_page.PAYLOAD_RE.search(
+                selection_result["page"].read_text(encoding="utf-8")
+            ).group(1)
+        ))
+        edited_range = {"start_s": 1.0, "end_s": 3.0}
+        segment = {
+            "candidate_id": "asset",
+            "source_range": {"start_s": 0.0, "end_s": 2.0},
+            "program_range": copy.deepcopy(edited_range),
+            "playback_rate": 1.0,
+        }
+        selection = {
+            "review_id": selection_payload["review_id"],
+            "submission_intent": "approve_selection",
+            "approval_scope": "b-roll-selection",
+            "explicit_user_action": True,
+            "revision_notes": "",
+            "plan_sha256": selection_payload["plan_sha256"],
+            "candidate_manifest_sha256": selection_payload["candidate_manifest_sha256"],
+            "review_video_sha256": selection_payload["review_video_sha256"],
+            "timeline_fps": copy.deepcopy(selection_payload["timeline"]["fps"]),
+            "timestamp": "2026-08-17T12:00:00Z",
+            "rationale": broll_plan.HUMAN_SELECTION_APPROVAL_RATIONALE,
+            "rationale_source": "review_ui_explicit_action",
+            "shots": [{
+                "id": "shot", "decision": "select",
+                "program_range": copy.deepcopy(edited_range),
+                "segments": [segment],
+            }],
+        }
+        prepared = broll_plan.approve_selection(
+            plan, selection, mode="human", actor="Actual user",
+            rationale=broll_plan.HUMAN_SELECTION_APPROVAL_RATIONALE,
+            project_root=self.root, timeline=self.timeline,
+            transcript=self.transcript,
+        )
+        self.assertEqual(original_presentation, presentation_path.read_bytes())
+        self.assertEqual(
+            original_presentation_sha256, broll_plan.sha256_file(presentation_path),
+        )
+        self._bind_composite_artifacts(prepared)
+
+        with mock.patch.object(broll_plan, "validate_plan", return_value=[]), mock.patch.object(
+                build_review_page, "_extract_frame") as extract:
+            result = build_review_page.build_review_page(
+                prepared, self.timeline, self.transcript, self.video, self.review_dir,
+                project_root=self.root,
+                review_id="123e4567-e89b-12d3-a456-426614174031",
+            )
+        extract.assert_not_called()
+        html = result["page"].read_text(encoding="utf-8")
+        payload = json.loads(base64.b64decode(
+            build_review_page.PAYLOAD_RE.search(html).group(1)
+        ))
+        self.assertEqual("composite_pending", prepared["shots"][0]["status"])
+        self.assertNotIn("review_default", prepared["shots"][0])
+        self.assertEqual(
+            original_presentation_plan_sha256,
+            prepared["presentation"]["carried_from_plan_sha256"],
+        )
+        self.assertEqual([], broll_plan.presentation_errors(
+            prepared, project_root=self.root, required=True,
+        ))
+        self.assertEqual("composite", payload["review_mode"])
+        self.assertEqual("approve", payload["approval_intent"])
+        self.assertEqual("speaker-inset-composite", payload["approval_scope"])
+        composite_receipt_source = re.search(
+            r"function buildCompositeReceipt\(commit,action\)\{(.+?)\ncopyButton",
+            html,
+        ).group(1)
+        self.assertNotIn("shots:", composite_receipt_source)
+
     def test_review_page_switches_selection_intent_and_publishes_composite_assets(self):
         selection_plan = copy.deepcopy(self.plan)
         selection_plan.pop("presentation")
@@ -2475,6 +3624,9 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
             ).group(1)
         ))
         self.assertEqual("selection", selection_payload["review_mode"])
+        self.assertIn("approval_intent", selection_payload)
+        self.assertEqual("approve_selection", selection_payload["approval_intent"])
+        self.assertEqual("b-roll-selection", selection_payload["approval_scope"])
 
         plan = copy.deepcopy(selection_plan)
         segment = {
@@ -2488,107 +3640,12 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
             "status": "composite_pending",
         })
         plan["selection"] = {
-            "status": "prepared", "submission_intent": "prepare_composite",
+            "status": "approved", "submission_intent": "approve_selection",
+            "approval_scope": "b-roll-selection", "consumed": True,
             "path": "b-roll/broll-selection.json", "sha256": "9" * 64,
             "style_sha256": broll_plan.canonical_sha256(plan["speaker_inset_style"]),
         }
-        cache = self.root / "work/cache/b-roll/speaker-inset"
-        cache.mkdir(parents=True)
-        evidence = cache / "evidence.jpg"
-        Image.new("RGB", (160, 90), "navy").save(evidence, "JPEG")
-        base = cache / "base.mp4"
-        context = cache / "context.mp4"
-        base.write_bytes(b"base-preview")
-        context.write_bytes(b"context-preview")
-        alternates = {}
-        for anchor in speaker_inset.PRESET_ANCHORS["corner-pip"]:
-            path = cache / f"context-{anchor}.mp4"
-            path.write_bytes(f"context-{anchor}".encode("ascii"))
-            alternates[anchor] = {
-                "path": path.relative_to(self.root / "work").as_posix(),
-                "sha256": broll_plan.sha256_file(path),
-            }
-        analysis = {
-            "schema_version": 1,
-            "shots": [{
-                "shot_id": "shot",
-                "subshots": [{
-                    "id": "shot-subshot-001",
-                    "program_range": copy.deepcopy(plan["shots"][0]["program_range"]),
-                    "evidence_points": [{
-                        "frames": [{
-                            "program_time_s": 1.0,
-                            "path": evidence.relative_to(self.root / "work").as_posix(),
-                            "sha256": broll_plan.sha256_file(evidence),
-                        }],
-                    }],
-                }],
-            }],
-        }
-        analysis_path = self.root / "work/b-roll/speaker-inset-analysis.json"
-        projectlib.write_json(analysis_path, analysis)
-        agent_input = {
-            "schema_version": 1, "actor": "Codex",
-            "project_layout_strategy": SpeakerInsetTests._layout_strategy(),
-            "shots": [{
-                "shot_id": "shot",
-                "layout_recommendation": SpeakerInsetTests._layout_recommendation(),
-                "subshots": [{
-                    "id": "shot-subshot-001", "speaker_status": "confirmed",
-                    "display_mode": "enabled", "anchor": "top-left",
-                    "rationale": "One current speaker is visible.",
-                    "keyframes": [{
-                        "program_time_s": 1.0,
-                        "roi": {"x": 0.1, "y": 0.1, "width": 0.3, "height": 0.6},
-                    }],
-                }],
-            }],
-        }
-        agent_path = self.root / "work/b-roll/speaker-inset-agent-input.json"
-        projectlib.write_json(agent_path, agent_input)
-        preview = {
-            "schema_version": 1,
-            "shots": [{
-                "shot_id": "shot",
-                "base_broll": {
-                    "path": base.relative_to(self.root / "work").as_posix(),
-                    "sha256": broll_plan.sha256_file(base),
-                },
-                "preview": {
-                    "path": context.relative_to(self.root / "work").as_posix(),
-                    "sha256": broll_plan.sha256_file(context),
-                },
-                "anchor_previews": alternates,
-            }],
-        }
-        preview_path = self.root / "work/b-roll/speaker-inset-preview.json"
-        projectlib.write_json(preview_path, preview)
-        clearance = {
-            "schema_version": 1, "actor": "Codex",
-            "shots": [{
-                "shot_id": "shot",
-                "continuity": {
-                    "risk": "none",
-                    "decision": "continuous",
-                    "rationale": "The inset remains enabled for the complete shot.",
-                },
-                "subshots": [{
-                    "id": "shot-subshot-001", "display_mode": "enabled",
-                    "anchor": "top-left", "clearance_status": "pass",
-                    "checked_anchors": ["top-left"],
-                    "subject_legibility": "pass",
-                    "rationale": "The inset does not cover the B-roll focal action.",
-                }],
-            }],
-        }
-        clearance_path = self.root / "work/b-roll/speaker-inset-clearance.json"
-        projectlib.write_json(clearance_path, clearance)
-        plan["speaker_inset"] = {
-            "analysis": {"path": "b-roll/speaker-inset-analysis.json", "sha256": broll_plan.sha256_file(analysis_path)},
-            "agent_input": {"path": "b-roll/speaker-inset-agent-input.json", "sha256": broll_plan.sha256_file(agent_path)},
-            "preview": {"path": "b-roll/speaker-inset-preview.json", "sha256": broll_plan.sha256_file(preview_path)},
-            "clearance": {"path": "b-roll/speaker-inset-clearance.json", "sha256": broll_plan.sha256_file(clearance_path)},
-        }
+        self._bind_composite_artifacts(plan)
         with mock.patch.object(broll_plan, "validate_plan", return_value=[]), mock.patch.object(
                 build_review_page, "_extract_frame") as extract:
             result = build_review_page.build_review_page(
@@ -2602,9 +3659,21 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
             build_review_page.PAYLOAD_RE.search(html).group(1)
         ))
         self.assertEqual("composite", payload["review_mode"])
+        self.assertIn("approval_scope", payload)
+        self.assertEqual("speaker-inset-composite", payload["approval_scope"])
         self.assertEqual({"segments": [segment]}, payload["shots"][0]["locked_selection"])
         self.assertEqual("pass", payload["shots"][0]["subshots"][0]["clearance_status"])
         self.assertEqual("pass", payload["shots"][0]["subshots"][0]["subject_legibility"])
+        self.assertEqual(
+            "medium", payload["shots"][0]["subshots"][0]["pixel_budget"]["pixel_risk"],
+        )
+        self.assertEqual(
+            "entry", payload["shots"][0]["subshots"][0]["legibility_checks"][0]["role"],
+        )
+        self.assertEqual(
+            "The speaker remains readable at final size.",
+            payload["shots"][0]["subshots"][0]["legibility_rationale"],
+        )
         self.assertEqual("continuous", payload["shots"][0]["continuity"]["decision"])
         self.assertEqual(
             SpeakerInsetTests._layout_strategy(),
@@ -2627,10 +3696,20 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
             / payload["shots"][0]["subshots"][0]["evidence_frames"][0]["path"]
         ).is_file())
         for text in (
-                "prepare_composite", "value.review_stage='composite'", "speaker_bindings",
+                "approve_selection", "Approve B-roll selection",
+                "value.review_stage='composite'", "speaker_bindings",
                 "Project layout strategy", "Preset assessments", "subject_legibility",
-                "continuity"):
+                "Pixel risk", "Legibility checks", "function legibilityMarkup",
+                "replace('_','-')", "continuity",
+                "Copy", "Download JSON",
+                "<details class=\"technical\"><summary>Locked B-roll</summary>"):
             self.assertIn(text, html)
+        self.assertNotIn("function lockedEntry", html)
+        self.assertNotIn("shots:shotEntries", html)
+        self.assertNotIn("<h3>Pure B-roll source</h3>", html)
+        self.assertNotIn(
+            "<details open class=\"technical\"><summary>Locked B-roll</summary>", html,
+        )
         self.assertNotIn("Project speaker size", html)
         self.assertNotIn("size-candidates", html)
 
@@ -2980,12 +4059,87 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
             'function reorderSegment(',
             'function fitToAroll(',
             'entry.segments=',
+            'Fit applied: segment allocation now matches the A-roll duration.',
+            'Unable to fit:',
         ):
             self.assertIn(text, template)
         self.assertNotIn(
             'type="radio" name="${esc(shot.id)}" value="${esc(candidate.id)}"',
             template,
         )
+
+    def test_template_uses_coarse_frame_aligned_segment_timing(self):
+        template = build_review_page.TEMPLATE_PATH.read_text(encoding="utf-8")
+        self.assertIn("const SEGMENT_COARSE_STEP_S=0.1;", template)
+        self.assertIn(
+            "const coarseStepFrames=Math.max(1,Math.round(SEGMENT_COARSE_STEP_S/frameDuration));",
+            template,
+        )
+        self.assertIn(
+            "moveBoundary(shot,state,Number(button.dataset.index),Number(button.dataset.delta)*(event.altKey?1:coarseStepFrames))",
+            template,
+        )
+        self.assertIn('step="0.1"', template)
+        self.assertIn('class="trim-end" type="number"', template)
+        self.assertIn('class="trim-end" type="number" min="0" readonly', template)
+        self.assertNotIn("else if(target.matches('.trim-end'))segment.source_end=Number(target.value)", template)
+        self.assertIn(
+            "segment.source_start+segment.frames*frameDuration*segment.playback_rate",
+            template,
+        )
+        self.assertIn("selected.forEach(autoSourceEnd)", template)
+        self.assertIn("state.fitValid=true;state.fitMessage='';renderShotState(shot)", template)
+
+    def test_template_reports_structured_actionable_segment_errors(self):
+        template = build_review_page.TEMPLATE_PATH.read_text(encoding="utf-8")
+        for text in (
+            "reason:'source_too_short'",
+            "requiredSourceS",
+            "availableSourceS",
+            "shortageS",
+            "latestLegalStartS",
+            "candidateDurationS",
+            "feasibleRates",
+            "Source footage is too short",
+            "candidate ends at",
+            "Move the clip start earlier",
+            "choose a feasible playback rate",
+            "shorten the segment",
+            "select another candidate",
+            'aria-invalid="true"',
+            'aria-describedby="${id}"',
+        ):
+            self.assertIn(text, template)
+        self.assertIn("function segmentStatus(", template)
+        self.assertIn("function segmentStatusText(", template)
+        self.assertIn(
+            "startInvalid=!status.valid&&(status.reason==='invalid_trim'||status.reason==='source_too_short')",
+            template,
+        )
+        self.assertIn("rateInvalid=status.reason==='source_too_short'", template)
+        self.assertIn(
+            "boundaryInvalid=index&&(!status.valid||!previousStatus.valid)",
+            template,
+        )
+        self.assertIn(
+            "previousStatus=index?segmentStatus(shot,segments[index-1]):null",
+            template,
+        )
+        self.assertIn(
+            "boundaryStatusId=status.valid&&previousStatus&&!previousStatus.valid?`segment-status-${esc(shot.id)}-${index-1}`:statusId",
+            template,
+        )
+        self.assertIn(
+            "class=\"boundary-adjust${boundaryInvalid?' timing-invalid':''}\"${assist(boundaryInvalid,boundaryStatusId)}",
+            template,
+        )
+        self.assertIn("Number.isFinite(status.latestLegalStartS)", template)
+        self.assertIn("segment.source_start=target.valueAsNumber", template)
+        self.assertIn(
+            "const invalidTrim=state.selected.map(segment=>segmentStatus(shot,segment)).find(status=>status.reason==='invalid_trim')",
+            template,
+        )
+        self.assertNotIn("reason_code", template.split("function buildReviewReceipt", 1)[1])
 
     def test_template_uses_stable_candidate_tones_for_reordered_segments(self):
         template = build_review_page.TEMPLATE_PATH.read_text(encoding="utf-8")
@@ -3027,28 +4181,26 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
         ))
         self.assertEqual(segment, payload["shots"][0]["review_default"]["segments"][0])
 
-    def test_template_separates_approve_and_revision_without_required_notes(self):
+    def test_template_allows_structured_edits_and_requires_revision_notes(self):
         template = build_review_page.TEMPLATE_PATH.read_text(encoding="utf-8")
         self.assertIn('id="modification-notes"', template)
         self.assertNotIn('id="rationale"', template)
-        self.assertNotIn('Modification notes</label>\n      <textarea id="modification-notes" required', template)
+        self.assertIn(
+            "Approve: leave blank. Request changes: required.",
+            template,
+        )
         for text in (
             "submission_intent", "request_revision", "revision_notes",
             "requested_program_range", "playback_rate:1.0", "Fit to A-roll",
             "Insert start", "Insert end", "Transcript", "A-roll source mapping",
             "Explicit user action approved the exact configuration shown in this review.",
+            "function syncIntent(){if(revisionNotes.value.trim())",
+            "Modification notes are required for Request changes.",
         ):
             self.assertIn(text, template)
-        self.assertIn("programRangeChanged", template)
-        self.assertIn("function segmentsEqual(a,b)", template)
-        self.assertIn(
-            "return !segmentsEqual(entry.segments,shot.review_default.segments)",
-            template,
-        )
-        self.assertNotIn(
-            "JSON.stringify(entry.segments)!==JSON.stringify(shot.review_default.segments)",
-            template,
-        )
+        self.assertNotIn("programRangeChanged", template)
+        self.assertNotIn("segmentChangedFromDefault", template)
+        self.assertNotIn("forcedRevision", template)
         self.assertIn("revisionNotes.value.trim()", template)
         self.assertIn("source_range", template)
         self.assertIn("remaining", template)
@@ -3159,11 +4311,11 @@ class BrollReviewPageTests(_BrollFixture, unittest.TestCase):
         self.assertIn("receipt.select()", template)
         self.assertNotIn("value.duplicate_notes", template)
 
-    def test_template_preserves_unchanged_program_timing_and_snaps_revisions(self):
+    def test_template_preserves_unchanged_program_timing_and_snaps_structured_edits(self):
         template = build_review_page.TEMPLATE_PATH.read_text(encoding="utf-8")
         self.assertIn("rangesEqual(raw,shot.original_program_range)?raw", template)
         self.assertIn("{start_s:snap(raw.start_s),end_s:snap(raw.end_s)}", template)
-        self.assertIn("rangesEqual(programRange(shot),shot.original_program_range)", template)
+        self.assertNotIn("programRangeChanged", template)
 
     def test_mixed_plan_exports_pre_skipped_shot_exactly_once(self):
         plan = copy.deepcopy(self.plan)
@@ -3277,6 +4429,311 @@ class SpeakerInsetTests(_BrollFixture, unittest.TestCase):
             "used_presets": used or [primary],
             "rationale": "The selected shots favor one consistent project layout.",
         }
+
+    def _clearance_contract_fixture(self):
+        style = {
+            **BrollPlanTests._speaker_style(),
+            "width_ratio": 0.30,
+            "aspect_ratio": 1.0,
+            "border": {"width_px": 0, "color": "#9E9E9E"},
+        }
+        hashes = {
+            "analysis_sha256": "a" * 64,
+            "agent_input_sha256": "b" * 64,
+            "preview_sha256": "c" * 64,
+            "selection_sha256": "d" * 64,
+            "style_sha256": broll_plan.canonical_sha256(style),
+            "review_video_sha256": "e" * 64,
+        }
+        plan = {
+            "speaker_inset_style": style,
+            "speaker_inset": {
+                "analysis": {"sha256": hashes["analysis_sha256"]},
+                "agent_input": {"sha256": hashes["agent_input_sha256"]},
+                "preview": {"sha256": hashes["preview_sha256"]},
+            },
+            "selection": {"sha256": hashes["selection_sha256"]},
+            "input_hashes": {
+                "review_video_sha256": hashes["review_video_sha256"],
+            },
+        }
+        analysis = {
+            "timeline_fps": {"num": 10, "den": 1},
+            "review_video_probe": {"width": 1000, "height": 1000},
+            "shots": [{
+                "shot_id": "shot",
+                "subshots": [{
+                    "id": "subshot",
+                    "program_range": {"start_s": 1.0, "end_s": 2.0},
+                }],
+            }],
+        }
+        roi = {"x": 0.0, "y": 0.0, "width": 0.20, "height": 0.20}
+        agent_input = {
+            "shots": [{
+                "shot_id": "shot",
+                "layout_recommendation": {
+                    "preset": "corner-pip", "anchor": "top-left",
+                },
+                "subshots": [{
+                    "id": "subshot",
+                    "speaker_status": "confirmed",
+                    "display_mode": "enabled",
+                    "anchor": "top-left",
+                    "keyframes": [
+                        {"program_time_s": 1.0, "roi": copy.deepcopy(roi)},
+                        {"program_time_s": 1.9, "roi": copy.deepcopy(roi)},
+                    ],
+                }],
+            }],
+        }
+        preview = {
+            "analysis_sha256": hashes["analysis_sha256"],
+            "agent_input_sha256": hashes["agent_input_sha256"],
+            "shots": [{
+                "shot_id": "shot",
+                "preview": {
+                    "path": "cache/b-roll/context.mp4",
+                    "sha256": "f" * 64,
+                    "probe": {"width": 1000, "height": 1000},
+                },
+                "anchor_previews": {
+                    anchor: {"path": f"cache/b-roll/{anchor}.mp4", "sha256": "f" * 64}
+                    for anchor in speaker_inset.PRESET_ANCHORS["corner-pip"]
+                },
+            }],
+        }
+        checkpoint_facts = [
+            {
+                "role": role,
+                "program_time_s": time_s,
+                "input_crop_px": {"width": 200, "height": 200},
+                "output_content_px": {"width": 300, "height": 300},
+                "scale_factor": 1.5,
+            }
+            for role, time_s in (("entry", 1.0), ("middle", 1.5), ("exit", 1.9))
+        ]
+        pixel_budget = {
+            **hashes,
+            "source_frame_px": {"width": 1000, "height": 1000},
+            "output_inset_px": {"width": 300, "height": 300},
+            "checkpoints": checkpoint_facts,
+            "max_scale_factor": 1.5,
+            "pixel_risk": "low",
+        }
+        legibility_checks = [
+            {
+                "role": role,
+                "program_time_s": time_s,
+                "preview_sha256": hashes["preview_sha256"],
+                "observation": "The complete speaker silhouette remains readable at final size.",
+            }
+            for role, time_s in (("entry", 1.0), ("middle", 1.5), ("exit", 1.9))
+        ]
+        legibility_checks.append({
+            "role": "motion_risk",
+            "status": "not_applicable",
+            "preview_sha256": hashes["preview_sha256"],
+            "reason": "No additional motion-risk frame exists in this stable subshot.",
+        })
+        clearance = {
+            "schema_version": 1,
+            "mode": "agent",
+            "actor": "Codex",
+            "timestamp": "2026-08-14T12:00:00+08:00",
+            "rationale": "Checked the exact final-size speaker inset.",
+            **{key: hashes[key] for key in (
+                "analysis_sha256", "agent_input_sha256", "preview_sha256",
+                "selection_sha256", "style_sha256",
+            )},
+            "shots": [{
+                "shot_id": "shot",
+                "continuity": {
+                    "risk": "none",
+                    "decision": "continuous",
+                    "rationale": "The speaker inset remains continuous.",
+                },
+                "subshots": [{
+                    "id": "subshot",
+                    "display_mode": "enabled",
+                    "anchor": "top-left",
+                    "clearance_status": "pass",
+                    "checked_anchors": ["top-left"],
+                    "subject_legibility": "pass",
+                    "legibility_rationale": "The speaker is immediately recognizable at final size.",
+                    "pixel_budget": pixel_budget,
+                    "legibility_checks": legibility_checks,
+                    "rationale": "The inset preserves the B-roll focal action.",
+                }],
+            }],
+        }
+        return plan, analysis, agent_input, preview, clearance
+
+    def test_confirmed_agent_input_cannot_skip_exact_preview_with_pure_broll(self):
+        plan, analysis, agent_input, _, _ = self._clearance_contract_fixture()
+        agent_input["schema_version"] = 1
+        agent_input.update({
+            "mode": "agent",
+            "actor": "Codex",
+            "timestamp": "2026-08-14T12:00:00+08:00",
+            "rationale": "Reviewed the temporal evidence.",
+            "project_layout_strategy": self._layout_strategy(),
+            "analysis_sha256": plan["speaker_inset"]["analysis"]["sha256"],
+            "selection_sha256": plan["selection"]["sha256"],
+            "style_sha256": broll_plan.canonical_sha256(plan["speaker_inset_style"]),
+            "review_video_sha256": plan["input_hashes"]["review_video_sha256"],
+        })
+        recommendation = agent_input["shots"][0]["layout_recommendation"]
+        recommendation.update(self._layout_recommendation())
+        analysis["shots"][0]["subshots"][0]["evidence_points"] = []
+
+        premature = copy.deepcopy(agent_input)
+        premature_subshot = premature["shots"][0]["subshots"][0]
+        premature_subshot.update({
+            "display_mode": "pure_broll", "anchor": None, "keyframes": [],
+        })
+        errors = speaker_inset.agent_input_errors(
+            premature, analysis, plan, {"fps": analysis["timeline_fps"]},
+        )
+        self.assertTrue(any("confirmed speaker must be enabled" in error for error in errors))
+
+    def test_clearance_legibility_state_matrix_is_fail_closed(self):
+        cases = (
+            ("confirmed", "enabled", "pass", "pass", True, None),
+            ("confirmed", "pure_broll", "fail", "subject_illegible", True, None),
+            ("confirmed", "pure_broll", "not_applicable", "no_safe_position", True, None),
+            ("ambiguous", "pure_broll", "not_applicable", "pass", True, None),
+            ("confirmed", "enabled", "fail", "pass", False, "enabled speaker must pass subject legibility"),
+            ("confirmed", "pure_broll", "fail", "pass", False, "subject_legibility fail requires subject_illegible"),
+            ("confirmed", "pure_broll", "fail", "no_safe_position", False, "subject_legibility fail requires subject_illegible"),
+            ("ambiguous", "enabled", "pass", "pass", False, "non-confirmed speaker clearance must remain pure_broll"),
+        )
+        for speaker_status, display_mode, legibility, status, valid, expected in cases:
+            with self.subTest(
+                    speaker_status=speaker_status, display_mode=display_mode,
+                    legibility=legibility, status=status):
+                plan, analysis, agent_input, preview, clearance = (
+                    self._clearance_contract_fixture()
+                )
+                agent_subshot = agent_input["shots"][0]["subshots"][0]
+                item = clearance["shots"][0]["subshots"][0]
+                agent_subshot["speaker_status"] = speaker_status
+                item.update({
+                    "display_mode": display_mode,
+                    "anchor": "top-left" if display_mode == "enabled" else None,
+                    "clearance_status": status,
+                    "subject_legibility": legibility,
+                    "checked_anchors": (
+                        ["top-left"] if display_mode == "enabled"
+                        or status == "subject_illegible"
+                        else list(speaker_inset.PRESET_ANCHORS["corner-pip"])
+                        if status == "no_safe_position" else []
+                    ),
+                })
+                if speaker_status != "confirmed":
+                    agent_subshot.update({
+                        "display_mode": "pure_broll", "anchor": None, "keyframes": [],
+                    })
+                    item.pop("pixel_budget")
+                    item.pop("legibility_checks")
+                    item.pop("legibility_rationale")
+                if display_mode == "pure_broll":
+                    clearance["shots"][0]["continuity"].update({
+                        "risk": "none", "decision": "all_pure_broll",
+                    })
+                errors = speaker_inset.clearance_errors(
+                    clearance, preview, agent_input, analysis, plan,
+                )
+                if valid:
+                    self.assertEqual([], errors)
+                else:
+                    self.assertTrue(
+                        any(expected in error for error in errors), errors,
+                    )
+
+    def test_pixel_risk_boundaries_are_advisory(self):
+        plan, analysis, agent_input, preview, _ = self._clearance_contract_fixture()
+        helper_parameters = inspect.signature(
+            speaker_inset.build_pixel_budget
+        ).parameters
+        self.assertNotIn("display_mode", helper_parameters)
+        cases = ((200, "low"), (199, "medium"), (100, "medium"), (99, "high"))
+        for source_crop_px, expected_risk in cases:
+            with self.subTest(source_crop_px=source_crop_px):
+                ratio = source_crop_px / analysis["review_video_probe"]["width"]
+                for keyframe in agent_input["shots"][0]["subshots"][0]["keyframes"]:
+                    keyframe["roi"].update({"width": ratio, "height": ratio})
+                budget = speaker_inset.build_pixel_budget(
+                    plan, analysis, agent_input, preview, "shot", "subshot",
+                )
+                self.assertEqual(expected_risk, budget["pixel_risk"])
+                self.assertAlmostEqual(
+                    300 / source_crop_px, budget["max_scale_factor"], places=6,
+                )
+                self.assertNotIn("display_mode", budget)
+
+    def test_legibility_checks_bind_preview_and_validate_motion_risk(self):
+        plan, analysis, agent_input, preview, clearance = (
+            self._clearance_contract_fixture()
+        )
+        self.assertEqual([], speaker_inset.clearance_errors(
+            clearance, preview, agent_input, analysis, plan,
+        ))
+
+        for role in ("entry", "middle", "exit", "motion_risk"):
+            stale = copy.deepcopy(clearance)
+            check = next(
+                item for item in stale["shots"][0]["subshots"][0]["legibility_checks"]
+                if item["role"] == role
+            )
+            check["preview_sha256"] = "0" * 64
+            errors = speaker_inset.clearance_errors(
+                stale, preview, agent_input, analysis, plan,
+            )
+            self.assertTrue(any("exact preview SHA-256" in error for error in errors), errors)
+
+        unaligned = copy.deepcopy(clearance)
+        unaligned["shots"][0]["subshots"][0]["legibility_checks"][1][
+            "program_time_s"
+        ] = 1.55
+        errors = speaker_inset.clearance_errors(
+            unaligned, preview, agent_input, analysis, plan,
+        )
+        self.assertTrue(any("timeline frames" in error for error in errors), errors)
+
+        motion = copy.deepcopy(clearance)
+        motion_check = motion["shots"][0]["subshots"][0]["legibility_checks"][3]
+        motion_check.update({
+            "status": "checked",
+            "program_time_s": 1.6,
+            "reason": "The speaker turns while the camera moves.",
+            "observation": "The full silhouette remains distinct during the turn.",
+        })
+        motion["shots"][0]["subshots"][0]["pixel_budget"] = (
+            speaker_inset.build_pixel_budget(
+                plan, analysis, agent_input, preview, "shot", "subshot",
+                motion_risk_time_s=1.6,
+            )
+        )
+        self.assertEqual([], speaker_inset.clearance_errors(
+            motion, preview, agent_input, analysis, plan,
+        ))
+        outside = copy.deepcopy(motion)
+        outside["shots"][0]["subshots"][0]["legibility_checks"][3][
+            "program_time_s"
+        ] = 2.0
+        errors = speaker_inset.clearance_errors(
+            outside, preview, agent_input, analysis, plan,
+        )
+        self.assertTrue(any("inside its subshot" in error for error in errors), errors)
+        missing_reason = copy.deepcopy(motion)
+        missing_reason["shots"][0]["subshots"][0]["legibility_checks"][3][
+            "reason"
+        ] = ""
+        errors = speaker_inset.clearance_errors(
+            missing_reason, preview, agent_input, analysis, plan,
+        )
+        self.assertTrue(any("motion-risk reason is required" in error for error in errors), errors)
 
     def _prepare_evidence(self, supplemental_points=None):
         probe = {
@@ -3487,6 +4944,63 @@ class SpeakerInsetTests(_BrollFixture, unittest.TestCase):
             speaker_inset.interpolate_roi(
                 keyframes, 1.5, {"start_s": 1.0, "end_s": 1.5},
             )
+
+    def test_composite_frame_uses_fractional_roi_motion_without_integer_plateaus(self):
+        frame_size = (200, 320)
+        base = Image.new("RGB", frame_size, (0, 180, 0))
+        speaker = Image.new("RGB", frame_size)
+        speaker.putdata([
+            (x, x, x)
+            for y in range(frame_size[1]) for x in range(frame_size[0])
+        ])
+        style = BrollPlanTests._speaker_style()
+        style["border"]["width_px"] = 0
+        roi = {"y": 0.1, "width": 0.4, "height": 0.5}
+
+        first = speaker_inset.composite_frame(
+            base, speaker, {"x": 0.101, **roi}, style, "corner-pip", "top-left",
+        )
+        second = speaker_inset.composite_frame(
+            base, speaker, {"x": 0.103, **roi}, style, "corner-pip", "top-left",
+        )
+
+        self.assertFalse(first.tobytes() == second.tobytes())
+
+    def test_fractional_roi_cover_crop_box_preserves_aspect_centering_and_top_alignment(self):
+        self.assertTrue(hasattr(speaker_inset, "_cover_crop_box"))
+        cases = (
+            ((200, 100), {"x": 0.101, "y": 0.203, "width": 0.603, "height": 0.407},
+             (64.22, 20.3, 96.78, 61.0)),
+            ((200, 200), {"x": 0.101, "y": 0.203, "width": 0.203, "height": 0.607},
+             (20.2, 40.6, 60.8, 91.35)),
+        )
+        for source_size, roi, expected in cases:
+            with self.subTest(source_size=source_size):
+                crop_box = speaker_inset._cover_crop_box(source_size, roi, (80, 100))
+                self.assertEqual(expected, tuple(round(value, 6) for value in crop_box))
+
+    def test_fractional_roi_tolerance_stays_inside_source_frame(self):
+        frame_size = (100, 100)
+        base = Image.new("RGB", frame_size)
+        speaker = Image.new("RGB", frame_size)
+        style = BrollPlanTests._speaker_style()
+        roi = {"x": 0.9, "y": 0.0, "width": 0.1000005, "height": 0.5}
+
+        self.assertEqual([], speaker_inset._roi_errors(roi))
+        result = speaker_inset.composite_frame(
+            base, speaker, roi, style, "corner-pip", "top-left",
+        )
+        crop_box = speaker_inset._cover_crop_box(
+            frame_size, roi, speaker_inset._inset_size(frame_size, style, "top-left"),
+        )
+        left, top, right, bottom = crop_box
+        self.assertGreaterEqual(left, 0)
+        self.assertGreaterEqual(top, 0)
+        self.assertLessEqual(right, frame_size[0])
+        self.assertLessEqual(bottom, frame_size[1])
+        self.assertGreater(right, left)
+        self.assertGreater(bottom, top)
+        self.assertEqual(frame_size, result.size)
 
     def test_probe_video_accepts_ffprobe_string_duration_and_rational_fps(self):
         payload = {
@@ -3962,6 +5476,7 @@ class SpeakerInsetTests(_BrollFixture, unittest.TestCase):
                 "preview": {
                     "path": context_path.relative_to(self.root / "work").as_posix(),
                     "sha256": broll_plan.sha256_file(context_path),
+                    "probe": {"width": 1920, "height": 1080},
                 },
                 "anchor_previews": alternate_bindings,
             }],
@@ -4028,6 +5543,12 @@ class SpeakerInsetTests(_BrollFixture, unittest.TestCase):
                 }],
             }],
         }
+        clearance["shots"][0]["subshots"][0].update(
+            _final_size_clearance_fields(
+                previewed, analysis, agent_input, preview_record,
+                "shot", subshots[0]["id"],
+            )
+        )
         obsolete_size_assessment = copy.deepcopy(clearance)
         obsolete_size_assessment["size_assessment"] = {}
         self.assertTrue(any(
@@ -4397,7 +5918,13 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
                 "shot_id": shot_id,
                 "program_range": copy.deepcopy(attached_shots[shot_id]["program_range"]),
                 "base_broll": binding(f"{shot_id}-base.mp4"),
-                "preview": binding(f"{shot_id}-recommended.mp4"),
+                "preview": {
+                    **binding(f"{shot_id}-recommended.mp4"),
+                    "probe": {
+                        "width": self.timeline["width"],
+                        "height": self.timeline["height"],
+                    },
+                },
                 "anchor_previews": {
                     value: binding(f"{shot_id}-anchor-{value}.mp4")
                     for value in speaker_inset.PRESET_ANCHORS[layout["preset"]]
@@ -4423,6 +5950,24 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
         clearance_shots = []
         for layout in layouts:
             subshot = analysis_by_id[layout["shot_id"]]["subshots"][0]
+            clearance_subshot = {
+                "id": subshot["id"],
+                "display_mode": "enabled" if enabled else "pure_broll",
+                "anchor": layout["anchor"] if enabled else None,
+                "clearance_status": "pass" if enabled else "no_safe_position",
+                "checked_anchors": [layout["anchor"]] if enabled else list(
+                    speaker_inset.PRESET_ANCHORS[layout["preset"]]
+                ),
+                "subject_legibility": "pass" if enabled else "not_applicable",
+                "rationale": (
+                    "The recommended placement is clear." if enabled else
+                    "No supported anchor leaves the B-roll focal content clear."
+                ),
+            }
+            clearance_subshot.update(_final_size_clearance_fields(
+                previewed, analysis, agent_input, preview,
+                layout["shot_id"], subshot["id"],
+            ))
             clearance_shots.append({
                 "shot_id": layout["shot_id"],
                 "continuity": {
@@ -4430,20 +5975,7 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
                     "decision": "continuous" if enabled else "all_pure_broll",
                     "rationale": "The effective display mode remains constant for the shot.",
                 },
-                "subshots": [{
-                    "id": subshot["id"],
-                    "display_mode": "enabled" if enabled else "pure_broll",
-                    "anchor": layout["anchor"] if enabled else None,
-                    "clearance_status": "pass" if enabled else "no_safe_position",
-                    "checked_anchors": [layout["anchor"]] if enabled else list(
-                        speaker_inset.PRESET_ANCHORS[layout["preset"]]
-                    ),
-                    "subject_legibility": "pass" if enabled else "not_applicable",
-                    "rationale": (
-                        "The recommended placement is clear." if enabled else
-                        "No supported anchor leaves the B-roll focal content clear."
-                    ),
-                }],
+                "subshots": [clearance_subshot],
             })
         clearance = {
             "schema_version": 1, "mode": "agent", "actor": "Codex",
@@ -4460,10 +5992,10 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
             previewed, analysis, agent_input, preview, clearance,
             self.root, self.timeline,
         )
-        decisions = broll_plan._decision_manifest(cleared["shots"])
         review = self.review_for(
-            cleared, decisions, rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
-            submission_intent="approve", review_stage="composite",
+            cleared, [], rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
+            submission_intent="approve",
+            approval_scope="speaker-inset-composite", review_stage="composite",
             explicit_user_action=True, revision_notes="",
             rationale_source="review_ui_explicit_action",
             timeline_fps=copy.deepcopy(self.timeline["fps"]),
@@ -4474,6 +6006,7 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
             clearance_sha256=cleared["speaker_inset"]["clearance"]["sha256"],
             style_sha256=broll_plan.canonical_sha256(cleared["speaker_inset_style"]),
         )
+        review.pop("shots")
         approved = broll_plan.apply_review(
             cleared, review, mode="human", actor="Actual user",
             rationale=broll_plan.HUMAN_APPROVAL_RATIONALE,
@@ -4515,13 +6048,20 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
         approved, _, _, _, _, review_video = self._approved_speaker_plan()
         projectlib.write_json(self.plan_path, approved)
 
-        result = normalize_broll.normalize_plan(
-            self.plan_path, self.timeline_path, self.root,
-            lut=self.selected_lut_path, review_video=review_video,
-        )
+        with mock.patch.object(
+                speaker_inset, "render_delivery_composite",
+                wraps=speaker_inset.render_delivery_composite) as render:
+            result = normalize_broll.normalize_plan(
+                self.plan_path, self.timeline_path, self.root,
+                lut=self.selected_lut_path, review_video=review_video,
+            )
 
         shot = result["shots"][0]
         normalized = shot["normalized"]
+        self.assertEqual(
+            normalize_broll.delivery_encoder_args(),
+            render.call_args.kwargs["delivery_encoder_args"],
+        )
         self.assertEqual("normalized", shot["status"])
         self.assertEqual("cache/b-roll/normalized/broll-001.mp4", normalized["path"])
         self.assertEqual(
@@ -4530,6 +6070,14 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
         )
         base = self.root / "work" / normalized["broll_base"]["path"]
         self.assertEqual(normalized["broll_base"]["sha256"], broll_plan.sha256_file(base))
+        self.assertEqual(
+            normalize_broll.INTERMEDIATE_PROFILE,
+            normalized["intermediate_profile"],
+        )
+        self.assertEqual(
+            normalize_broll.INTERMEDIATE_PROFILE,
+            normalized["broll_base"]["intermediate_profile"],
+        )
         self.assertEqual({
             "kind": "speaker-inset",
             "layout_preset": "corner-pip",
@@ -4661,11 +6209,13 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
     def test_base_render_failure_preserves_existing_speaker_composite(self):
         approved, _, _, _, _, review_video = self._approved_speaker_plan()
         projectlib.write_json(self.plan_path, approved)
-        normalize_broll.normalize_plan(
+        normalized = normalize_broll.normalize_plan(
             self.plan_path, self.timeline_path, self.root,
             lut=self.selected_lut_path, review_video=review_video,
         )
         published_bytes = self.output.read_bytes()
+        base_path = self.root / "work" / normalized["shots"][0]["normalized"]["broll_base"]["path"]
+        base_bytes = base_path.read_bytes()
         projectlib.write_json(self.plan_path, approved)
 
         with (
@@ -4681,16 +6231,22 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
             )
 
         self.assertEqual(published_bytes, self.output.read_bytes())
+        self.assertEqual(base_bytes, base_path.read_bytes())
+        self.assertEqual("selected", projectlib.load_json(self.plan_path)["shots"][0]["status"])
         self.assertFalse(self.output.with_suffix(".part.mp4").exists())
+        self.assertFalse(base_path.with_suffix(".part.mp4").exists())
+        self.assertFalse(self.plan_path.with_suffix(".part.json").exists())
+        self.assertFalse(any(self.output.parent.glob("broll-001-segment-*")))
 
     def test_composite_render_failure_preserves_existing_speaker_composite(self):
         approved, _, _, _, _, review_video = self._approved_speaker_plan()
         projectlib.write_json(self.plan_path, approved)
-        normalize_broll.normalize_plan(
+        normalized = normalize_broll.normalize_plan(
             self.plan_path, self.timeline_path, self.root,
             lut=self.selected_lut_path, review_video=review_video,
         )
         published_bytes = self.output.read_bytes()
+        base_path = self.root / "work" / normalized["shots"][0]["normalized"]["broll_base"]["path"]
         projectlib.write_json(self.plan_path, approved)
 
         with (
@@ -4706,7 +6262,12 @@ class NormalizeAndCheckTests(_BrollFixture, unittest.TestCase):
             )
 
         self.assertEqual(published_bytes, self.output.read_bytes())
+        self.assertFalse(base_path.exists())
+        self.assertEqual("selected", projectlib.load_json(self.plan_path)["shots"][0]["status"])
         self.assertFalse(self.output.with_suffix(".part.mp4").exists())
+        self.assertFalse(base_path.with_suffix(".part.mp4").exists())
+        self.assertFalse(self.plan_path.with_suffix(".part.json").exists())
+        self.assertFalse(any(self.output.parent.glob("broll-001-segment-*")))
 
     def test_stale_review_video_preserves_existing_speaker_outputs(self):
         approved, _, _, _, _, review_video = self._approved_speaker_plan()
@@ -5097,7 +6658,7 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
     def test_normalizes_video_to_dimensions_fps_duration_and_no_audio(self):
         candidate, shot = self._video_shot(self._video())
         record = normalize_broll.normalize_shot(candidate, shot, self.timeline, self.output)
-        self.assertEqual(self.output, record["path"])
+        self.assertEqual(self.output.resolve(), record["path"])
         self.assertEqual((96, 54), (record["probe"]["width"], record["probe"]["height"]))
         self.assertEqual({"num": 30000, "den": 1001}, record["probe"]["fps"])
         self.assertEqual("1:1", record["probe"]["sar"])
@@ -5205,7 +6766,7 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
             int(json.loads(probe.stdout)["streams"][0]["nb_read_frames"]),
         )
 
-    def test_fixed_speed_segments_normalize_individually_and_hard_concat(self):
+    def test_fixed_speed_segments_use_source_direct_hard_concat(self):
         frame = 1001 / 30000
         boundary = 15 * frame
         shot_end = 30 * frame
@@ -5255,23 +6816,29 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
             )
 
         self.assertEqual("canonical", result["selection_format"])
-        self.assertEqual(2, len(result["segments"]))
-        self.assertEqual(result["sha256"], result["concat_sha256"])
+        self.assertEqual(normalize_broll.INTERMEDIATE_PROFILE, result["intermediate_profile"])
+        self.assertEqual(2, len(result["source_segments"]))
+        self.assertNotIn("segments", result)
+        self.assertNotIn("concat_sha256", result)
         self.assertAlmostEqual(shot_end, result["probe"]["duration_s"], delta=frame)
         self.assertFalse(result["probe"]["has_audio"])
-        for index, segment in enumerate(result["segments"], 1):
-            self.assertTrue((self.output.parent / f"broll-001-segment-{index:02d}.mp4").is_file())
+        for index, segment in enumerate(result["source_segments"], 1):
+            self.assertFalse((self.output.parent / f"broll-001-segment-{index:02d}.mp4").exists())
             self.assertEqual(shot["selected"]["segments"][index - 1], segment["segment"])
-            self.assertEqual(segment["normalized_sha256"], broll_plan.sha256_file(
-                self.output.parent / f"broll-001-segment-{index:02d}.mp4"
-            ))
-        filters = [command[command.index("-vf") + 1] for command in commands
-                   if command[0] == "ffmpeg" and "-vf" in command]
-        self.assertTrue(any("/0.5" in value for value in filters))
-        self.assertTrue(any("/2" in value for value in filters))
-        self.assertTrue(any("concat=n=2:v=1:a=0" in " ".join(command) for command in commands))
+        render = next(
+            command for command in commands
+            if command[0] == "ffmpeg" and "-filter_complex" in command
+        )
+        filters = render[render.index("-filter_complex") + 1]
+        self.assertIn("/0.5", filters)
+        self.assertIn("/2", filters)
+        self.assertIn("concat=n=2:v=1:a=0", filters)
+        self.assertEqual(1, sum(
+            command[0] == "ffmpeg" and "-filter_complex" in command
+            for command in commands
+        ))
 
-    def test_multisegment_resume_reuses_verified_component_without_partial_plan_publish(self):
+    def test_multisegment_retry_rebuilds_whole_shot_without_component_state(self):
         frame = 1001 / 30000
         boundary, shot_end = 30 * frame, 60 * frame
         plan = copy.deepcopy(self.base_plan)
@@ -5312,40 +6879,161 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
             timeline=self.timeline,
         )
         projectlib.write_json(self.plan_path, approved)
-        real_normalize = normalize_broll.normalize_shot
+        real_normalize = normalize_broll.normalize_selection
 
-        def fail_second(candidate, *args, **kwargs):
-            if candidate["id"] == "asset-2":
-                raise RuntimeError("second segment failed")
-            return real_normalize(candidate, *args, **kwargs)
-
-        with mock.patch.object(normalize_broll, "normalize_shot", side_effect=fail_second):
-            with self.assertRaisesRegex(RuntimeError, "second segment failed"):
+        with mock.patch.object(
+                normalize_broll, "normalize_selection",
+                side_effect=RuntimeError("shot filtergraph failed")):
+            with self.assertRaisesRegex(RuntimeError, "shot filtergraph failed"):
                 normalize_broll.normalize_plan(
                     self.plan_path, self.timeline_path, self.root, lut=self.selected_lut_path,
                 )
         self.assertEqual("selected", projectlib.load_json(self.plan_path)["shots"][0]["status"])
         self.assertFalse(self.output.exists())
-        first_component = self.output.parent / "broll-001-segment-01.mp4"
-        self.assertTrue(first_component.is_file())
-        first_hash = broll_plan.sha256_file(first_component)
+        self.assertFalse(self.output.with_suffix(".part.mp4").exists())
+        self.assertFalse(self.plan_path.with_suffix(".part.json").exists())
+        self.assertFalse(any(self.output.parent.glob("broll-001-segment-*")))
 
-        with mock.patch.object(normalize_broll, "normalize_shot", wraps=real_normalize) as render:
+        with mock.patch.object(
+                normalize_broll, "normalize_selection", wraps=real_normalize) as render:
             updated = normalize_broll.normalize_plan(
                 self.plan_path, self.timeline_path, self.root, lut=self.selected_lut_path,
             )
         self.assertEqual(1, render.call_count)
-        self.assertEqual("asset-2", render.call_args.args[0]["id"])
-        self.assertEqual(first_hash, broll_plan.sha256_file(first_component))
+        self.assertEqual(["asset", "asset-2"], [
+            candidate["id"] for candidate in render.call_args.args[0]
+        ])
         self.assertEqual("normalized", updated["shots"][0]["status"])
-        self.assertEqual(2, len(updated["shots"][0]["normalized"]["segments"]))
+        self.assertEqual(2, len(updated["shots"][0]["normalized"]["source_segments"]))
+        self.assertNotIn("segments", updated["shots"][0]["normalized"])
         verified, artifacts = check_broll.verify_plan(
             self.plan_path, self.timeline_path, self.root, review_video,
         )
         summary = artifacts["summary"].read_text(encoding="utf-8")
         self.assertEqual("verified", verified["shots"][0]["status"])
-        for text in ("Segment 1", "Segment 2", "asset-2", "Playback rate", "Concat SHA-256"):
+        for text in (
+                "source-direct single-filtergraph", "Intermediate profile",
+                "Source segment 1", "Source segment 2", "asset-2", "Playback rate"):
             self.assertIn(text, summary)
+        self.assertNotIn("Legacy concat SHA-256", summary)
+
+    def test_legacy_component_record_remains_readable_without_new_profile_claim(self):
+        frame = 1001 / 30000
+        boundary, shot_end = 30 * frame, 60 * frame
+        first_source = self._video("legacy-component-1.mp4")
+        second_source = self._video("legacy-component-2.mp4")
+        candidates = []
+        for candidate_id, source in (("first", first_source), ("second", second_source)):
+            candidates.append({
+                "id": candidate_id, "media_type": "video",
+                "cache_path": source.relative_to(self.root / "work").as_posix(),
+                "sha256": broll_plan.sha256_file(source),
+                "probe": {"duration_s": 2.0},
+                "provenance": {"source_type": "local", "license": "owned"},
+            })
+        segments = [{
+            "candidate_id": candidate["id"],
+            "source_range": {"start_s": 0.0, "end_s": boundary},
+            "program_range": {
+                "start_s": index * boundary, "end_s": (index + 1) * boundary,
+            },
+            "playback_rate": 1.0,
+        } for index, candidate in enumerate(candidates)]
+        shot = {
+            "id": "shot", "status": "selected",
+            "program_range": {"start_s": 0.0, "end_s": shot_end},
+            "source_ranges": [{"clip_id": "one", "start_s": 0.0, "end_s": shot_end}],
+            "transcript_evidence": {"words": [{"word": "factory"}]},
+            "candidates": candidates,
+            "selected": {"segments": copy.deepcopy(segments)},
+        }
+        component_records = []
+        for index, (candidate, segment) in enumerate(zip(candidates, segments), 1):
+            component_output = normalize_broll._segment_output(self.output, index)
+            component_shot = {
+                "id": "shot", "status": "selected",
+                "program_range": copy.deepcopy(segment["program_range"]),
+                "candidates": [candidate],
+                "selected": {"segments": [copy.deepcopy(segment)]},
+            }
+            component = normalize_broll.normalize_shot(
+                candidate, component_shot, self.timeline, component_output,
+            )
+            component_records.append({
+                "candidate_id": candidate["id"],
+                "segment": copy.deepcopy(segment),
+                "source_path": component["source_path"],
+                "source_sha256": component["source_sha256"],
+                "normalized_path": component_output.relative_to(
+                    self.root / "work"
+                ).as_posix(),
+                "normalized_sha256": component["sha256"],
+                "probe": copy.deepcopy(component["probe"]),
+                "source_duration_s": boundary,
+                "effective_duration_s": boundary,
+                "program_duration_s": boundary,
+                "playback_rate": 1.0,
+            })
+        subprocess.run([
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-i", str(normalize_broll._segment_output(self.output, 1)),
+            "-i", str(normalize_broll._segment_output(self.output, 2)),
+            "-filter_complex",
+            "[0:v]setpts=PTS-STARTPTS[v0];[1:v]setpts=PTS-STARTPTS[v1];"
+            "[v0][v1]concat=n=2:v=1:a=0[outv]",
+            "-map", "[outv]", "-an", *normalize_broll.delivery_encoder_args(),
+            str(self.output),
+        ], check=True, capture_output=True)
+        probe = normalize_broll._probe(self.output)
+        legacy = {
+            "path": self.output.relative_to(self.root / "work").as_posix(),
+            "selection_format": "canonical",
+            "segments": component_records,
+            "source_paths": [candidate["cache_path"] for candidate in candidates],
+            "source_sha256s": [candidate["sha256"] for candidate in candidates],
+            "sha256": broll_plan.sha256_file(self.output),
+            "concat_sha256": broll_plan.sha256_file(self.output),
+            "probe": probe,
+            "program_duration_s": shot_end,
+        }
+        normalize_broll._validate_normalized(
+            legacy, candidates, shot, self.timeline, self.output.resolve(),
+            self.root.resolve(), {},
+        )
+        self.assertNotIn("intermediate_profile", legacy)
+
+        shot["normalized"] = legacy
+        stage = self.root / "work/cache/b-roll/legacy-summary"
+        destination = self.root / "review/03-b-roll/legacy-summary"
+        stage.mkdir(parents=True)
+        stills = {}
+        for label in ("first", "middle", "last"):
+            still = stage / f"{label}.jpg"
+            still.write_bytes(label.encode("ascii"))
+            stills[label] = still
+        summary_path = self.root / "legacy-summary.md"
+        check_broll._summary(
+            {
+                "timeline_id": "main",
+                "input_hashes": {
+                    "timeline_sha256": "1" * 64,
+                    "review_video_sha256": "2" * 64,
+                },
+                "review": {
+                    "review_id": "legacy-review",
+                    "plan_sha256": "3" * 64,
+                    "candidate_manifest_sha256": "4" * 64,
+                },
+            },
+            [(1, shot, candidates, None)],
+            [(None, None, {"first": 0.0, "middle": boundary, "last": shot_end - frame}, stills)],
+            {}, self.root.resolve(), stage, destination, summary_path,
+        )
+        summary = summary_path.read_text(encoding="utf-8")
+        self.assertIn("legacy component-based", summary)
+        self.assertIn("legacy unrecorded", summary)
+        self.assertIn("Legacy concat SHA-256", summary)
+        self.assertNotIn("source-direct single-filtergraph", summary)
 
     def test_legacy_long_trim_remains_recoverable_and_is_reported(self):
         source = self._video("legacy-long.mp4")
@@ -5610,6 +7298,8 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
             with self.assertRaisesRegex(RuntimeError, "pause after first"):
                 normalize_broll.normalize_plan(self.plan_path, self.timeline_path, self.root, lut=self.selected_lut_path)
         persisted = projectlib.load_json(self.plan_path)
+        persisted_plan_bytes = self.plan_path.read_bytes()
+        first_record_sha256 = persisted["shots"][0]["normalized"]["sha256"]
         first_bytes = self.output.read_bytes()
         second_output = self.output.with_name("broll-002.mp4")
         real_write = projectlib.write_json
@@ -5622,10 +7312,17 @@ check_broll.verify_plan(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
             with self.assertRaisesRegex(OSError, "disk full"):
                 normalize_broll.normalize_plan(self.plan_path, self.timeline_path, self.root, lut=self.selected_lut_path)
         self.assertEqual(persisted, projectlib.load_json(self.plan_path))
+        self.assertEqual(persisted_plan_bytes, self.plan_path.read_bytes())
+        self.assertEqual(
+            first_record_sha256,
+            projectlib.load_json(self.plan_path)["shots"][0]["normalized"]["sha256"],
+        )
+        self.assertEqual("selected", projectlib.load_json(self.plan_path)["shots"][1]["status"])
         self.assertEqual(first_bytes, self.output.read_bytes())
         self.assertFalse(second_output.exists())
         self.assertFalse(second_output.with_suffix(".part.mp4").exists())
         self.assertFalse(self.plan_path.with_suffix(".part.json").exists())
+        self.assertFalse(any(self.output.parent.glob("broll-002-segment-*")))
 
     def test_plan_uses_reviewed_cache_path_not_candidate_path(self):
         reviewed = self.candidates / "reviewed.mp4"

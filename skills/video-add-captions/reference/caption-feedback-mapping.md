@@ -1,9 +1,12 @@
 # Caption Feedback Mapping
 
-This skill is agent-facing. Users first choose an exact gallery combination ID or
-explicitly reply `跳过`; after seeing source-backed preview evidence, they may
-describe adjustments in natural language. The agent maps only that recorded user
-feedback to optional JSON overrides accepted by `scripts/generate_caption_project.mjs`.
+This skill is agent-facing. In the canonical workflow, users choose a style and
+approve or revise source-backed previews by copying structured summaries from the
+bound HTML review pages. Standalone compatibility accepts an exact gallery
+combination ID or `skip`, and accepts `approve` only after source-backed preview
+evidence exists. Historical non-English aliases remain accepted silently but are
+not user instructions. The agent maps only recorded user feedback to optional JSON
+overrides accepted by `scripts/generate_caption_project.mjs`.
 
 ## Safe Edit Points
 
@@ -15,8 +18,9 @@ feedback to optional JSON overrides accepted by `scripts/generate_caption_projec
 - Edit caption cue JSON only when correcting subtitle text or timing data.
 
 The user may skip gallery selection, which explicitly chooses `clean`. The
-source-backed preview confirmation cannot be skipped. Full rendering requires the
-exact recorded response `确认渲染`.
+source-backed preview confirmation cannot be skipped. Canonical full rendering
+requires the exact copied approval summary; standalone compatibility requires the
+exact public response `approve`.
 
 ## Official Style Vocabulary
 

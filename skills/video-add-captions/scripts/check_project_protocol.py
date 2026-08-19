@@ -178,14 +178,33 @@ def check_expressive_caption_plan():
     del complete["cues"][0]["words"][0]["semantic_role"]
     complete["cues"][1]["words"][1]["semantic_role"] = "number"
     complete["cues"][2]["words"][0]["semantic_role"] = "keyword"
+    complete["cues"][0]["hero_line"] = {
+        "level": "hero",
+        "word_indexes": [1, 2],
+        "rationale": "The opening phrase is the primary conclusion.",
+    }
     summary = build_captions.validate_caption_plan(complete, require_complete=True)
     assert summary == {
         "mode": "expressive",
         "planning_status": "complete",
         "cue_count": 3,
         "layout_beat_count": 3,
+        "hero_line_count": 1,
     }
     assert build_captions.validate_caption_plan(standard["cues"], require_complete=True)["mode"] == "standard"
+    spatial_binding = {
+        "policy": "composite-aware",
+        "path": "captions/caption-spatial-context.json",
+        "sha256": "a" * 64,
+        "source_operation": "b-roll",
+        "source_revision": 4,
+    }
+    bound_standard = copy.deepcopy(standard)
+    bound_standard["spatial_context"] = copy.deepcopy(spatial_binding)
+    assert build_captions.validate_caption_plan(bound_standard, require_complete=True)["mode"] == "standard"
+    bound_complete = copy.deepcopy(complete)
+    bound_complete["spatial_context"] = copy.deepcopy(spatial_binding)
+    assert build_captions.validate_caption_plan(bound_complete, require_complete=True)["hero_line_count"] == 1
 
     def assert_invalid(mutator, message):
         candidate = copy.deepcopy(complete)
@@ -237,6 +256,68 @@ def check_expressive_caption_plan():
         lambda plan: plan["presentation"]["layout_beats"][1].update(id="layout-beat-001"),
         "duplicate layout beat id",
     )
+    assert_invalid(
+        lambda plan: plan["cues"][0]["hero_line"].update(level="large"),
+        "hero_line level",
+    )
+    assert_invalid(
+        lambda plan: plan["cues"][0]["hero_line"].update(word_indexes=[]),
+        "hero_line word_indexes",
+    )
+    assert_invalid(
+        lambda plan: plan["cues"][0]["hero_line"].update(word_indexes=[1, 3]),
+        "hero_line word_indexes",
+    )
+    assert_invalid(
+        lambda plan: plan["cues"][0]["hero_line"].update(word_indexes=[2, 2]),
+        "hero_line word_indexes",
+    )
+    assert_invalid(
+        lambda plan: plan["cues"][0]["hero_line"].update(word_indexes=[0]),
+        "hero_line word_indexes",
+    )
+    assert_invalid(
+        lambda plan: plan["cues"][0]["hero_line"].update(word_indexes=[3]),
+        "hero_line word_indexes",
+    )
+    assert_invalid(
+        lambda plan: plan["cues"][0]["hero_line"].update(rationale="  "),
+        "hero_line rationale",
+    )
+    assert_invalid(
+        lambda plan: plan["cues"][0].update(hero_lines=[plan["cues"][0].pop("hero_line")]),
+        "hero_lines",
+    )
+    assert_invalid(
+        lambda plan: plan.update(spatial_context={**spatial_binding, "sha256": "ABC"}),
+        "spatial_context sha256",
+    )
+
+    standard_with_hero = copy.deepcopy(standard)
+    standard_with_hero["cues"][0]["hero_line"] = {
+        "level": "strong",
+        "word_indexes": [1],
+        "rationale": "Not allowed in Standard.",
+    }
+    try:
+        build_captions.validate_caption_plan(standard_with_hero, require_complete=True)
+    except ValueError as error:
+        assert "hero_line" in str(error), str(error)
+    else:
+        raise AssertionError("Standard plan carrying hero_line must fail")
+
+    legacy_with_hero = copy.deepcopy(standard["cues"])
+    legacy_with_hero[0]["hero_line"] = {
+        "level": "strong",
+        "word_indexes": [1],
+        "rationale": "Not allowed in a legacy cue array.",
+    }
+    try:
+        build_captions.validate_caption_plan(legacy_with_hero, require_complete=True)
+    except ValueError as error:
+        assert "hero_line" in str(error), str(error)
+    else:
+        raise AssertionError("legacy cue array carrying hero_line must fail")
 
     with tempfile.TemporaryDirectory(prefix="caption-top-layout-python-") as temporary:
         invalid_path = Path(temporary) / "top-statement.json"
@@ -285,6 +366,11 @@ def check_presentation_renderer_modes():
             "program_duration_s": 5,
             "cues": cues,
         }), encoding="utf-8")
+        cues[2]["hero_line"] = {
+            "level": "strong",
+            "word_indexes": [1, 2],
+            "rationale": "The closing phrase is the fixture hero line.",
+        }
         expressive_plan = root / "expressive.json"
         expressive_plan.write_text(json.dumps({
             "schema_version": 1,
@@ -435,6 +521,13 @@ def check_presentation_renderer_modes():
         expressive_on_html, expressive_on_meta = generate(
             "expressive-on", expressive_plan, "clean", True, expressive_overrides,
         )
+        canonical_hero_plan = root / "expressive-canonical-hero.json"
+        canonical_hero_data = json.loads(expressive_plan.read_text(encoding="utf-8"))
+        canonical_hero_data["cues"][2]["hero_line"]["level"] = "hero"
+        canonical_hero_plan.write_text(json.dumps(canonical_hero_data), encoding="utf-8")
+        canonical_hero_html, canonical_hero_meta = generate(
+            "expressive-canonical-hero", canonical_hero_plan, "clean", False, expressive_overrides,
+        )
         standard_overlay_off_html, standard_overlay_off_meta = generate(
             "standard-overlay-off", standard_plan, "clean", mode="overlay",
         )
@@ -473,6 +566,10 @@ def check_presentation_renderer_modes():
             assert "expressive-cue" not in html
             assert "data-layout-beat-id" not in html
             assert "semantic-keyword" not in html
+            assert "placement-" not in html
+            assert "spatialContext" not in html
+            assert 'class="caption-cue clip" data-start=' in html
+            assert 'class="caption-word">Keep</span>' in html
         assert standard_off_meta["selection"]["karaoke"] is False
         assert standard_on_meta["selection"]["karaoke"] is True
         assert standard_overlay_off_meta["selection"]["karaoke"] is False
@@ -491,6 +588,19 @@ def check_presentation_renderer_modes():
         for role in ("semantic-keyword", "semantic-number", "semantic-contrast"):
             assert role in expressive_off_html
             assert role in expressive_on_html
+        for role in ("keyword", "number", "contrast"):
+            assert f'class="caption-word semantic-{role}"' in expressive_off_html
+            assert "--semantic-scale:1.22" in expressive_off_html
+        assert expressive_off_html.count('class="caption-hero-line hero-level-strong"') == 1
+        assert expressive_on_html.count('class="caption-hero-line hero-level-strong"') == 1
+        assert canonical_hero_html.count('class="caption-hero-line hero-level-hero"') == 1
+        assert 'data-hero-level="strong"' in expressive_off_html
+        assert 'data-hero-level="hero"' in canonical_hero_html
+        assert "color: #F4C542;" in expressive_off_html
+        assert "font-size: 1.5em;" in expressive_off_html
+        assert ".hero-level-strong {" not in expressive_off_html
+        assert ".hero-level-hero {" not in expressive_off_html
+        assert "--semantic-scale:1;--semantic-color:#F4C542" in expressive_off_html
         assert expressive_off_meta["selection"]["karaoke"] is False
         assert expressive_on_meta["selection"]["karaoke"] is True
         assert expressive_approved_off_meta["selection"]["karaoke"] is False
@@ -500,6 +610,14 @@ def check_presentation_renderer_modes():
         assert expressive_off_meta["presentation"]["coexistenceMode"] == "semantic-only"
         assert expressive_on_meta["presentation"]["coexistenceMode"] == "semantic-plus-karaoke"
         assert expressive_off_meta["presentation"]["layoutBeats"] == expressive_on_meta["presentation"]["layoutBeats"]
+        assert expressive_off_meta["presentation"]["heroLines"] == [{
+            "cueIndex": 3, "level": "strong", "wordIndexes": [1, 2],
+        }]
+        assert canonical_hero_meta["presentation"]["heroLines"] == [{
+            "cueIndex": 3, "level": "hero", "wordIndexes": [1, 2],
+        }]
+        assert expressive_off_meta["expressiveTreatments"]["value"]["heroLine"]["levels"]["hero"]["scale"] == 1.5
+        assert expressive_off_meta["expressiveTreatments"]["value"]["heroLine"]["canonicalLevel"] == "hero"
         assert expressive_off_meta["resolvedStyle"] == expressive_on_meta["resolvedStyle"]
         assert expressive_on_meta["presentation"]["combinedScaleRule"].startswith("effective scale = max")
         generator_source = generator.read_text(encoding="utf-8")

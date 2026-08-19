@@ -16,6 +16,7 @@ Usage:
 """
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -29,6 +30,7 @@ MIN_CUE_DUR = 0.6   # cues shorter than this (or 1 token) are merged into a neig
 PRESENTATION_MODES = {"standard", "expressive"}
 LAYOUT_VARIANTS = {"bottom-standard", "center-emphasis"}
 SEMANTIC_ROLES = {"normal", "keyword", "number", "contrast"}
+HERO_LINE_LEVELS = {"strong", "hero"}
 
 def _cjk(ch):
     return ("一" <= ch <= "鿿" or "぀" <= ch <= "ヿ"
@@ -196,10 +198,67 @@ def _same_time(left, right):
     return _is_number(left) and _is_number(right) and abs(float(left) - float(right)) <= 1e-6
 
 
+def _reject_non_expressive_hero_lines(cues, mode):
+    for position, cue in enumerate(cues, 1):
+        if not isinstance(cue, dict):
+            continue
+        if "hero_lines" in cue:
+            raise ValueError(f"cue at position {position} uses unsupported hero_lines; use one hero_line")
+        if "hero_line" in cue:
+            raise ValueError(f"{mode} cue at position {position} must not contain hero_line")
+
+
+def _validate_hero_line(cue, cue_index):
+    if "hero_lines" in cue:
+        raise ValueError(f"cue index {cue_index} uses unsupported hero_lines; use one hero_line")
+    hero_line = cue.get("hero_line")
+    if hero_line is None:
+        return False
+    if not isinstance(hero_line, dict):
+        raise ValueError(f"cue index {cue_index} hero_line must be an object")
+    if hero_line.get("level") not in HERO_LINE_LEVELS:
+        raise ValueError(f"cue index {cue_index} hero_line level must be strong or hero")
+    word_indexes = hero_line.get("word_indexes")
+    if not isinstance(word_indexes, list) or not word_indexes:
+        raise ValueError(f"cue index {cue_index} hero_line word_indexes must be a non-empty array")
+    if any(not isinstance(value, int) or isinstance(value, bool) for value in word_indexes):
+        raise ValueError(f"cue index {cue_index} hero_line word_indexes must contain integers")
+    if word_indexes != list(range(word_indexes[0], word_indexes[-1] + 1)):
+        raise ValueError(f"cue index {cue_index} hero_line word_indexes must be unique, ordered, and contiguous")
+    words = cue.get("words", [])
+    if word_indexes[0] < 1 or word_indexes[-1] > len(words):
+        raise ValueError(f"cue index {cue_index} hero_line word_indexes are outside the cue words")
+    rationale = hero_line.get("rationale")
+    if not isinstance(rationale, str) or not rationale.strip() or "\n" in rationale or "\r" in rationale:
+        raise ValueError(f"cue index {cue_index} hero_line rationale must be non-empty single-line text")
+    return True
+
+
+def _validate_spatial_binding(plan):
+    binding = plan.get("spatial_context")
+    if binding is None:
+        return
+    if not isinstance(binding, dict):
+        raise ValueError("spatial_context must be an object")
+    required = {"policy", "path", "sha256", "source_operation", "source_revision"}
+    if set(binding) != required:
+        raise ValueError("spatial_context binding fields are invalid")
+    if binding.get("policy") != "composite-aware" or binding.get("source_operation") != "b-roll":
+        raise ValueError("spatial_context policy/source operation is invalid")
+    if not isinstance(binding.get("path"), str) or not binding["path"].strip():
+        raise ValueError("spatial_context path must be non-empty")
+    if not isinstance(binding.get("sha256"), str) or not re.fullmatch(r"[0-9a-f]{64}", binding["sha256"]):
+        raise ValueError("spatial_context sha256 must be 64 lowercase hex characters")
+    revision = binding.get("source_revision")
+    if not isinstance(revision, int) or isinstance(revision, bool) or revision <= 0:
+        raise ValueError("spatial_context source_revision must be a positive integer")
+
+
 def validate_caption_plan(plan, *, require_complete=False):
     if isinstance(plan, list):
         if not plan:
             raise ValueError("legacy top-level cue array must not be empty")
+        _reject_non_expressive_hero_lines(plan, "legacy")
         return {"mode": "standard", "cue_count": len(plan), "layout_beat_count": 0}
     if not isinstance(plan, dict):
         raise ValueError("caption plan must be an object or a legacy top-level cue array")
@@ -207,8 +266,10 @@ def validate_caption_plan(plan, *, require_complete=False):
     cues = plan.get("cues")
     if not isinstance(cues, list) or not cues:
         raise ValueError("canonical caption plan must contain a non-empty cues array")
+    _validate_spatial_binding(plan)
     presentation = plan.get("presentation")
     if presentation is None:
+        _reject_non_expressive_hero_lines(cues, "standard")
         return {"mode": "standard", "cue_count": len(cues), "layout_beat_count": 0}
     if not isinstance(presentation, dict):
         raise ValueError("presentation must be an object")
@@ -217,6 +278,7 @@ def validate_caption_plan(plan, *, require_complete=False):
     if mode not in PRESENTATION_MODES:
         raise ValueError("presentation mode must be standard or expressive")
     if mode == "standard":
+        _reject_non_expressive_hero_lines(cues, "standard")
         return {"mode": "standard", "cue_count": len(cues), "layout_beat_count": 0}
     if presentation.get("schema_version") != 1:
         raise ValueError("expressive presentation schema_version must be 1")
@@ -225,6 +287,7 @@ def validate_caption_plan(plan, *, require_complete=False):
     cue_positions = {}
     cue_indices = set()
     previous_index = 0
+    hero_line_count = 0
     for position, cue in enumerate(cues):
         if not isinstance(cue, dict):
             raise ValueError(f"cue at position {position + 1} must be an object")
@@ -259,6 +322,7 @@ def validate_caption_plan(plan, *, require_complete=False):
                 raise ValueError(
                     f"cue index {cue_index} word {word_index} has invalid semantic_role: {semantic_role}"
                 )
+        hero_line_count += int(_validate_hero_line(cue, cue_index))
 
     planning_status = presentation.get("planning_status")
     if planning_status not in {"draft", "complete"}:
@@ -351,6 +415,7 @@ def validate_caption_plan(plan, *, require_complete=False):
         "planning_status": planning_status,
         "cue_count": len(cues),
         "layout_beat_count": len(layout_beats),
+        "hero_line_count": hero_line_count,
     }
 
 

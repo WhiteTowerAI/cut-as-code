@@ -22,6 +22,8 @@ export const cloneValue = (value) => {
   return value;
 };
 
+export const captionExpressiveTreatments = Object.freeze(cloneValue(config.expressiveTreatments));
+
 export const mergeDeep = (base, overrides) => {
   const output = cloneValue(base);
   if (!overrides) {

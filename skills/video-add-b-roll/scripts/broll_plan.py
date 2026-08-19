@@ -1,10 +1,13 @@
 """Validate B-roll plans and record review decisions."""
 
+import base64
+import binascii
 import copy
 import hashlib
 import json
 import math
 import os
+import re
 import sys
 import tempfile
 import uuid
@@ -22,6 +25,7 @@ DYNAMIC_SOCIAL_MIN_RATIO = 0.40
 DYNAMIC_SOCIAL_MAX_RATIO = 0.70
 KEN_BURNS_DIRECTIONS = {"zoom-in", "pan-left", "pan-right"}
 HUMAN_APPROVAL_RATIONALE = "Explicit user action approved the exact configuration shown in this review."
+HUMAN_SELECTION_APPROVAL_RATIONALE = "Explicit user action approved the exact B-roll selection shown in this review."
 HUMAN_PREPARE_COMPOSITE_RATIONALE = "Explicit user action locked the exact B-roll selection for composite preview."
 REVIEW_INTENTS = {"approve", "request_revision"}
 PRESENTATION_MODES = {"ordinary", "speaker-inset"}
@@ -37,6 +41,7 @@ SPEAKER_VISUAL_REVIEW_CHECKS = (
 PEXELS_LICENSE_URL = "https://www.pexels.com/license/"
 PEXELS_TERMS_URL = "https://www.pexels.com/terms-of-service/"
 _INVALID_NUMBER = object()
+REVIEW_PAGE_PAYLOAD_RE = re.compile(r"atob\('([^']+)'\)")
 
 
 def sha256_file(path):
@@ -362,7 +367,7 @@ def candidate_manifest(plan):
 def review_subject(plan):
     value = copy.deepcopy(plan)
     receipt = value.get("review")
-    receipt_ids = receipt.get("decision_skipped_shot_ids", []) if isinstance(receipt, dict) and receipt.get("status") == "approved" else []
+    receipt_ids = receipt.get("decision_skipped_shot_ids", []) if (isinstance(receipt, dict) and receipt.get("status") == "approved" and receipt.get("review_stage") != "composite") else []
     decision_skipped_ids = set(receipt_ids) if isinstance(receipt_ids, list) and all(isinstance(shot_id, str) for shot_id in receipt_ids) else set()
 
     def clean(item):
@@ -435,6 +440,9 @@ def presentation_errors(plan, *, project_root=None, required=False):
         errors.append("presentation decision path is invalid")
     if not _is_sha256(presentation.get("sha256")):
         errors.append("presentation decision SHA-256 is invalid")
+    carried_from = presentation.get("carried_from_plan_sha256")
+    if carried_from is not None and not _is_sha256(carried_from):
+        errors.append("presentation carried plan SHA-256 is invalid")
     if mode == "speaker-inset":
         style = plan.get("speaker_inset_style")
         if not speaker_inset.style_enabled(style) or speaker_inset.style_errors(style):
@@ -457,6 +465,11 @@ def presentation_errors(plan, *, project_root=None, required=False):
         return errors + ["presentation decision artifact is invalid"]
     if not isinstance(receipt, dict):
         return errors + ["presentation decision artifact must be an object"]
+    current_plan_sha256 = canonical_sha256(presentation_subject(plan))
+    receipt_plan_sha256 = receipt.get("plan_sha256")
+    if (receipt_plan_sha256 != current_plan_sha256
+            and (carried_from is None or receipt_plan_sha256 != carried_from)):
+        errors.append("presentation decision plan_sha256 does not match")
     expected = {
         "schema_version": 1,
         "status": "chosen",
@@ -467,7 +480,6 @@ def presentation_errors(plan, *, project_root=None, required=False):
         "actor": presentation.get("actor"),
         "timestamp": presentation.get("timestamp"),
         "presentation_mode": mode,
-        "plan_sha256": canonical_sha256(presentation_subject(plan)),
         "candidate_manifest_sha256": canonical_sha256(candidate_manifest(plan)),
         "review_video_sha256": plan.get("input_hashes", {}).get("review_video_sha256"),
     }
@@ -648,10 +660,15 @@ def _review_errors(plan, shots):
     if not isinstance(decision, dict) or not isinstance(review, dict): return errors
     if review.get("status") != "approved": errors.append("review status must be approved")
     persisted_intent = review.get("submission_intent")
-    if persisted_intent is not None and persisted_intent != "approve":
-        errors.append("approved review submission_intent must be approve")
-    if persisted_intent == "approve" and (not isinstance(review.get("revision_notes"), str) or review["revision_notes"].strip()):
+    if persisted_intent is not None and persisted_intent not in {"approve", "approve_selection"}:
+        errors.append("approved review submission_intent is invalid")
+    if persisted_intent in {"approve", "approve_selection"} and (
+            not isinstance(review.get("revision_notes"), str)
+            or review["revision_notes"].strip()):
         errors.append("approved review revision_notes must be empty")
+    if (persisted_intent == "approve_selection"
+            and review.get("approval_scope") != "b-roll-selection"):
+        errors.append("approved selection review scope is invalid")
     if not isinstance(review.get("review_id"), str) or not review["review_id"].strip(): errors.append("review_id is required")
     elif not _is_uuid(review["review_id"]): errors.append("review_id must be a UUID")
     mode, actor, rationale = decision.get("mode"), decision.get("actor"), decision.get("rationale")
@@ -665,8 +682,13 @@ def _review_errors(plan, shots):
     if not _valid_timestamp(review.get("timestamp")): errors.append("review timestamp is invalid")
     if mode == "human" and (decision.get("explicit_user_action") is not True or review.get("explicit_user_action") is not True):
         errors.append("human review requires explicit_user_action true")
-    if persisted_intent == "approve" and mode == "human":
-        if rationale != HUMAN_APPROVAL_RATIONALE:
+    if persisted_intent in {"approve", "approve_selection"} and mode == "human":
+        expected_rationale = (
+            HUMAN_SELECTION_APPROVAL_RATIONALE
+            if persisted_intent == "approve_selection"
+            else HUMAN_APPROVAL_RATIONALE
+        )
+        if rationale != expected_rationale:
             errors.append("new human review rationale must describe the explicit UI action")
         if (decision.get("rationale_source") != "review_ui_explicit_action"
                 or review.get("rationale_source") != "review_ui_explicit_action"):
@@ -735,6 +757,39 @@ def _review_errors(plan, shots):
     return errors
 
 
+def _ordinary_source_review_errors(plan, *, project_root=None, verify_files=False):
+    review = plan.get("review") if isinstance(plan, dict) else None
+    if (not isinstance(review, dict)
+            or review.get("submission_intent") != "approve"
+            or review.get("review_stage") == "composite"):
+        return []
+    source = review.get("source_review")
+    if not isinstance(source, dict):
+        return ["approved review source page is invalid"]
+    if (not _is_uuid(source.get("review_id"))
+            or source.get("review_id") != review.get("review_id")
+            or source.get("consumed") is not True):
+        return ["approved review source page is invalid"]
+    path_value = source.get("path")
+    if (not isinstance(path_value, str)
+            or path_value != f"review/03-b-roll/b-roll-review-{review['review_id']}.html"
+            or not _is_sha256(source.get("sha256"))):
+        return ["approved review source page binding is invalid"]
+    if not verify_files:
+        return []
+    if project_root is None:
+        return ["approved review page verification requires project root"]
+    root = Path(project_root).resolve()
+    page = (root / path_value).resolve()
+    try:
+        page.relative_to((root / "review/03-b-roll").resolve())
+    except ValueError:
+        return ["approved review page path is invalid"]
+    if not page.is_file() or sha256_file(page) != source["sha256"]:
+        return ["approved review page is missing or stale"]
+    return []
+
+
 def _speaker_artifact_binding_errors(plan, shots):
     style = plan.get("speaker_inset_style")
     enabled = speaker_inset.style_enabled(style)
@@ -777,7 +832,7 @@ def _speaker_artifact_binding_errors(plan, shots):
             errors.append(f"speaker_inset {name} SHA-256 is invalid")
     selection = plan.get("selection")
     if isinstance(selection, dict) and selection.get("style_sha256") != canonical_sha256(style):
-        errors.append("prepared selection speaker inset style SHA-256 is stale")
+        errors.append("approved selection speaker inset style SHA-256 is stale")
     return errors
 
 
@@ -1630,22 +1685,65 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
                 errors.append(f"{shot_id} speaker inset verification composition SHA-256 is stale")
         elif "verification" in shot:
             errors.append(f"{shot_id} {status} shot must not carry verification")
-    if any(isinstance(shot, dict) and shot.get("status") == "composite_pending" for shot in shots):
-        if not speaker_inset.style_enabled(style):
-            errors.append("composite_pending shots require enabled speaker_inset_style")
-        selection = plan.get("selection")
-        if not isinstance(selection, dict) or selection.get("status") != "prepared":
-            errors.append("composite_pending shots require a prepared selection")
+    composite_pending = any(
+        isinstance(shot, dict) and shot.get("status") == "composite_pending"
+        for shot in shots
+    )
+    selection = plan.get("selection")
+    if composite_pending and not speaker_inset.style_enabled(style):
+        errors.append("composite_pending shots require enabled speaker_inset_style")
+    if composite_pending or selection is not None:
+        if not isinstance(selection, dict) or selection.get("status") != "approved":
+            errors.append("composite_pending shots require an approved selection")
+        elif selection.get("submission_intent") != "approve_selection":
+            errors.append("approved selection submission_intent is invalid")
+        elif selection.get("approval_scope") != "b-roll-selection":
+            errors.append("approved selection scope is invalid")
+        elif selection.get("consumed") is not True:
+            errors.append("approved selection review page must be consumed")
         elif not _is_sha256(selection.get("sha256")):
-            errors.append("prepared selection SHA-256 is invalid")
+            errors.append("approved selection SHA-256 is invalid")
         elif selection.get("path") != "b-roll/broll-selection.json":
-            errors.append("prepared selection path is invalid")
+            errors.append("approved selection path is invalid")
         elif verify_files and project_root:
             selection_path = Path(project_root).resolve() / "work" / selection["path"]
             if not selection_path.is_file():
-                errors.append("prepared selection file is missing")
+                errors.append("approved selection file is missing")
             elif sha256_file(selection_path) != selection["sha256"]:
-                errors.append("prepared selection SHA-256 is stale")
+                errors.append("approved selection SHA-256 is stale")
+            else:
+                try:
+                    selection_receipt = projectlib.load_json(selection_path)
+                except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                    errors.append("approved selection receipt is invalid")
+                else:
+                    for field in (
+                            "status", "submission_intent", "approval_scope",
+                            "review_id", "style_sha256"):
+                        if selection_receipt.get(field) != selection.get(field):
+                            errors.append(f"approved selection {field} does not match receipt")
+                    source_review = selection_receipt.get("source_review")
+                    if not isinstance(source_review, dict) or source_review.get("consumed") is not True:
+                        errors.append("approved selection source review is invalid")
+                    elif source_review.get("legacy_page_unbound") is True:
+                        if selection.get("legacy_submission_intent") != "prepare_composite":
+                            errors.append("unbound selection page requires legacy receipt")
+                    else:
+                        page_path = Path(project_root).resolve() / str(source_review.get("path", ""))
+                        try:
+                            page_path.resolve().relative_to(
+                                (Path(project_root).resolve() / "review/03-b-roll").resolve()
+                            )
+                        except ValueError:
+                            errors.append("approved selection review page path is invalid")
+                        else:
+                            page_sha256 = source_review.get("sha256")
+                            if not _is_sha256(page_sha256):
+                                errors.append("approved selection review page SHA-256 is invalid")
+                            elif selection.get("review_page_sha256") != page_sha256:
+                                errors.append("approved selection review page SHA-256 does not match")
+                            elif not page_path.is_file() or sha256_file(page_path) != page_sha256:
+                                errors.append("approved selection review page is missing or stale")
     errors.extend(_speaker_artifact_binding_errors(plan, shots))
     errors.extend(speaker_inset.artifact_errors(
         plan, timeline, transcript,
@@ -1659,6 +1757,9 @@ def validate_plan(plan, timeline, transcript, project=None, project_root=None, v
         plan, shots, project_root=project_root, verify_files=verify_files
     ))
     errors.extend(_review_errors(plan, shots))
+    errors.extend(_ordinary_source_review_errors(
+        plan, project_root=project_root, verify_files=verify_files,
+    ))
     if "visual_review" in plan:
         errors.extend(_visual_review_errors(
             plan, project_root=project_root, verify_files=verify_files
@@ -1859,6 +1960,8 @@ def validate_revision_request(plan, request, timeline, transcript):
     notes = request.get("revision_notes", "")
     if not isinstance(notes, str):
         errors.append("revision_notes must be a string")
+    elif not notes.strip():
+        errors.append("revision_notes must be non-empty")
     input_hashes = plan.get("input_hashes")
     if not isinstance(input_hashes, dict):
         errors.append("plan input_hashes must be an object")
@@ -1950,10 +2053,16 @@ def rebuild_plan_from_revision(plan, request, timeline, transcript):
     result["decision"] = None
     result["review"] = None
     for key in (
-        "candidate_ranking", "presentation", "speaker_inset_style", "selection",
-        "speaker_inset", "review_status", "visual_review",
+        "candidate_ranking", "selection", "speaker_inset", "review_status",
+        "visual_review",
     ):
         result.pop(key, None)
+    presentation = result.get("presentation")
+    if isinstance(presentation, dict):
+        presentation.setdefault(
+            "carried_from_plan_sha256",
+            canonical_sha256(presentation_subject(plan)),
+        )
     for shot in result["shots"]:
         entry = entries[shot["id"]]
         shot.pop("normalized", None)
@@ -1984,7 +2093,88 @@ def rebuild_plan_from_revision(plan, request, timeline, transcript):
     return result
 
 
-def _apply_exact_entries(result, entries, *, timeline, explicit_intent, target_status, action):
+def _candidate_review_page(project_root, review_id, *, presentation_mode,
+                           expected_bindings, timeline):
+    root = Path(project_root).resolve()
+    page = root / "review/03-b-roll" / f"b-roll-review-{review_id}.html"
+    if not page.is_file():
+        raise ValueError("immutable candidate review page is missing")
+    try:
+        document = page.read_text(encoding="utf-8")
+        match = REVIEW_PAGE_PAYLOAD_RE.search(document)
+        if match is None:
+            raise ValueError
+        payload = json.loads(base64.b64decode(match.group(1), validate=True))
+    except (OSError, UnicodeDecodeError, binascii.Error, json.JSONDecodeError, ValueError) as exc:
+        raise ValueError("immutable candidate review page payload is invalid") from exc
+    expected_mode = "selection" if presentation_mode == "speaker-inset" else "standard"
+    expected_page_bindings = {
+        "review_id": review_id,
+        "review_mode": expected_mode,
+        **expected_bindings,
+    }
+    if (not isinstance(payload, dict)
+            or any(payload.get(field) != expected
+                   for field, expected in expected_page_bindings.items())
+            or not isinstance(payload.get("timeline"), dict)
+            or payload["timeline"].get("fps") != timeline.get("fps")):
+        raise ValueError("immutable candidate review page binding is invalid")
+    return page
+
+
+def _preflight_page_approval(plan, review_id, *, timeline, transcript,
+                             project_root, presentation_mode):
+    if not isinstance(timeline, dict):
+        raise ValueError("explicit page approval requires the canonical timeline")
+    if not isinstance(transcript, dict):
+        raise ValueError("explicit page approval requires the canonical transcript")
+    if project_root is None:
+        raise ValueError("explicit page approval requires the project root")
+    root = Path(project_root).resolve()
+    for name, value, path in (
+            ("timeline", timeline, root / "work/timeline.json"),
+            ("transcript", transcript, root / "work/understand/transcript.json")):
+        try:
+            canonical = projectlib.load_json(path)
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError(f"canonical {name} file is missing or invalid") from exc
+        if value != canonical:
+            raise ValueError(f"canonical {name} does not match project file")
+    presentation_validation = presentation_errors(
+        plan, project_root=root, required=True,
+    )
+    if presentation_validation:
+        raise ValueError(
+            "invalid presentation decision: " + "; ".join(presentation_validation)
+        )
+    if plan["presentation"]["mode"] != presentation_mode:
+        raise ValueError(
+            f"explicit page approval requires {presentation_mode} presentation"
+        )
+    errors = validate_plan(
+        plan, timeline, transcript, project_root=root, verify_files=True,
+    )
+    if errors:
+        raise ValueError("invalid approval source plan: " + "; ".join(errors))
+    expected_bindings = {
+        "plan_sha256": canonical_sha256(review_subject(plan)),
+        "candidate_manifest_sha256": canonical_sha256(candidate_manifest(plan)),
+        "review_video_sha256": plan["input_hashes"]["review_video_sha256"],
+    }
+    page = _candidate_review_page(
+        root, review_id, presentation_mode=presentation_mode,
+        expected_bindings=expected_bindings, timeline=timeline,
+    )
+    return root, {
+        "review_id": review_id,
+        "path": page.relative_to(root).as_posix(),
+        "sha256": sha256_file(page),
+        "consumed": True,
+    }
+
+
+def _apply_exact_entries(result, entries, *, timeline, transcript=None,
+                         explicit_intent, target_status, action):
     shots = {shot.get("id"): shot for shot in result["shots"]}
     seen = set()
     for entry in entries:
@@ -2001,6 +2191,68 @@ def _apply_exact_entries(result, entries, *, timeline, explicit_intent, target_s
         raise ValueError("review is missing shots: " + ", ".join(missing))
 
     entries_by_id = {entry["id"]: entry for entry in entries}
+    approved_ranges = {}
+    approved_source_ranges = {}
+    approved_words = {}
+    editable_approval = explicit_intent and transcript is not None
+    if editable_approval:
+        if not isinstance(timeline, dict):
+            raise ValueError("explicit page approval requires the canonical timeline")
+        if not isinstance(transcript, dict):
+            raise ValueError("explicit page approval requires the canonical transcript")
+        frame = timeline_frame_duration(timeline)
+        mapped_words = _mapped_word_records(transcript, timeline)
+        for shot in result["shots"]:
+            entry = entries_by_id[shot["id"]]
+            if entry.get("decision") != "select":
+                continue
+            program = _range(entry.get("program_range"))
+            if not program or program[1] <= program[0]:
+                raise ValueError(f"{shot['id']} approve program_range is invalid")
+            bounds = revision_program_bounds(result, timeline, shot["id"])
+            if (program[0] < bounds["start_s"]["min"] - RANGE_EPSILON
+                    or program[0] > bounds["start_s"]["max"] + RANGE_EPSILON
+                    or program[1] < bounds["end_s"]["min"] - RANGE_EPSILON
+                    or program[1] > bounds["end_s"]["max"] + RANGE_EPSILON):
+                raise ValueError(f"{shot['id']} approved program range is outside allowed bounds")
+            if program[1] - program[0] + RANGE_EPSILON < frame:
+                raise ValueError(
+                    f"{shot['id']} approved program range must be at least one timeline frame"
+                )
+            if not _frame_aligned(program[0], frame) or not _frame_aligned(program[1], frame):
+                raise ValueError(
+                    f"{shot['id']} approved program range must align to timeline frames"
+                )
+            source_ranges = _timeline_source_ranges(program, timeline)
+            if not source_ranges:
+                raise ValueError(
+                    f"{shot['id']} approved program range cannot be mapped to source"
+                )
+            words = [
+                copy.deepcopy(word) for word in mapped_words
+                if (_range(word.get("program_range"))[0] >= program[0] - RANGE_EPSILON
+                    and _range(word.get("program_range"))[1] <= program[1] + RANGE_EPSILON)
+            ]
+            if not words:
+                raise ValueError(
+                    f"{shot['id']} approved program range requires a complete transcript word"
+                )
+            approved_ranges[shot["id"]] = {
+                "start_s": program[0], "end_s": program[1],
+            }
+            approved_source_ranges[shot["id"]] = source_ranges
+            approved_words[shot["id"]] = words
+        ordered_ranges = sorted(
+            (_range(value)[0], _range(value)[1], shot_id)
+            for shot_id, value in approved_ranges.items()
+        )
+        for index, (start, end, shot_id) in enumerate(ordered_ranges):
+            for other_start, other_end, other_id in ordered_ranges[index + 1:]:
+                if other_start < end - RANGE_EPSILON and start < other_end - RANGE_EPSILON:
+                    raise ValueError(
+                        f"{shot_id} approved program range overlaps {other_id}"
+                    )
+
     selected_hashes = []
     decision_skipped_ids = []
     for shot in result["shots"]:
@@ -2012,8 +2264,11 @@ def _apply_exact_entries(result, entries, *, timeline, explicit_intent, target_s
             raise ValueError(f"{shot['id']} was already skipped and requires decision skip")
         shot.pop("normalized", None)
         shot.pop("verification", None)
+        if editable_approval:
+            shot.pop("review_default", None)
         if decision == "skip":
-            if (isinstance(shot.get("review_default"), dict)
+            if (explicit_intent and not editable_approval
+                    and isinstance(shot.get("review_default"), dict)
                     and shot["review_default"].get("decision") != "skip"):
                 raise ValueError(
                     f"{shot['id']} {action} does not match the exact review default"
@@ -2041,7 +2296,13 @@ def _apply_exact_entries(result, entries, *, timeline, explicit_intent, target_s
                 or any(candidate is None for candidate in selected_candidates)):
             raise ValueError(f"{shot['id']} selected candidate does not belong to shot")
         candidate = selected_candidates[0]
-        if explicit_intent:
+        if editable_approval:
+            shot["program_range"] = copy.deepcopy(approved_ranges[shot["id"]])
+            shot["source_ranges"] = copy.deepcopy(approved_source_ranges[shot["id"]])
+            shot["transcript_evidence"] = {
+                "words": copy.deepcopy(approved_words[shot["id"]]),
+            }
+        elif explicit_intent:
             if not _ranges_equal(entry.get("program_range"), shot.get("program_range")):
                 raise ValueError(
                     f"{shot['id']} {action} program_range does not match current review"
@@ -2060,7 +2321,7 @@ def _apply_exact_entries(result, entries, *, timeline, explicit_intent, target_s
                 raise ValueError("canonical segment approval requires the canonical timeline")
             frame_duration = timeline_frame_duration(timeline)
             segment_errors = _canonical_segments_errors(
-                segments, candidates, shot.get("program_range"), frame_duration,
+                segments, candidates, shot["program_range"], frame_duration,
             )
             if segment_errors:
                 raise ValueError(f"{shot['id']} " + "; ".join(segment_errors))
@@ -2081,29 +2342,36 @@ def _apply_exact_entries(result, entries, *, timeline, explicit_intent, target_s
     return selected_hashes, decision_skipped_ids
 
 
-def prepare_composite(plan, selection, *, mode, actor, rationale, project_root, timeline):
-    """Freeze exact B-roll choices without creating approval or normalization authority."""
+def _approve_selection(plan, selection, *, mode, actor, rationale,
+                       project_root, timeline, transcript=None, legacy=False):
+    """Apply the exact B-roll content decision before speaker compositing."""
     if not isinstance(plan, dict):
         raise ValueError("plan must be an object")
     if not isinstance(selection, dict):
         raise ValueError("selection must be an object")
-    if selection.get("submission_intent") != "prepare_composite":
-        raise ValueError("submission_intent must be prepare_composite")
+    expected_intent = "prepare_composite" if legacy else "approve_selection"
+    if selection.get("submission_intent") != expected_intent:
+        raise ValueError(f"submission_intent must be {expected_intent}")
+    if not legacy and selection.get("approval_scope") != "b-roll-selection":
+        raise ValueError("approval_scope must be b-roll-selection")
     notes = selection.get("revision_notes", "")
     if not isinstance(notes, str) or notes.strip():
-        raise ValueError("prepare_composite requires empty revision_notes")
+        raise ValueError(f"{expected_intent} requires empty revision_notes")
     if not speaker_inset.style_enabled(plan.get("speaker_inset_style")):
-        raise ValueError("prepare_composite requires enabled speaker_inset_style")
+        raise ValueError(f"{expected_intent} requires enabled speaker_inset_style")
     style_validation = speaker_inset.style_errors(plan["speaker_inset_style"])
     if style_validation:
         raise ValueError("invalid speaker_inset_style: " + "; ".join(style_validation))
-    presentation_validation = presentation_errors(
-        plan, project_root=project_root, required=True,
-    )
-    if presentation_validation:
-        raise ValueError(
-            "invalid presentation decision: " + "; ".join(presentation_validation)
+    source_review = None
+    if legacy:
+        presentation_validation = presentation_errors(
+            plan, project_root=project_root, required=True,
         )
+        if presentation_validation:
+            raise ValueError(
+                "invalid presentation decision: " + "; ".join(presentation_validation)
+            )
+        root = Path(project_root).resolve()
 
     plan_shots, entries = plan.get("shots"), selection.get("shots")
     if not isinstance(plan_shots, list):
@@ -2137,10 +2405,16 @@ def prepare_composite(plan, selection, *, mode, actor, rationale, project_root, 
     if mode == "human" and selection.get("explicit_user_action") is not True:
         raise ValueError("human selection requires explicit_user_action true")
     rationale_source = selection.get("rationale_source")
+    expected_rationale = (
+        HUMAN_PREPARE_COMPOSITE_RATIONALE
+        if legacy else HUMAN_SELECTION_APPROVAL_RATIONALE
+    )
     if mode == "human" and (
-            rationale != HUMAN_PREPARE_COMPOSITE_RATIONALE
+            rationale != expected_rationale
             or rationale_source != "review_ui_explicit_action"):
-        raise ValueError("human prepare_composite requires the explicit review UI action rationale")
+        raise ValueError(
+            f"human {expected_intent} requires the explicit review UI action rationale"
+        )
     if not _is_uuid(selection.get("review_id")):
         raise ValueError("review_id must be a UUID")
     input_hashes = plan.get("input_hashes")
@@ -2156,26 +2430,51 @@ def prepare_composite(plan, selection, *, mode, actor, rationale, project_root, 
     for field, expected in expected_bindings.items():
         if selection.get(field) != expected:
             raise ValueError(f"{field} does not match current review artifacts")
+    if not legacy:
+        root, source_review = _preflight_page_approval(
+            plan, selection["review_id"], timeline=timeline,
+            transcript=transcript, project_root=project_root,
+            presentation_mode="speaker-inset",
+        )
     if selection.get("timeline_fps") != timeline.get("fps"):
         raise ValueError("timeline_fps does not match canonical timeline")
 
     result = copy.deepcopy(plan)
+    presentation = result.get("presentation")
+    if isinstance(presentation, dict):
+        presentation.setdefault(
+            "carried_from_plan_sha256",
+            canonical_sha256(presentation_subject(plan)),
+        )
     result["decision"] = None
     result["review"] = None
     result.pop("review_status", None)
     result.pop("visual_review", None)
     result.pop("selection", None)
     selected_hashes, decision_skipped_ids = _apply_exact_entries(
-        result, entries, timeline=timeline, explicit_intent=True,
-        target_status="composite_pending", action="prepare_composite",
+        result, entries, timeline=timeline, transcript=transcript,
+        explicit_intent=True,
+        target_status="composite_pending", action=expected_intent,
     )
     decisions = _decision_manifest(result["shots"])
     if decisions is None:
         raise ValueError("selection decision manifest cannot be reconstructed")
+    if legacy:
+        review_page = root / "review/03-b-roll" / f"b-roll-review-{selection['review_id']}.html"
+        source_review = {
+            "review_id": selection["review_id"],
+            "path": review_page.relative_to(root).as_posix(),
+            "consumed": True,
+        }
+        if review_page.is_file():
+            source_review["sha256"] = sha256_file(review_page)
+        else:
+            source_review["legacy_page_unbound"] = True
     receipt = {
         "schema_version": 1,
-        "status": "prepared",
-        "submission_intent": "prepare_composite",
+        "status": "approved",
+        "submission_intent": "approve_selection",
+        "approval_scope": "b-roll-selection",
         "review_id": selection["review_id"],
         "mode": mode,
         "actor": actor.strip(),
@@ -2189,8 +2488,33 @@ def prepare_composite(plan, selection, *, mode, actor, rationale, project_root, 
         "decisions": decisions,
         "decision_skipped_shot_ids": sorted(set(decision_skipped_ids)),
         "selected_asset_sha256": sorted(set(selected_hashes)),
+        "source_review": source_review,
     }
-    root = Path(project_root).resolve()
+    if legacy:
+        receipt["legacy_submission_intent"] = "prepare_composite"
+    if not legacy:
+        validation_result = copy.deepcopy(result)
+        validation_result["selection"] = {
+            "status": "approved",
+            "submission_intent": "approve_selection",
+            "approval_scope": "b-roll-selection",
+            "consumed": True,
+            "path": "b-roll/broll-selection.json",
+            "sha256": "0" * 64,
+            "review_id": receipt["review_id"],
+            "mode": receipt["mode"],
+            "actor": receipt["actor"],
+            "timestamp": receipt["timestamp"],
+            "style_sha256": receipt["style_sha256"],
+            "review_page_sha256": source_review["sha256"],
+        }
+        validation_errors = validate_plan(
+            validation_result, timeline, transcript,
+        )
+        if validation_errors:
+            raise ValueError(
+                "invalid approved selection: " + "; ".join(validation_errors)
+            )
     target = root / "work/b-roll/broll-selection.json"
     target.parent.mkdir(parents=True, exist_ok=True)
     temp = None
@@ -2204,8 +2528,10 @@ def prepare_composite(plan, selection, *, mode, actor, rationale, project_root, 
         if temp is not None:
             temp.unlink(missing_ok=True)
     result["selection"] = {
-        "status": "prepared",
-        "submission_intent": "prepare_composite",
+        "status": "approved",
+        "submission_intent": "approve_selection",
+        "approval_scope": "b-roll-selection",
+        "consumed": True,
         "path": "b-roll/broll-selection.json",
         "sha256": sha256_file(target),
         "review_id": receipt["review_id"],
@@ -2214,10 +2540,64 @@ def prepare_composite(plan, selection, *, mode, actor, rationale, project_root, 
         "timestamp": receipt["timestamp"],
         "style_sha256": receipt["style_sha256"],
     }
+    if "sha256" in source_review:
+        result["selection"]["review_page_sha256"] = source_review["sha256"]
+    if legacy:
+        result["selection"]["legacy_submission_intent"] = "prepare_composite"
+    if not any(shot.get("status") == "composite_pending" for shot in result["shots"]):
+        result["review_status"] = "approved"
+        result["decision"] = {
+            "mode": mode,
+            "actor": actor.strip(),
+            "rationale": rationale,
+            "rationale_source": rationale_source,
+        }
+        if mode == "human":
+            result["decision"]["explicit_user_action"] = True
+        result["review"] = {
+            "status": "approved",
+            "submission_intent": "approve_selection",
+            "approval_scope": "b-roll-selection",
+            "revision_notes": "",
+            "review_id": selection["review_id"],
+            "mode": mode,
+            "actor": actor.strip(),
+            "rationale": rationale,
+            "rationale_source": rationale_source,
+            "timestamp": selection["timestamp"],
+            "explicit_user_action": selection.get("explicit_user_action") is True,
+            "candidate_manifest_sha256": canonical_sha256(candidate_manifest(result)),
+            "review_video_sha256": result["input_hashes"]["review_video_sha256"],
+            "timeline_fps": copy.deepcopy(timeline["fps"]),
+            "selection_sha256": result["selection"]["sha256"],
+            "decisions": decisions,
+            "decision_skipped_shot_ids": sorted(set(decision_skipped_ids)),
+            "selected_asset_sha256": sorted(set(selected_hashes)),
+            "source_review": copy.deepcopy(source_review),
+        }
+        result["review"]["plan_sha256"] = canonical_sha256(review_subject(result))
     return result
 
 
-def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None, timeline=None):
+def approve_selection(plan, selection, *, mode, actor, rationale, project_root,
+                      timeline, transcript=None):
+    """Apply the user's exact B-roll content selection once."""
+    return _approve_selection(
+        plan, selection, mode=mode, actor=actor, rationale=rationale,
+        project_root=project_root, timeline=timeline, transcript=transcript,
+    )
+
+
+def prepare_composite(plan, selection, *, mode, actor, rationale, project_root, timeline):
+    """Read a legacy prepare_composite export and emit canonical selection evidence."""
+    return _approve_selection(
+        plan, selection, mode=mode, actor=actor, rationale=rationale,
+        project_root=project_root, timeline=timeline, legacy=True,
+    )
+
+
+def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None,
+                 timeline=None, transcript=None, project_root=None):
     if not isinstance(plan, dict): raise ValueError("plan must be an object")
     if not isinstance(review, dict): raise ValueError("review must be an object")
     explicit_intent = "submission_intent" in review
@@ -2232,9 +2612,23 @@ def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None,
             raise ValueError("revision_notes must be a string")
         if notes.strip():
             raise ValueError("approve requires empty revision_notes")
-    plan_shots, entries = plan.get("shots"), review.get("shots")
+    plan_shots = plan.get("shots")
     if not isinstance(plan_shots, list): raise ValueError("plan shots must be a list")
-    if not isinstance(entries, list): raise ValueError("review shots must be a list")
+    composite_review = (
+        speaker_inset.style_enabled(plan.get("speaker_inset_style"))
+        and any(
+            isinstance(shot, dict) and shot.get("status") == "composite_pending"
+            for shot in plan_shots
+        )
+    )
+    if composite_review:
+        if "shots" in review:
+            raise ValueError("composite review must not include candidate shots")
+        entries = []
+    else:
+        entries = review.get("shots")
+        if not isinstance(entries, list):
+            raise ValueError("review shots must be a list")
     plan_ids = set()
     for shot in plan_shots:
         if not isinstance(shot, dict): raise ValueError("plan shot must be an object")
@@ -2272,20 +2666,11 @@ def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None,
         "candidate_manifest_sha256": canonical_sha256(candidate_manifest(plan)),
         "review_video_sha256": input_hashes.get("review_video_sha256"),
     }
-    all_skipped = (
-        len(entries) == len(plan_shots)
-        and all(
-            isinstance(entry, dict) and entry.get("decision") == "skip"
-            for entry in entries
-        )
-    )
-    composite_review = (
-        speaker_inset.style_enabled(plan.get("speaker_inset_style"))
-        and not all_skipped
-    )
     if composite_review:
         if review.get("review_stage") != "composite":
             raise ValueError("speaker inset approval review_stage must be composite")
+        if review.get("approval_scope") != "speaker-inset-composite":
+            raise ValueError("speaker inset approval_scope must be speaker-inset-composite")
         speaker = plan.get("speaker_inset")
         if not isinstance(speaker, dict):
             raise ValueError("speaker inset approval requires speaker artifacts")
@@ -2305,14 +2690,19 @@ def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None,
     for field, expected in expected_bindings.items():
         if review.get(field) != expected:
             raise ValueError(f"{field} does not match current review artifacts")
+    source_review = None
+    editable_approval = explicit_intent and not composite_review
+    if editable_approval:
+        root, source_review = _preflight_page_approval(
+            plan, review["review_id"], timeline=timeline,
+            transcript=transcript, project_root=project_root,
+            presentation_mode="ordinary",
+        )
     result = copy.deepcopy(plan)
     result.pop("visual_review", None)
     if explicit_intent and review.get("timeline_fps") != timeline.get("fps"):
         raise ValueError("timeline_fps does not match canonical timeline")
     if composite_review:
-        locked_decisions = _decision_manifest(plan_shots)
-        if entries != locked_decisions:
-            raise ValueError("composite review shots must match the locked selection")
         selected_hashes = []
         decision_skipped_ids = []
         for shot in result["shots"]:
@@ -2334,7 +2724,9 @@ def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None,
                 raise ValueError("composite approval requires composite_pending or skipped shots")
     else:
         selected_hashes, decision_skipped_ids = _apply_exact_entries(
-            result, entries, timeline=timeline, explicit_intent=explicit_intent,
+            result, entries, timeline=timeline,
+            transcript=transcript if editable_approval else None,
+            explicit_intent=explicit_intent,
             target_status="selected", action="approve",
         )
     decisions = _decision_manifest(result["shots"])
@@ -2347,12 +2739,22 @@ def apply_review(plan, review, *, mode, actor, rationale, interaction_path=None,
     if mode == "human": result["decision"]["explicit_user_action"] = True
     result["review"] = {"status": "approved", "review_id": review["review_id"], "mode": mode, "actor": actor, "rationale": rationale, "timestamp": review["timestamp"], **expected_bindings, "decisions": decisions, "decision_skipped_shot_ids": sorted(set(decision_skipped_ids)), "selected_asset_sha256": sorted(set(selected_hashes))}
     if composite_review:
-        result["review"]["review_stage"] = "composite"
+        result["review"].update({
+            "review_stage": "composite",
+            "approval_scope": "speaker-inset-composite",
+        })
     if explicit_intent:
         result["review"].update({"submission_intent": "approve", "revision_notes": ""})
+    if source_review is not None:
+        result["review"]["source_review"] = source_review
     if rationale_source is not None:
         result["review"]["rationale_source"] = rationale_source
     if mode == "human": result["review"]["explicit_user_action"] = True
+    if editable_approval:
+        result["review"]["plan_sha256"] = canonical_sha256(review_subject(result))
+        validation_errors = validate_plan(result, timeline, transcript)
+        if validation_errors:
+            raise ValueError("invalid approved review: " + "; ".join(validation_errors))
     if interaction_path:
         target = Path(interaction_path); target.parent.mkdir(parents=True, exist_ok=True)
         temp = None

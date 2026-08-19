@@ -446,6 +446,15 @@ def _summary(plan, selected, records, artifacts, root, stage, destination, path)
         lines.extend(["No B-roll shots were selected; all approved decisions are skips.", ""])
     for (_, shot, candidates, _), (_, _, times, stills) in zip(selected, records):
         normalized = shot["normalized"]
+        source_records = normalized.get("source_segments")
+        component_records = normalized.get("segments")
+        chain = (
+            "source-direct single-filtergraph"
+            if isinstance(source_records, list) else
+            "legacy component-based"
+            if isinstance(component_records, list) else
+            "legacy single-asset"
+        )
         evidence = ", ".join(str(word.get("word", "")).strip() for word in shot["transcript_evidence"]["words"])
         lines.extend([
             f"## Shot `{str(shot.get('id')).replace('`', '')}`", "",
@@ -453,9 +462,10 @@ def _summary(plan, selected, records, artifacts, root, stage, destination, path)
             f"- Source ranges: `{json.dumps(shot['source_ranges'], sort_keys=True)}`",
             f"- Transcript evidence: {evidence}",
             f"- Selection format: `{normalized.get('selection_format', 'legacy')}`",
+            f"- Intermediate chain: `{chain}`",
+            f"- Intermediate profile: `{json.dumps(normalized.get('intermediate_profile', 'legacy unrecorded'), sort_keys=True)}`",
             f"- Program duration: `{normalized.get('program_duration_s', 'legacy record')}s`",
             f"- Normalized SHA-256: `{normalized['sha256']}`",
-            f"- Concat SHA-256: `{normalized.get('concat_sha256', normalized['sha256'])}`",
             f"- Normalized probe: `{json.dumps(normalized.get('probe', {}), sort_keys=True)}`",
             f"- Grade plan SHA-256: `{normalized.get('grade_plan_sha256', 'not active')}`",
             f"- Selected LUT SHA-256: `{normalized.get('selected_lut_sha256', 'not active')}`",
@@ -469,13 +479,31 @@ def _summary(plan, selected, records, artifacts, root, stage, destination, path)
                 f"- Layout recommendation rationale: {recommendations.get(shot.get('id'), {}).get('rationale', '')}",
                 f"- Final composite SHA-256: `{normalized['sha256']}`",
                 f"- B-roll base SHA-256: `{base.get('sha256')}`",
+                f"- B-roll base profile: `{json.dumps(base.get('intermediate_profile', 'legacy unrecorded'), sort_keys=True)}`",
             ])
             lines.extend(
                 f"- Composition {field}: `{value}`"
                 for field, value in composition.items()
             )
-        component_records = normalized.get("segments")
-        if isinstance(component_records, list):
+        if isinstance(source_records, list):
+            candidate_map = {candidate.get("id"): candidate for candidate in candidates}
+            for index, source_record in enumerate(source_records, 1):
+                candidate = candidate_map.get(source_record.get("candidate_id"), {})
+                lines.extend([
+                    f"- Source segment {index}: `{source_record.get('candidate_id')}`",
+                    f"  - Selected source: `{candidate.get('cache_path')}` (`{candidate.get('sha256')}`)",
+                    f"  - Source provenance: `{json.dumps(candidate.get('provenance', {}), sort_keys=True)}`",
+                    f"  - Segment: `{json.dumps(source_record.get('segment', {}), sort_keys=True)}`",
+                    f"  - Source duration: `{source_record.get('source_duration_s')}s`",
+                    f"  - Effective duration: `{source_record.get('effective_duration_s')}s`",
+                    f"  - Program duration: `{source_record.get('program_duration_s')}s`",
+                    f"  - Playback rate: `{source_record.get('playback_rate')}x`",
+                    f"  - Source SHA-256: `{source_record.get('source_sha256')}`",
+                ])
+        elif isinstance(component_records, list):
+            lines.append(
+                f"- Legacy concat SHA-256: `{normalized.get('concat_sha256')}`"
+            )
             candidate_map = {candidate.get("id"): candidate for candidate in candidates}
             for index, component in enumerate(component_records, 1):
                 candidate = candidate_map.get(component.get("candidate_id"), {})
