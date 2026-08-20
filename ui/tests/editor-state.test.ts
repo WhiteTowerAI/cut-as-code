@@ -274,8 +274,8 @@ test('Save All submits every dirty operation in canonical order and clears expor
     operations: [
       ...project.operations!,
       {
-        id: 'graphic-motion',
-        kind: 'graphic-motion',
+        id: 'motion-graphics',
+        kind: 'motion-graphics',
         revision: 5,
         editable: true,
         fields: { cues: [{ id: 'motion-001', enabled: true }] },
@@ -306,13 +306,13 @@ test('Save All submits every dirty operation in canonical order and clears expor
     },
     review: async () => authoritative,
   })
-  store.getState().editOperationDraft('graphic-motion', { cueId: 'motion-001', enabled: false })
+  store.getState().editOperationDraft('motion-graphics', { cueId: 'motion-001', enabled: false })
   store.getState().editOperationDraft('content-cards', { copy: 'Updated card' })
   store.getState().editOperationDraft('captions', { cueId: 'cue-001', text: 'Updated caption' })
 
   await store.getState().saveAllOperationDrafts()
 
-  expect(calls).toEqual(['captions', 'content-cards', 'graphic-motion'])
+  expect(calls).toEqual(['captions', 'content-cards', 'motion-graphics'])
   expect(store.getState().hasUnsavedChanges()).toBe(false)
   expect(store.getState().exportBlockers()).toEqual([])
 })
@@ -406,9 +406,9 @@ test('setOpenMenu keeps only the assigned menu open', () => {
 test('setActiveTab changes the active library tab', () => {
   const store = createStateStore()
 
-  store.getState().setActiveTab('graphic-motion')
+  store.getState().setActiveTab('motion-graphics')
 
-  expect(store.getState().activeTab).toBe('graphic-motion')
+  expect(store.getState().activeTab).toBe('motion-graphics')
 })
 
 test('setProject replaces the project snapshot with the next revision', () => {
@@ -1126,7 +1126,7 @@ test('runtime projection creates independent real card and motion lanes without 
       },
       operations: [
         { id: 'content-cards', revision: 2, status: 'approved', etag: 'cards' },
-        { id: 'graphic-motion', revision: 3, status: 'approved', etag: 'motion' },
+        { id: 'motion-graphics', revision: 3, status: 'approved', etag: 'motion' },
       ],
       reviews: [],
       content_cards_edit: {
@@ -1136,7 +1136,7 @@ test('runtime projection creates independent real card and motion lanes without 
           layout: 'quote', placement: 'bottom', program_range: { start_s: 6, end_s: 8 },
         }],
       },
-      graphic_motion_edit: {
+      motion_graphics_edit: {
         cues: [{
           id: 'motion-001', content: 'Actual motion', enabled: true, recipe_id: 'recipe-real',
           status: 'verified', review_status: 'approved', program_range: { start_s: 0, end_s: 5 },
@@ -1148,7 +1148,7 @@ test('runtime projection creates independent real card and motion lanes without 
   const mapped = projectFromSnapshot(null, snapshot)!
 
   expect(mapped.tracks.map((track) => [track.id, track.kind])).toEqual([
-    ['track-video', 'video'], ['track-audio', 'audio'], ['track-content-cards', 'card'], ['track-graphic-motion', 'graphic-motion'],
+    ['track-video', 'video'], ['track-audio', 'audio'], ['track-content-cards', 'card'], ['track-motion-graphics', 'motion-graphics'],
   ])
   expect(mapped.tracks[0].clips?.[0]).toMatchObject({ displayName: 'interview.mp4', trackId: 'track-video' })
   expect(mapped.tracks[1].clips).toEqual([expect.objectContaining({
@@ -1181,8 +1181,8 @@ test('runtime projection maps composited Viewer layers without exposing filesyst
           content: { text: 'A real caption', style: { preset: 'clean' } },
         },
         {
-          id: 'layer_motion', operation_id: 'graphic-motion', cue_id: 'gm-001',
-          kind: 'graphic-motion', media_type: 'image-sequence', z_index: 300,
+          id: 'layer_motion', operation_id: 'motion-graphics', cue_id: 'gm-001',
+          kind: 'motion-graphics', media_type: 'image-sequence', z_index: 300,
           program_range: { start_s: 0, end_s: 5 },
           transform: { x: 0.5, y: 0.5, scale: 1 },
           content: { text: 'THE REAL TONY STARK?' },
@@ -1206,7 +1206,7 @@ test('runtime projection maps composited Viewer layers without exposing filesyst
       transform: { x: 0.5, y: 0.85, scale: 1 },
     }),
     expect.objectContaining({
-      id: 'layer_motion', kind: 'graphic-motion', mediaType: 'image-sequence', zIndex: 300,
+      id: 'layer_motion', kind: 'motion-graphics', mediaType: 'image-sequence', zIndex: 300,
       imageSequence: expect.objectContaining({
         startNumber: 1, frameCount: 150,
         frameUrlTemplate: '/v1/projects/layered-project/layers/layer_motion/frames/%d',
@@ -1216,14 +1216,14 @@ test('runtime projection maps composited Viewer layers without exposing filesyst
   expect(JSON.stringify(mapped)).not.toContain('work/cache')
 })
 
-test('graphic-motion runtime projection preserves every authoritative operation and resource', () => {
+test('motion-graphics runtime projection preserves every authoritative operation and resource', () => {
   const snapshot: RuntimeSnapshot = {
     read_only: false, errors: [], snapshot_etag: 'snapshot-etag',
     resources: [
       { id: 'res_project', kind: 'project', etag: 'p', size: 1 },
       { id: 'res_timeline', kind: 'timeline', etag: 't', size: 1 },
       { id: 'res_cut', kind: 'plan', etag: 'cut', size: 1, operation_id: 'cut' },
-      { id: 'res_gm', kind: 'plan', etag: 'gm', size: 1, operation_id: 'graphic-motion' },
+      { id: 'res_gm', kind: 'plan', etag: 'gm', size: 1, operation_id: 'motion-graphics' },
     ],
     media: [], artifacts: [],
     view: {
@@ -1231,7 +1231,7 @@ test('graphic-motion runtime projection preserves every authoritative operation 
       timeline: { duration_s: 4, fps: { num: 30000, den: 1001 }, clips: [] },
       operations: [
         { id: 'cut', revision: 2, status: 'approved', etag: 'cut-op' },
-        { id: 'graphic-motion', revision: 5, status: 'draft', etag: 'gm-op' },
+        { id: 'motion-graphics', revision: 5, status: 'draft', etag: 'gm-op' },
       ],
       reviews: [],
     },
@@ -1239,7 +1239,7 @@ test('graphic-motion runtime projection preserves every authoritative operation 
 
   const mapped = projectFromSnapshot(getScenario('1-84')!.initialState.project, snapshot)!
 
-  expect(mapped.operations?.map((operation) => operation.id)).toEqual(['cut', 'graphic-motion'])
+  expect(mapped.operations?.map((operation) => operation.id)).toEqual(['cut', 'motion-graphics'])
   expect(mapped.resources?.map((resource) => resource.id)).toEqual(['res_project', 'res_timeline', 'res_cut', 'res_gm'])
   expect(mapped.tracks).toEqual([])
   expect(mapped.assets).toEqual([])
@@ -1308,7 +1308,7 @@ test('runtime projection invalidates a terminal receipt when any bound artifact 
   expect(operation.approval?.evidenceHashes).toEqual([`sha256:${currentHash}`, `sha256:${missingHash}`])
 })
 
-test('getScenario resolves every dash-form Figma node and graphic motion', () => {
+test('getScenario resolves every dash-form Figma node and motion graphics', () => {
   const ids = [
     '1-60',
     '1-1373',
@@ -1326,7 +1326,7 @@ test('getScenario resolves every dash-form Figma node and graphic motion', () =>
     '123-79',
     '123-167',
     '126-2',
-    'graphic-motion',
+    'motion-graphics',
   ] as const
 
   expect(ids.map((id) => getScenario(id)?.id)).toEqual(ids)

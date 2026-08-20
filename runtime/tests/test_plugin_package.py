@@ -30,7 +30,7 @@ ENTRY_SKILLS = {
     "video-cut",
     "video-color-grade",
     "video-add-b-roll",
-    "video-add-graphic-motion",
+    "video-add-motion-graphics",
     "video-add-captions",
     "video-add-content-cards",
     "video-edit-compare",
@@ -897,15 +897,15 @@ const { ensureHub, hubPaths, readTrustedLocator } = require(process.argv[1]);
             extracted = installed / package_root
             self._assert_unknown_third_party_asset_is_rejected(extracted)
             self._audit_route_allowlist(extracted)
-            self._audit_graphic_motion_core(extracted, root / "graphic motion core project")
+            self._audit_motion_graphics_core(extracted, root / "motion graphics core project")
             self._smoke_open_editor(extracted, root / "video project with spaces", root)
 
     def test_compliance_inventory_covers_packaged_third_party_assets_and_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="cut compliance package ") as temporary:
             package_root = Path(temporary) / "package with spaces"
             shutil.copytree(
-                REPOSITORY_ROOT / "skills" / "video-add-graphic-motion" / "recipes" / "animxyz",
-                package_root / "skills" / "video-add-graphic-motion" / "recipes" / "animxyz",
+                REPOSITORY_ROOT / "skills" / "video-add-motion-graphics" / "recipes" / "animxyz",
+                package_root / "skills" / "video-add-motion-graphics" / "recipes" / "animxyz",
             )
             shutil.copytree(REPOSITORY_ROOT / "ui" / "dist", package_root / "ui" / "dist")
             (package_root / "runtime").mkdir(parents=True)
@@ -1084,25 +1084,25 @@ const { ensureHub, hubPaths, readTrustedLocator } = require(process.argv[1]);
                 if name.startswith("skills/") and len(Path(name).parts) > 2
             }
             self.assertTrue(ENTRY_SKILLS.issubset(packaged_skills))
-            self.assertIn("skills/video-add-graphic-motion/SKILL.md", relative_names)
-            self.assertNotIn("skills/video-add-graphic-motion/recipes/imported/SKILL.md", relative_names)
+            self.assertIn("skills/video-add-motion-graphics/SKILL.md", relative_names)
+            self.assertNotIn("skills/video-add-motion-graphics/recipes/imported/SKILL.md", relative_names)
             animxyz_manifests = [
                 name for name in relative_names
-                if name.startswith("skills/video-add-graphic-motion/recipes/animxyz/")
+                if name.startswith("skills/video-add-motion-graphics/recipes/animxyz/")
                 and name.endswith("/recipe.motion.yaml")
             ]
             self.assertEqual(len(animxyz_manifests), 20)
-            graphic_motion_skill = archive.read(
-                "cut-as-code-editor/skills/video-add-graphic-motion/SKILL.md"
+            motion_graphics_skill = archive.read(
+                "cut-as-code-editor/skills/video-add-motion-graphics/SKILL.md"
             ).decode("utf-8")
-            self.assertIn("exactly 10 selectable AnimXYZ core recipes", graphic_motion_skill)
-            self.assertIn("exactly 20 AnimXYZ recipe manifests", graphic_motion_skill)
-            self.assertIn("missing_content_pack", graphic_motion_skill)
-            self.assertNotIn("1,477 recipes", graphic_motion_skill)
-            self.assertNotIn("REQUIRED SUB-SKILLS", graphic_motion_skill)
-            self.assertNotIn("reference/recipe-selection.md", graphic_motion_skill)
-            normalized_graphic_motion_skill = " ".join(graphic_motion_skill.split())
-            self.assertIn("Non-skipped validate/register/render is unavailable", normalized_graphic_motion_skill)
+            self.assertIn("exactly 10 selectable AnimXYZ core recipes", motion_graphics_skill)
+            self.assertIn("exactly 20 AnimXYZ recipe manifests", motion_graphics_skill)
+            self.assertIn("missing_content_pack", motion_graphics_skill)
+            self.assertNotIn("1,477 recipes", motion_graphics_skill)
+            self.assertNotIn("REQUIRED SUB-SKILLS", motion_graphics_skill)
+            self.assertNotIn("reference/recipe-selection.md", motion_graphics_skill)
+            normalized_motion_graphics_skill = " ".join(motion_graphics_skill.split())
+            self.assertIn("Non-skipped validate/register/render is unavailable", normalized_motion_graphics_skill)
             packaged_assets = {
                 Path(name).name for name in relative_names
                 if name.startswith("ui/dist/assets/editor/")
@@ -1195,7 +1195,7 @@ process.stdout.write(JSON.stringify({
             ["GET", "/v1/projects/project_a/events"],
             ["GET", "/v1/projects/project_a/drafts/captions"],
             ["PUT", "/v1/projects/project_a/drafts/content-cards"],
-            ["DELETE", "/v1/projects/project_a/drafts/graphic-motion"],
+            ["DELETE", "/v1/projects/project_a/drafts/motion-graphics"],
             ["GET", "/assets/index.js"],
             ["HEAD", "/assets/index.js"],
             ["POST", "/v1/meta"],
@@ -1295,8 +1295,8 @@ process.stdout.write(JSON.stringify({
             self.assertEqual(audited_assets[asset_path]["component"], expected["component"])
             self.assertEqual(audited_assets[asset_path]["sha256"], expected["sha256"])
 
-    def _audit_graphic_motion_core(self, plugin_root: Path, project_root: Path) -> None:
-        library = plugin_root / "skills" / "video-add-graphic-motion" / "scripts" / "recipe_library.mjs"
+    def _audit_motion_graphics_core(self, plugin_root: Path, project_root: Path) -> None:
+        library = plugin_root / "skills" / "video-add-motion-graphics" / "scripts" / "recipe_library.mjs"
         searched = subprocess.run(
             ["node", str(library), "search", "--query", "animxyz fade rotate", "--limit", "20", "--json"],
             cwd=plugin_root,

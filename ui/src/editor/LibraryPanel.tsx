@@ -27,7 +27,7 @@ const tabs: ReadonlyArray<{ id: LibraryTab; label: string }> = [
   { id: 'assets', label: 'My Assets' },
 ]
 
-// Captions, Cards, and Graphic Motion panels remain implemented below for a future restore.
+// Captions, Cards, and Motion Graphics panels remain implemented below for a future restore.
 
 function tileForAsset(asset: AssetView, runtime = false): TileItem {
   if (runtime) {
@@ -363,15 +363,15 @@ function MotionPanel({ store }: LibraryPanelProps) {
   const [query, setQuery] = useState('')
   const runtime = Boolean(project?.runtime)
   if (runtime) {
-    const cues = project?.tracks.find((track) => track.kind === 'graphic-motion')?.clips ?? []
+    const cues = project?.tracks.find((track) => track.kind === 'motion-graphics')?.clips ?? []
     const items: TileItem[] = cues.map((cue) => ({
       id: cue.id, label: cue.summary || cue.displayName || 'Untitled motion', preview: 'runtime', previewText: cue.summary || 'Untitled motion',
     }))
     return (
       <>
         {items.length
-          ? <TileGrid items={items} kind="graphic-motion" selectedId={selection?.id} onSelect={select} />
-          : <RuntimeEmpty>No graphic motion cues</RuntimeEmpty>}
+          ? <TileGrid items={items} kind="motion-graphics" selectedId={selection?.id} onSelect={select} />
+          : <RuntimeEmpty>No motion graphics cues</RuntimeEmpty>}
       </>
     )
   }
@@ -388,7 +388,7 @@ function MotionPanel({ store }: LibraryPanelProps) {
           onChange={(event) => setQuery(event.target.value)}
         />
       </label>
-      <TileGrid items={results} kind="graphic-motion" selectedId={selection?.id} onSelect={select} />
+      <TileGrid items={results} kind="motion-graphics" selectedId={selection?.id} onSelect={select} />
       <PlacementControls />
       <button className="library-primary-action" type="button">Insert motion</button>
     </>

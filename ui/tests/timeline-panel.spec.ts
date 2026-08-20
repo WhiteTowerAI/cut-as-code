@@ -582,16 +582,16 @@ test('content card context menu copies, explains, reviews, and toggles the Cue',
   await expect(page.getByRole('menuitem', { name: 'Enable Cue' })).toBeVisible()
 })
 
-test('graphic motion context menu exposes recipe review metadata and Inspector controls', async ({ page }) => {
+test('motion graphics context menu exposes recipe review metadata and Inspector controls', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/?scenario=cue-context-actions')
 
   const motion = page.locator('[data-timeline-clip="cue-motion"]')
   await motion.click({ button: 'right' })
-  await page.getByRole('menu', { name: 'Graphic Motion' }).getByRole('menuitem', { name: 'Edit in Inspector' }).click()
-  const inspector = page.getByRole('region', { name: 'Graphic Motion Inspector' })
+  await page.getByRole('menu', { name: 'Motion Graphics' }).getByRole('menuitem', { name: 'Edit in Inspector' }).click()
+  const inspector = page.getByRole('region', { name: 'Motion Graphics Inspector' })
   await expect(inspector).toBeVisible()
-  await expect(inspector.getByLabel('Graphic Motion Inspector enabled')).toBeChecked()
+  await expect(inspector.getByLabel('Motion Graphics Inspector enabled')).toBeChecked()
   await expect(inspector).toContainText('Adjust position and scale')
 
   await motion.click({ button: 'right' })

@@ -1384,7 +1384,7 @@ def graphic_motion_content_bounds(cue, project_root):
             else resolve_project_path(project_root, value)
         )
         if os.path.commonpath((str(Path(project_root).resolve()), str(path))) != str(Path(project_root).resolve()):
-            raise ValueError("graphic-motion frame path escapes project root")
+            raise ValueError("motion-graphics frame path escapes project root")
         stat = path.stat()
         resolved_frames.append((path, frame.get("sha256"), stat.st_size, stat.st_mtime_ns))
     cache_key = tuple((str(path), sha256, size, mtime) for path, sha256, size, mtime in resolved_frames)
@@ -1398,7 +1398,7 @@ def graphic_motion_content_bounds(cue, project_root):
             if size is None:
                 size = image.size
             elif image.size != size:
-                raise ValueError("graphic-motion frames must share one canvas size")
+                raise ValueError("motion-graphics frames must share one canvas size")
             alpha = image.getchannel("A") if "A" in image.getbands() else None
             bounds = alpha.getbbox() if alpha is not None else image.getbbox()
         if bounds is not None:
@@ -1422,7 +1422,7 @@ def graphic_motion_content_bounds(cue, project_root):
 
 
 def _editor_transforms_for_contributions(operation_id, plan, contribution_count):
-    if operation_id == "graphic-motion":
+    if operation_id == "motion-graphics":
         cues = [
             cue for cue in plan.get("cues", [])
             if isinstance(cue, dict) and cue.get("status") == "verified"
@@ -1442,7 +1442,7 @@ def _editor_transforms_for_contributions(operation_id, plan, contribution_count)
 
 
 def _editor_content_bounds_for_contributions(operation_id, plan, contribution_count, project_root):
-    if operation_id == "graphic-motion":
+    if operation_id == "motion-graphics":
         cues = [
             cue for cue in plan.get("cues", [])
             if isinstance(cue, dict) and cue.get("status") == "verified"
@@ -1461,7 +1461,7 @@ def _editor_content_bounds_for_contributions(operation_id, plan, contribution_co
     bounds = []
     for cue in cues:
         value = cue.get("editor_content_bounds")
-        if value is None and operation_id == "graphic-motion":
+        if value is None and operation_id == "motion-graphics":
             value = graphic_motion_content_bounds(cue, project_root)
         if value is None:
             value = {"x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0}
@@ -1680,7 +1680,7 @@ def build_render_plan(project, project_root):
                 continue
         editor_transforms = None
         editor_content_bounds = None
-        if operation_id in {"captions", "content-cards", "graphic-motion"} and operation.get("plan"):
+        if operation_id in {"captions", "content-cards", "motion-graphics"} and operation.get("plan"):
             try:
                 editor_plan = load_json(resolve_project_path(project_root, operation["plan"]))
                 contributions = _expand_editor_overlay_contributions(

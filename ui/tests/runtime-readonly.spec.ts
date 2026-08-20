@@ -213,8 +213,8 @@ test('streams confined media by opaque ID with HTTP byte ranges', async () => {
   }
 })
 
-test('serves only declared hash-bound Graphic Motion frames through opaque layer URLs', async () => {
-  const root = await createGraphicMotionLayerProjectFixture()
+test('serves only declared hash-bound Motion Graphics frames through opaque layer URLs', async () => {
+  const root = await createMotionGraphicsLayerProjectFixture()
   const isolated = await authenticatedSidecarFor(root)
   try {
     const snapshotResponse = await isolated.client.get(`/v1/projects/${isolated.ready.projectId}/snapshot`)
@@ -222,7 +222,7 @@ test('serves only declared hash-bound Graphic Motion frames through opaque layer
     const snapshotBody = await snapshotResponse.json()
     const layer = snapshotBody.snapshot.view.layers[0]
     expect(layer).toMatchObject({
-      kind: 'graphic-motion',
+      kind: 'motion-graphics',
       media_type: 'image-sequence',
       image_sequence: { frame_count: 1, frame_url_template: expect.stringContaining('/layers/') },
     })
@@ -238,7 +238,7 @@ test('serves only declared hash-bound Graphic Motion frames through opaque layer
     expect(undeclared.status()).toBe(404)
     await undeclared.body()
 
-    await writeFile(path.join(root, 'work', 'cache', 'graphic-motion', 'rendered', 'motion-001', 'frame_000001.png'), 'tampered')
+    await writeFile(path.join(root, 'work', 'cache', 'motion-graphics', 'rendered', 'motion-001', 'frame_000001.png'), 'tampered')
     const changed = await isolated.client.get(frameURL)
     expect(changed.status()).toBe(404)
     await changed.body()
@@ -369,7 +369,7 @@ test('keeps the primary workspace visible without production protocol diagnostic
 
     await expect(page.getByRole('region', { name: 'Library', exact: true })).toBeVisible()
     await expect(page.getByRole('region', { name: 'Viewer', exact: true })).toBeVisible()
-    await expect(page.getByRole('tab', { name: 'Graphic Motion', exact: true })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Motion Graphics', exact: true })).toBeVisible()
   } finally {
     await page.close()
     await stopSidecar(isolated.process)
@@ -435,8 +435,8 @@ test('runtime cue lists do not repeat card or motion details below the selected 
     await expect(page.locator('.library-tile')).toHaveCount(1)
     await expect(page.getByRole('group', { name: 'Content Card fields' })).toHaveCount(0)
 
-    await page.getByRole('tab', { name: 'Graphic Motion' }).click()
-    await expect(page.getByRole('group', { name: 'Graphic Motion fields' })).toHaveCount(0)
+    await page.getByRole('tab', { name: 'Motion Graphics' }).click()
+    await expect(page.getByRole('group', { name: 'Motion Graphics fields' })).toHaveCount(0)
   } finally {
     await page.close()
     await stopSidecar(isolated.process)
@@ -566,7 +566,7 @@ test('browser projects opaque project media into a playable Viewer and shared ti
     expect(decoded.nonBlack).toBeGreaterThan(0)
     await expect.poll(() => source.evaluate((video) => video.currentTime)).toBeCloseTo(0.2, 1)
 
-    for (const tabName of ['My Assets', 'Captions', 'Cards', 'Graphic Motion']) {
+    for (const tabName of ['My Assets', 'Captions', 'Cards', 'Motion Graphics']) {
       const tab = page.getByRole('tab', { name: tabName, exact: true })
       await expect(tab).toBeVisible()
       await tab.click()
@@ -1324,7 +1324,7 @@ test('caption Inspector updates the second cue and keeps the first cue unchanged
   }
 })
 
-test('real 42-sol Graphic Motion cue can be disabled, saved, and locally discarded', async ({ page }) => {
+test('real 42-sol Motion Graphics cue can be disabled, saved, and locally discarded', async ({ page }) => {
   const sourceRoot = process.env.CAC_REAL_EDITOR_PROJECT
   test.skip(!sourceRoot, 'Set CAC_REAL_EDITOR_PROJECT to the 42-sol project root')
   test.setTimeout(180_000)
@@ -1345,9 +1345,9 @@ test('real 42-sol Graphic Motion cue can be disabled, saved, and locally discard
     await expect(page.getByText('original-video.mp4', { exact: true })).toBeVisible()
     await expect(page.getByText('City Walk', { exact: true })).toHaveCount(0)
 
-    await page.getByRole('tab', { name: 'Graphic Motion' }).click()
+    await page.getByRole('tab', { name: 'Motion Graphics' }).click()
     await page.getByRole('button', { name: /THE REAL TONY STARK/ }).click()
-    const enabled = page.getByLabel('Graphic Motion enabled')
+    const enabled = page.getByLabel('Motion Graphics enabled')
     await expect(enabled).toBeChecked()
     await expect(page.getByText('License: unknown', { exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Insert motion' })).toHaveCount(0)
@@ -1366,7 +1366,7 @@ test('real 42-sol Graphic Motion cue can be disabled, saved, and locally discard
       snapshot: { media: expect.any(Array), artifacts: expect.any(Array) },
     })
     await expect.poll(async () => {
-      const plan = JSON.parse(await readFile(path.join(root, 'work', 'graphic-motion', 'graphic-motion-plan.json'), 'utf8'))
+      const plan = JSON.parse(await readFile(path.join(root, 'work', 'motion-graphics', 'motion-graphics-plan.json'), 'utf8'))
       return plan.cues[0].status
     }).toBe('skipped')
     await expect(enabled).not.toBeChecked()
@@ -1374,7 +1374,7 @@ test('real 42-sol Graphic Motion cue can be disabled, saved, and locally discard
     await enabled.click()
     const localEditState = {
       checked: await enabled.isChecked(),
-      status: await page.getByRole('status', { name: 'Graphic Motion review status' }).textContent(),
+      status: await page.getByRole('status', { name: 'Motion Graphics review status' }).textContent(),
     }
     expect(localEditState, JSON.stringify(localEditState)).toMatchObject({ checked: true })
     await expect(page.getByRole('button', { name: 'Save All' })).toBeEnabled()
@@ -1387,7 +1387,7 @@ test('real 42-sol Graphic Motion cue can be disabled, saved, and locally discard
   }
 })
 
-test('real project saves a transformed Graphic Motion layer without rendering and exports only on demand', async ({ page }) => {
+test('real project saves a transformed Motion Graphics layer without rendering and exports only on demand', async ({ page }) => {
   const sourceRoot = process.env.CAC_REAL_EDITOR_PROJECT
   test.skip(!sourceRoot || process.env.CAC_REAL_EXPORT_E2E !== '1', 'Set CAC_REAL_EDITOR_PROJECT and CAC_REAL_EXPORT_E2E=1')
   test.setTimeout(600_000)
@@ -1404,7 +1404,7 @@ test('real project saves a transformed Graphic Motion layer without rendering an
     },
   })
   await refreshSourceFingerprint(root)
-  const motionPlan = JSON.parse(await readFile(path.join(root, 'work', 'graphic-motion', 'graphic-motion-plan.json'), 'utf8'))
+  const motionPlan = JSON.parse(await readFile(path.join(root, 'work', 'motion-graphics', 'motion-graphics-plan.json'), 'utf8'))
   const motionCue = motionPlan.cues.find((cue: { status?: string }) => cue.status === 'verified')
   expect(motionCue).toBeTruthy()
   const finalPath = path.join(root, 'final', 'final-video.mp4')
@@ -1434,10 +1434,10 @@ test('real project saves a transformed Graphic Motion layer without rendering an
         y: 40,
       },
     })
-    await page.getByRole('tab', { name: 'Graphic Motion' }).click()
+    await page.getByRole('tab', { name: 'Motion Graphics' }).click()
     await page.getByRole('button', { name: new RegExp(motionCue.intent.content.slice(0, 24), 'i') }).click()
 
-    const layer = page.locator('[data-viewer-layer="graphic-motion"]')
+    const layer = page.locator('[data-viewer-layer="motion-graphics"]')
     await expect(layer).toBeVisible()
     const initialTransform = await layer.evaluate((element) => ({
       x: Number(element.getAttribute('data-layer-x')),
@@ -1480,7 +1480,7 @@ test('real project saves a transformed Graphic Motion layer without rendering an
     const transactionBody = await transactionResponse.json()
     expect(transactionResponse.status(), JSON.stringify({ transactionBody, editedTransform })).toBe(200)
     await expect.poll(async () => {
-      const plan = JSON.parse(await readFile(path.join(root, 'work', 'graphic-motion', 'graphic-motion-plan.json'), 'utf8'))
+      const plan = JSON.parse(await readFile(path.join(root, 'work', 'motion-graphics', 'motion-graphics-plan.json'), 'utf8'))
       return plan.cues.find((cue: { id: string }) => cue.id === motionCue.id)?.editor_transform
     }).toEqual(editedTransform)
 
@@ -1541,7 +1541,7 @@ test('real 42-sol workspace passes the desktop viewport and visual audit', async
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto(await armLaunch(isolated))
     await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
-    await page.getByRole('tab', { name: 'Graphic Motion' }).click()
+    await page.getByRole('tab', { name: 'Motion Graphics' }).click()
     await page.getByRole('button', { name: /THE REAL TONY STARK/ }).click()
     await expect(page.locator('.viewer-selection-toolbar')).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Volume' })).toHaveCount(0)
@@ -1554,9 +1554,9 @@ test('real 42-sol workspace passes the desktop viewport and visual audit', async
     expect(timelineSurfaceBox).not.toBeNull()
     await timelineSurface.click({ position: { x: timelineSurfaceBox!.width * 2 / 167.973152, y: 40 } })
     await expect.poll(() => source.evaluate((video) => video.currentTime)).toBeCloseTo(2, 0)
-    const graphicMotion = page.locator('[data-viewer-layer="graphic-motion"]')
-    await expect(graphicMotion).toBeVisible()
-    const motionFrame = graphicMotion.locator('img')
+    const motionGraphics = page.locator('[data-viewer-layer="motion-graphics"]')
+    await expect(motionGraphics).toBeVisible()
+    const motionFrame = motionGraphics.locator('img')
     await expect(motionFrame).toHaveAttribute('src', /\/layers\/layer_[a-f0-9]+\/frames\/60$/)
     const motionPixels = await motionFrame.evaluate(async (image: HTMLImageElement) => {
       await image.decode()
@@ -1722,11 +1722,11 @@ test('real 46-sol workspace satisfies the scoped UI review', async ({ page }) =>
     await expect(page.getByLabel('Content card copy')).toHaveCount(0)
     await page.screenshot({ path: path.join(visualOutput!, '46-sol-cards.png'), fullPage: false })
 
-    await page.getByRole('tab', { name: 'Graphic Motion' }).click()
+    await page.getByRole('tab', { name: 'Motion Graphics' }).click()
     await expect(page.locator('.library-tile').filter({ hasText: 'Automatic snake charger plugs itself into the Tesla.' })).toHaveCount(1)
-    await expect(page.getByRole('group', { name: 'Graphic Motion fields' })).toHaveCount(0)
+    await expect(page.getByRole('group', { name: 'Motion Graphics fields' })).toHaveCount(0)
     await expect(page.getByText('Recipe: xyz-fade-up', { exact: true })).toHaveCount(0)
-    await page.screenshot({ path: path.join(visualOutput!, '46-sol-graphic-motion.png'), fullPage: false })
+    await page.screenshot({ path: path.join(visualOutput!, '46-sol-motion-graphics.png'), fullPage: false })
   } finally {
     await page.close()
     await stopSidecar(isolated.process)
@@ -1897,11 +1897,11 @@ async function createProjectFixture() {
   return root
 }
 
-async function createGraphicMotionLayerProjectFixture() {
+async function createMotionGraphicsLayerProjectFixture() {
   const root = await mkdtemp(path.join(tmpdir(), 'cut-editor-layer-'))
-  const frameRoot = path.join(root, 'work', 'cache', 'graphic-motion', 'rendered', 'motion-001')
+  const frameRoot = path.join(root, 'work', 'cache', 'motion-graphics', 'rendered', 'motion-001')
   await mkdir(frameRoot, { recursive: true })
-  await mkdir(path.join(root, 'work', 'graphic-motion'), { recursive: true })
+  await mkdir(path.join(root, 'work', 'motion-graphics'), { recursive: true })
   await mkdir(path.join(root, 'input'), { recursive: true })
   const frame = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')
   const framePath = path.join(frameRoot, 'frame_000001.png')
@@ -1918,18 +1918,18 @@ async function createGraphicMotionLayerProjectFixture() {
       program_range: { start_s: 0, end_s: 1 }, speed: 1,
     }],
   }))
-  await writeFile(path.join(root, 'work', 'graphic-motion', 'graphic-motion-plan.json'), JSON.stringify({
+  await writeFile(path.join(root, 'work', 'motion-graphics', 'motion-graphics-plan.json'), JSON.stringify({
     schema_version: 3,
     cues: [{
       id: 'motion-001', status: 'verified', program_range: { start_s: 0, end_s: 1 },
       intent: { content: 'Bound motion' }, selection: { chosen_recipe_id: 'fixture' },
       recipe: {}, review: {},
       render: {
-        kind: 'overlay', asset: 'cache/graphic-motion/rendered/motion-001',
+        kind: 'overlay', asset: 'cache/motion-graphics/rendered/motion-001',
         asset_type: 'image-sequence', pattern: 'frame_%06d.png', start_number: 1,
         fps: { num: 30, den: 1 }, start_s: 0, duration_s: 1,
         frames: [{
-          path: 'work/cache/graphic-motion/rendered/motion-001/frame_000001.png',
+          path: 'work/cache/motion-graphics/rendered/motion-001/frame_000001.png',
           sha256: createHash('sha256').update(frame).digest('hex'),
         }],
       },
@@ -1940,10 +1940,10 @@ async function createGraphicMotionLayerProjectFixture() {
     project_id: 'layer-fixture',
     source: { path: '../input/source.mp4' },
     active_sequence: 'main',
-    sequences: { main: { timeline: 'timeline.json', operations: ['graphic-motion'] } },
+    sequences: { main: { timeline: 'timeline.json', operations: ['motion-graphics'] } },
     operations: [{
-      id: 'graphic-motion', revision: 1, status: 'verified',
-      plan: 'graphic-motion/graphic-motion-plan.json', depends_on: [], based_on: {},
+      id: 'motion-graphics', revision: 1, status: 'verified',
+      plan: 'motion-graphics/motion-graphics-plan.json', depends_on: [], based_on: {},
     }],
     reviews: [], render: { status: 'draft' },
   }))

@@ -13,11 +13,11 @@ const LAUNCH_TTL_MS = 60_000
 const PROTOCOL_CALL_TIMEOUT_MS = 30_000
 const MAX_IMPORT_BYTES = 2 * 1024 * 1024 * 1024
 const IMPORT_EXTENSIONS = new Set(['.mp4', '.mov', '.webm', '.mp3', '.wav', '.jpg', '.jpeg', '.png', '.webp', '.gif'])
-const DRAFT_OPERATIONS = new Set(['content-cards', 'captions', 'graphic-motion'])
+const DRAFT_OPERATIONS = new Set(['content-cards', 'captions', 'motion-graphics'])
 const DRAFT_FIELDS = Object.freeze({
   'content-cards': new Set(['cueId', 'copy', 'layout', 'placement', 'enabled', 'transform', 'contentBounds']),
   captions: new Set(['cueId', 'text', 'transform', 'contentBounds']),
-  'graphic-motion': new Set(['cueId', 'enabled', 'transform', 'contentBounds']),
+  'motion-graphics': new Set(['cueId', 'enabled', 'transform', 'contentBounds']),
 })
 const HTTP_ROUTE_ALLOWLIST = Object.freeze([
   Object.freeze({ id: 'launch', methods: Object.freeze(['GET']), pattern: /^\/$/ }),
@@ -538,14 +538,14 @@ async function collectLayerSequences(root) {
   }
   const operations = Array.isArray(project.operations) ? project.operations : []
   for (const operation of operations) {
-    if (!operation || !['captions', 'content-cards', 'graphic-motion'].includes(operation.id) || typeof operation.plan !== 'string') continue
+    if (!operation || !['captions', 'content-cards', 'motion-graphics'].includes(operation.id) || typeof operation.plan !== 'string') continue
     let plan
     try {
       plan = await readBoundJson(root, path.resolve(root, 'work', operation.plan))
     } catch {
       continue
     }
-    if (operation.id === 'graphic-motion') {
+    if (operation.id === 'motion-graphics') {
       for (const cue of Array.isArray(plan.cues) ? plan.cues : []) {
         const render = cue?.render
         if (!cue || cue.status !== 'verified' || typeof cue.id !== 'string' || render?.asset_type !== 'image-sequence') continue

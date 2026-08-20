@@ -61,7 +61,7 @@ const figmaScenarios: readonly FigmaScenario[] = [
 
 const geometryScenarios: readonly Readonly<{ scenarioId: string; viewport: Dimensions }>[] = [
   ...figmaScenarios.map(({ scenarioId, viewport }) => ({ scenarioId, viewport })),
-  { scenarioId: 'graphic-motion', viewport: { width: 320, height: 688 } },
+  { scenarioId: 'motion-graphics', viewport: { width: 320, height: 688 } },
 ]
 
 const expectedCurrentRunScenarioIds: string[] = []
@@ -435,22 +435,22 @@ for (const scenario of figmaScenarios) {
   })
 }
 
-test('user-extension Graphic Motion captures a 320x688 browser baseline', async ({ page }) => {
+test('user-extension Motion Graphics captures a 320x688 browser baseline', async ({ page }) => {
   const viewport = { width: 320, height: 688 }
-  const browserFile = artifactName('user-extension', 'graphic-motion', 'browser', 'png')
-  const resultFile = artifactName('user-extension', 'graphic-motion', 'result', 'json')
+  const browserFile = artifactName('user-extension', 'motion-graphics', 'browser', 'png')
+  const resultFile = artifactName('user-extension', 'motion-graphics', 'result', 'json')
   const browserPath = resolve(SCREENSHOT_DIR, browserFile)
 
   await page.setViewportSize(viewport)
-  await page.goto('/?scenario=graphic-motion')
-  await expect(page.locator('[data-scenario-id]')).toHaveAttribute('data-scenario-id', 'graphic-motion')
+  await page.goto('/?scenario=motion-graphics')
+  await expect(page.locator('[data-scenario-id]')).toHaveAttribute('data-scenario-id', 'motion-graphics')
   await settleVisuals(page)
   await page.screenshot({ path: browserPath, animations: 'disabled', caret: 'hide' })
 
   const result: ComparisonResult = {
     label: 'user-extension',
     nodeId: null,
-    scenarioId: 'graphic-motion',
+    scenarioId: 'motion-graphics',
     viewport,
     reference: null,
     referenceCompared: null,
@@ -469,7 +469,7 @@ test('user-extension Graphic Motion captures a 320x688 browser baseline', async 
       result: resultFile,
     },
   }
-  expectedCurrentRunScenarioIds.push('graphic-motion')
+  expectedCurrentRunScenarioIds.push('motion-graphics')
   writeResult(result)
 
   const aggregate = JSON.parse(
@@ -480,7 +480,7 @@ test('user-extension Graphic Motion captures a 320x688 browser baseline', async 
 
 test('geometry gate reports text clipped by hidden and clip ancestors', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 240 })
-  await page.goto('/?scenario=graphic-motion')
+  await page.goto('/?scenario=motion-graphics')
   await settleVisuals(page)
   await page.evaluate(() => {
     const outer = document.createElement('div')
@@ -517,11 +517,11 @@ test('all scenarios have unclipped, non-overlapping visible text leaves', async 
   expect(failures, failures.join('\n')).toEqual([])
 })
 
-test('current-run visual evidence covers every Figma scenario and Graphic Motion', () => {
+test('current-run visual evidence covers every Figma scenario and Motion Graphics', () => {
   const results = [...currentRunResults.values()]
   expect(results.map(({ scenarioId }) => scenarioId)).toEqual([
     ...figmaScenarios.map(({ scenarioId }) => scenarioId),
-    'graphic-motion',
+    'motion-graphics',
   ])
   for (const result of results) {
     expect(result.browser).toEqual(result.viewport)

@@ -26,7 +26,7 @@ function CueInspector({ operation, store }: ProjectReviewPanelProps) {
   const edit = useStore(store, (state) => state.editOperationDraft)
   const expectedKind = operation.kind === 'content-cards' ? 'card'
     : operation.kind === 'captions' ? 'caption'
-      : operation.kind === 'graphic-motion' ? 'graphic-motion'
+      : operation.kind === 'motion-graphics' ? 'motion-graphics'
         : null
   if (!expectedKind || selection?.kind !== expectedKind) return null
   const cues = Array.isArray(operation.fields.cues)
@@ -37,7 +37,7 @@ function CueInspector({ operation, store }: ProjectReviewPanelProps) {
   const fields = draftFieldsForCue(draft, selection.id)
   const title = expectedKind === 'caption' ? 'Caption Inspector'
     : expectedKind === 'card' ? 'Content Card Inspector'
-      : 'Graphic Motion Inspector'
+      : 'Motion Graphics Inspector'
 
   return (
     <section className="cue-inspector" aria-label={title} data-cue-inspector={selection.id} tabIndex={-1}>
@@ -98,7 +98,7 @@ function CueInspector({ operation, store }: ProjectReviewPanelProps) {
           <span>Enabled</span>
         </label>
       ) : null}
-      {expectedKind === 'graphic-motion' ? (
+      {expectedKind === 'motion-graphics' ? (
         <p>Adjust position and scale directly on the selected layer in the Viewer.</p>
       ) : null}
     </section>

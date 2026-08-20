@@ -1609,8 +1609,8 @@ button {
 .timeline-lane--caption { --timeline-row-height: 64px; }
 .timeline-track-header--card,
 .timeline-lane--card,
-.timeline-track-header--graphic-motion,
-.timeline-lane--graphic-motion { --timeline-row-height: 64px; }
+.timeline-track-header--motion-graphics,
+.timeline-lane--motion-graphics { --timeline-row-height: 64px; }
 .timeline-track-header--video,
 .timeline-lane--video { --timeline-row-height: 108px; }
 .timeline-track-header--audio,
@@ -1624,13 +1624,13 @@ button {
 .timeline-lane.timeline-track-density--compact.timeline-lane--caption,
 .timeline-track-header.timeline-track-density--compact.timeline-track-header--card,
 .timeline-lane.timeline-track-density--compact.timeline-lane--card,
-.timeline-track-header.timeline-track-density--compact.timeline-track-header--graphic-motion,
-.timeline-lane.timeline-track-density--compact.timeline-lane--graphic-motion { --timeline-row-height: 48px; }
+.timeline-track-header.timeline-track-density--compact.timeline-track-header--motion-graphics,
+.timeline-lane.timeline-track-density--compact.timeline-lane--motion-graphics { --timeline-row-height: 48px; }
 .timeline-track-header.timeline-track-density--relaxed.timeline-track-header--caption,
 .timeline-lane.timeline-track-density--relaxed.timeline-lane--caption,
 .timeline-track-header.timeline-track-density--relaxed.timeline-track-header--card,
 .timeline-lane.timeline-track-density--relaxed.timeline-lane--card,
-.timeline-track-header.timeline-track-density--relaxed.timeline-track-header--graphic-motion { --timeline-row-height: 96px; }
+.timeline-track-header.timeline-track-density--relaxed.timeline-track-header--motion-graphics { --timeline-row-height: 96px; }
 .timeline-lane.timeline-track-density--compact { padding-top: 4px; padding-bottom: 4px; }
 .timeline-lane--video.timeline-track-density--compact .timeline-clip-shell,
 .timeline-lane--video.timeline-track-density--compact .timeline-clip { height: 40px; }
@@ -1640,8 +1640,8 @@ button {
 .timeline-lane--caption.timeline-track-density--compact .timeline-clip,
 .timeline-lane--card.timeline-track-density--compact .timeline-clip-shell,
 .timeline-lane--card.timeline-track-density--compact .timeline-clip,
-.timeline-lane--graphic-motion.timeline-track-density--compact .timeline-clip-shell,
-.timeline-lane--graphic-motion.timeline-track-density--compact .timeline-clip { height: 32px; }
+.timeline-lane--motion-graphics.timeline-track-density--compact .timeline-clip-shell,
+.timeline-lane--motion-graphics.timeline-track-density--compact .timeline-clip { height: 32px; }
 .timeline-track-header.is-collapsed,
 .timeline-lane.is-collapsed { --timeline-row-height: 32px; min-height: 32px; height: 32px; padding-top: 4px; padding-bottom: 4px; }
 .timeline-lane.is-collapsed > .timeline-clip-shell { display: none; }
@@ -1705,7 +1705,7 @@ button {
 .timeline-lane--audio { padding-top: 8px; }
 .timeline-lane--caption { padding-top: 8px; }
 .timeline-lane--card,
-.timeline-lane--graphic-motion { padding-top: 8px; }
+.timeline-lane--motion-graphics { padding-top: 8px; }
 .timeline-lane--reserved { height: 88px; padding: 0; background: #242529; }
 
 .timeline-clip-shell {
@@ -1716,7 +1716,7 @@ button {
 .timeline-clip-shell--audio { height: 60px; }
 .timeline-clip-shell--caption,
 .timeline-clip-shell--card,
-.timeline-clip-shell--graphic-motion { height: 48px; }
+.timeline-clip-shell--motion-graphics { height: 48px; }
 
 .timeline-clip {
   position: relative;
@@ -1981,7 +1981,7 @@ button {
 .timeline-clip--audio[data-linked='false']:active { cursor: grabbing; }
 .timeline-clip--caption { display: flex; height: 48px; padding: 0 8px; border-color: #3b3e46; background: #294e4a; }
 .timeline-clip--card { display: flex; height: 48px; padding: 0 8px; border-color: #87724a; background: #51462f; }
-.timeline-clip--graphic-motion { display: flex; height: 48px; padding: 0 8px; border-color: #3d7885; background: #244b54; }
+.timeline-clip--motion-graphics { display: flex; height: 48px; padding: 0 8px; border-color: #3d7885; background: #244b54; }
 
 .timeline-clip-label {
   position: absolute;

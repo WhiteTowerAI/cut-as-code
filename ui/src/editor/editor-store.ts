@@ -126,7 +126,7 @@ function getOperation(project: EditorProjectView | null, operationId: string) {
 function isSupportedOperation(
   operation: EditorOperationView | undefined,
 ): operation is EditorOperationView {
-  return Boolean(operation?.editable && ['content-cards', 'captions', 'graphic-motion'].includes(operation.kind))
+  return Boolean(operation?.editable && ['content-cards', 'captions', 'motion-graphics'].includes(operation.kind))
 }
 
 function isOperationDraftChange(operation: EditorOperationView, value: unknown): value is ContentCardsDraftChange {
@@ -231,7 +231,7 @@ function applyDraftChangesToTracks(
 ) {
   const kind = operationId === 'captions' ? 'caption'
     : operationId === 'content-cards' ? 'card'
-      : operationId === 'graphic-motion' ? 'graphic-motion'
+      : operationId === 'motion-graphics' ? 'motion-graphics'
         : null
   if (!kind) return project.tracks
   return project.tracks.map((track) => track.kind !== kind ? track : {
@@ -790,7 +790,7 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
       const kindOrder = new Map<EditorOperationView['kind'], number>([
         ['captions', 0],
         ['content-cards', 1],
-        ['graphic-motion', 2],
+        ['motion-graphics', 2],
       ])
       const operationIds = (get().project?.operations ?? [])
         .filter((operation) => isSupportedOperation(operation) && get().operationDrafts[operation.id]?.dirty)

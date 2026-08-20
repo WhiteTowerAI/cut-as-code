@@ -1,9 +1,9 @@
 ---
-name: video-add-graphic-motion
+name: video-add-motion-graphics
 description: Use when an understood Project Protocol V1 video needs selective transcript-timed motion graphics from this package's compact AnimXYZ core.
 ---
 
-# Video Add Graphic Motion - Packaged Core
+# Video Add Motion Graphics - Packaged Core
 
 This package ships exactly 10 selectable AnimXYZ core recipes: `xyz-fade-big`,
 `xyz-fade-down`, `xyz-fade-left`, `xyz-fade-right`, `xyz-fade-small`, `xyz-fade-up`,
@@ -20,7 +20,7 @@ not invoke this skill or render video.
 The full repository also supports optional Codrops and sticker libraries. They are intentionally
 omitted from this compact editor package. Treat a request for Codrops, canvas-confetti, mo.js,
 Line MD, Meteocons, tsParticles, or another absent family as
-`missing_content_pack: graphic-motion-expanded-library`; do not silently return an empty catalog,
+`missing_content_pack: motion-graphics-expanded-library`; do not silently return an empty catalog,
 search the web, or substitute another effect.
 
 HyperFrames authoring and rendering skills are external prerequisites for any non-skipped cue.
@@ -34,9 +34,9 @@ throughout the complete animation path; skip any cue that cannot be placed safel
 Search and inspect the shipped core deterministically:
 
 ```powershell
-node skills/video-add-graphic-motion/scripts/recipe_library.mjs search `
+node skills/video-add-motion-graphics/scripts/recipe_library.mjs search `
   --query "fade rise rotate" --limit 8 --json
-node skills/video-add-graphic-motion/scripts/recipe_library.mjs show xyz-fade-up --json
+node skills/video-add-motion-graphics/scripts/recipe_library.mjs show xyz-fade-up --json
 ```
 
 For a selected core recipe, record manifest evidence and Agent rationale, materialize it with

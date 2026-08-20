@@ -63,8 +63,8 @@ export type RuntimeSnapshot = Readonly<{
       style: Readonly<Record<string, unknown>>
       cues: readonly RuntimeCaptionCue[]
     }>
-    graphic_motion_edit?: Readonly<{
-      cues: readonly RuntimeGraphicMotionCue[]
+    motion_graphics_edit?: Readonly<{
+      cues: readonly RuntimeMotionGraphicsCue[]
     }>
     layers?: readonly RuntimeLayer[]
   }>
@@ -82,7 +82,7 @@ export type RuntimeLayer = Readonly<{
   id: string
   operation_id: string
   cue_id: string
-  kind: 'caption' | 'card' | 'graphic-motion'
+  kind: 'caption' | 'card' | 'motion-graphics'
   media_type: 'dom' | 'image-sequence'
   z_index: number
   program_range: Readonly<{ start_s: number; end_s: number }>
@@ -162,7 +162,7 @@ export type RuntimeCardCue = Readonly<{
   transform?: RuntimeLayerTransform
 }>
 
-export type RuntimeGraphicMotionCue = Readonly<{
+export type RuntimeMotionGraphicsCue = Readonly<{
   id: string
   status?: string
   enabled: boolean
