@@ -7,6 +7,7 @@ import http.client
 import json
 import os
 import shutil
+import socket
 import subprocess
 import tempfile
 import time
@@ -29,7 +30,7 @@ ENTRY_SKILLS = {
     "video-cut",
     "video-color-grade",
     "video-add-b-roll",
-    "video-add-graphic-motion",
+    "video-add-motion-graphics",
     "video-add-captions",
     "video-add-content-cards",
     "video-edit-compare",
@@ -135,7 +136,7 @@ class PluginPackageTests(unittest.TestCase):
 
     def test_browser_opener_defaults_and_keeps_url_as_single_argv(self) -> None:
         script = r"""
-const { TOOL, openBrowser, shouldOpenBrowser } = require(process.argv[1]);
+const { TOOL, browserLaunchSpec, openBrowser, shouldOpenBrowser } = require(process.argv[1]);
 const url = 'http://127.0.0.1:43123/?project=project_a&launch=token-value';
 const calls = [];
 (async () => {
@@ -149,6 +150,14 @@ const calls = [];
     queueMicrotask(() => handlers.spawn?.());
     return child;
   }, 'win32');
+  const failure = await openBrowser(url, () => {
+    const handlers = {};
+    const child = {
+      unref() {},
+      once(event, handler) { handlers[event] = handler; queueMicrotask(() => event === 'error' && handler(Object.assign(new Error('missing'), { code: 'ENOENT' }))); return child; },
+    };
+    return child;
+  }, 'linux').then(() => null, (error) => error.message);
   process.stdout.write(JSON.stringify({
     defaultValue: shouldOpenBrowser(undefined),
     falseValue: shouldOpenBrowser(false),
@@ -157,12 +166,15 @@ const calls = [];
     description: TOOL.description,
     inputSchema: TOOL.inputSchema,
     calls,
+    darwin: browserLaunchSpec('darwin'),
+    linux: browserLaunchSpec('linux'),
+    failure,
   }));
 })().catch((error) => { process.stderr.write(error.stack); process.exitCode = 1; });
 """
         result = subprocess.run(
             ["node", "-e", script, str(REPOSITORY_ROOT / "runtime" / "mcp.cjs")],
-            check=True,
+            check=False,
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -191,6 +203,17 @@ const calls = [];
             ],
             "options": {"detached": True, "stdio": "ignore", "windowsHide": True},
         }, {"event": "unref"}])
+        self.assertEqual(audit["darwin"], {
+            "command": "open", "args": [], "options": {"detached": True, "stdio": "ignore"},
+        })
+        self.assertEqual(audit["linux"], {
+            "command": "xdg-open", "args": [], "options": {"detached": True, "stdio": "ignore"},
+        })
+        self.assertEqual(
+            audit["failure"],
+            "Could not open the system browser automatically. Open this URL manually: "
+            "http://127.0.0.1:43123/?project=project_a&launch=token-value",
+        )
 
     def test_windows_export_actions_wait_for_system_process_start(self) -> None:
         script = r"""
@@ -327,6 +350,537 @@ const root = process.argv[2];
             finally:
                 self._stop_mcp(process)
 
+    def test_editor_launch_hook_matches_only_exact_prompt_and_reconnects(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="cut editor hook ") as temporary:
+            plugin_data = Path(temporary) / "plugin data"
+            script = r"""
+const { runHook } = require(process.argv[1]);
+const { readTrustedLocator, hubPaths } = require(process.argv[2]);
+(async () => {
+  const opened = [];
+  const dependencies = { openBrowser: async (url) => opened.push(url) };
+  const unrelated = await runHook({ hook_event_name: 'UserPromptSubmit', prompt: 'Open another tool' }, dependencies);
+  const first = await runHook({ hook_event_name: 'UserPromptSubmit', prompt: 'Open Cut as Code Editor' }, dependencies);
+  const firstLocator = await readTrustedLocator(hubPaths(process.env.PLUGIN_DATA).locator);
+  const second = await runHook({ hook_event_name: 'UserPromptSubmit', prompt: 'Open Cut as Code Editor' }, dependencies);
+  const secondLocator = await readTrustedLocator(hubPaths(process.env.PLUGIN_DATA).locator);
+  process.stdout.write(JSON.stringify({ unrelated, first, second, opened, firstPid: firstLocator.pid, secondPid: secondLocator.pid }));
+})().catch((error) => { process.stderr.write(String(error)); process.exit(1); });
+"""
+            environment = {
+                **os.environ,
+                "PLUGIN_ROOT": str(REPOSITORY_ROOT),
+                "PLUGIN_DATA": str(plugin_data),
+            }
+            try:
+                result = subprocess.run(
+                    [
+                        "node", "-e", script,
+                        str(REPOSITORY_ROOT / "hooks" / "launch-editor.cjs"),
+                        str(REPOSITORY_ROOT / "runtime" / "hub-client.cjs"),
+                    ],
+                    cwd=REPOSITORY_ROOT,
+                    env=environment,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    timeout=30,
+                )
+                evidence = json.loads(result.stdout)
+                self.assertIsNone(evidence["unrelated"])
+                expected = {"decision": "block", "reason": "Cut as Code Editor opened."}
+                self.assertEqual(evidence["first"], expected)
+                self.assertEqual(evidence["second"], expected)
+                self.assertEqual(len(evidence["opened"]), 2)
+                self.assertEqual(
+                    urllib.parse.urlsplit(evidence["opened"][0]).netloc,
+                    urllib.parse.urlsplit(evidence["opened"][1]).netloc,
+                )
+                self.assertEqual(evidence["firstPid"], evidence["secondPid"])
+            finally:
+                subprocess.run(
+                    ["node", str(REPOSITORY_ROOT / "runtime" / "hub-client.cjs"), "shutdown"],
+                    cwd=REPOSITORY_ROOT,
+                    env=environment,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    timeout=20,
+                )
+
+    def test_editor_drafts_survive_runtime_restart_without_mutating_project(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="cut editor drafts ") as temporary:
+            temporary_root = Path(temporary)
+            project_root = temporary_root / "video project"
+            plugin_data = temporary_root / "plugin data"
+            self._create_project(project_root)
+            environment = {
+                **os.environ,
+                "CAC_PYTHON": str(BUNDLED_PYTHON),
+                "PLUGIN_DATA": str(plugin_data),
+            }
+            process = self._start_mcp(REPOSITORY_ROOT, environment)
+            try:
+                opened = self._open_editor(process, 1, project_root)
+                self._assert_real_browser_ready(opened["url"], opened["projectId"], project_root.name)
+                session = self._session_values[-1]
+                snapshot = self._draft_request(opened["url"], opened["projectId"], session, "GET", "snapshot")[2]["snapshot"]
+                revision = next(item["revision"] for item in snapshot["view"]["operations"] if item["id"] == "captions")
+                authority_before = (project_root / "work" / "project.json").read_bytes()
+                saved = self._draft_request(opened["url"], opened["projectId"], session, "PUT", "drafts/captions", {
+                    "baseRevision": revision,
+                    "changes": [{"cueId": "cue-001", "text": "Recovered copy"}],
+                })
+                self.assertEqual(saved[0], 200)
+                self.assertEqual((project_root / "work" / "project.json").read_bytes(), authority_before)
+                update_script = r"""
+const { ensureHub } = require(process.argv[1]);
+(async () => {
+  const before = await ensureHub({ pluginRoot: process.argv[2], dataRoot: process.env.PLUGIN_DATA });
+  const pending = await ensureHub({ pluginRoot: process.argv[2], dataRoot: process.env.PLUGIN_DATA, protocolVersion: 2, runtimeVersion: 'next-incompatible' });
+  process.stdout.write(JSON.stringify({ beforePid: before.pid, pendingPid: pending.pid, updatePending: pending.updatePending }));
+})().catch((error) => { process.stderr.write(String(error)); process.exit(1); });
+"""
+                update_result = subprocess.run(
+                    ["node", "-e", update_script, str(REPOSITORY_ROOT / "runtime" / "hub-client.cjs"), str(REPOSITORY_ROOT)],
+                    cwd=REPOSITORY_ROOT, env=environment, check=True, capture_output=True, text=True, encoding="utf-8", timeout=20,
+                )
+                update_evidence = json.loads(update_result.stdout)
+                self.assertEqual(update_evidence["beforePid"], update_evidence["pendingPid"])
+                self.assertTrue(update_evidence["updatePending"])
+            finally:
+                self._stop_mcp(process)
+                subprocess.run(
+                    ["node", str(REPOSITORY_ROOT / "runtime" / "hub-client.cjs"), "shutdown"],
+                    cwd=REPOSITORY_ROOT, env=environment, check=True, capture_output=True, text=True, timeout=20,
+                )
+
+            restarted = self._start_mcp(REPOSITORY_ROOT, environment)
+            try:
+                reopened = self._open_editor(restarted, 2, project_root)
+                self._assert_real_browser_ready(reopened["url"], reopened["projectId"], project_root.name)
+                session = self._session_values[-1]
+                recovered = self._draft_request(reopened["url"], reopened["projectId"], session, "GET", "drafts/captions")
+                self.assertEqual(recovered[0], 200)
+                self.assertEqual(recovered[2]["draft"]["changes"][0]["text"], "Recovered copy")
+                self.assertFalse(recovered[2]["draft"]["conflict"])
+                stale = self._draft_request(reopened["url"], reopened["projectId"], session, "PUT", "drafts/captions", {
+                    "baseRevision": revision - 1,
+                    "changes": [{"cueId": "cue-001", "text": "Stale copy"}],
+                })
+                self.assertTrue(stale[2]["draft"]["conflict"])
+                removed = self._draft_request(reopened["url"], reopened["projectId"], session, "DELETE", "drafts/captions")
+                self.assertEqual(removed[0], 200)
+                self.assertEqual(self._draft_request(reopened["url"], reopened["projectId"], session, "GET", "drafts/captions")[0], 404)
+            finally:
+                self._stop_mcp(restarted)
+                subprocess.run(
+                    ["node", str(REPOSITORY_ROOT / "runtime" / "hub-client.cjs"), "shutdown"],
+                    cwd=REPOSITORY_ROOT, env=environment, check=False, capture_output=True, text=True, timeout=20,
+                )
+
+    def test_editor_hub_hands_off_compatible_and_incompatible_versions_when_safe(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="cut editor update ") as temporary:
+            environment = {**os.environ, "PLUGIN_DATA": str(Path(temporary) / "plugin data")}
+            script = r"""
+const { HUB_CAPABILITIES, ensureHub, hubRequest } = require(process.argv[1]);
+(async () => {
+  const options = { pluginRoot: process.argv[2], dataRoot: process.env.PLUGIN_DATA };
+  const first = await ensureHub({ ...options, protocolVersion: 1, runtimeVersion: '1.0.0' });
+  const compatible = await ensureHub({ ...options, protocolVersion: 1, runtimeVersion: '1.1.0' });
+  const capabilityHandoff = await ensureHub({
+    ...options, protocolVersion: 1, runtimeVersion: '1.2.0',
+    capabilities: [...HUB_CAPABILITIES, 'future-capability'],
+  });
+  const handedOff = await ensureHub({ ...options, protocolVersion: 2, runtimeVersion: '2.0.0' });
+  const meta = await hubRequest(handedOff, 'GET', '/v1/health');
+  process.stdout.write(JSON.stringify({
+    firstPid: first.pid,
+    compatiblePid: compatible.pid,
+    compatibleUpdateAvailable: compatible.updateAvailable,
+    capabilityHandoffPid: capabilityHandoff.pid,
+    capabilityHandoffCapabilities: capabilityHandoff.capabilities,
+    handedOffPid: handedOff.pid,
+    meta,
+  }));
+})().catch((error) => { process.stderr.write(String(error)); process.exit(1); });
+"""
+            try:
+                result = subprocess.run(
+                    ["node", "-e", script, str(REPOSITORY_ROOT / "runtime" / "hub-client.cjs"), str(REPOSITORY_ROOT)],
+                    cwd=REPOSITORY_ROOT, env=environment, check=True, capture_output=True, text=True, encoding="utf-8", timeout=30,
+                )
+                evidence = json.loads(result.stdout)
+                self.assertNotEqual(evidence["firstPid"], evidence["compatiblePid"])
+                self.assertIsNone(evidence.get("compatibleUpdateAvailable"))
+                self.assertNotEqual(evidence["compatiblePid"], evidence["capabilityHandoffPid"])
+                self.assertIn("future-capability", evidence["capabilityHandoffCapabilities"])
+                self.assertNotEqual(evidence["capabilityHandoffPid"], evidence["handedOffPid"])
+                self.assertEqual(evidence["meta"]["protocolVersion"], 2)
+                self.assertEqual(evidence["meta"]["runtimeVersion"], "2.0.0")
+                self.assertIn("recoverable-drafts", evidence["meta"]["capabilities"])
+            finally:
+                subprocess.run(
+                    ["node", str(REPOSITORY_ROOT / "runtime" / "hub-client.cjs"), "shutdown"],
+                    cwd=REPOSITORY_ROOT, env=environment, check=False, capture_output=True, text=True, timeout=20,
+                )
+
+    def test_active_editor_drains_before_compatible_update_handoff(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="cut draining update ") as temporary:
+            root = Path(temporary)
+            project_root = root / "video project"
+            plugin_data = root / "plugin data"
+            self._create_project(project_root)
+            environment = {**os.environ, "CAC_PYTHON": str(BUNDLED_PYTHON), "PLUGIN_DATA": str(plugin_data)}
+            process = self._start_mcp(REPOSITORY_ROOT, environment)
+            events = None
+            connection = None
+            try:
+                opened = self._open_editor(process, 1, project_root)
+                self._assert_real_browser_ready(opened["url"], opened["projectId"], project_root.name)
+                session = self._session_values[-1]
+                parsed = urllib.parse.urlsplit(opened["url"])
+                connection = http.client.HTTPConnection(parsed.hostname, parsed.port, timeout=5)
+                connection.request(
+                    "GET",
+                    f"/v1/projects/{urllib.parse.quote(opened['projectId'], safe='')}/events",
+                    headers={"Cookie": f"cut_session={session}"},
+                )
+                events = connection.getresponse()
+                self.assertEqual(events.status, 200)
+                self.assertEqual(events.readline(), b"event: ready\n")
+
+                script = r"""
+const { ensureHub } = require(process.argv[1]);
+(async () => {
+  const current = await ensureHub({ pluginRoot: process.argv[2], dataRoot: process.env.PLUGIN_DATA });
+  const pending = await ensureHub({
+    pluginRoot: process.argv[2], dataRoot: process.env.PLUGIN_DATA,
+    protocolVersion: current.protocolVersion, runtimeVersion: '9.0.0',
+  });
+  process.stdout.write(JSON.stringify({ oldPid: current.pid, pendingPid: pending.pid, updateAvailable: pending.updateAvailable }));
+})().catch((error) => { process.stderr.write(String(error)); process.exit(1); });
+"""
+                requested = subprocess.run(
+                    ["node", "-e", script, str(REPOSITORY_ROOT / "runtime" / "hub-client.cjs"), str(REPOSITORY_ROOT)],
+                    cwd=REPOSITORY_ROOT, env=environment, check=True, capture_output=True, text=True, encoding="utf-8", timeout=20,
+                )
+                evidence = json.loads(requested.stdout)
+                self.assertEqual(evidence["oldPid"], evidence["pendingPid"])
+                self.assertTrue(evidence["updateAvailable"])
+                time.sleep(1.5)
+                while True:
+                    locator = json.loads((plugin_data / "hub.json").read_text(encoding="utf-8"))
+                    if locator["pid"] == evidence["oldPid"]:
+                        break
+                    self.fail("compatible update interrupted an active editor")
+
+                events.close()
+                connection.close()
+                events = None
+                connection = None
+                deadline = time.monotonic() + 15
+                promoted = None
+                while time.monotonic() < deadline:
+                    try:
+                        candidate = json.loads((plugin_data / "hub.json").read_text(encoding="utf-8"))
+                    except (FileNotFoundError, json.JSONDecodeError):
+                        candidate = None
+                    if candidate and candidate.get("runtimeVersion") == "9.0.0" and candidate.get("pid") != evidence["oldPid"]:
+                        promoted = candidate
+                        break
+                    time.sleep(0.1)
+                self.assertIsNotNone(promoted)
+            finally:
+                if events:
+                    events.close()
+                if connection:
+                    connection.close()
+                self._stop_mcp(process)
+                subprocess.run(
+                    ["node", str(REPOSITORY_ROOT / "runtime" / "hub-client.cjs"), "shutdown"],
+                    cwd=REPOSITORY_ROOT, env=environment, check=False, capture_output=True, text=True, timeout=20,
+                )
+
+    def test_close_project_protects_a_mutation_waiting_for_its_request_body(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="cut close barrier ") as temporary:
+            root = Path(temporary)
+            project_root = root / "video project"
+            plugin_data = root / "plugin data"
+            self._create_project(project_root)
+            environment = {**os.environ, "CAC_PYTHON": str(BUNDLED_PYTHON), "PLUGIN_DATA": str(plugin_data)}
+            process = self._start_mcp(REPOSITORY_ROOT, environment)
+            stalled = None
+            try:
+                opened = self._open_editor(process, 1, project_root)
+                self._assert_real_browser_ready(opened["url"], opened["projectId"], project_root.name)
+                project_session = self._session_values[-1]
+                editor = urllib.parse.urlsplit(opened["url"])
+
+                locator = json.loads((plugin_data / "hub.json").read_text(encoding="utf-8"))
+                control = http.client.HTTPConnection(locator["host"], locator["port"], timeout=5)
+                try:
+                    control.request(
+                        "POST", "/v1/hub/launch", body=b"{}",
+                        headers={"Authorization": f"Bearer {locator['controlToken']}", "Content-Type": "application/json"},
+                    )
+                    launch_response = control.getresponse()
+                    launch = json.loads(launch_response.read())
+                    self.assertEqual(launch_response.status, 200)
+                finally:
+                    control.close()
+                status, headers, _ = self._request(launch["url"])
+                self.assertEqual(status, 303)
+                hub_cookie = headers["set-cookie"].split(";", 1)[0]
+
+                stalled = socket.create_connection((editor.hostname, editor.port), timeout=5)
+                request_head = (
+                    f"POST /v1/projects/{urllib.parse.quote(opened['projectId'], safe='')}/transactions HTTP/1.1\r\n"
+                    f"Host: {editor.netloc}\r\n"
+                    f"Cookie: cut_session={project_session}\r\n"
+                    f"Origin: {editor.scheme}://{editor.netloc}\r\n"
+                    "Content-Type: application/json\r\n"
+                    "Content-Length: 1024\r\n"
+                    "Connection: keep-alive\r\n\r\n"
+                    "{"
+                )
+                stalled.sendall(request_head.encode("utf-8"))
+                time.sleep(0.2)
+
+                hub = http.client.HTTPConnection(locator["host"], locator["port"], timeout=5)
+                try:
+                    payload = json.dumps({"force": False}).encode("utf-8")
+                    hub.request(
+                        "POST", f"/v1/hub/projects/{urllib.parse.quote(opened['projectId'], safe='')}/close",
+                        body=payload,
+                        headers={
+                            "Cookie": hub_cookie,
+                            "Origin": f"http://{locator['host']}:{locator['port']}",
+                            "Content-Type": "application/json",
+                        },
+                    )
+                    close_response = hub.getresponse()
+                    close_result = json.loads(close_response.read())
+                    self.assertEqual(close_response.status, 409)
+                    self.assertTrue(close_result["requiresConfirmation"])
+                    self.assertIn("active operation", close_result["reasons"])
+                finally:
+                    hub.close()
+            finally:
+                if stalled:
+                    stalled.close()
+                self._stop_mcp(process)
+                subprocess.run(
+                    ["node", str(REPOSITORY_ROOT / "runtime" / "hub-client.cjs"), "shutdown"],
+                    cwd=REPOSITORY_ROOT, env=environment, check=False, capture_output=True, text=True, timeout=20,
+                )
+
+    def test_pending_editor_update_advances_automatically_after_draft_is_cleared(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="cut pending update ") as temporary:
+            root = Path(temporary)
+            project_root = root / "video project"
+            plugin_data = root / "plugin data"
+            self._create_project(project_root)
+            environment = {**os.environ, "CAC_PYTHON": str(BUNDLED_PYTHON), "PLUGIN_DATA": str(plugin_data)}
+            process = self._start_mcp(REPOSITORY_ROOT, environment)
+            try:
+                opened = self._open_editor(process, 1, project_root)
+                self._assert_real_browser_ready(opened["url"], opened["projectId"], project_root.name)
+                session = self._session_values[-1]
+                saved = self._draft_request(opened["url"], opened["projectId"], session, "PUT", "drafts/captions", {
+                    "baseRevision": 1,
+                    "changes": [{"cueId": "cue-001", "text": "Blocks update"}],
+                })
+                self.assertEqual(saved[0], 200)
+                script = r"""
+const { ensureHub } = require(process.argv[1]);
+(async () => {
+  const current = await ensureHub({ pluginRoot: process.argv[2], dataRoot: process.env.PLUGIN_DATA });
+  const pending = await ensureHub({
+    pluginRoot: process.argv[2], dataRoot: process.env.PLUGIN_DATA,
+    protocolVersion: 2, runtimeVersion: '2.0.0',
+  });
+  process.stdout.write(JSON.stringify({ oldPid: current.pid, pending: pending.updatePending }));
+})().catch((error) => { process.stderr.write(String(error)); process.exit(1); });
+"""
+                requested = subprocess.run(
+                    ["node", "-e", script, str(REPOSITORY_ROOT / "runtime" / "hub-client.cjs"), str(REPOSITORY_ROOT)],
+                    cwd=REPOSITORY_ROOT, env=environment, check=True, capture_output=True, text=True, encoding="utf-8", timeout=20,
+                )
+                evidence = json.loads(requested.stdout)
+                self.assertTrue(evidence["pending"])
+                removed = self._draft_request(opened["url"], opened["projectId"], session, "DELETE", "drafts/captions")
+                self.assertEqual(removed[0], 200)
+                locator_path = plugin_data / "hub.json"
+                deadline = time.monotonic() + 15
+                promoted = None
+                while time.monotonic() < deadline:
+                    try:
+                        candidate = json.loads(locator_path.read_text(encoding="utf-8"))
+                    except (FileNotFoundError, json.JSONDecodeError):
+                        candidate = None
+                    if candidate and candidate.get("protocolVersion") == 2 and candidate.get("pid") != evidence["oldPid"]:
+                        promoted = candidate
+                        break
+                    time.sleep(0.1)
+                self.assertIsNotNone(promoted)
+                deadline = time.monotonic() + 5
+                while time.monotonic() < deadline and self._pid_is_live(opened["pid"]):
+                    time.sleep(0.1)
+                self.assertFalse(self._pid_is_live(opened["pid"]))
+                reopened = self._open_editor(process, 2, project_root)
+                self.assertNotEqual(reopened["pid"], opened["pid"])
+                self._assert_real_browser_ready(reopened["url"], reopened["projectId"], project_root.name)
+            finally:
+                self._stop_mcp(process)
+                subprocess.run(
+                    ["node", str(REPOSITORY_ROOT / "runtime" / "hub-client.cjs"), "shutdown"],
+                    cwd=REPOSITORY_ROOT, env=environment, check=False, capture_output=True, text=True, timeout=20,
+                )
+
+    def test_handoff_prepare_rechecks_a_real_mutation_lease(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="cut handoff lease ") as temporary:
+            root = Path(temporary)
+            project_root = root / "video project"
+            plugin_data = root / "plugin data"
+            self._create_project(project_root)
+            environment = {**os.environ, "CAC_PYTHON": str(BUNDLED_PYTHON), "PLUGIN_DATA": str(plugin_data)}
+            process = self._start_mcp(REPOSITORY_ROOT, environment)
+            lease_process = None
+            try:
+                self._open_editor(process, 1, project_root)
+                lease_script = (
+                    "import sys; sys.path.insert(0, sys.argv[2]); import projectlib; "
+                    "lease=projectlib.acquire_project_lease(sys.argv[1], blocking=True); "
+                    "print('ready', flush=True); input(); projectlib.release_project_lease(lease)"
+                )
+                lease_process = subprocess.Popen(
+                    [str(BUNDLED_PYTHON), "-c", lease_script, str(project_root),
+                     str(REPOSITORY_ROOT / "skills" / "video-understand" / "scripts")],
+                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                )
+                self.assertEqual(lease_process.stdout.readline().strip(), "ready")
+                script = r"""
+const { hubPaths, hubRequest, readTrustedLocator } = require(process.argv[1]);
+(async () => {
+  const locator = await readTrustedLocator(hubPaths(process.env.PLUGIN_DATA).locator);
+  let failure;
+  try { await hubRequest(locator, 'POST', '/v1/hub/handoff/prepare', {}); }
+  catch (error) { failure = error.message; }
+  const resumed = await hubRequest(locator, 'POST', '/v1/hub/handoff/resume', {});
+  process.stdout.write(JSON.stringify({ failure, resumed }));
+})().catch((error) => { process.stderr.write(String(error)); process.exit(1); });
+"""
+                result = subprocess.run(
+                    ["node", "-e", script, str(REPOSITORY_ROOT / "runtime" / "hub-client.cjs")],
+                    cwd=REPOSITORY_ROOT, env=environment, check=True, capture_output=True, text=True, encoding="utf-8", timeout=20,
+                )
+                evidence = json.loads(result.stdout)
+                self.assertEqual(evidence["failure"], "Projects have protected work")
+                self.assertEqual(evidence["resumed"]["status"], "resumed")
+            finally:
+                if lease_process:
+                    if lease_process.stdin and not lease_process.stdin.closed:
+                        lease_process.stdin.write("release\n")
+                        lease_process.stdin.flush()
+                    lease_process.wait(timeout=10)
+                    for stream in (lease_process.stdin, lease_process.stdout, lease_process.stderr):
+                        if stream and not stream.closed:
+                            stream.close()
+                self._stop_mcp(process)
+                subprocess.run(
+                    ["node", str(REPOSITORY_ROOT / "runtime" / "hub-client.cjs"), "shutdown"],
+                    cwd=REPOSITORY_ROOT, env=environment, check=False, capture_output=True, text=True, timeout=20,
+                )
+
+    def test_editor_hub_rejects_a_locator_with_a_forged_challenge_response(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="cut forged hub ") as temporary:
+            script = r"""
+const crypto = require('node:crypto');
+const fs = require('node:fs');
+const http = require('node:http');
+const path = require('node:path');
+const { readTrustedLocator } = require(process.argv[1]);
+const { locatorProof } = require(process.argv[2]);
+const root = process.argv[3];
+const lockToken = crypto.randomBytes(32).toString('base64url');
+const controlToken = crypto.randomBytes(32).toString('base64url');
+const server = http.createServer((request, response) => {
+  response.writeHead(200, { 'Content-Type': 'application/json' });
+  response.end(JSON.stringify({ ok: true, instanceId: 'forged', pid: process.pid, proof: 'forged' }));
+});
+server.listen(0, '127.0.0.1', async () => {
+  const locator = {
+    schemaVersion: 2, host: '127.0.0.1', port: server.address().port, pid: process.pid,
+    instanceId: 'forged', protocolVersion: 1, runtimeVersion: '1.0.0', capabilities: [], controlToken,
+  };
+  locator.startupProof = locatorProof(lockToken, locator);
+  fs.writeFileSync(path.join(root, 'hub.lock'), JSON.stringify({ token: lockToken }));
+  fs.writeFileSync(path.join(root, 'hub.json'), JSON.stringify(locator));
+  const trusted = await readTrustedLocator(path.join(root, 'hub.json'));
+  process.stdout.write(JSON.stringify({ trusted }));
+  server.close();
+});
+"""
+            result = subprocess.run(
+                [
+                    "node", "-e", script,
+                    str(REPOSITORY_ROOT / "runtime" / "hub-client.cjs"),
+                    str(REPOSITORY_ROOT / "runtime" / "hub-trust.cjs"),
+                    temporary,
+                ],
+                cwd=REPOSITORY_ROOT, check=True, capture_output=True, text=True, encoding="utf-8", timeout=20,
+            )
+            self.assertIsNone(json.loads(result.stdout)["trusted"])
+
+    def test_failed_editor_hub_handoff_preserves_the_trusted_old_hub(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="cut failed hub handoff ") as temporary:
+            environment = {**os.environ, "PLUGIN_DATA": str(Path(temporary) / "plugin data")}
+            script = r"""
+const fs = require('node:fs');
+const path = require('node:path');
+const { ensureHub, hubPaths, readTrustedLocator } = require(process.argv[1]);
+(async () => {
+  const options = { pluginRoot: process.argv[2], dataRoot: process.env.PLUGIN_DATA };
+  const old = await ensureHub({ ...options, protocolVersion: 1, runtimeVersion: '1.0.0' });
+  const paths = hubPaths(options.dataRoot);
+  const beforeLocator = fs.readFileSync(paths.locator, 'utf8');
+  const beforeLock = fs.readFileSync(paths.lock, 'utf8');
+  let failure;
+  try {
+    await ensureHub({
+      ...options, protocolVersion: 2, runtimeVersion: '2.0.0', startupTimeoutMs: 100,
+      spawnProcess: () => ({ unref() {} }),
+    });
+  } catch (error) { failure = error.message; }
+  const trusted = await readTrustedLocator(paths.locator);
+  process.stdout.write(JSON.stringify({
+    failure, oldPid: old.pid, trustedPid: trusted?.pid,
+    locatorUnchanged: beforeLocator === fs.readFileSync(paths.locator, 'utf8'),
+    lockUnchanged: beforeLock === fs.readFileSync(paths.lock, 'utf8'),
+    candidates: fs.readdirSync(options.dataRoot).filter((name) => name.startsWith('hub.next.')),
+  }));
+})().catch((error) => { process.stderr.write(String(error)); process.exit(1); });
+"""
+            try:
+                result = subprocess.run(
+                    ["node", "-e", script, str(REPOSITORY_ROOT / "runtime" / "hub-client.cjs"), str(REPOSITORY_ROOT)],
+                    cwd=REPOSITORY_ROOT, env=environment, check=True, capture_output=True, text=True, encoding="utf-8", timeout=20,
+                )
+                evidence = json.loads(result.stdout)
+                self.assertEqual(evidence["failure"], "replacement editor Hub startup timed out")
+                self.assertEqual(evidence["oldPid"], evidence["trustedPid"])
+                self.assertTrue(evidence["locatorUnchanged"])
+                self.assertTrue(evidence["lockUnchanged"])
+                self.assertEqual(evidence["candidates"], [])
+            finally:
+                subprocess.run(
+                    ["node", str(REPOSITORY_ROOT / "runtime" / "hub-client.cjs"), "shutdown"],
+                    cwd=REPOSITORY_ROOT, env=environment, check=False, capture_output=True, text=True, timeout=20,
+                )
+
     def test_package_is_portable_deterministic_and_launches_after_extraction(self) -> None:
         with tempfile.TemporaryDirectory(prefix="cut as code package ") as temporary:
             root = Path(temporary)
@@ -343,15 +897,15 @@ const root = process.argv[2];
             extracted = installed / package_root
             self._assert_unknown_third_party_asset_is_rejected(extracted)
             self._audit_route_allowlist(extracted)
-            self._audit_graphic_motion_core(extracted, root / "graphic motion core project")
+            self._audit_motion_graphics_core(extracted, root / "motion graphics core project")
             self._smoke_open_editor(extracted, root / "video project with spaces", root)
 
     def test_compliance_inventory_covers_packaged_third_party_assets_and_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="cut compliance package ") as temporary:
             package_root = Path(temporary) / "package with spaces"
             shutil.copytree(
-                REPOSITORY_ROOT / "skills" / "video-add-graphic-motion" / "recipes" / "animxyz",
-                package_root / "skills" / "video-add-graphic-motion" / "recipes" / "animxyz",
+                REPOSITORY_ROOT / "skills" / "video-add-motion-graphics" / "recipes" / "animxyz",
+                package_root / "skills" / "video-add-motion-graphics" / "recipes" / "animxyz",
             )
             shutil.copytree(REPOSITORY_ROOT / "ui" / "dist", package_root / "ui" / "dist")
             (package_root / "runtime").mkdir(parents=True)
@@ -467,12 +1021,17 @@ const root = process.argv[2];
             required = {
                 ".codex-plugin/plugin.json",
                 ".mcp.json",
+                "hooks/hooks.json",
+                "hooks/launch-editor.cjs",
                 "LICENSE",
                 "PACKAGE_AUDIT.json",
                 "README.md",
                 "SBOM.spdx.json",
                 "THIRD_PARTY_NOTICES.md",
                 "runtime/mcp.cjs",
+                "runtime/hub-client.cjs",
+                "runtime/hub-trust.cjs",
+                "runtime/hub.cjs",
                 "runtime/project_snapshot.py",
                 "runtime/protocol_service.py",
                 "runtime/reconcile_manual_timeline.py",
@@ -525,25 +1084,25 @@ const root = process.argv[2];
                 if name.startswith("skills/") and len(Path(name).parts) > 2
             }
             self.assertTrue(ENTRY_SKILLS.issubset(packaged_skills))
-            self.assertIn("skills/video-add-graphic-motion/SKILL.md", relative_names)
-            self.assertNotIn("skills/video-add-graphic-motion/recipes/imported/SKILL.md", relative_names)
+            self.assertIn("skills/video-add-motion-graphics/SKILL.md", relative_names)
+            self.assertNotIn("skills/video-add-motion-graphics/recipes/imported/SKILL.md", relative_names)
             animxyz_manifests = [
                 name for name in relative_names
-                if name.startswith("skills/video-add-graphic-motion/recipes/animxyz/")
+                if name.startswith("skills/video-add-motion-graphics/recipes/animxyz/")
                 and name.endswith("/recipe.motion.yaml")
             ]
             self.assertEqual(len(animxyz_manifests), 20)
-            graphic_motion_skill = archive.read(
-                "cut-as-code-editor/skills/video-add-graphic-motion/SKILL.md"
+            motion_graphics_skill = archive.read(
+                "cut-as-code-editor/skills/video-add-motion-graphics/SKILL.md"
             ).decode("utf-8")
-            self.assertIn("exactly 10 selectable AnimXYZ core recipes", graphic_motion_skill)
-            self.assertIn("exactly 20 AnimXYZ recipe manifests", graphic_motion_skill)
-            self.assertIn("missing_content_pack", graphic_motion_skill)
-            self.assertNotIn("1,477 recipes", graphic_motion_skill)
-            self.assertNotIn("REQUIRED SUB-SKILLS", graphic_motion_skill)
-            self.assertNotIn("reference/recipe-selection.md", graphic_motion_skill)
-            normalized_graphic_motion_skill = " ".join(graphic_motion_skill.split())
-            self.assertIn("Non-skipped validate/register/render is unavailable", normalized_graphic_motion_skill)
+            self.assertIn("exactly 10 selectable AnimXYZ core recipes", motion_graphics_skill)
+            self.assertIn("exactly 20 AnimXYZ recipe manifests", motion_graphics_skill)
+            self.assertIn("missing_content_pack", motion_graphics_skill)
+            self.assertNotIn("1,477 recipes", motion_graphics_skill)
+            self.assertNotIn("REQUIRED SUB-SKILLS", motion_graphics_skill)
+            self.assertNotIn("reference/recipe-selection.md", motion_graphics_skill)
+            normalized_motion_graphics_skill = " ".join(motion_graphics_skill.split())
+            self.assertIn("Non-skipped validate/register/render is unavailable", normalized_motion_graphics_skill)
             packaged_assets = {
                 Path(name).name for name in relative_names
                 if name.startswith("ui/dist/assets/editor/")
@@ -566,6 +1125,9 @@ const root = process.argv[2];
             }
             self.assertEqual(set(executable_sources), {
                 "runtime/export_project.py",
+                "runtime/hub-client.cjs",
+                "runtime/hub-trust.cjs",
+                "runtime/hub.cjs",
                 "runtime/mcp.cjs",
                 "runtime/project_snapshot.py",
                 "runtime/protocol_service.py",
@@ -574,6 +1136,8 @@ const root = process.argv[2];
                 "runtime/sidecar.cjs",
             })
             sidecar = executable_sources["runtime/sidecar.cjs"]
+            hub = executable_sources["runtime/hub.cjs"]
+            hub_client = executable_sources["runtime/hub-client.cjs"]
             mcp = executable_sources["runtime/mcp.cjs"]
             self.assertIn("const HTTP_ROUTE_ALLOWLIST", sidecar)
             self.assertIn("routeForRequest", sidecar)
@@ -585,19 +1149,23 @@ const root = process.argv[2];
             self.assertEqual(sidecar.count("spawn("), 3)
             self.assertIn("runProcess('ffmpeg',", sidecar)
             self.assertIn("path.join(__dirname, 'sequence_bounds.py')", sidecar)
-            self.assertEqual(mcp.count("spawn("), 1)
+            self.assertEqual(mcp.count("spawn("), 0)
+            self.assertEqual(hub.count("spawn("), 2)
+            self.assertEqual(hub_client.count("spawnProcess(process.execPath,"), 1)
             self.assertIn("startProtocolService", sidecar)
-            self.assertIn("sidecar.cjs", mcp)
+            self.assertIn("sidecar.cjs", hub)
+            self.assertIn("ensureHub", mcp)
+            self.assertIn("PLUGIN_DATA", hub_client)
             self.assertIn("function browserLaunchSpec", mcp)
             self.assertIn("function openBrowser", mcp)
             self.assertIn("spawnProcess(command, [...args, url], options)", mcp)
             self.assertIn("child.once('spawn', resolve)", mcp)
-            self.assertIn("child.once('error', reject)", mcp)
+            self.assertIn("Could not open the system browser automatically. Open this URL manually:", mcp)
             self.assertNotIn("ready-file", sidecar)
-            self.assertNotIn("readyFile", mcp)
+            self.assertNotIn("readyFile", hub_client)
             self.assertNotIn("bootstrapToken", sidecar)
-            self.assertNotIn("bootstrapToken", mcp)
-            self.assertNotIn("cut-as-code-editor-sidecars", mcp)
+            self.assertNotIn("bootstrapToken", hub_client)
+            self.assertNotIn("cut-as-code-editor-sidecars", hub_client)
         return "cut-as-code-editor"
 
     def _audit_route_allowlist(self, plugin_root: Path) -> None:
@@ -625,6 +1193,9 @@ process.stdout.write(JSON.stringify({
             ["GET", "/v1/projects/project_a/artifacts/artifact_a1"],
             ["GET", "/v1/projects/project_a/layers/layer_a1/frames/1"],
             ["GET", "/v1/projects/project_a/events"],
+            ["GET", "/v1/projects/project_a/drafts/captions"],
+            ["PUT", "/v1/projects/project_a/drafts/content-cards"],
+            ["DELETE", "/v1/projects/project_a/drafts/motion-graphics"],
             ["GET", "/assets/index.js"],
             ["HEAD", "/assets/index.js"],
             ["POST", "/v1/meta"],
@@ -649,11 +1220,11 @@ process.stdout.write(JSON.stringify({
         audit = json.loads(result.stdout)
         self.assertEqual(
             audit["declared"],
-            ["launch", "meta", "snapshot", "transaction", "timeline-edit", "review", "export-start", "export-status", "export-action", "resource", "import", "file", "layer-frame", "events", "static"],
+            ["launch", "meta", "snapshot", "transaction", "timeline-edit", "review", "export-start", "export-status", "export-action", "resource", "import", "file", "layer-frame", "events", "draft", "static"],
         )
         self.assertEqual(
             audit["actual"],
-            ["launch", "meta", "snapshot", "transaction", "timeline-edit", "review", "export-start", "export-status", "export-action", "resource", "import", "file", "file", "layer-frame", "events", "static", "static", None, None, None, None],
+            ["launch", "meta", "snapshot", "transaction", "timeline-edit", "review", "export-start", "export-status", "export-action", "resource", "import", "file", "file", "layer-frame", "events", "draft", "draft", "draft", "static", "static", None, None, None, None],
         )
 
     def _assert_unknown_third_party_asset_is_rejected(
@@ -724,8 +1295,8 @@ process.stdout.write(JSON.stringify({
             self.assertEqual(audited_assets[asset_path]["component"], expected["component"])
             self.assertEqual(audited_assets[asset_path]["sha256"], expected["sha256"])
 
-    def _audit_graphic_motion_core(self, plugin_root: Path, project_root: Path) -> None:
-        library = plugin_root / "skills" / "video-add-graphic-motion" / "scripts" / "recipe_library.mjs"
+    def _audit_motion_graphics_core(self, plugin_root: Path, project_root: Path) -> None:
+        library = plugin_root / "skills" / "video-add-motion-graphics" / "scripts" / "recipe_library.mjs"
         searched = subprocess.run(
             ["node", str(library), "search", "--query", "animxyz fade rotate", "--limit", "20", "--json"],
             cwd=plugin_root,
@@ -765,9 +1336,16 @@ process.stdout.write(JSON.stringify({
         self, plugin_root: Path, project_root: Path, temporary_root: Path
     ) -> None:
         self._create_project(project_root)
-        environment = {**os.environ, "CAC_PYTHON": str(BUNDLED_PYTHON)}
+        plugin_data = temporary_root / "plugin data"
+        environment = {
+            **os.environ,
+            "CAC_PYTHON": str(BUNDLED_PYTHON),
+            "PLUGIN_DATA": str(plugin_data),
+        }
         process = self._start_mcp(plugin_root, environment)
         first_pid = None
+        first_session = None
+        second_pid = None
         try:
             tools = self._rpc(process, {"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
             self.assertEqual([item["name"] for item in tools["result"]["tools"]], ["open_editor"])
@@ -783,7 +1361,53 @@ process.stdout.write(JSON.stringify({
             self.assertEqual(set(details), {"pid", "projectRoot", "url", "projectId"})
             first_pid = details["pid"]
             self._assert_real_browser_ready(details["url"], details["projectId"], project_root.name)
+            first_session = self._session_values[-1]
             self._assert_launch_error(details["url"])
+
+            second_root = temporary_root / "second video project"
+            self._create_project(second_root)
+            second = self._open_editor(process, 20, second_root)
+            second_pid = second["pid"]
+            self.assertNotEqual(second["projectId"], details["projectId"])
+            self.assertNotEqual(second_pid, first_pid)
+            same_first = self._open_editor(process, 21, project_root)
+            self.assertEqual(same_first["pid"], first_pid)
+            self.assertEqual(same_first["projectId"], details["projectId"])
+            lease_script = (
+                "import sys; sys.path.insert(0, sys.argv[2]); import projectlib; "
+                "lease = projectlib.acquire_project_lease(sys.argv[1], blocking=True); "
+                "print('ready', flush=True); input(); projectlib.release_project_lease(lease)"
+            )
+            lease_process = subprocess.Popen(
+                [str(BUNDLED_PYTHON), "-c", lease_script, str(second_root),
+                 str(plugin_root / "skills" / "video-understand" / "scripts")],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            )
+            old_hub_pid = json.loads((plugin_data / "hub.json").read_text(encoding="utf-8"))["pid"]
+            try:
+                self.assertEqual(lease_process.stdout.readline().strip(), "ready")
+                self._assert_hub_picker(plugin_root, environment, [project_root.name, second_root.name])
+            finally:
+                if lease_process.stdin:
+                    lease_process.stdin.write("release\n")
+                    lease_process.stdin.flush()
+                lease_process.wait(timeout=10)
+                for stream in (lease_process.stdin, lease_process.stdout, lease_process.stderr):
+                    if stream and not stream.closed:
+                        stream.close()
+
+            deadline = time.monotonic() + 15
+            promoted = None
+            while time.monotonic() < deadline:
+                try:
+                    candidate = json.loads((plugin_data / "hub.json").read_text(encoding="utf-8"))
+                except (FileNotFoundError, json.JSONDecodeError):
+                    candidate = None
+                if candidate and candidate.get("runtimeVersion") == "99.0.0" and candidate.get("pid") != old_hub_pid:
+                    promoted = candidate
+                    break
+                time.sleep(0.1)
+            self.assertIsNotNone(promoted)
 
             reopened = self._rpc(process, {
                 "jsonrpc": "2.0",
@@ -793,9 +1417,11 @@ process.stdout.write(JSON.stringify({
             })
             reconnected = json.loads(reopened["result"]["content"][0]["text"])
             self.assertNotEqual(reconnected["url"], details["url"])
-            self.assertEqual(reconnected["pid"], details["pid"])
+            self.assertNotEqual(reconnected["pid"], details["pid"])
             self._assert_adversarial_launch_rejections(reconnected["url"], reconnected["projectId"])
             self._assert_real_browser_ready(reconnected["url"], reconnected["projectId"], project_root.name)
+            first_pid = reconnected["pid"]
+            first_session = self._session_values[-1]
             self._assert_launch_error(reconnected["url"])
 
             final = self._open_editor(process, 4, project_root)
@@ -805,20 +1431,240 @@ process.stdout.write(JSON.stringify({
         finally:
             self._stop_mcp(process)
         if first_pid is not None:
-            self.assertFalse(self._pid_is_live(first_pid))
+            self.assertTrue(self._pid_is_live(first_pid))
+        if first_session is not None:
+            self._assert_authenticated_snapshot(final["url"], final["projectId"], first_session)
 
         restarted = self._start_mcp(plugin_root, environment)
         restarted_pid = None
         try:
             details = self._open_editor(restarted, 1, project_root)
             restarted_pid = details["pid"]
-            self.assertNotEqual(restarted_pid, first_pid)
+            self.assertEqual(restarted_pid, first_pid)
             self._assert_real_browser_ready(details["url"], details["projectId"], project_root.name)
             self._rpc(restarted, {"jsonrpc": "2.0", "id": 2, "method": "shutdown"})
         finally:
             self._stop_mcp(restarted)
         if restarted_pid is not None:
+            self.assertTrue(self._pid_is_live(restarted_pid))
+        subprocess.run(
+            ["node", str(plugin_root / "runtime" / "hub-client.cjs"), "shutdown"],
+            cwd=plugin_root,
+            env=environment,
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=20,
+        )
+        if restarted_pid is not None:
             self.assertFalse(self._pid_is_live(restarted_pid))
+        if second_pid is not None:
+            self.assertFalse(self._pid_is_live(second_pid))
+
+    def _assert_hub_picker(
+        self, plugin_root: Path, environment: dict[str, str], project_names: list[str]
+    ) -> None:
+        update = subprocess.run(
+            [
+                "node", "-e",
+                "const {ensureHub}=require(process.argv[1]); ensureHub({pluginRoot:process.argv[2],dataRoot:process.env.PLUGIN_DATA,runtimeVersion:'99.0.0'}).catch(e=>{console.error(e);process.exit(1)})",
+                str(plugin_root / "runtime" / "hub-client.cjs"), str(plugin_root),
+            ],
+            cwd=plugin_root, env=environment, check=True, capture_output=True, text=True, encoding="utf-8", timeout=20,
+        )
+        self.assertEqual(update.returncode, 0)
+        launched = subprocess.run(
+            ["node", str(plugin_root / "runtime" / "hub-client.cjs"), "launch"],
+            cwd=plugin_root,
+            env=environment,
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=20,
+        )
+        url = json.loads(launched.stdout)["url"]
+        script = r"""
+const { chromium } = require(process.argv[1]);
+(async () => {
+  const browser = await chromium.launch({ channel: 'chrome' });
+  try {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.goto(process.argv[2]);
+    await page.waitForFunction(() => document.documentElement.dataset.runtimeState === 'hub-ready');
+    const names = await page.locator('[data-hub-project-name]').allTextContents();
+    const updateText = await page.locator('[data-update-pending]').textContent();
+    await page.screenshot({ path: process.argv[3], fullPage: true });
+    const closeTarget = process.argv[5];
+    const firstTarget = process.argv[6];
+    const openProject = async (name) => {
+      const [editor] = await Promise.all([
+        context.waitForEvent('page'),
+        page.getByRole('link', { name: `Open ${name}` }).click(),
+      ]);
+      await editor.waitForFunction(() => document.documentElement.dataset.runtimeState === 'ready');
+      return editor;
+    };
+    const firstEditor = await openProject(firstTarget);
+    const closeEditor = await openProject(closeTarget);
+    const concurrentEditors = (await context.pages()).filter((candidate) => candidate !== page && candidate.url().includes('?project=')).length;
+    const staleWrite = await firstEditor.evaluate(async () => {
+      const projectId = new URL(location.href).searchParams.get('project');
+      const snapshotResponse = await fetch(`/v1/projects/${encodeURIComponent(projectId)}/snapshot`, { credentials: 'same-origin' });
+      const snapshotBody = await snapshotResponse.json();
+      const snapshot = snapshotBody.snapshot;
+      const project = snapshot.resources.find((item) => item.kind === 'project');
+      const plan = snapshot.resources.find((item) => item.operation_id === 'captions');
+      const operation = snapshot.view.operations.find((item) => item.id === 'captions');
+      const body = JSON.stringify({
+        operation: 'captions',
+        readSet: { project: project.etag, operation: operation.etag, plan: plan.etag },
+        review: { schema_version: 1, cue_id: 'cue-001', text: 'Saved from packaged Chrome' },
+      });
+      const save = () => fetch(`/v1/projects/${encodeURIComponent(projectId)}/transactions`, {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body,
+      });
+      const first = await save();
+      const firstBody = await first.json();
+      const stale = await save();
+      const staleBody = await stale.json();
+      return { firstStatus: first.status, firstOk: firstBody.ok, staleStatus: stale.status, staleError: staleBody.error };
+    });
+    const draftWrite = await closeEditor.evaluate(async () => {
+      const projectId = new URL(location.href).searchParams.get('project');
+      const response = await fetch(`/v1/projects/${encodeURIComponent(projectId)}/drafts/captions`, {
+        method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ baseRevision: 1, changes: [{ cueId: 'cue-001', text: 'Recovered in Chrome' }] }),
+      });
+      return { status: response.status, body: await response.json() };
+    });
+    const quitDialogReady = page.waitForEvent('dialog');
+    const quitClick = page.getByRole('button', { name: 'Quit Editor Service' }).click();
+    const quitDialog = await quitDialogReady;
+    const quitConfirmation = quitDialog.message();
+    await quitDialog.dismiss();
+    await quitClick;
+    await page.waitForFunction(() => document.documentElement.dataset.runtimeState === 'hub-ready');
+    const closeDialogReady = page.waitForEvent('dialog');
+    const closeClick = page.getByRole('button', { name: `Close ${closeTarget}` }).click();
+    const closeDialog = await closeDialogReady;
+    const confirmation = closeDialog.message();
+    await closeDialog.accept();
+    await closeClick;
+    await page.locator('[data-hub-project]', { hasText: closeTarget }).getByText('Ready', { exact: true }).waitFor();
+    const recoveredEditor = await openProject(closeTarget);
+    const recoveredDraft = await recoveredEditor.evaluate(async () => {
+      const projectId = new URL(location.href).searchParams.get('project');
+      const response = await fetch(`/v1/projects/${encodeURIComponent(projectId)}/drafts/captions`, { credentials: 'same-origin' });
+      return { status: response.status, body: await response.json() };
+    });
+    await page.getByRole('button', { name: 'Refresh projects' }).click();
+    await page.locator('[data-hub-project]', { hasText: closeTarget }).getByText('Open', { exact: true }).waitFor();
+    const cleanupDialogReady = page.waitForEvent('dialog');
+    const cleanupClick = page.getByRole('button', { name: `Close ${closeTarget}` }).click();
+    const cleanupDialog = await cleanupDialogReady;
+    await cleanupDialog.accept();
+    await cleanupClick;
+    await page.locator('[data-hub-project]', { hasText: closeTarget }).getByText('Ready', { exact: true }).waitFor();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: process.argv[4], fullPage: true });
+    process.stdout.write(JSON.stringify({
+      url: page.url(),
+      names,
+      updateText,
+      concurrentEditors,
+      staleWrite,
+      draftWrite,
+      quitConfirmation,
+      confirmation,
+      recoveredDraft,
+      firstStatus: await page.locator('[data-hub-project]', { hasText: firstTarget }).locator('.hub-status').textContent(),
+      closedStatus: await page.locator('[data-hub-project]', { hasText: closeTarget }).locator('.hub-status').textContent(),
+    }));
+  } finally { await browser.close(); }
+})().catch((error) => { process.stderr.write(String(error)); process.exit(1); });
+"""
+        result = subprocess.run(
+            [
+                "node", "-e", script,
+                str(REPOSITORY_ROOT / "ui" / "node_modules" / "playwright"), url,
+                str(REPOSITORY_ROOT / "ui" / "test-results" / "hub-picker-desktop.png"),
+                str(REPOSITORY_ROOT / "ui" / "test-results" / "hub-picker-mobile.png"),
+                project_names[1], project_names[0],
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=60,
+        )
+        if result.returncode != 0:
+            subprocess.run(
+                ["node", str(plugin_root / "runtime" / "hub-client.cjs"), "shutdown"],
+                cwd=plugin_root, env=environment, check=False, capture_output=True, text=True, timeout=20,
+            )
+            self.fail(f"installed Chrome Hub smoke failed: {result.stderr}")
+        evidence = json.loads(result.stdout)
+        parsed = urllib.parse.urlsplit(url)
+        self.assertEqual(evidence["url"], f"{parsed.scheme}://{parsed.netloc}/")
+        self.assertEqual(set(evidence["names"]), set(project_names))
+        self.assertIn("99.0.0 is available", evidence["updateText"])
+        self.assertEqual(evidence["concurrentEditors"], 2)
+        self.assertEqual(evidence["staleWrite"], {
+            "firstStatus": 200, "firstOk": True, "staleStatus": 409, "staleError": "conflict",
+        })
+        self.assertEqual(evidence["draftWrite"]["status"], 200)
+        self.assertIn("mutation lease", evidence["quitConfirmation"])
+        self.assertIn("recoverable draft", evidence["quitConfirmation"])
+        self.assertIn("recoverable draft", evidence["confirmation"])
+        self.assertIn("mutation lease", evidence["confirmation"])
+        self.assertEqual(evidence["recoveredDraft"]["status"], 200)
+        self.assertEqual(
+            evidence["recoveredDraft"]["body"]["draft"]["changes"][0]["text"],
+            "Recovered in Chrome",
+        )
+        self.assertEqual(evidence["firstStatus"], "Open")
+        self.assertEqual(evidence["closedStatus"], "Ready")
+
+    def _assert_authenticated_snapshot(self, url: str, project_id: str, session: str) -> None:
+        parsed = urllib.parse.urlsplit(url)
+        connection = http.client.HTTPConnection(parsed.hostname, parsed.port, timeout=5)
+        try:
+            connection.request(
+                "GET",
+                f"/v1/projects/{urllib.parse.quote(project_id, safe='')}/snapshot",
+                headers={"Cookie": f"cut_session={session}"},
+            )
+            response = connection.getresponse()
+            body = json.loads(response.read())
+            self.assertEqual(response.status, 200)
+            self.assertTrue(body["ok"])
+            self.assertIsInstance(body["snapshot"], dict)
+        finally:
+            connection.close()
+
+    @staticmethod
+    def _draft_request(
+        url: str, project_id: str, session: str, method: str, suffix: str,
+        body: dict | None = None,
+    ) -> tuple[int, dict[str, str], dict]:
+        parsed = urllib.parse.urlsplit(url)
+        connection = http.client.HTTPConnection(parsed.hostname, parsed.port, timeout=5)
+        payload = json.dumps(body).encode("utf-8") if body is not None else None
+        path = f"/v1/projects/{urllib.parse.quote(project_id, safe='')}/{suffix}"
+        try:
+            connection.request(method, path, body=payload, headers={
+                "Cookie": f"cut_session={session}",
+                "Origin": f"{parsed.scheme}://{parsed.netloc}",
+                **({"Content-Type": "application/json"} if payload else {}),
+            })
+            response = connection.getresponse()
+            response_body = json.loads(response.read())
+            return response.status, {key.lower(): value for key, value in response.getheaders()}, response_body
+        finally:
+            connection.close()
 
     def _assert_adversarial_launch_rejections(self, url: str, project_id: str) -> None:
         parsed = urllib.parse.urlsplit(url)
@@ -876,7 +1722,7 @@ process.stdout.write(JSON.stringify([
         initial_files = source.index("await refreshFiles(state, false)")
         listen = source.index("server.listen(0, LOOPBACK, resolve)")
         ready = source.index("process.stdout.write(JSON.stringify(ready) + '\\n')")
-        layers = source.index("void refreshLayerSequences(state)")
+        layers = source.index("state.layerRefresh = refreshLayerSequences(state)")
 
         self.assertLess(initial_files, listen)
         self.assertLess(listen, ready)
@@ -1040,12 +1886,15 @@ const { chromium } = require(process.argv[1]);
                 for secret in secret_values:
                     self.assertNotIn(secret.encode("ascii"), content, str(known_path))
         captured = str(process.args)
-        mcp_source = (temporary_root / "installed plugin path with spaces" / "cut-as-code-editor" / "runtime" / "mcp.cjs").read_text(encoding="utf-8")
-        sidecar_source = (temporary_root / "installed plugin path with spaces" / "cut-as-code-editor" / "runtime" / "sidecar.cjs").read_text(encoding="utf-8")
+        runtime_root = temporary_root / "installed plugin path with spaces" / "cut-as-code-editor" / "runtime"
+        runtime_sources = [
+            (runtime_root / name).read_text(encoding="utf-8")
+            for name in ("hub-client.cjs", "hub.cjs", "mcp.cjs", "sidecar.cjs")
+        ]
         for secret in secret_values:
             self.assertNotIn(secret, captured)
-            self.assertNotIn(secret, mcp_source)
-            self.assertNotIn(secret, sidecar_source)
+            for source in runtime_sources:
+                self.assertNotIn(secret, source)
 
     @staticmethod
     def _rpc(process: subprocess.Popen[str], request: dict) -> dict:
@@ -1070,7 +1919,20 @@ const { chromium } = require(process.argv[1]);
         source = root / "input" / "source.mp4"
         source.write_bytes(b"fixture-video")
         stat = source.stat()
-        (root / "work" / "captions" / "captions-plan.json").write_text('{"cues": []}\n', encoding="utf-8")
+        (root / "work" / "captions" / "captions-plan.json").write_text(json.dumps({
+            "schema_version": 1,
+            "target": "overlay",
+            "timeline_id": "main",
+            "timebase": "program",
+            "program_duration_s": 1,
+            "style": {"status": "approved", "preset": "clean"},
+            "review": {"status": "pending", "evidence": []},
+            "cues": [{
+                "id": "cue-001", "index": 1, "start": 0, "end": 1,
+                "text": "Fixture caption", "lines": ["Fixture caption"],
+                "program_range": {"start_s": 0, "end_s": 1},
+            }],
+        }) + "\n", encoding="utf-8")
         (root / "work" / "timeline.json").write_text(json.dumps({
             "schema_version": 1, "source_duration_s": 1, "program_duration_s": 1,
             "fps": {"num": 30, "den": 1},

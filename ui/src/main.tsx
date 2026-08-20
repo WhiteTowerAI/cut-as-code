@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { EditorShell, type RuntimeProjectStatus } from './editor/EditorShell'
+import { HubShell } from './hub/HubShell'
 import { RuntimeApiClient } from './runtime/api-client'
 import './styles.css'
 
@@ -60,6 +61,7 @@ function RuntimeEditor() {
   }, [fixtureMode, projectId])
 
   if (fixtureMode) return <EditorShell key="fixture" />
+  if (!projectId) return <HubShell />
   if (runtimeState.phase === 'ready') {
     return <EditorShell key={runtimeState.runtime.projectId} runtime={runtimeState.runtime} />
   }

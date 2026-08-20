@@ -206,16 +206,16 @@ def build_snapshot(project_root):
         if edit_model:
             view["captions_edit"] = edit_model
             layers = [*_caption_layers(edit_model), *layers]
-    graphic_motion = next((node for node in operations if isinstance(node, dict) and node.get("id") == "graphic-motion"), None)
-    if graphic_motion and isinstance(graphic_motion.get("plan"), str):
+    motion_graphics = next((node for node in operations if isinstance(node, dict) and node.get("id") == "motion-graphics"), None)
+    if motion_graphics and isinstance(motion_graphics.get("plan"), str):
         try:
-            motion_plan = json.loads(_contained_path(root, graphic_motion["plan"]).read_text(encoding="utf-8"))
-            edit_model = _graphic_motion_edit_model(motion_plan, root)
+            motion_plan = json.loads(_contained_path(root, motion_graphics["plan"]).read_text(encoding="utf-8"))
+            edit_model = _motion_graphics_edit_model(motion_plan, root)
         except (OSError, UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
             edit_model = None
         if edit_model:
-            view["graphic_motion_edit"] = edit_model
-            layers.extend(_graphic_motion_layers(edit_model))
+            view["motion_graphics_edit"] = edit_model
+            layers.extend(_motion_graphics_layers(edit_model))
     if layers:
         view["layers"] = layers
     snapshot = _snapshot(resources, _unique(errors), view)
@@ -496,7 +496,7 @@ def _captions_edit_model(plan):
     return {"style": copy_json(plan.get("style", {})), "cues": entries}
 
 
-def _graphic_motion_edit_model(plan, project_root):
+def _motion_graphics_edit_model(plan, project_root):
     if not isinstance(plan, dict):
         return None
     cues = plan.get("cues")
@@ -546,7 +546,7 @@ def _graphic_motion_edit_model(plan, project_root):
                 "start_number": render.get("start_number"),
                 "fps": copy_json(render.get("fps")),
                 "frame_count": len(frames),
-                "content_bounds": projectlib.graphic_motion_content_bounds(cue, project_root),
+                "content_bounds": projectlib.motion_graphics_content_bounds(cue, project_root),
             } if render.get("asset_type") == "image-sequence" else None,
         })
     return {"cues": entries}
@@ -615,17 +615,17 @@ def _content_card_layers(edit_model):
     ]
 
 
-def _graphic_motion_layers(edit_model):
+def _motion_graphics_layers(edit_model):
     layers = []
     for cue in edit_model.get("cues", []):
         if not cue.get("enabled"):
             continue
         image_sequence = cue.get("image_sequence")
         entry = {
-            "id": _layer_id("graphic-motion", cue["id"]),
-            "operation_id": "graphic-motion",
+            "id": _layer_id("motion-graphics", cue["id"]),
+            "operation_id": "motion-graphics",
             "cue_id": cue["id"],
-            "kind": "graphic-motion",
+            "kind": "motion-graphics",
             "media_type": "image-sequence" if image_sequence else "dom",
             "z_index": 300,
             "program_range": copy_json(cue["program_range"]),

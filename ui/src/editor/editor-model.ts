@@ -1,10 +1,10 @@
-export type LibraryTab = 'assets' | 'captions' | 'cards' | 'graphic-motion'
+export type LibraryTab = 'assets' | 'captions' | 'cards' | 'motion-graphics'
 
 export type MenuId = 'viewer-more' | 'aspect-ratio' | null
 
 export type EditorSelection =
   | {
-      kind: 'asset' | 'video' | 'audio' | 'caption' | 'card' | 'graphic-motion'
+      kind: 'asset' | 'video' | 'audio' | 'caption' | 'card' | 'motion-graphics'
       id: string
     }
   | null
@@ -46,7 +46,7 @@ export type EditorLayerView = Readonly<{
   id: string
   operationId: string
   cueId: string
-  kind: 'caption' | 'card' | 'graphic-motion'
+  kind: 'caption' | 'card' | 'motion-graphics'
   mediaType: 'dom' | 'image-sequence'
   zIndex: number
   programRange: Readonly<{ startS: number; endS: number }>
@@ -65,7 +65,7 @@ export type EditorLayerView = Readonly<{
 export type TrackView = Readonly<{
   id: string
   name: string
-  kind: 'video' | 'audio' | 'caption' | 'card' | 'graphic-motion'
+  kind: 'video' | 'audio' | 'caption' | 'card' | 'motion-graphics'
   clips?: readonly ClipView[]
 }>
 

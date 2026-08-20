@@ -75,7 +75,7 @@ export function isLayerActive(layer: EditorLayerView, programTimeS: number) {
   return programTimeS >= layer.programRange.startS && programTimeS < layer.programRange.endS
 }
 
-export function graphicMotionFrameNumber(layer: EditorLayerView, programTimeS: number) {
+export function motionGraphicsFrameNumber(layer: EditorLayerView, programTimeS: number) {
   const sequence = layer.imageSequence
   if (!sequence || sequence.frameCount <= 0 || sequence.fps.numerator <= 0 || sequence.fps.denominator <= 0) return null
   const fps = sequence.fps.numerator / sequence.fps.denominator
@@ -103,7 +103,7 @@ function clampTransform(transform: LayerTransform): LayerTransform {
 function layerSelectionKind(layer: EditorLayerView) {
   return layer.kind === 'caption' ? 'caption' as const
     : layer.kind === 'card' ? 'card' as const
-      : 'graphic-motion' as const
+      : 'motion-graphics' as const
 }
 
 function layerText(layer: EditorLayerView) {
@@ -111,7 +111,7 @@ function layerText(layer: EditorLayerView) {
 }
 
 function layerFrameUrl(layer: EditorLayerView, programTimeS: number) {
-  const frame = graphicMotionFrameNumber(layer, programTimeS)
+  const frame = motionGraphicsFrameNumber(layer, programTimeS)
   const template = layer.imageSequence?.frameUrlTemplate
   return frame === null || !template ? undefined : template.replace('%d', String(frame))
 }
@@ -143,7 +143,7 @@ function axisScales(transform: LayerTransform) {
     : { scaleX: transform.scale, scaleY: transform.scale }
 }
 
-function graphicMotionRect(layer: EditorLayerView, transform = layer.transform) {
+function motionGraphicsRect(layer: EditorLayerView, transform = layer.transform) {
   const bounds = layer.imageSequence?.contentBounds ?? { x: 0, y: 0, width: 1, height: 1 }
   const { scaleX, scaleY } = axisScales(transform)
   return {
@@ -154,7 +154,7 @@ function graphicMotionRect(layer: EditorLayerView, transform = layer.transform) 
   }
 }
 
-function clampGraphicMotionTransform(
+function clampMotionGraphicsTransform(
   transform: LayerTransform,
   bounds: Readonly<{ x: number; y: number; width: number; height: number }>,
 ): LayerTransform {
@@ -910,7 +910,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
           y: state.transform.y + deltaY / canvasHeight,
         } as LayerTransform
       transform = state.layer.imageSequence && state.bounds
-        ? clampGraphicMotionTransform(moved, state.bounds)
+        ? clampMotionGraphicsTransform(moved, state.bounds)
         : clampCenteredTransform(moved, layerWidth, layerHeight)
     } else if (state.mode === 'scale') {
       const scale = typeof state.transform.scale === 'number'
@@ -923,7 +923,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
         })
     } else {
       const bounds = state.bounds ?? { x: 0, y: 0, width: 1, height: 1 }
-      const initial = graphicMotionRect(state.layer, state.transform)
+      const initial = motionGraphicsRect(state.layer, state.transform)
       const dx = deltaX / state.canvasWidth
       const dy = deltaY / state.canvasHeight
       let left = initial.left
@@ -950,7 +950,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
       }
       const scaleX = (right - left) / bounds.width
       const scaleY = (bottom - top) / bounds.height
-      transform = clampGraphicMotionTransform({
+      transform = clampMotionGraphicsTransform({
         x: left - (bounds.x - 0.5) * scaleX,
         y: top - (bounds.y - 0.5) * scaleY,
         scale_x: scaleX,
@@ -1029,7 +1029,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
               {activeLayers.map((layer) => {
                 const selected = selection?.id === layer.cueId && selection.kind === layerSelectionKind(layer)
                 const frameUrl = layerFrameUrl(layer, currentTimeS)
-                const graphicRect = layer.imageSequence ? graphicMotionRect(layer) : undefined
+                const graphicRect = layer.imageSequence ? motionGraphicsRect(layer) : undefined
                 const { scaleX, scaleY } = axisScales(layer.transform)
                 const style = {
                   '--layer-x': graphicRect?.left ?? layer.transform.x,

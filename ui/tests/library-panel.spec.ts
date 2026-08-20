@@ -245,13 +245,13 @@ test.skip('caption theme controls match the official panel geometry', async ({ p
   })
 })
 
-test.skip('keeps Graphic Motion discoverable in the compact four-tab strip', async ({ page }) => {
+test.skip('keeps Motion Graphics discoverable in the compact four-tab strip', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 688 })
   await page.goto('/?scenario=1-84')
 
   const tablist = page.getByRole('tablist', { name: 'Library sections' })
   const assets = page.getByRole('tab', { name: 'My Assets' })
-  const motion = page.getByRole('tab', { name: 'Graphic Motion' })
+  const motion = page.getByRole('tab', { name: 'Motion Graphics' })
   const tabGeometry = () => tablist.evaluate((node) => {
     const listBox = node.getBoundingClientRect()
     const relativeBox = (tab: string) => {
@@ -268,7 +268,7 @@ test.skip('keeps Graphic Motion discoverable in the compact four-tab strip', asy
       assets: relativeBox('assets'),
       captions: relativeBox('captions'),
       cards: relativeBox('cards'),
-      motion: relativeBox('graphic-motion'),
+      motion: relativeBox('motion-graphics'),
     }
   })
   const selectedTabViewport = () => tablist.evaluate((node) => {
@@ -310,14 +310,14 @@ test.skip('keeps Graphic Motion discoverable in the compact four-tab strip', asy
   await expect.poll(() => tablist.evaluate((node) => Math.round(node.scrollLeft))).toBe(0)
 })
 
-test.skip('keeps Graphic Motion discoverable in the workspace Library', async ({ page }) => {
+test.skip('keeps Motion Graphics discoverable in the workspace Library', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1200 })
   await page.goto('/?scenario=1-1373')
 
   const tablist = page.getByRole('tablist', { name: 'Library sections' })
   const geometry = await tablist.evaluate((node) => {
     const listBox = node.getBoundingClientRect()
-    const motionBox = node.querySelector<HTMLElement>('[data-tab="graphic-motion"]')!.getBoundingClientRect()
+    const motionBox = node.querySelector<HTMLElement>('[data-tab="motion-graphics"]')!.getBoundingClientRect()
     return {
       scrollLeft: Math.round(node.scrollLeft),
       clientWidth: node.clientWidth,
@@ -356,7 +356,7 @@ test.skip('switches the single library panel across all four tabs', async ({ pag
   const assets = page.getByRole('tab', { name: 'My Assets' })
   const captions = page.getByRole('tab', { name: 'Captions' })
   const cards = page.getByRole('tab', { name: 'Cards' })
-  const motion = page.getByRole('tab', { name: 'Graphic Motion' })
+  const motion = page.getByRole('tab', { name: 'Motion Graphics' })
 
   await expect(assets).toHaveAttribute('aria-selected', 'true')
 
@@ -388,7 +388,7 @@ test.skip('moves tab focus and selection with the keyboard', async ({ page }) =>
   const assets = page.getByRole('tab', { name: 'My Assets' })
   const captions = page.getByRole('tab', { name: 'Captions' })
   const cards = page.getByRole('tab', { name: 'Cards' })
-  const motion = page.getByRole('tab', { name: 'Graphic Motion' })
+  const motion = page.getByRole('tab', { name: 'Motion Graphics' })
 
   for (const tab of [assets, captions, cards, motion]) {
     const panelId = await tab.getAttribute('aria-controls')
@@ -432,6 +432,6 @@ test('keeps only My Assets visible and does not synthesize asset previews', asyn
   await expect(page.getByRole('tab', { name: 'My Assets' })).toHaveCount(1)
   await expect(page.getByRole('tab', { name: 'Captions' })).toHaveCount(0)
   await expect(page.getByRole('tab', { name: 'Cards' })).toHaveCount(0)
-  await expect(page.getByRole('tab', { name: 'Graphic Motion' })).toHaveCount(0)
+  await expect(page.getByRole('tab', { name: 'Motion Graphics' })).toHaveCount(0)
   await expect(page.locator('[data-asset-id] [data-library-preview]')).toHaveCount(0)
 })

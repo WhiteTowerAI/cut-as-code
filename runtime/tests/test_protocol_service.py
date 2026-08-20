@@ -119,6 +119,25 @@ class ProtocolServiceTests(unittest.TestCase):
         self.assertNotEqual(plan_before["etag"], plan_after["etag"])
         self.assertEqual(plan_before["id"], plan_after["id"])
 
+    def test_project_status_reports_an_external_mutation_lease(self):
+        opened = self.service.handle_request(
+            {"verb": "open_project", "project_root": str(self.root)}
+        )
+        project_id = opened["project_id"]
+        self.assertEqual(
+            {"ok": True, "mutation_lease": False},
+            self.service.handle_request({"verb": "project.status", "project_id": project_id}),
+        )
+
+        lease = self.service._acquire_lease(self.root)
+        try:
+            self.assertEqual(
+                {"ok": True, "mutation_lease": True},
+                self.service.handle_request({"verb": "project.status", "project_id": project_id}),
+            )
+        finally:
+            self.service._release_lease(lease)
+
     def test_timeline_edits_are_authoritative_and_keep_active_dependents_current(self):
         self._configure_cut_project()
         opened = self.service.handle_request(
@@ -786,7 +805,7 @@ class ProtocolServiceTests(unittest.TestCase):
             updated["cues"][1]["editor_content_bounds"],
         )
 
-    def test_caption_transform_advances_the_downstream_graphic_motion_plan_atomically(self):
+    def test_caption_transform_advances_the_downstream_motion_graphics_plan_atomically(self):
         self.plan.write_text(json.dumps({
             "schema_version": 1,
             "target": "overlay",
@@ -801,7 +820,7 @@ class ProtocolServiceTests(unittest.TestCase):
                 "program_range": {"start_s": 0.0, "end_s": 0.4},
             }],
         }, indent=2) + "\n", encoding="utf-8")
-        graphic_plan_path = self.root / "work" / "graphic-motion" / "graphic-motion-plan.json"
+        graphic_plan_path = self.root / "work" / "motion-graphics" / "motion-graphics-plan.json"
         graphic_plan_path.parent.mkdir()
         graphic_plan = {
             "schema_version": 3,
@@ -813,20 +832,20 @@ class ProtocolServiceTests(unittest.TestCase):
         project = json.loads(self.project_path.read_text(encoding="utf-8"))
         graphic_operation = copy.deepcopy(project["operations"][0])
         graphic_operation.update({
-            "id": "graphic-motion",
+            "id": "motion-graphics",
             "revision": 3,
             "status": "verified",
             "depends_on": ["captions"],
             "based_on": {"captions": 1},
-            "plan": "graphic-motion/graphic-motion-plan.json",
-            "plan_sha256": protocol_service.graphic_motion_plan.canonical_sha256(graphic_plan),
+            "plan": "motion-graphics/motion-graphics-plan.json",
+            "plan_sha256": protocol_service.motion_graphics_plan.canonical_sha256(graphic_plan),
         })
         project["operations"].append(graphic_operation)
-        project["sequences"]["main"]["operations"].append("graphic-motion")
+        project["sequences"]["main"]["operations"].append("motion-graphics")
         self.project_path.write_text(json.dumps(project, indent=2) + "\n", encoding="utf-8")
         opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
 
-        with mock.patch.object(self.service, "_validate_graphic_motion_plan"):
+        with mock.patch.object(self.service, "_validate_motion_graphics_plan"):
             response = self.service.handle_request({
                 "verb": "plan.update", "project_id": opened["project_id"], "operation": "captions",
                 "read_set": self._read_set(opened["snapshot"], "captions"),
@@ -840,13 +859,13 @@ class ProtocolServiceTests(unittest.TestCase):
         self.assertTrue(response["ok"], response.get("error"))
         saved_project = json.loads(self.project_path.read_text(encoding="utf-8"))
         saved_operation = next(
-            item for item in saved_project["operations"] if item["id"] == "graphic-motion"
+            item for item in saved_project["operations"] if item["id"] == "motion-graphics"
         )
         saved_plan = json.loads(graphic_plan_path.read_text(encoding="utf-8"))
         self.assertEqual(2, saved_operation["based_on"]["captions"])
         self.assertEqual(2, saved_plan["based_on"]["captions"])
         self.assertEqual(
-            protocol_service.graphic_motion_plan.canonical_sha256(saved_plan),
+            protocol_service.motion_graphics_plan.canonical_sha256(saved_plan),
             saved_operation["plan_sha256"],
         )
 
@@ -913,16 +932,16 @@ class ProtocolServiceTests(unittest.TestCase):
         self.assertEqual(operation["outputs"], changed["outputs"])
         self.assertEqual("draft", captured["project"]["render"]["status"])
 
-    def test_graphic_motion_transform_only_update_does_not_revalidate_unchanged_recipe_metadata(self):
+    def test_motion_graphics_transform_only_update_does_not_revalidate_unchanged_recipe_metadata(self):
         plan = {
             "schema_version": 3,
             "cues": [{"id": "gm-001", "status": "verified"}],
             "delivery_bindings": [],
         }
         operation = {
-            "id": "graphic-motion", "revision": 2, "status": "verified",
-            "render": {"kind": "overlay", "asset": "cache/graphic-motion/gm-001"},
-            "outputs": ["cache/graphic-motion/gm-001"],
+            "id": "motion-graphics", "revision": 2, "status": "verified",
+            "render": {"kind": "overlay", "asset": "cache/motion-graphics/gm-001"},
+            "outputs": ["cache/motion-graphics/gm-001"],
         }
         project = {
             "operations": [copy.deepcopy(operation)],
@@ -941,9 +960,9 @@ class ProtocolServiceTests(unittest.TestCase):
             return {"ok": True}
 
         with (
-            mock.patch.object(protocol_service.graphic_motion_plan, "_input_bindings", return_value=[]),
-            mock.patch.object(protocol_service.graphic_motion_plan, "_cue_bindings", return_value=[]),
-            mock.patch.object(self.service, "_validate_graphic_motion_plan", side_effect=AssertionError("full validation must not run")),
+            mock.patch.object(protocol_service.motion_graphics_plan, "_input_bindings", return_value=[]),
+            mock.patch.object(protocol_service.motion_graphics_plan, "_cue_bindings", return_value=[]),
+            mock.patch.object(self.service, "_validate_motion_graphics_plan", side_effect=AssertionError("full validation must not run")),
             mock.patch.object(self.service, "_commit", side_effect=capture),
         ):
             response = self.service._apply_plan_update(context, {
@@ -961,13 +980,13 @@ class ProtocolServiceTests(unittest.TestCase):
         self.assertEqual((3, "verified"), (changed["revision"], changed["status"]))
         self.assertEqual("draft", captured["project"]["render"]["status"])
 
-    def test_graphic_motion_transform_supports_independent_axis_scaling(self):
+    def test_motion_graphics_transform_supports_independent_axis_scaling(self):
         transform = {"x": 0.3, "y": 0.7, "scale_x": 1.25, "scale_y": 0.75}
 
         self.assertEqual(transform, self.service._validate_editor_transform(transform))
 
-    def test_frozen_graphic_motion_recipe_uses_materialized_hashes_without_current_catalog_entry(self):
-        target = self.root / "work/cache/graphic-motion/hyperframes/gm-001"
+    def test_frozen_motion_graphics_recipe_uses_materialized_hashes_without_current_catalog_entry(self):
+        target = self.root / "work/cache/motion-graphics/hyperframes/gm-001"
         target.mkdir(parents=True)
         manifest_path = target / "recipe.motion.yaml"
         conversion_path = target / "conversion.json"
@@ -996,14 +1015,14 @@ class ProtocolServiceTests(unittest.TestCase):
             },
         }
 
-        errors = protocol_service.graphic_motion_plan._recipe_errors(
+        errors = protocol_service.motion_graphics_plan._recipe_errors(
             "gm-001", cue, self.root, verify_files=True, library={},
             require_library_match=False,
         )
 
         self.assertEqual([], errors)
 
-    def test_frozen_graphic_motion_selection_allows_historical_matched_field_names(self):
+    def test_frozen_motion_graphics_selection_allows_historical_matched_field_names(self):
         cue = {
             "intent": {"recipe_queries": ["legacy query"]},
             "selection": {
@@ -1018,12 +1037,12 @@ class ProtocolServiceTests(unittest.TestCase):
                 "avoid_when_review": "No frozen warning applies.",
                 "field_evidence": {
                     field: f"Evidence for {field}"
-                    for field in protocol_service.graphic_motion_plan.SELECTION_FIELDS
+                    for field in protocol_service.motion_graphics_plan.SELECTION_FIELDS
                 },
             },
         }
 
-        errors = protocol_service.graphic_motion_plan._selection_errors(
+        errors = protocol_service.motion_graphics_plan._selection_errors(
             "gm-001", cue, {"legacy-recipe"}, require_known_fields=False,
         )
 
@@ -1374,7 +1393,7 @@ class ProtocolServiceTests(unittest.TestCase):
         self.assertEqual("top", saved["cards"][0]["placement"]["region"])
         project = json.loads(self.project_path.read_text(encoding="utf-8"))
         operation = next(item for item in project["operations"] if item["id"] == "content-cards")
-        dependent = next(item for item in project["operations"] if item["id"] == "graphic-motion")
+        dependent = next(item for item in project["operations"] if item["id"] == "motion-graphics")
         review = project["reviews"][0]
         self.assertEqual((2, "stale"), (operation["revision"], operation["status"]))
         self.assertEqual(("stale", {"content-cards": 1}), (dependent["status"], dependent["based_on"]))
@@ -1447,8 +1466,8 @@ class ProtocolServiceTests(unittest.TestCase):
 
         self.assertTrue(response["ok"])
         saved = json.loads(self.project_path.read_text(encoding="utf-8"))
-        graphic_motion = next(item for item in saved["operations"] if item["id"] == "graphic-motion")
-        self.assertEqual(3, graphic_motion["revision"])
+        motion_graphics = next(item for item in saved["operations"] if item["id"] == "motion-graphics")
+        self.assertEqual(3, motion_graphics["revision"])
 
     def test_plan_update_rejects_generic_patch_and_managed_fields(self):
         self._configure_content_cards_project()
@@ -1785,7 +1804,7 @@ class ProtocolServiceTests(unittest.TestCase):
 
         self.assertTrue(response["ok"])
         project = json.loads(self.project_path.read_text(encoding="utf-8"))
-        self.assertEqual(9, next(item for item in project["operations"] if item["id"] == "graphic-motion")["revision"])
+        self.assertEqual(9, next(item for item in project["operations"] if item["id"] == "motion-graphics")["revision"])
         self.assertEqual(2, next(item for item in project["operations"] if item["id"] == "content-cards")["revision"])
 
     def test_review_final_cas_reconciles_other_operation_and_updates_exact_receipt(self):
@@ -1802,7 +1821,7 @@ class ProtocolServiceTests(unittest.TestCase):
 
         def external_write():
             current = json.loads(self.project_path.read_text(encoding="utf-8"))
-            next(item for item in current["operations"] if item["id"] == "graphic-motion")["revision"] = 9
+            next(item for item in current["operations"] if item["id"] == "motion-graphics")["revision"] = 9
             self.project_path.write_text(json.dumps(current), encoding="utf-8")
 
         self.service._before_final_cas = external_write
@@ -1816,7 +1835,7 @@ class ProtocolServiceTests(unittest.TestCase):
 
         self.assertTrue(response["ok"])
         committed = json.loads(self.project_path.read_text(encoding="utf-8"))
-        self.assertEqual(9, next(item for item in committed["operations"] if item["id"] == "graphic-motion")["revision"])
+        self.assertEqual(9, next(item for item in committed["operations"] if item["id"] == "motion-graphics")["revision"])
         receipt = next(item for item in committed["reviews"] if item["id"] == "content-cards-preview-r1")
         self.assertEqual(("approved", "Current evidence"), (receipt["status"], receipt["rationale"]))
 
@@ -1855,8 +1874,8 @@ class ProtocolServiceTests(unittest.TestCase):
         self._configure_content_cards_project()
         project = json.loads(self.project_path.read_text(encoding="utf-8"))
         project["reviews"].append({
-            "id": "graphic-motion-preview", "revision": 1, "status": "approved",
-            "depends_on": ["graphic-motion"], "based_on": {"graphic-motion": 2},
+            "id": "motion-graphics-preview", "revision": 1, "status": "approved",
+            "depends_on": ["motion-graphics"], "based_on": {"motion-graphics": 2},
             "snapshot_etag": "graphic-snapshot", "evidence_hashes": ["sha256:graphic"],
             "decision_mode": "human", "actor": "first-reviewer", "rationale": "Initial decision",
         })
@@ -1865,7 +1884,7 @@ class ProtocolServiceTests(unittest.TestCase):
 
         def external_receipt_change():
             current = json.loads(self.project_path.read_text(encoding="utf-8"))
-            receipt = next(item for item in current["reviews"] if item["id"] == "graphic-motion-preview")
+            receipt = next(item for item in current["reviews"] if item["id"] == "motion-graphics-preview")
             receipt.update({"actor": "external-reviewer", "rationale": "Updated external decision"})
             self.project_path.write_text(json.dumps(current), encoding="utf-8")
 
@@ -1880,7 +1899,7 @@ class ProtocolServiceTests(unittest.TestCase):
 
         self.assertTrue(response["ok"])
         committed = json.loads(self.project_path.read_text(encoding="utf-8"))
-        unrelated = next(item for item in committed["reviews"] if item["id"] == "graphic-motion-preview")
+        unrelated = next(item for item in committed["reviews"] if item["id"] == "motion-graphics-preview")
         target = next(item for item in committed["reviews"] if item["id"] == "content-cards-preview-r1")
         self.assertEqual(("external-reviewer", "Updated external decision"),
                          (unrelated["actor"], unrelated["rationale"]))
@@ -1967,7 +1986,7 @@ class ProtocolServiceTests(unittest.TestCase):
         cards["based_on"] = {"captions": 1}
         cards["status"] = "stale"
         project["operations"].insert(0, captions)
-        project["sequences"]["main"]["operations"] = ["captions", "content-cards", "graphic-motion"]
+        project["sequences"]["main"]["operations"] = ["captions", "content-cards", "motion-graphics"]
         self.project_path.write_text(json.dumps(project), encoding="utf-8")
         project["reviews"][0]["snapshot_etag"] = build_snapshot(self.root)["snapshot_etag"]
         self.project_path.write_text(json.dumps(project), encoding="utf-8")
@@ -2102,10 +2121,10 @@ class ProtocolServiceTests(unittest.TestCase):
             plan = apply_cards_review.apply_review(plan, self._cards_review(copy="Original copy", placement="bottom"))
         self.plan.write_text(json.dumps(plan, indent=2) + "\n", encoding="utf-8")
         project = self._project()
-        project["sequences"]["main"]["operations"] = ["content-cards", "graphic-motion"]
+        project["sequences"]["main"]["operations"] = ["content-cards", "motion-graphics"]
         project["operations"] = [
             {**project["operations"][0], "id": "content-cards", "status": "approved", "plan": "content-cards/cards-plan.json"},
-            {**project["operations"][0], "id": "graphic-motion", "status": "approved", "revision": 2,
+            {**project["operations"][0], "id": "motion-graphics", "status": "approved", "revision": 2,
              "depends_on": ["content-cards"], "based_on": {"content-cards": 1}, "plan": None},
         ]
         self.preview_path = self.root / "review" / "03-content-cards" / "preview.png"

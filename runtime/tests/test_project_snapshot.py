@@ -113,9 +113,9 @@ class ProjectSnapshotTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / "input").mkdir()
-            for directory in ("captions", "content-cards", "graphic-motion"):
+            for directory in ("captions", "content-cards", "motion-graphics"):
                 (root / "work" / directory).mkdir(parents=True, exist_ok=True)
-            motion_frames = root / "work" / "cache" / "graphic-motion" / "rendered" / "motion-001"
+            motion_frames = root / "work" / "cache" / "motion-graphics" / "rendered" / "motion-001"
             motion_frames.mkdir(parents=True)
             first_frame = Image.new("RGBA", (1280, 720), (0, 0, 0, 0))
             first_frame.paste((255, 255, 255, 255), (100, 200, 300, 400))
@@ -159,7 +159,7 @@ class ProjectSnapshotTests(unittest.TestCase):
                     {"id": "card-002", "card_type": "quote", "program_start_s": 6, "duration_s": 2, "copy": {"text": "Second card"}, "placement": {"region": "bottom"}, "visual_treatment": {"layout": "quote"}, "editor_transform": {"x": 0.6, "y": 0.7, "scale": 0.9}},
                 ],
             }), encoding="utf-8")
-            (root / "work" / "graphic-motion" / "graphic-motion-plan.json").write_text(json.dumps({
+            (root / "work" / "motion-graphics" / "motion-graphics-plan.json").write_text(json.dumps({
                 "schema_version": 3,
                 "cues": [{
                     "id": "motion-001",
@@ -176,7 +176,7 @@ class ProjectSnapshotTests(unittest.TestCase):
                     },
                     "render": {
                         "kind": "overlay",
-                        "asset": "cache/graphic-motion/rendered/motion-001",
+                        "asset": "cache/motion-graphics/rendered/motion-001",
                         "asset_type": "image-sequence",
                         "pattern": "frame_%06d.png",
                         "start_number": 1,
@@ -184,8 +184,8 @@ class ProjectSnapshotTests(unittest.TestCase):
                         "start_s": 0,
                         "duration_s": 5,
                         "frames": [
-                            {"path": "work/cache/graphic-motion/rendered/motion-001/frame_000001.png", "sha256": frame_hashes[0]},
-                            {"path": "work/cache/graphic-motion/rendered/motion-001/frame_000002.png", "sha256": frame_hashes[1]},
+                            {"path": "work/cache/motion-graphics/rendered/motion-001/frame_000001.png", "sha256": frame_hashes[0]},
+                            {"path": "work/cache/motion-graphics/rendered/motion-001/frame_000002.png", "sha256": frame_hashes[1]},
                         ],
                     },
                     "editor_transform": {"x": 0.55, "y": 0.5, "scale": 1.1},
@@ -196,7 +196,7 @@ class ProjectSnapshotTests(unittest.TestCase):
             for operation_id, plan in (
                 ("captions", "captions/captions-plan.json"),
                 ("content-cards", "content-cards/cards-plan.json"),
-                ("graphic-motion", "graphic-motion/graphic-motion-plan.json"),
+                ("motion-graphics", "motion-graphics/motion-graphics-plan.json"),
             ):
                 operations.append({
                     "id": operation_id, "revision": 1, "status": "approved", "plan": plan,
@@ -222,14 +222,14 @@ class ProjectSnapshotTests(unittest.TestCase):
         self.assertEqual({"start_s": 6, "end_s": 8}, view["content_cards_edit"]["cues"][1]["program_range"])
         self.assertEqual(["segment:3"], view["content_cards_edit"]["cues"][0]["evidence_refs"])
         self.assertEqual("Top area remains clear.", view["content_cards_edit"]["cues"][0]["decision_rationale"])
-        self.assertEqual("motion-001", view["graphic_motion_edit"]["cues"][0]["id"])
-        self.assertEqual("recipe-real", view["graphic_motion_edit"]["cues"][0]["recipe_id"])
-        self.assertEqual("bound", view["graphic_motion_edit"]["cues"][0]["source_status"])
-        self.assertEqual("unknown", view["graphic_motion_edit"]["cues"][0]["license_status"])
-        self.assertEqual("Real motion", view["graphic_motion_edit"]["cues"][0]["source_text"])
-        self.assertEqual("The reveal matches the spoken transition.", view["graphic_motion_edit"]["cues"][0]["decision_rationale"])
+        self.assertEqual("motion-001", view["motion_graphics_edit"]["cues"][0]["id"])
+        self.assertEqual("recipe-real", view["motion_graphics_edit"]["cues"][0]["recipe_id"])
+        self.assertEqual("bound", view["motion_graphics_edit"]["cues"][0]["source_status"])
+        self.assertEqual("unknown", view["motion_graphics_edit"]["cues"][0]["license_status"])
+        self.assertEqual("Real motion", view["motion_graphics_edit"]["cues"][0]["source_text"])
+        self.assertEqual("The reveal matches the spoken transition.", view["motion_graphics_edit"]["cues"][0]["decision_rationale"])
         self.assertEqual(
-            ["caption", "caption", "card", "card", "graphic-motion"],
+            ["caption", "caption", "card", "card", "motion-graphics"],
             [layer["kind"] for layer in view["layers"]],
         )
         self.assertEqual(

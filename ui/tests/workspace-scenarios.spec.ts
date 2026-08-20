@@ -17,7 +17,7 @@ const scenarioIds = [
   '123-79',
   '123-167',
   '126-2',
-  'graphic-motion',
+  'motion-graphics',
 ] as const
 
 for (const scenarioId of scenarioIds) {

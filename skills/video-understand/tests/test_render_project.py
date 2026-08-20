@@ -167,7 +167,7 @@ class OverlayFrameBoundaryTests(unittest.TestCase):
                 "source": "../../source.mp4",
                 "timeline": "../timeline.json",
                 "contributions": [{
-                    "operation": "graphic-motion",
+                    "operation": "motion-graphics",
                     "kind": "overlay",
                     "asset": "../../overlay.mp4",
                     "start_s": 0,

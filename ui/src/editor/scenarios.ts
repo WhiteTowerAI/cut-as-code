@@ -18,7 +18,7 @@ export const scenarioIds = [
   '123-79',
   '123-167',
   '126-2',
-  'graphic-motion',
+  'motion-graphics',
   'review-content-cards',
   'review-content-cards-conflict',
   'timeline-editing',
@@ -168,7 +168,7 @@ const cueContextProject: EditorProjectView = {
       metadata: { layout: 'lower-third', placement: 'bottom-left' },
       sourceRange: { startS: 7, endS: 10 }, programRange: { startS: 7, endS: 10 },
     }] },
-    { id: 'track-graphic-motion', name: 'Graphic Motion', kind: 'graphic-motion', clips: [{
+    { id: 'track-motion-graphics', name: 'Motion Graphics', kind: 'motion-graphics', clips: [{
       id: 'cue-motion', displayName: 'Motion: xyz-fade-up', summary: 'A system comes online', enabled: true,
       sourceText: 'The system comes online.', decisionRationale: 'The restrained rise makes the state change legible.',
       reviewStatus: 'verified', reviewMode: 'agent', reviewEvidence: ['review/motion/gm-001.png'],
@@ -190,7 +190,7 @@ const cueContextProject: EditorProjectView = {
       approval: { status: 'none' },
     },
     {
-      id: 'graphic-motion', kind: 'graphic-motion', revision: 1, editable: true,
+      id: 'motion-graphics', kind: 'motion-graphics', revision: 1, editable: true,
       fields: { cues: [{ id: 'cue-motion', enabled: true, content: 'A system comes online', program_range: { start_s: 13, end_s: 15 } }] },
       preview: { status: 'current', revision: 1, reviewId: 'motion-review', snapshotEtag: 'motion-snapshot', evidenceHashes: ['sha256:motion-preview'] },
       approval: { status: 'none' },
@@ -369,7 +369,7 @@ const scenarios: readonly EditorScenario[] = [
     }),
   },
   { id: '126-2', initialState: state({ activeTab: 'cards' }) },
-  { id: 'graphic-motion', initialState: state({ activeTab: 'graphic-motion' }) },
+  { id: 'motion-graphics', initialState: state({ activeTab: 'motion-graphics' }) },
   { id: 'review-content-cards', initialState: state({ project: reviewProject, activeTab: 'cards' }) },
   {
     id: 'review-content-cards-conflict',

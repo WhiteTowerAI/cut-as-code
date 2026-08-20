@@ -118,7 +118,7 @@ function productionDependencyClosure(packageLock, roots) {
 }
 
 function inspectAnimxyz(root) {
-  const recipesRoot = path.join(root, 'skills', 'video-add-graphic-motion', 'recipes', 'animxyz')
+  const recipesRoot = path.join(root, 'skills', 'video-add-motion-graphics', 'recipes', 'animxyz')
   const manifests = walk(recipesRoot).filter((file) => path.basename(file) === 'recipe.motion.yaml')
   if (manifests.length !== 20) throw new Error(`expected 20 packaged AnimXYZ manifests, found ${manifests.length}`)
   for (const manifest of manifests) {
@@ -137,7 +137,7 @@ function inspectAnimxyz(root) {
   const evidence = {
     kind: 'vendored-manifest-declarations',
     manifest_count: manifests.length,
-    manifest_glob: 'skills/video-add-graphic-motion/recipes/animxyz/*/recipe.motion.yaml',
+    manifest_glob: 'skills/video-add-motion-graphics/recipes/animxyz/*/recipe.motion.yaml',
     source_repository: 'https://github.com/nexu-io/motion-anything',
     source_revision: 'b016900d9ee92fc2d3e4dc520359cc8999d2ed4e',
     upstream: 'https://animxyz.com',
@@ -258,7 +258,7 @@ function inspectPackagedScriptAndFontAssets(root, dependencyComponents) {
       })
       continue
     }
-    if (/^skills\/video-add-graphic-motion\/recipes\/animxyz\/(?:[^/]+\/hyperframes\/)?_runtime\/animxyz\.css$/.test(item.path)) {
+    if (/^skills\/video-add-motion-graphics\/recipes\/animxyz\/(?:[^/]+\/hyperframes\/)?_runtime\/animxyz\.css$/.test(item.path)) {
       const hash = sha256(fs.readFileSync(item.file))
       if (hash !== '4a133a5e4bf9ff2b3c87d7ef3a20064ccaab3c8838cafbf540c75d658f7c451d') unknown.push(item.path)
       else thirdParty.push({ path: item.path, component: '@animxyz/core', sha256: hash })
@@ -361,17 +361,18 @@ function requiredPackagedFile(root, packagedPath) {
 }
 
 function isFirstPartyOrGeneratedAsset(packagedPath) {
-  if (/^runtime\/(?:mcp|sidecar)\.cjs$/.test(packagedPath)) return true
-  if (/^skills\/video-add-graphic-motion\/recipes\/animxyz\/[^/]+\/hyperframes\/hf-(?:adapter|recipe)\.js$/.test(packagedPath)) return true
+  if (packagedPath === 'hooks/launch-editor.cjs') return true
+  if (/^runtime\/(?:hub|hub-client|hub-trust|mcp|sidecar)\.cjs$/.test(packagedPath)) return true
+  if (/^skills\/video-add-motion-graphics\/recipes\/animxyz\/[^/]+\/hyperframes\/hf-(?:adapter|recipe)\.js$/.test(packagedPath)) return true
   return new Set([
-    'skills/video-add-graphic-motion/scripts/audit_sticker_metadata.mjs',
-    'skills/video-add-graphic-motion/scripts/convert_codrops_recipes.mjs',
-    'skills/video-add-graphic-motion/scripts/convert_motion_anything_recipes.mjs',
-    'skills/video-add-graphic-motion/scripts/import_sticker_recipes.mjs',
-    'skills/video-add-graphic-motion/scripts/recipe_library.mjs',
-    'skills/video-add-graphic-motion/scripts/sticker_recipe_catalog.mjs',
-    'skills/video-add-graphic-motion/scripts/sticker_semantics.mjs',
-    'skills/video-add-graphic-motion/scripts/verify_codrops_hyperframes.mjs',
+    'skills/video-add-motion-graphics/scripts/audit_sticker_metadata.mjs',
+    'skills/video-add-motion-graphics/scripts/convert_codrops_recipes.mjs',
+    'skills/video-add-motion-graphics/scripts/convert_motion_anything_recipes.mjs',
+    'skills/video-add-motion-graphics/scripts/import_sticker_recipes.mjs',
+    'skills/video-add-motion-graphics/scripts/recipe_library.mjs',
+    'skills/video-add-motion-graphics/scripts/sticker_recipe_catalog.mjs',
+    'skills/video-add-motion-graphics/scripts/sticker_semantics.mjs',
+    'skills/video-add-motion-graphics/scripts/verify_codrops_hyperframes.mjs',
     'skills/video-add-captions/scripts/build_style_preview_gallery.mjs',
     'skills/video-add-captions/scripts/caption_interaction.mjs',
     'skills/video-add-captions/scripts/caption_interaction_state.mjs',

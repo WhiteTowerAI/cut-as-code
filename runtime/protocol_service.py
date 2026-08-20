@@ -19,17 +19,17 @@ CARDS_SCRIPTS = (
     / "video-add-content-cards"
     / "scripts"
 )
-GRAPHIC_MOTION_SCRIPTS = (
+MOTION_GRAPHICS_SCRIPTS = (
     Path(__file__).resolve().parents[1]
     / "skills"
-    / "video-add-graphic-motion"
+    / "video-add-motion-graphics"
     / "scripts"
 )
 sys.path.insert(0, str(CARDS_SCRIPTS))
 import apply_cards_review  # noqa: E402
 import projectlib  # noqa: E402
-sys.path.insert(0, str(GRAPHIC_MOTION_SCRIPTS))
-import graphic_motion_plan  # noqa: E402
+sys.path.insert(0, str(MOTION_GRAPHICS_SCRIPTS))
+import motion_graphics_plan  # noqa: E402
 
 
 class PreparedTransactionError(RuntimeError):
@@ -61,6 +61,8 @@ class ProtocolService:
             return self._get_snapshot(request)
         if verb == "get_resource":
             return self._get_resource(request)
+        if verb == "project.status":
+            return self._project_status(request)
         if verb == "plan.update":
             return self._update_plan(request)
         if verb == "timeline.edit":
@@ -70,6 +72,22 @@ class ProtocolService:
         if verb == "review.record":
             return self._record_review(request)
         return {"ok": False, "error": "unknown verb"}
+
+    def _project_status(self, request):
+        if set(request) != {"verb", "project_id"}:
+            return {"ok": False, "error": "project.status accepts only project_id"}
+        project_id = request.get("project_id")
+        invalid = self._validate_id("project_id", project_id)
+        if invalid:
+            return invalid
+        project = self._projects.get(project_id)
+        if project is None:
+            return {"ok": False, "error": "unknown project_id"}
+        lease = self._acquire_lease(project["root"])
+        if lease is None:
+            return {"ok": True, "mutation_lease": True}
+        self._release_lease(lease)
+        return {"ok": True, "mutation_lease": False}
 
     def _open_project(self, request):
         try:
@@ -321,7 +339,7 @@ class ProtocolService:
             if not isinstance(items, list) or not items:
                 return []
             return copy.deepcopy(declared) if declared else []
-        elif operation_id == "graphic-motion":
+        elif operation_id == "motion-graphics":
             items = [
                 item for item in plan.get("cues", [])
                 if isinstance(item, dict) and item.get("status") == "verified"
@@ -515,7 +533,7 @@ class ProtocolService:
             if not operation or operation_id not in affected_operation_ids:
                 continue
             self._rebind_operation_plan(plan, operation, updated_timeline, timeline_sha256)
-            if operation_id == "graphic-motion":
+            if operation_id == "motion-graphics":
                 operation["render"] = [
                     copy.deepcopy(cue["render"])
                     for cue in plan.get("cues", [])
@@ -958,7 +976,7 @@ class ProtocolService:
             for cue in shifted.get("cues", []):
                 if not cls._shift_program_range(cue, boundary, delta):
                     cls._shift_start_end(cue, boundary, delta)
-        elif operation_id == "graphic-motion":
+        elif operation_id == "motion-graphics":
             for cue in shifted.get("cues", []):
                 cls._shift_program_range(cue, boundary, delta)
         elif operation_id == "b-roll":
@@ -978,7 +996,7 @@ class ProtocolService:
         else:
             collection = {
                 "content-cards": "cards",
-                "graphic-motion": "cues",
+                "motion-graphics": "cues",
                 "b-roll": "shots",
             }.get(operation_id)
             if collection and isinstance(remapped.get(collection), list):
@@ -1381,11 +1399,11 @@ class ProtocolService:
         hashes = plan.get("input_hashes")
         if isinstance(hashes, dict) and "timeline_sha256" in hashes:
             hashes["timeline_sha256"] = timeline_sha256
-        if operation.get("id") == "graphic-motion":
-            bindings = list(graphic_motion_plan._input_bindings(plan))
+        if operation.get("id") == "motion-graphics":
+            bindings = list(motion_graphics_plan._input_bindings(plan))
             for cue in plan.get("cues", []):
                 if isinstance(cue, dict) and cue.get("status") == "verified":
-                    bindings.extend(graphic_motion_plan._cue_bindings(cue))
+                    bindings.extend(motion_graphics_plan._cue_bindings(cue))
             plan["delivery_bindings"] = bindings
         bindings = plan.get("delivery_bindings")
         if isinstance(bindings, list):
@@ -1582,7 +1600,7 @@ class ProtocolService:
                     self._validate_caption_plan(updated_plan)
             except (TypeError, ValueError) as exc:
                 return {"ok": False, "error": f"invalid captions update: {exc}"}
-        elif operation_id == "graphic-motion":
+        elif operation_id == "motion-graphics":
             try:
                 transform_only = (
                     isinstance(review, dict)
@@ -1593,19 +1611,19 @@ class ProtocolService:
                 )
                 if transform_only:
                     if review.get("schema_version") != 1:
-                        raise ValueError("graphic-motion update schema_version must be 1")
+                        raise ValueError("motion-graphics update schema_version must be 1")
                     updated_plan = self._apply_editor_transform(
-                        plan, "graphic-motion", review.get("cue_id"), review.get("editor_transform")
+                        plan, "motion-graphics", review.get("cue_id"), review.get("editor_transform")
                     )
                     if "editor_content_bounds" in review:
                         updated_plan = self._apply_editor_content_bounds(
-                            updated_plan, "graphic-motion", review.get("cue_id"), review["editor_content_bounds"]
+                            updated_plan, "motion-graphics", review.get("cue_id"), review["editor_content_bounds"]
                         )
                 else:
-                    updated_plan = self._apply_graphic_motion_update(plan, review)
-                    self._validate_graphic_motion_plan(root, project, updated_plan)
+                    updated_plan = self._apply_motion_graphics_update(plan, review)
+                    self._validate_motion_graphics_plan(root, project, updated_plan)
             except (TypeError, ValueError) as exc:
-                return {"ok": False, "error": f"invalid graphic-motion update: {exc}"}
+                return {"ok": False, "error": f"invalid motion-graphics update: {exc}"}
         else:
             return {"ok": False, "error": "unsupported operation"}
         if updated_plan == plan:
@@ -1676,26 +1694,26 @@ class ProtocolService:
         return updated
 
     @staticmethod
-    def _apply_graphic_motion_update(plan, update):
+    def _apply_motion_graphics_update(plan, update):
         if (not isinstance(update, dict)
                 or not {"schema_version", "cue_id"}.issubset(update)
                 or set(update) - {"schema_version", "cue_id", "enabled", "editor_transform", "editor_content_bounds"}):
-            raise ValueError("graphic-motion update must contain only typed cue fields")
+            raise ValueError("motion-graphics update must contain only typed cue fields")
         if "enabled" not in update and "editor_transform" not in update:
-            raise ValueError("graphic-motion update must change enabled or editor_transform")
+            raise ValueError("motion-graphics update must change enabled or editor_transform")
         if update.get("schema_version") != 1:
-            raise ValueError("graphic-motion update schema_version must be 1")
+            raise ValueError("motion-graphics update schema_version must be 1")
         cue_id = update.get("cue_id")
         if not isinstance(cue_id, str) or not cue_id.strip():
-            raise ValueError("graphic-motion cue_id must be nonblank")
+            raise ValueError("motion-graphics cue_id must be nonblank")
         updated = copy.deepcopy(plan)
         cue = next((item for item in updated.get("cues", []) if isinstance(item, dict) and item.get("id") == cue_id), None)
         if cue is None:
-            raise ValueError("graphic-motion cue does not exist")
+            raise ValueError("motion-graphics cue does not exist")
         if "enabled" in update:
             enabled = update["enabled"]
             if not isinstance(enabled, bool):
-                raise ValueError("graphic-motion enabled must be boolean")
+                raise ValueError("motion-graphics enabled must be boolean")
             if enabled:
                 cue["status"] = "verified"
                 cue.pop("skip_reason", None)
@@ -1705,16 +1723,16 @@ class ProtocolService:
         if "editor_transform" in update:
             ProtocolService._validate_editor_transform(update["editor_transform"])
             updated = ProtocolService._apply_editor_transform(
-                updated, "graphic-motion", cue_id, update["editor_transform"]
+                updated, "motion-graphics", cue_id, update["editor_transform"]
             )
         if "editor_content_bounds" in update:
             updated = ProtocolService._apply_editor_content_bounds(
-                updated, "graphic-motion", cue_id, update["editor_content_bounds"]
+                updated, "motion-graphics", cue_id, update["editor_content_bounds"]
             )
-        bindings = list(graphic_motion_plan._input_bindings(updated))
+        bindings = list(motion_graphics_plan._input_bindings(updated))
         for item in updated.get("cues", []):
             if isinstance(item, dict) and item.get("status") == "verified":
-                bindings.extend(graphic_motion_plan._cue_bindings(item))
+                bindings.extend(motion_graphics_plan._cue_bindings(item))
         updated["delivery_bindings"] = bindings
         return updated
 
@@ -1879,7 +1897,7 @@ class ProtocolService:
     def _mutation_context(self, request):
         project_id = request["project_id"]
         operation_id = request.get("operation")
-        if operation_id not in {"content-cards", "captions", "graphic-motion"}:
+        if operation_id not in {"content-cards", "captions", "motion-graphics"}:
             return {"ok": False, "error": "unsupported operation"}
         root = self._projects[project_id]["root"]
         snapshot = build_snapshot(root)
@@ -1950,27 +1968,27 @@ class ProtocolService:
 
         writes = []
         for operation in project.get("operations", []):
-            if operation.get("id") != "graphic-motion" or operation.get("id") == changed_id:
+            if operation.get("id") != "motion-graphics" or operation.get("id") == changed_id:
                 continue
             based_on = operation.get("based_on")
             if not isinstance(based_on, dict) or changed_id not in based_on:
                 continue
             plan_value = operation.get("plan")
             if not isinstance(plan_value, str) or not plan_value.strip():
-                raise ValueError("graphic-motion dependency plan is missing")
+                raise ValueError("motion-graphics dependency plan is missing")
             plan_path = projectlib.resolve_project_path(root, plan_value)
             try:
                 plan = json.loads(plan_path.read_text(encoding="utf-8"))
             except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-                raise ValueError("graphic-motion dependency plan is unreadable") from exc
+                raise ValueError("motion-graphics dependency plan is unreadable") from exc
             plan_based_on = plan.get("based_on")
             if not isinstance(plan_based_on, dict) or changed_id not in plan_based_on:
-                raise ValueError("graphic-motion dependency plan does not track the changed operation")
+                raise ValueError("motion-graphics dependency plan does not track the changed operation")
             plan["based_on"][changed_id] = revision
-            self._validate_graphic_motion_plan(root, project, plan)
+            self._validate_motion_graphics_plan(root, project, plan)
             if "plan_sha256" in operation:
-                operation["plan_sha256"] = graphic_motion_plan.canonical_sha256(plan)
-            writes.append((plan_path, plan, "graphic-motion"))
+                operation["plan_sha256"] = motion_graphics_plan.canonical_sha256(plan)
+            writes.append((plan_path, plan, "motion-graphics"))
         return writes
 
     def _commit(self, root, plan_path, plan, project, expected, verb, operation_id, dependent_plan_writes=None):
@@ -2248,7 +2266,7 @@ class ProtocolService:
             transaction_id = intent.get("transaction_id")
             operation_id = intent.get("operation")
             if (intent.get("schema_version") != 1
-                    or operation_id not in {"cut", "content-cards", "captions", "graphic-motion"}
+                    or operation_id not in {"cut", "content-cards", "captions", "motion-graphics"}
                     or intent.get("verb") not in {"timeline.edit", "plan.update", "review.record"}
                     or intent.get("state") not in {"prepared", "committed"}
                     or not isinstance(transaction_id, str) or str(uuid.UUID(transaction_id)) != transaction_id
@@ -2283,10 +2301,10 @@ class ProtocolService:
                 required_targets.add(plan_path.resolve())
                 allowed.add(plan_path.resolve())
                 graphic_operation = next(
-                    (item for item in current_project.get("operations", []) if item.get("id") == "graphic-motion"),
+                    (item for item in current_project.get("operations", []) if item.get("id") == "motion-graphics"),
                     None,
                 )
-                if (operation_id != "graphic-motion" and graphic_operation
+                if (operation_id != "motion-graphics" and graphic_operation
                         and isinstance(graphic_operation.get("plan"), str)):
                     allowed.add(projectlib.resolve_project_path(root, graphic_operation["plan"]).resolve())
             states = []
@@ -2375,8 +2393,8 @@ class ProtocolService:
                         self._validate_cards_plan(plan)
                     elif candidate.get("id") == "captions":
                         self._validate_caption_plan(plan)
-                    elif candidate.get("id") == "graphic-motion":
-                        self._validate_graphic_motion_plan(root, project, plan)
+                    elif candidate.get("id") == "motion-graphics":
+                        self._validate_motion_graphics_plan(root, project, plan)
                 return [*errors, *projectlib.validate_timeline(timeline)]
             operation = next((item for item in project.get("operations", [])
                               if item.get("id") == operation_id), None)
@@ -2389,16 +2407,16 @@ class ProtocolService:
             elif operation_id == "captions":
                 self._validate_caption_plan(plan)
             else:
-                self._validate_graphic_motion_plan(root, project, plan)
+                self._validate_motion_graphics_plan(root, project, plan)
             graphic_operation = next(
-                (item for item in project.get("operations", []) if item.get("id") == "graphic-motion"),
+                (item for item in project.get("operations", []) if item.get("id") == "motion-graphics"),
                 None,
             )
             if graphic_operation and isinstance(graphic_operation.get("plan"), str):
                 graphic_path = projectlib.resolve_project_path(root, graphic_operation["plan"]).resolve()
                 if graphic_path in proposed and graphic_path != plan_path:
                     graphic_plan = json.loads(proposed[graphic_path])
-                    self._validate_graphic_motion_plan(root, project, graphic_plan)
+                    self._validate_motion_graphics_plan(root, project, graphic_plan)
             return errors
         except (OSError, TypeError, ValueError, json.JSONDecodeError):
             return ["invalid recovered JSON"]
@@ -2465,16 +2483,16 @@ class ProtocolService:
             raise ValueError("caption cue ids must be unique")
 
     @staticmethod
-    def _validate_graphic_motion_plan(root, project, plan):
+    def _validate_motion_graphics_plan(root, project, plan):
         active_sequence = project.get("active_sequence")
         sequences = project.get("sequences") if isinstance(project.get("sequences"), dict) else {}
         sequence = sequences.get(active_sequence) if isinstance(active_sequence, str) else None
         timeline_value = sequence.get("timeline") if isinstance(sequence, dict) else None
         if not isinstance(timeline_value, str) or not timeline_value.strip():
-            raise ValueError("graphic-motion requires the active timeline")
+            raise ValueError("motion-graphics requires the active timeline")
         timeline_path = projectlib.resolve_project_path(root, timeline_value)
         timeline = json.loads(timeline_path.read_text(encoding="utf-8"))
-        errors = graphic_motion_plan.validate_plan(
+        errors = motion_graphics_plan.validate_plan(
             plan,
             timeline,
             project=project,

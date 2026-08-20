@@ -126,7 +126,7 @@ function getOperation(project: EditorProjectView | null, operationId: string) {
 function isSupportedOperation(
   operation: EditorOperationView | undefined,
 ): operation is EditorOperationView {
-  return Boolean(operation?.editable && ['content-cards', 'captions', 'graphic-motion'].includes(operation.kind))
+  return Boolean(operation?.editable && ['content-cards', 'captions', 'motion-graphics'].includes(operation.kind))
 }
 
 function isOperationDraftChange(operation: EditorOperationView, value: unknown): value is ContentCardsDraftChange {
@@ -231,7 +231,7 @@ function applyDraftChangesToTracks(
 ) {
   const kind = operationId === 'captions' ? 'caption'
     : operationId === 'content-cards' ? 'card'
-      : operationId === 'graphic-motion' ? 'graphic-motion'
+      : operationId === 'motion-graphics' ? 'motion-graphics'
         : null
   if (!kind) return project.tracks
   return project.tracks.map((track) => track.kind !== kind ? track : {
@@ -328,6 +328,7 @@ export type EditorState = {
   redoTimeline: () => Promise<void>
   editOperationDraft: (operationId: string, change: ContentCardsDraftChange) => void
   discardOperationDraft: (operationId: string) => void
+  restoreOperationDraft: (operationId: string, draft: OperationDraft) => void
   saveOperationDraft: (operationId: string) => Promise<void>
   saveAllOperationDrafts: () => Promise<void>
   recordReviewDecision: (operationId: string, decision: 'approved' | 'rejected', rationale?: string) => Promise<void>
@@ -345,6 +346,8 @@ export type EditorRuntimeAdapter = Readonly<{
   save: (operationId: string, draft: ContentCardsDraftChange) => Promise<EditorProjectView>
   review: (operationId: string, decision: 'approved' | 'rejected', rationale?: string) => Promise<EditorProjectView>
   timelineEdit?: (command: TimelineEditCommand) => Promise<EditorProjectView>
+  persistDraft?: (operationId: string, draft: Pick<OperationDraft, 'baseRevision' | 'changes'>) => Promise<void>
+  discardDraft?: (operationId: string) => Promise<void>
 }>
 
 export function draftFieldsForCue(draft: OperationDraft | null | undefined, cueId: string) {
@@ -374,6 +377,7 @@ export type EditorInitialState = Omit<
   | 'redoTimeline'
   | 'editOperationDraft'
   | 'discardOperationDraft'
+  | 'restoreOperationDraft'
   | 'saveOperationDraft'
   | 'saveAllOperationDrafts'
   | 'recordReviewDecision'
@@ -401,6 +405,18 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
   let nextActivityId = 1
   let nextPlaybackRequestId = 1
   let nextTimelineMarkerId = 1
+  const draftPersistence = new Map<string, Promise<void>>()
+  const enqueueDraftPersistence = (operationId: string, action: () => Promise<void>) => {
+    const pending = (draftPersistence.get(operationId) ?? Promise.resolve())
+      .catch(() => {})
+      .then(action)
+    draftPersistence.set(operationId, pending)
+    void pending.then(
+      () => { if (draftPersistence.get(operationId) === pending) draftPersistence.delete(operationId) },
+      () => { if (draftPersistence.get(operationId) === pending) draftPersistence.delete(operationId) },
+    )
+    return pending
+  }
   return createStore<EditorState>()((set, get) => ({
     ...initialState,
     operationDrafts: {},
@@ -643,10 +659,37 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
         requestId: current?.requestId,
       }
       set({ operationDrafts: { ...get().operationDrafts, [operationId]: draft } })
+      if (!runtime?.persistDraft) return
+      const persistedDraft = { baseRevision: draft.baseRevision, changes: draft.changes }
+      void enqueueDraftPersistence(operationId, () => runtime.persistDraft!(operationId, persistedDraft)).catch((error) => {
+        const current = get().operationDrafts[operationId]
+        if (current?.changes !== draft.changes) return
+        set({ operationDrafts: { ...get().operationDrafts, [operationId]: {
+          ...current, error: error instanceof Error ? error.message : 'Could not preserve draft',
+        } } })
+      })
     },
     discardOperationDraft: (operationId) => {
       const { [operationId]: _discarded, ...operationDrafts } = get().operationDrafts
       set({ operationDrafts })
+      if (runtime?.discardDraft) void enqueueDraftPersistence(operationId, () => runtime.discardDraft!(operationId)).catch(() => {})
+    },
+    restoreOperationDraft: (operationId, draft) => {
+      const operation = getOperation(get().project, operationId)
+      if (!isSupportedOperation(operation) || !draft.changes.length
+        || draft.changes.some((change) => !isOperationDraftChange(operation, change))) return
+      const changes = draft.changes.filter((change) => !fieldsMatch(operation.fields, change))
+      if (!changes.length) {
+        if (runtime?.discardDraft) void enqueueDraftPersistence(operationId, () => runtime.discardDraft!(operationId)).catch(() => {})
+        return
+      }
+      set({ operationDrafts: { ...get().operationDrafts, [operationId]: {
+        baseRevision: draft.baseRevision,
+        fields: changes.at(-1)!,
+        changes,
+        dirty: true,
+        conflict: draft.conflict || operation.revision !== draft.baseRevision,
+      } } })
     },
     saveOperationDraft: async (operationId) => {
       const state = get()
@@ -674,17 +717,25 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
           const newerChanges = current.changes.filter((change) => !submittedCueIds.has(change.cueId ?? '') ||
             !submittedChanges.some((submitted) => JSON.stringify(submitted) === JSON.stringify(change)))
           if (newerChanges.length) {
+            const rebasedDraft: OperationDraft = {
+              baseRevision: getOperation(project, operationId)?.revision ?? current.baseRevision,
+              fields: newerChanges.at(-1)!, changes: newerChanges, dirty: true, conflict: false, pending: false,
+              requestId,
+            }
             set({ project, operationDrafts: {
               ...get().operationDrafts,
-              [operationId]: {
-                baseRevision: getOperation(project, operationId)?.revision ?? current.baseRevision,
-                fields: newerChanges.at(-1)!, changes: newerChanges, dirty: true, conflict: false, pending: false,
-                requestId,
-              },
+              [operationId]: rebasedDraft,
             } })
+            if (runtime.persistDraft) {
+              await enqueueDraftPersistence(operationId, () => runtime.persistDraft!(operationId, {
+                baseRevision: rebasedDraft.baseRevision,
+                changes: rebasedDraft.changes,
+              }))
+            }
           } else {
             const { [operationId]: _saved, ...operationDrafts } = get().operationDrafts
             set({ project, operationDrafts })
+            if (runtime.discardDraft) await enqueueDraftPersistence(operationId, () => runtime.discardDraft!(operationId))
           }
           get().addActivity({ category: 'save', status: 'succeeded', operationId, message: 'Save completed' })
         } catch (error) {
@@ -739,7 +790,7 @@ export function createEditorStore(initialState: EditorInitialState, runtime?: Ed
       const kindOrder = new Map<EditorOperationView['kind'], number>([
         ['captions', 0],
         ['content-cards', 1],
-        ['graphic-motion', 2],
+        ['motion-graphics', 2],
       ])
       const operationIds = (get().project?.operations ?? [])
         .filter((operation) => isSupportedOperation(operation) && get().operationDrafts[operation.id]?.dirty)

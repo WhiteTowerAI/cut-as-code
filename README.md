@@ -6,6 +6,10 @@
 
 **Cut-as-code** turns video editing into an inspectable, code-driven workflow you can drive with AI coding agents like Claude Code, Codex, and OpenClaw. The agent proposes and records editing decisions as readable files; you review them in browser pages and template galleries, approve the work, and then render the final videos — all free, open source (MIT), and with nothing uploaded to a cloud service.
 
+The bundled Editor Hub outlives browser tabs and Agent/MCP sessions. Closing or refreshing a tab does not stop a project. Use **Close Project** in the Hub to release one runtime or **Quit Editor Service** to stop all runtimes; protected drafts and active work require confirmation. An idle runtime is eligible for reclamation after 30 minutes only when it has no connected event client, active operation, mutation lease, or recoverable draft. Reopening reconstructs it from authoritative Protocol V1 files and any permitted draft in Plugin data.
+
+Plugin data is private state for the current OS user and is the Hub discovery trust root. The launcher rejects malformed, unsigned, stale, unresponsive, or challenge-mismatched locators. It does not claim to isolate the editor from another process that already has the same user's permission to rewrite Plugin data; that process is inside the local trust boundary and can also rewrite Plugin configuration and drafts.
+
 - ✂️ **Cut** — reviewed keep/drop decisions and a compact first cut.
 - 🎨 **Color grade** — candidate looks to review, then a baked LUT.
 - 🎬 **B-roll** — reviewed visual cutaways from local media or Pexels.

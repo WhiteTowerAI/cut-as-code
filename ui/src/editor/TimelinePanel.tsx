@@ -280,7 +280,7 @@ function Clip({
         }}
         onContextMenu={(event) => onContextMenu(event, track, clip)}
       >
-        {(kind === 'caption' || kind === 'card' || kind === 'graphic-motion') && (
+        {(kind === 'caption' || kind === 'card' || kind === 'motion-graphics') && (
           <span className="timeline-caption-cue">{clip.summary || clip.displayName || 'Untitled cue'}</span>
         )}
         {(kind === 'video' || kind === 'audio') && (
@@ -424,7 +424,7 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
   const showCaptionTrack = hasCaptionTrack
   const reserveCaptionTrack = false
   const trackOrder: Readonly<Record<TrackView['kind'], number>> = {
-    caption: 0, card: 1, 'graphic-motion': 2, video: 3, audio: 4,
+    caption: 0, card: 1, 'motion-graphics': 2, video: 3, audio: 4,
   }
   const effectiveSoloTrackId = timelineSoloTrackId && tracks.some((track) => track.id === timelineSoloTrackId)
     ? timelineSoloTrackId
@@ -825,7 +825,7 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
       clip.programRange.endS,
     )
     const sourceTimeS = clipSourceTimeAtProgramTime(clip, contextTimeS)
-    if (track.kind === 'caption' || track.kind === 'card' || track.kind === 'graphic-motion') {
+    if (track.kind === 'caption' || track.kind === 'card' || track.kind === 'motion-graphics') {
       openCueContextMenu(event, track, clip)
       return
     }
@@ -1083,7 +1083,7 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
   function cueOperationId(kind: TrackView['kind']) {
     return kind === 'caption' ? 'captions'
       : kind === 'card' ? 'content-cards'
-        : kind === 'graphic-motion' ? 'graphic-motion'
+        : kind === 'motion-graphics' ? 'motion-graphics'
           : ''
   }
 
@@ -1094,7 +1094,7 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
     const canToggle = track.kind !== 'caption' && canEdit
     const kindLabel = track.kind === 'caption' ? 'Caption'
       : track.kind === 'card' ? 'Content Card'
-        : 'Graphic Motion'
+        : 'Motion Graphics'
     const programRange = `${formatPreciseTime(clip.programRange.startS)} - ${formatPreciseTime(clip.programRange.endS)}`
     const editInInspector = () => {
       window.requestAnimationFrame(() => {

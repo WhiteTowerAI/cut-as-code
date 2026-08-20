@@ -24,7 +24,7 @@ export function reviewStatusText(operation: EditorOperationView, conflict: boole
 
 function operationLabel(kind: EditorOperationView['kind']) {
   if (kind === 'content-cards') return 'Content Cards'
-  if (kind === 'graphic-motion') return 'Graphic Motion'
+  if (kind === 'motion-graphics') return 'Motion Graphics'
   return 'Captions'
 }
 

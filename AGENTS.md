@@ -25,12 +25,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-cut-as-code is **a stack of agentic video-editing skills**, not an application. Each
-directory under `skills/<name>/` is a self-contained skill: a `SKILL.md` (the agent
-playbook — read it first), plus `scripts/`, `examples/`, and `reference/`. There is no
-root build, package manifest, lint config, or aggregate test suite. Scripts and skill-local
-checks run ad hoc. When you change a skill, the SKILL.md *is* the spec; keep it and its
-scripts in sync.
+cut-as-code is a stack of agentic video-editing skills plus its local Editor Plugin and
+browser UI. Each directory under `skills/<name>/` is a self-contained skill: a `SKILL.md`
+(the agent playbook — read it first), plus `scripts/`, `examples/`, and `reference/`.
+Plugin runtime code lives under `.codex-plugin/`, `hooks/`, `runtime/`, and `ui/`; the
+stable desktop bootstrap lives under `launcher/`. There is no root build, package manifest,
+lint config, or aggregate test suite. Scripts and checks run ad hoc. When you change a skill,
+the SKILL.md *is* the spec; keep it and its scripts in sync.
 
 Each `SKILL.md` starts with YAML frontmatter (`name:`, `description:`) — the `name` is the
 slash-command trigger for that skill.
@@ -230,9 +231,10 @@ Prefer `python -m unittest` over `pytest` — the suites use `unittest` fixtures
 - **`CLAUDE.md` and `AGENTS.md` must stay byte-identical.** They were once hardlinked but
   are now separate files; apply every edit to both.
 - **Editor UI verification.** Work under `ui/` must use Playwright with installed Chrome for screenshot-based visual inspection and interaction verification; typecheck/build alone are insufficient.
-- `work/`, `docs/`, `/tests/`, and `.env` are gitignored — only `skills/` plus the root docs
-  are tracked. A video project lives *outside* the repo and is addressed by an explicit
-  project root, so scripts take paths, never assume cwd is the project.
+- `work/`, `docs/`, `/tests/`, and `.env` are gitignored. Product source includes `skills/`
+  plus the Plugin, editor runtime/UI, packaging, and launcher directories. A video project
+  lives *outside* the repo and is addressed by an explicit project root, so scripts take
+  paths, never assume cwd is the project.
 - **Never commit `docs/` — including `docs/superpowers/` — under any circumstance.** It is
   local scratch and vendored material. Never stage it, never force-add it (`git add -f`),
   and never remove it from `.gitignore`. If a commit or PR would include anything under

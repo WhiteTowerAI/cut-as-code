@@ -186,7 +186,7 @@ class EditorProtocolFreshnessTests(unittest.TestCase):
         self.assertEqual([
             {"x": 0.2, "y": 0.3, "scale": 0.8},
             {"x": 0.5, "y": 0.5, "scale": 1.0},
-        ], projectlib._editor_transforms_for_contributions("graphic-motion", motion_plan, 2))
+        ], projectlib._editor_transforms_for_contributions("motion-graphics", motion_plan, 2))
 
         caption_plan = {
             "cues": [

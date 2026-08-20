@@ -15,29 +15,29 @@ $outputDirectory = Split-Path -Parent $outputAbsolute
 $packageName = 'cut-as-code-editor'
 $stageRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("$packageName-" + [guid]::NewGuid().ToString('N'))
 $packageRoot = Join-Path $stageRoot $packageName
-$skillNames = @('cut-as-code', 'video-understand', 'video-cut', 'video-color-grade', 'video-add-b-roll', 'video-add-graphic-motion', 'video-add-captions', 'video-add-content-cards', 'video-edit-compare', 'video-to-shorts')
+$skillNames = @('cut-as-code', 'video-understand', 'video-cut', 'video-color-grade', 'video-add-b-roll', 'video-add-motion-graphics', 'video-add-captions', 'video-add-content-cards', 'video-edit-compare', 'video-to-shorts')
 $excludedDirectoryNames = @('.git', '.hyperframes', '__pycache__', 'cache', 'docs', 'fixtures', 'node_modules', 'screenshots', 'test-results', 'tests', 'work')
 $excludedExtensions = @('.gif', '.jpeg', '.jpg', '.map', '.m4a', '.mkv', '.mov', '.mp3', '.mp4', '.png', '.pyc', '.tmp', '.wav', '.webm', '.webp')
 $allowedEditorAssets = @('ASSET_MANIFEST.json', 'viewer-poster.png', 'brand.png', 'caption-boxed.png', 'caption-clean.png', 'caption-minimal.png', 'caption-pill.png', 'caption-shorts.png', 'caption-social-bold.png', 'caption-stroked.png', 'card-cta.png', 'card-lower-third.png', 'card-product.png', 'card-quote.png', 'card-split.png', 'card-stat.png', 'city.png', 'founder.png', 'icon-filter.svg', 'icon-search.svg', 'icon-upload.svg', 'product.png')
 $normalTimestamp = [DateTimeOffset]::new(2020, 1, 1, 0, 0, 0, [TimeSpan]::Zero)
 
 function Test-ExcludedRelativePath {
-    param([Parameter(Mandatory = $true)][string]$Relative, [switch]$GraphicMotion)
+    param([Parameter(Mandatory = $true)][string]$Relative, [switch]$MotionGraphics)
     $segments = $Relative -split '[\\/]'
     if ($segments | Where-Object { $excludedDirectoryNames -contains $_ -or $_ -like '.env*' }) { return $true }
     $normalized = $Relative -replace '\\', '/'
-    if ($normalized -eq 'package-video-add-graphic-motion.SKILL.md') { return $true }
+    if ($normalized -eq 'package-video-add-motion-graphics.SKILL.md') { return $true }
     if ($normalized -match '(^|/)assets/editor/') { return -not ($allowedEditorAssets -contains [System.IO.Path]::GetFileName($normalized)) }
-    if ($GraphicMotion -and $segments[0] -eq 'recipes' -and $segments[1] -ne 'animxyz' -and $Relative -ne 'recipes\ATTRIBUTION.md') { return $true }
+    if ($MotionGraphics -and $segments[0] -eq 'recipes' -and $segments[1] -ne 'animxyz' -and $Relative -ne 'recipes\ATTRIBUTION.md') { return $true }
     return ($excludedExtensions -contains [System.IO.Path]::GetExtension($Relative).ToLowerInvariant())
 }
 
 function Copy-AllowlistedTree {
-    param([Parameter(Mandatory = $true)][string]$Source, [Parameter(Mandatory = $true)][string]$Destination, [switch]$GraphicMotion)
+    param([Parameter(Mandatory = $true)][string]$Source, [Parameter(Mandatory = $true)][string]$Destination, [switch]$MotionGraphics)
     $sourceItem = Get-Item -LiteralPath $Source
     Get-ChildItem -LiteralPath $sourceItem.FullName -Recurse -File -Force | Sort-Object FullName | ForEach-Object {
         $relative = $_.FullName.Substring($sourceItem.FullName.Length).TrimStart('\', '/')
-        if (Test-ExcludedRelativePath -Relative $relative -GraphicMotion:$GraphicMotion) { return }
+        if (Test-ExcludedRelativePath -Relative $relative -MotionGraphics:$MotionGraphics) { return }
         $destinationFile = Join-Path $Destination $relative
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destinationFile) | Out-Null
         Copy-Item -LiteralPath $_.FullName -Destination $destinationFile -Force
@@ -46,7 +46,7 @@ function Copy-AllowlistedTree {
 
 function Assert-PackageContents {
     param([Parameter(Mandatory = $true)][string]$Root)
-    $requiredFiles = @('.codex-plugin\plugin.json', '.mcp.json', 'LICENSE', 'PACKAGE_AUDIT.json', 'README.md', 'SBOM.spdx.json', 'THIRD_PARTY_NOTICES.md', 'runtime\mcp.cjs', 'runtime\project_snapshot.py', 'runtime\protocol_service.py', 'runtime\sidecar.cjs', 'ui\dist\index.html')
+    $requiredFiles = @('.codex-plugin\plugin.json', '.mcp.json', 'hooks\hooks.json', 'hooks\launch-editor.cjs', 'LICENSE', 'PACKAGE_AUDIT.json', 'README.md', 'SBOM.spdx.json', 'THIRD_PARTY_NOTICES.md', 'runtime\hub-client.cjs', 'runtime\hub-trust.cjs', 'runtime\hub.cjs', 'runtime\mcp.cjs', 'runtime\project_snapshot.py', 'runtime\protocol_service.py', 'runtime\sidecar.cjs', 'ui\dist\index.html')
     foreach ($requiredFile in $requiredFiles) {
         if (-not (Test-Path -LiteralPath (Join-Path $Root $requiredFile) -PathType Leaf)) { throw "Package is missing required file: $requiredFile" }
     }
@@ -102,12 +102,13 @@ try {
     New-Item -ItemType Directory -Force -Path $packageRoot | Out-Null
     foreach ($file in @('.mcp.json', 'LICENSE', 'README.md')) { Copy-Item -LiteralPath (Join-Path $repoRoot $file) -Destination (Join-Path $packageRoot $file) -Force }
     Copy-AllowlistedTree -Source (Join-Path $repoRoot '.codex-plugin') -Destination (Join-Path $packageRoot '.codex-plugin')
+    Copy-AllowlistedTree -Source (Join-Path $repoRoot 'hooks') -Destination (Join-Path $packageRoot 'hooks')
     Copy-AllowlistedTree -Source (Join-Path $repoRoot 'runtime') -Destination (Join-Path $packageRoot 'runtime')
     Copy-AllowlistedTree -Source (Join-Path $repoRoot 'ui\dist') -Destination (Join-Path $packageRoot 'ui\dist')
     foreach ($skillName in $skillNames) {
-        Copy-AllowlistedTree -Source (Join-Path $repoRoot "skills\$skillName") -Destination (Join-Path $packageRoot "skills\$skillName") -GraphicMotion:($skillName -eq 'video-add-graphic-motion')
+        Copy-AllowlistedTree -Source (Join-Path $repoRoot "skills\$skillName") -Destination (Join-Path $packageRoot "skills\$skillName") -MotionGraphics:($skillName -eq 'video-add-motion-graphics')
     }
-    Copy-Item -LiteralPath (Join-Path $repoRoot 'runtime\package-video-add-graphic-motion.SKILL.md') -Destination (Join-Path $packageRoot 'skills\video-add-graphic-motion\SKILL.md') -Force
+    Copy-Item -LiteralPath (Join-Path $repoRoot 'runtime\package-video-add-motion-graphics.SKILL.md') -Destination (Join-Path $packageRoot 'skills\video-add-motion-graphics\SKILL.md') -Force
     & node (Join-Path $repoRoot 'scripts\generate_package_compliance.cjs') $repoRoot $packageRoot
     if ($LASTEXITCODE -ne 0) { throw "Package compliance generation failed with exit code $LASTEXITCODE" }
     Assert-PackageContents -Root $packageRoot

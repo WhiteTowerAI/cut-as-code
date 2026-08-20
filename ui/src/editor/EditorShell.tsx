@@ -129,12 +129,12 @@ function Workspace({
   const activeOperation = useStore(store, (state) => {
     const selectedOperationId = state.selection?.kind === 'card' ? 'content-cards'
       : state.selection?.kind === 'caption' ? 'captions'
-        : state.selection?.kind === 'graphic-motion' ? 'graphic-motion'
+        : state.selection?.kind === 'motion-graphics' ? 'motion-graphics'
           : undefined
     const operationId = selectedOperationId
       ?? (state.activeTab === 'cards' ? 'content-cards'
         : state.activeTab === 'captions' ? 'captions'
-          : state.activeTab === 'graphic-motion' ? 'graphic-motion'
+          : state.activeTab === 'motion-graphics' ? 'motion-graphics'
             : undefined)
     return operationId
       ? state.project?.operations?.find((operation) => operation.id === operationId)
@@ -405,6 +405,28 @@ export function EditorShell({ runtime }: { runtime?: RuntimeProjectStatus }) {
     bridge.sync(runtime.snapshot)
     store.getState().setProject(projectFromSnapshot(null, runtime.snapshot))
   }, [bridge, runtime, scenario.initialState.project, store])
+  useEffect(() => {
+    if (!runtime) return
+    let active = true
+    const operationIds = runtime.snapshot.view.operations?.map((operation) => operation.id)
+      .filter((operationId) => ['content-cards', 'captions', 'motion-graphics'].includes(operationId)) ?? []
+    void Promise.all(operationIds.map(async (operationId) => ({
+      operationId,
+      draft: await runtime.client.getDraft(operationId),
+    }))).then((drafts) => {
+      if (!active) return
+      for (const { operationId, draft } of drafts) {
+        if (draft) store.getState().restoreOperationDraft(operationId, {
+          baseRevision: draft.baseRevision,
+          fields: draft.changes.at(-1) as ContentCardsDraftChange,
+          changes: draft.changes as readonly ContentCardsDraftChange[],
+          dirty: true,
+          conflict: draft.conflict,
+        })
+      }
+    }).catch(() => {})
+    return () => { active = false }
+  }, [runtime?.projectId, store])
   const viewerScenarios = new Set(['1-282', '57-152', '1-1026', '1-528', '123-79'])
   const timelineScenarios = new Set(['1-324', '1-1115', '1-754', '123-167', 'timeline-editing', 'audio-context-actions'])
   const isViewerScenario = viewerScenarios.has(scenarioId)
@@ -468,6 +490,10 @@ function runtimeAdapter(client: RuntimeApiClient, initial: RuntimeSnapshot) {
     return project
   }
   return {
+    persistDraft: async (operationId: string, draft: { baseRevision: number; changes: readonly ContentCardsDraftChange[] }) => {
+      await client.persistDraft(operationId, draft)
+    },
+    discardDraft: async (operationId: string) => client.discardDraft(operationId),
     sync: (next: RuntimeSnapshot) => { snapshot = next },
     timelineEdit: async (command: TimelineEditCommand) => {
       try {
@@ -534,9 +560,9 @@ function runtimeAdapter(client: RuntimeApiClient, initial: RuntimeSnapshot) {
           ...(draft.transform ? { editor_transform: draft.transform } : {}),
           ...(draft.contentBounds ? { editor_content_bounds: draft.contentBounds } : {}),
         }
-      } else if (operationId === 'graphic-motion') {
-        const cue = snapshot.view.graphic_motion_edit?.cues.find((item) => item.id === draft.cueId)
-        if (!draft.cueId || !cue) throw new Error('Graphic Motion cue is required')
+      } else if (operationId === 'motion-graphics') {
+        const cue = snapshot.view.motion_graphics_edit?.cues.find((item) => item.id === draft.cueId)
+        if (!draft.cueId || !cue) throw new Error('Motion Graphics cue is required')
         review = {
           schema_version: 1,
           cue_id: draft.cueId,
@@ -588,7 +614,7 @@ export function projectFromSnapshot(base: EditorProjectView | null, snapshot: Ru
   const runtimeOperations = snapshot.view.operations ?? []
   const edit = snapshot.view.content_cards_edit
   const captionsEdit = snapshot.view.captions_edit
-  const graphicMotionEdit = snapshot.view.graphic_motion_edit
+  const motionGraphicsEdit = snapshot.view.motion_graphics_edit
   const timeline = snapshot.view.timeline
   const assets = snapshot.media.map((item) => ({
     id: item.id,
@@ -678,10 +704,10 @@ export function projectFromSnapshot(base: EditorProjectView | null, snapshot: Ru
       : { startS: cue.program_range.start_s, endS: cue.program_range.end_s },
     programRange: { startS: cue.program_range.start_s, endS: cue.program_range.end_s },
   })) ?? []
-  const motionClips = graphicMotionEdit?.cues.map((cue) => ({
+  const motionClips = motionGraphicsEdit?.cues.map((cue) => ({
     id: cue.id,
-    trackId: 'track-graphic-motion',
-    displayName: cue.recipe_id ? `Motion: ${cue.recipe_id}` : 'Graphic motion',
+    trackId: 'track-motion-graphics',
+    displayName: cue.recipe_id ? `Motion: ${cue.recipe_id}` : 'Motion graphics',
     summary: cue.content,
     enabled: cue.enabled,
     sourceText: cue.source_text,
@@ -704,7 +730,7 @@ export function projectFromSnapshot(base: EditorProjectView | null, snapshot: Ru
     ...(hasAudio ? [{ id: 'track-audio', name: 'Audio', kind: 'audio' as const, clips: audioClips }] : []),
     ...(captionsEdit ? [{ id: 'track-captions', name: 'Captions', kind: 'caption' as const, clips: captionClips }] : []),
     ...(edit?.cues ? [{ id: 'track-content-cards', name: 'Cards', kind: 'card' as const, clips: cardClips }] : []),
-    ...(graphicMotionEdit ? [{ id: 'track-graphic-motion', name: 'Graphic Motion', kind: 'graphic-motion' as const, clips: motionClips }] : []),
+    ...(motionGraphicsEdit ? [{ id: 'track-motion-graphics', name: 'Motion Graphics', kind: 'motion-graphics' as const, clips: motionClips }] : []),
   ]
   const layers = snapshot.view.layers?.map((layer) => ({
     id: layer.id,
@@ -760,7 +786,7 @@ export function projectFromSnapshot(base: EditorProjectView | null, snapshot: Ru
       snapshot,
       operation.id === 'content-cards' ? (edit ? { ...edit.fields, cues: edit.cues ?? [] } : undefined)
         : operation.id === 'captions' ? { style: captionsEdit?.style ?? {}, cues: captionsEdit?.cues ?? [] }
-          : operation.id === 'graphic-motion' ? { cues: graphicMotionEdit?.cues ?? [] }
+          : operation.id === 'motion-graphics' ? { cues: motionGraphicsEdit?.cues ?? [] }
             : undefined,
     )),
     resources: snapshot.resources.map((resource) => ({
@@ -821,7 +847,7 @@ function operationFromSnapshot(
   })
   return {
       id: operationId, kind: operationId, revision,
-      editable: ['content-cards', 'captions', 'graphic-motion'].includes(operationId)
+      editable: ['content-cards', 'captions', 'motion-graphics'].includes(operationId)
         && !snapshot.read_only && Boolean(fields), fields: fields ?? {},
       ...(previewReceipt ? { preview: {
         status: previewIsCurrent ? 'current' : 'stale', revision: previewRevision,

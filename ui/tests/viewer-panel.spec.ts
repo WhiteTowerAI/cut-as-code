@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import {
   createPlaybackController,
-  graphicMotionFrameNumber,
+  motionGraphicsFrameNumber,
   isLayerActive,
   lastPresentedSourceTime,
   nativeBoundaryDelayMs,
@@ -117,7 +117,7 @@ test('timeline track headers align row-for-row and share vertical wheel scrollin
             fields: {}, review_template: { schema_version: 1, cards: [] },
             cues: [{ id: 'card-1', copy: 'Card', layout: 'default', placement: 'right', enabled: true, program_range: { start_s: 2, end_s: 4 } }],
           },
-          graphic_motion_edit: {
+          motion_graphics_edit: {
             cues: [{ id: 'motion-1', content: 'Motion', enabled: true, program_range: { start_s: 4, end_s: 6 } }],
           },
         },
@@ -368,14 +368,14 @@ test('runtime Viewer keeps one maximized responsive canvas without an extra blac
   }
 })
 
-test('runtime Viewer composites source video, evidence, captions, cards, and Graphic Motion', async ({ page }) => {
+test('runtime Viewer composites source video, evidence, captions, cards, and Motion Graphics', async ({ page }) => {
   const base = runtimeSnapshot()
   const snapshot = runtimeSnapshot({
     view: {
       ...base.view,
-      operations: [{ id: 'graphic-motion', revision: 1, status: 'verified', etag: 'gm-r1' }],
+      operations: [{ id: 'motion-graphics', revision: 1, status: 'verified', etag: 'gm-r1' }],
       reviews: [{
-        id: 'review-gm-r1', revision: 1, status: 'draft', based_on: { 'graphic-motion': 1 },
+        id: 'review-gm-r1', revision: 1, status: 'draft', based_on: { 'motion-graphics': 1 },
         snapshot_etag: 'snapshot-layered', evidence_hashes: [`sha256:${'a'.repeat(64)}`],
       }],
       layers: [
@@ -404,8 +404,8 @@ test('runtime Viewer composites source video, evidence, captions, cards, and Gra
           },
         },
         {
-          id: 'layer_motion', operation_id: 'graphic-motion', cue_id: 'gm-001',
-          kind: 'graphic-motion', media_type: 'image-sequence', z_index: 300,
+          id: 'layer_motion', operation_id: 'motion-graphics', cue_id: 'gm-001',
+          kind: 'motion-graphics', media_type: 'image-sequence', z_index: 300,
           program_range: { start_s: 0, end_s: 3 },
           transform: { x: 0.5, y: 0.5, scale: 1 },
           content: { text: 'THE REAL TONY STARK?' },
@@ -420,7 +420,7 @@ test('runtime Viewer composites source video, evidence, captions, cards, and Gra
     snapshot_etag: 'snapshot-layered',
     resources: [
       { id: 'res_project', kind: 'project', etag: 'project-r1', size: 1 },
-      { id: 'res_gm', kind: 'plan', etag: 'gm-plan-r1', size: 1, operation_id: 'graphic-motion' },
+      { id: 'res_gm', kind: 'plan', etag: 'gm-plan-r1', size: 1, operation_id: 'motion-graphics' },
     ],
     artifacts: [{
       id: 'artifact_gm', name: 'gm-review.png', size: 1, sha256: 'a'.repeat(64),
@@ -438,7 +438,7 @@ test('runtime Viewer composites source video, evidence, captions, cards, and Gra
   await expect(canvas.locator('[data-viewer-layer]')).toHaveCount(3)
   await expect(canvas.getByText('Caption layer', { exact: true })).toHaveCount(0)
   await expect(canvas.getByText('Card layer', { exact: true })).toHaveCount(0)
-  for (const [kind, id] of [['caption', 'layer_caption'], ['card', 'layer_card'], ['graphic-motion', 'layer_motion']]) {
+  for (const [kind, id] of [['caption', 'layer_caption'], ['card', 'layer_card'], ['motion-graphics', 'layer_motion']]) {
     const layer = canvas.locator(`[data-viewer-layer="${kind}"]`)
     await expect(layer.locator('img')).toHaveAttribute(
       'src', new RegExp(`/layers/${id}/frames/1$`),
@@ -463,7 +463,7 @@ test('runtime Viewer composites source video, evidence, captions, cards, and Gra
   await expect(canvas.locator('img[alt="gm-review.png"]')).toHaveCount(0)
 })
 
-test('Caption, Card, and Graphic Motion layers drag flush to every Viewer corner', async ({ page }) => {
+test('Caption, Card, and Motion Graphics layers drag flush to every Viewer corner', async ({ page }) => {
   const base = runtimeSnapshot()
   const snapshot = runtimeSnapshot({
     view: {
@@ -471,7 +471,7 @@ test('Caption, Card, and Graphic Motion layers drag flush to every Viewer corner
       operations: [
         { id: 'captions', revision: 1, status: 'draft', etag: 'captions-r1' },
         { id: 'content-cards', revision: 1, status: 'draft', etag: 'cards-r1' },
-        { id: 'graphic-motion', revision: 1, status: 'draft', etag: 'motion-r1' },
+        { id: 'motion-graphics', revision: 1, status: 'draft', etag: 'motion-r1' },
       ],
       captions_edit: {
         style: {}, cues: [{ id: 'caption-001', text: 'Caption layer', program_range: { start_s: 0, end_s: 3 } }],
@@ -481,7 +481,7 @@ test('Caption, Card, and Graphic Motion layers drag flush to every Viewer corner
         review_template: { schema_version: 1, cards: [{ id: 'card-001', selected: true, copy: 'Card layer' }] },
         cues: [{ id: 'card-001', copy: 'Card layer', enabled: true, program_range: { start_s: 0, end_s: 3 } }],
       },
-      graphic_motion_edit: {
+      motion_graphics_edit: {
         cues: [{ id: 'gm-001', content: 'Motion layer', enabled: true, program_range: { start_s: 0, end_s: 3 } }],
       },
       layers: [
@@ -500,8 +500,8 @@ test('Caption, Card, and Graphic Motion layers drag flush to every Viewer corner
           content: { text: 'Card layer' },
         },
         {
-          id: 'layer_motion', operation_id: 'graphic-motion', cue_id: 'gm-001',
-          kind: 'graphic-motion', media_type: 'image-sequence', z_index: 300,
+          id: 'layer_motion', operation_id: 'motion-graphics', cue_id: 'gm-001',
+          kind: 'motion-graphics', media_type: 'image-sequence', z_index: 300,
           program_range: { start_s: 0, end_s: 3 },
           transform: { x: 0.5, y: 0.5, scale: 1 },
           content: { text: 'Motion layer' },
@@ -521,13 +521,13 @@ test('Caption, Card, and Graphic Motion layers drag flush to every Viewer corner
     ),
   }))
 
-  for (const kind of ['caption', 'card', 'graphic-motion']) {
+  for (const kind of ['caption', 'card', 'motion-graphics']) {
     const isolatedSnapshot = {
       ...snapshot,
       view: {
         ...snapshot.view,
         operations: snapshot.view.operations.filter((operation) => operation.id === (
-          kind === 'caption' ? 'captions' : kind === 'card' ? 'content-cards' : 'graphic-motion'
+          kind === 'caption' ? 'captions' : kind === 'card' ? 'content-cards' : 'motion-graphics'
         )),
         layers: snapshot.view.layers.filter((layer) => layer.kind === kind),
       },
@@ -558,7 +558,7 @@ test('Caption, Card, and Graphic Motion layers drag flush to every Viewer corner
       } else {
         expect(Math.abs(movedBox!.x + movedBox!.width - movedCanvasBox!.x - movedCanvasBox!.width), `${kind} right edge`).toBeLessThanOrEqual(1)
         expect(Math.abs(movedBox!.y + movedBox!.height - movedCanvasBox!.y - movedCanvasBox!.height), `${kind} bottom edge`).toBeLessThanOrEqual(1)
-        if (kind === 'graphic-motion') {
+        if (kind === 'motion-graphics') {
           expect(Number(await layer.getAttribute('data-layer-x'))).toBeGreaterThan(1)
         }
       }
@@ -566,21 +566,21 @@ test('Caption, Card, and Graphic Motion layers drag flush to every Viewer corner
   }
 })
 
-test('Graphic Motion uses a content-fitted PowerPoint selection box with eight resize handles', async ({ page }) => {
+test('Motion Graphics uses a content-fitted PowerPoint selection box with eight resize handles', async ({ page }) => {
   const base = runtimeSnapshot()
   const snapshot = runtimeSnapshot({
     view: {
       ...base.view,
-      operations: [{ id: 'graphic-motion', revision: 1, status: 'verified', etag: 'gm-r1' }],
-      graphic_motion_edit: {
+      operations: [{ id: 'motion-graphics', revision: 1, status: 'verified', etag: 'gm-r1' }],
+      motion_graphics_edit: {
         cues: [{
           id: 'gm-001', status: 'verified', enabled: true, content: 'Motion',
           program_range: { start_s: 0, end_s: 3 }, transform: { x: 0.5, y: 0.5, scale: 1 },
         }],
       },
       layers: [{
-        id: 'layer_motion', operation_id: 'graphic-motion', cue_id: 'gm-001',
-        kind: 'graphic-motion', media_type: 'image-sequence', z_index: 300,
+        id: 'layer_motion', operation_id: 'motion-graphics', cue_id: 'gm-001',
+        kind: 'motion-graphics', media_type: 'image-sequence', z_index: 300,
         program_range: { start_s: 0, end_s: 3 },
         transform: { x: 0.5, y: 0.5, scale: 1 },
         content: { text: 'Motion' },
@@ -593,7 +593,7 @@ test('Graphic Motion uses a content-fitted PowerPoint selection box with eight r
     },
     resources: [
       { id: 'res_project', kind: 'project', etag: 'project-r1', size: 1 },
-      { id: 'res_gm', kind: 'plan', etag: 'gm-plan-r1', size: 1, operation_id: 'graphic-motion' },
+      { id: 'res_gm', kind: 'plan', etag: 'gm-plan-r1', size: 1, operation_id: 'motion-graphics' },
     ],
   })
   await page.route('**/v1/projects/project_motion_handles/snapshot', (route) => route.fulfill({
@@ -614,9 +614,9 @@ test('Graphic Motion uses a content-fitted PowerPoint selection box with eight r
       view: {
         ...snapshot.view,
         project_revision: (snapshot.view.project_revision ?? 1) + 1,
-        operations: [{ id: 'graphic-motion', revision: 2, status: 'verified', etag: 'gm-r2' }],
+        operations: [{ id: 'motion-graphics', revision: 2, status: 'verified', etag: 'gm-r2' }],
       },
-      resources: snapshot.resources.map((resource) => resource.operation_id === 'graphic-motion'
+      resources: snapshot.resources.map((resource) => resource.operation_id === 'motion-graphics'
         ? { ...resource, etag: 'gm-plan-r2' }
         : resource),
     }
@@ -654,7 +654,7 @@ test('Graphic Motion uses a content-fitted PowerPoint selection box with eight r
   await page.getByRole('button', { name: 'Save All' }).click()
   await expect.poll(() => transactionBody).toBeTruthy()
   expect(transactionBody).toMatchObject({
-    operation: 'graphic-motion',
+    operation: 'motion-graphics',
     review: {
       schema_version: 1,
       cue_id: 'gm-001',
@@ -667,10 +667,10 @@ test('Graphic Motion uses a content-fitted PowerPoint selection box with eight r
   })
 })
 
-test('layer timing is half-open and Graphic Motion frame selection follows the program clock', () => {
+test('layer timing is half-open and Motion Graphics frame selection follows the program clock', () => {
   const layer: EditorLayerView = {
-    id: 'layer_motion', operationId: 'graphic-motion', cueId: 'gm-001',
-    kind: 'graphic-motion', mediaType: 'image-sequence', zIndex: 300,
+    id: 'layer_motion', operationId: 'motion-graphics', cueId: 'gm-001',
+    kind: 'motion-graphics', mediaType: 'image-sequence', zIndex: 300,
     programRange: { startS: 2, endS: 5 },
     transform: { x: 0.5, y: 0.5, scale: 1 },
     content: { text: 'Motion' },
@@ -685,9 +685,9 @@ test('layer timing is half-open and Graphic Motion frame selection follows the p
   expect(isLayerActive(layer, 2)).toBe(true)
   expect(isLayerActive(layer, 4.999)).toBe(true)
   expect(isLayerActive(layer, 5)).toBe(false)
-  expect(graphicMotionFrameNumber(layer, 2)).toBe(1)
-  expect(graphicMotionFrameNumber(layer, 3.001)).toBe(31)
-  expect(graphicMotionFrameNumber(layer, 20)).toBe(90)
+  expect(motionGraphicsFrameNumber(layer, 2)).toBe(1)
+  expect(motionGraphicsFrameNumber(layer, 3.001)).toBe(31)
+  expect(motionGraphicsFrameNumber(layer, 20)).toBe(90)
 })
 
 test('dragging and scaling a Viewer layer stays local until Save All and never exports', async ({ page }) => {
@@ -740,6 +740,12 @@ test('dragging and scaling a Viewer layer stays local until Save All and never e
   await page.route('**/v1/projects/project_transform/snapshot', (route) => route.fulfill({
     contentType: 'application/json', body: JSON.stringify({ ok: true, snapshot }),
   }))
+  await page.route('**/v1/projects/project_transform/drafts/content-cards', async (route) => {
+    if (route.request().method() === 'GET') return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ ok: false }) })
+    if (route.request().method() === 'DELETE') return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true }) })
+    const draft = route.request().postDataJSON()
+    return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, draft: { ...draft, conflict: false } }) })
+  })
   await page.route('**/v1/projects/project_transform/transactions', async (route) => {
     transactionBody = route.request().postDataJSON() as Record<string, unknown>
     const review = transactionBody.review as { editor_transform?: { x: number; y: number; scale: number } }
