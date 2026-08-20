@@ -1,0 +1,76 @@
+spec_version: 1
+id: "codrops-shapesslideshow-index"
+name: "Shape Slideshow with Clip-path"
+description: "Large geometric masks reveal cinematic image-and-title slides."
+surfaces: [video]
+category: "fullscreen-chapter"
+tech: [html, css, js]
+canvas: [video]
+target: [fullscreen]
+intent: "fullscreen-chapter"
+runtime: [css, js]
+export: [skill, html]
+dependencies: []
+tags:
+  - "codrops"
+  - "shapes"
+  - "slideshow"
+  - "cinematic"
+  - "images"
+  - "chapter"
+  - "fullscreen"
+intent_keywords:
+  - "cinematic shape slideshow"
+  - "masked image chapter"
+  - "editorial title reveal"
+  - "形状遮罩幻灯片"
+  - "电影感章节揭示"
+best_for:
+  - "An opener, chapter, interstitial, or outro for cinematic essays, trailers, travel, and narrative visual pieces"
+  - "A fullscreen image-and-title beat that uses a simple shape to protect one focal area"
+avoid_when:
+  - "The edit needs factual on-screen detail or a light playful tone"
+  - "The image crop loses essential faces or story evidence behind the mask"
+structural_roles:
+  - "opener"
+  - "chapter"
+  - "interstitial"
+  - "outro"
+motion_functions:
+  - "reveal"
+  - "transition"
+  - "settle"
+visual_language:
+  - "cinematic"
+  - "editorial"
+  - "geometric"
+mechanisms:
+  - "shape-mask"
+  - "slideshow"
+  - "image-reveal"
+rhythm_energy: "medium"
+information_density: "balanced"
+frame_relationship: "fullscreen"
+color_tendency: "dark"
+style_rationale: "The visible image scenes are revealed by a large circle or shape mask with concise type, a cinematic full-screen section device."
+restraint:
+  max_per_view: 1
+  notes: "Use as one frame-dominant designed cutaway; adapt content, palette, typography, framing, and timing instead of running an unchanged source showcase."
+motion:
+  duration_ms: 6000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: "index/index.html"
+implementations:
+  - tech: js
+    files: ["index/index.html", "index/hf-recipe.js", "index/hf-adapter.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/codrops/ShapesSlideshow/tree/793c6d005a897e4545a33bbd9de4cb4b013117ef"
+  attribution_required: true
+author:
+  name: "codrops"
+  url: "https://github.com/codrops"
+version: 0.1.0

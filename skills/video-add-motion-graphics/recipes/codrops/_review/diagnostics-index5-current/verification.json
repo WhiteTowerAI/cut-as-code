@@ -1,0 +1,1691 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-07T06:52:43.786Z",
+  "imports_root": "D:\\Users\\Charles Kang\\Desktop\\temp\\cut-as-code\\skills\\video-add-motion-graphics\\recipes\\codrops",
+  "total_variants": 1,
+  "visual": [],
+  "cli": [
+    {
+      "key": "OnScrollColumnsRows/index5",
+      "ok": true,
+      "check": {
+        "ok": true,
+        "json": {
+          "ok": true,
+          "strict": false,
+          "lint": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "filesScanned": 1
+          },
+          "runtime": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": []
+          },
+          "layout": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 38,
+            "findings": [
+              {
+                "code": "canvas_overflow",
+                "severity": "info",
+                "time": 0.444,
+                "selector": "h2.outro__title",
+                "message": "Text extends outside the composition canvas.",
+                "rect": {
+                  "left": 852.59,
+                  "top": 3818.5,
+                  "right": 1067.41,
+                  "bottom": 3854.5,
+                  "width": 214.81,
+                  "height": 36
+                },
+                "containerSelector": "[data-composition-id=\"codrops-onscrollcolumnsrows-index5\"]",
+                "text": "More you might like",
+                "fixHint": "Move the text inward, reduce its size, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 2774.5
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 852.59,
+                  "y": 3818.5,
+                  "width": 214.81,
+                  "height": 36
+                },
+                "firstSeen": 0.444,
+                "lastSeen": 0.444,
+                "occurrences": 1
+              },
+              {
+                "code": "canvas_overflow",
+                "severity": "info",
+                "time": 0.444,
+                "selector": "h3.card__title > a:nth-of-type(1)",
+                "message": "Text extends outside the composition canvas.",
+                "rect": {
+                  "left": 708.95,
+                  "top": 4184.42,
+                  "right": 875.05,
+                  "bottom": 4205.42,
+                  "width": 166.09,
+                  "height": 21
+                },
+                "containerSelector": "[data-composition-id=\"codrops-onscrollcolumnsrows-index5\"]",
+                "text": "On-Scroll SVG Filter Effect",
+                "fixHint": "Move the text inward, reduce its size, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 3125.42
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 708.95,
+                  "y": 4184.42,
+                  "width": 166.09,
+                  "height": 21
+                },
+                "firstSeen": 0.444,
+                "lastSeen": 0.444,
+                "occurrences": 1
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 0.444,
+                "selector": "div.column__item-img",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 493,
+                  "top": 564.99,
+                  "right": 750.1,
+                  "bottom": 915.71,
+                  "width": 257.1,
+                  "height": 350.72
+                },
+                "containerSelector": "div.column__item-imgwrap",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 495.26,
+                  "top": 585,
+                  "right": 747.84,
+                  "bottom": 895.7,
+                  "width": 252.58,
+                  "height": 310.7
+                },
+                "overflow": {
+                  "left": 2.26,
+                  "right": 2.26,
+                  "top": 20.01,
+                  "bottom": 20.01
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 493,
+                  "y": 564.99,
+                  "width": 257.1,
+                  "height": 350.72
+                },
+                "firstSeen": 0.444,
+                "lastSeen": 0.444,
+                "occurrences": 1
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 0.444,
+                "selector": "div.column__item-img",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 478.11,
+                  "top": 878.52,
+                  "right": 751.78,
+                  "bottom": 1243.59,
+                  "width": 273.68,
+                  "height": 365.08
+                },
+                "containerSelector": "div.column__item-imgwrap",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 482.29,
+                  "top": 905.7,
+                  "right": 747.6,
+                  "bottom": 1216.41,
+                  "width": 265.31,
+                  "height": 310.7
+                },
+                "overflow": {
+                  "left": 4.18,
+                  "right": 4.18,
+                  "top": 27.18,
+                  "bottom": 27.18
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 478.11,
+                  "y": 878.52,
+                  "width": 273.68,
+                  "height": 365.08
+                },
+                "firstSeen": 0.444,
+                "lastSeen": 0.444,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 0.444,
+                "selector": "div.column__item-img",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 478.11,
+                  "top": 878.52,
+                  "right": 751.78,
+                  "bottom": 1243.59,
+                  "width": 273.68,
+                  "height": 365.08
+                },
+                "containerSelector": "[data-composition-id=\"codrops-onscrollcolumnsrows-index5\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 163.59
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 478.11,
+                  "y": 878.52,
+                  "width": 273.68,
+                  "height": 365.08
+                },
+                "firstSeen": 0.444,
+                "lastSeen": 0.444,
+                "occurrences": 1
+              },
+              {
+                "code": "canvas_overflow",
+                "severity": "info",
+                "time": 1.333,
+                "selector": "h2.outro__title",
+                "message": "Text extends outside the composition canvas.",
+                "rect": {
+                  "left": 852.59,
+                  "top": 3594.5,
+                  "right": 1067.41,
+                  "bottom": 3630.5,
+                  "width": 214.81,
+                  "height": 36
+                },
+                "containerSelector": "[data-composition-id=\"codrops-onscrollcolumnsrows-index5\"]",
+                "text": "More you might like",
+                "fixHint": "Move the text inward, reduce its size, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 2550.5
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 852.59,
+                  "y": 3594.5,
+                  "width": 214.81,
+                  "height": 36
+                },
+                "firstSeen": 1.333,
+                "lastSeen": 1.333,
+                "occurrences": 1
+              },
+              {
+                "code": "canvas_overflow",
+                "severity": "info",
+                "time": 1.333,
+                "selector": "h3.card__title > a:nth-of-type(1)",
+                "message": "Text extends outside the composition canvas.",
+                "rect": {
+                  "left": 708.95,
+                  "top": 3960.42,
+                  "right": 875.05,
+                  "bottom": 3981.42,
+                  "width": 166.09,
+                  "height": 21
+                },
+                "containerSelector": "[data-composition-id=\"codrops-onscrollcolumnsrows-index5\"]",
+                "text": "On-Scroll SVG Filter Effect",
+                "fixHint": "Move the text inward, reduce its size, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 2901.42
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 708.95,
+                  "y": 3960.42,
+                  "width": 166.09,
+                  "height": 21
+                },
+                "firstSeen": 1.333,
+                "lastSeen": 1.333,
+                "occurrences": 1
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 1.333,
+                "selector": "div.column__item-img",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 497.7,
+                  "top": 345.99,
+                  "right": 744,
+                  "bottom": 686.71,
+                  "width": 246.3,
+                  "height": 340.72
+                },
+                "containerSelector": "div.column__item-imgwrap",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 498.97,
+                  "top": 361,
+                  "right": 742.73,
+                  "bottom": 671.7,
+                  "width": 243.76,
+                  "height": 310.7
+                },
+                "overflow": {
+                  "top": 15.01,
+                  "bottom": 15.01
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 497.7,
+                  "y": 345.99,
+                  "width": 246.3,
+                  "height": 340.72
+                },
+                "firstSeen": 1.333,
+                "lastSeen": 1.333,
+                "occurrences": 1
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 1.333,
+                "selector": "div.column__item-img",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 484.67,
+                  "top": 659.53,
+                  "right": 746.62,
+                  "bottom": 1014.57,
+                  "width": 261.95,
+                  "height": 355.04
+                },
+                "containerSelector": "div.column__item-imgwrap",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 487.44,
+                  "top": 681.7,
+                  "right": 743.85,
+                  "bottom": 992.41,
+                  "width": 256.4,
+                  "height": 310.7
+                },
+                "overflow": {
+                  "left": 2.77,
+                  "right": 2.77,
+                  "top": 22.17,
+                  "bottom": 22.16
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 484.67,
+                  "y": 659.53,
+                  "width": 261.95,
+                  "height": 355.04
+                },
+                "firstSeen": 1.333,
+                "lastSeen": 1.333,
+                "occurrences": 1
+              },
+              {
+                "code": "canvas_overflow",
+                "severity": "info",
+                "time": 2.222,
+                "selector": "h2.outro__title",
+                "message": "Text extends outside the composition canvas.",
+                "rect": {
+                  "left": 852.59,
+                  "top": 3180.5,
+                  "right": 1067.41,
+                  "bottom": 3216.5,
+                  "width": 214.81,
+                  "height": 36
+                },
+                "containerSelector": "[data-composition-id=\"codrops-onscrollcolumnsrows-index5\"]",
+                "text": "More you might like",
+                "fixHint": "Move the text inward, reduce its size, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 2136.5
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 852.59,
+                  "y": 3180.5,
+                  "width": 214.81,
+                  "height": 36
+                },
+                "firstSeen": 2.222,
+                "lastSeen": 2.222,
+                "occurrences": 1
+              },
+              {
+                "code": "canvas_overflow",
+                "severity": "info",
+                "time": 2.222,
+                "selector": "h3.card__title > a:nth-of-type(1)",
+                "message": "Text extends outside the composition canvas.",
+                "rect": {
+                  "left": 708.95,
+                  "top": 3546.42,
+                  "right": 875.05,
+                  "bottom": 3567.42,
+                  "width": 166.09,
+                  "height": 21
+                },
+                "containerSelector": "[data-composition-id=\"codrops-onscrollcolumnsrows-index5\"]",
+                "text": "On-Scroll SVG Filter Effect",
+                "fixHint": "Move the text inward, reduce its size, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 2487.42
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 708.95,
+                  "y": 3546.42,
+                  "width": 166.09,
+                  "height": 21
+                },
+                "firstSeen": 2.222,
+                "lastSeen": 2.222,
+                "occurrences": 1
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 2.222,
+                "selector": "div.column__item-img",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 505.59,
+                  "top": -58.76,
+                  "right": 733.52,
+                  "bottom": 263.47,
+                  "width": 227.93,
+                  "height": 322.23
+                },
+                "containerSelector": "div.column__item-imgwrap",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 505.78,
+                  "top": -53,
+                  "right": 733.34,
+                  "bottom": 257.7,
+                  "width": 227.56,
+                  "height": 310.7
+                },
+                "overflow": {
+                  "top": 5.76,
+                  "bottom": 5.77
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 505.59,
+                  "y": -58.76,
+                  "width": 227.93,
+                  "height": 322.23
+                },
+                "firstSeen": 2.222,
+                "lastSeen": 2.222,
+                "occurrences": 1
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 2.222,
+                "selector": "div.column__item-img",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 495.96,
+                  "top": 254.78,
+                  "right": 737.93,
+                  "bottom": 591.33,
+                  "width": 241.97,
+                  "height": 336.55
+                },
+                "containerSelector": "div.column__item-imgwrap",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 496.9,
+                  "top": 267.7,
+                  "right": 736.99,
+                  "bottom": 578.41,
+                  "width": 240.09,
+                  "height": 310.7
+                },
+                "overflow": {
+                  "top": 12.92,
+                  "bottom": 12.92
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 495.96,
+                  "y": 254.78,
+                  "width": 241.97,
+                  "height": 336.55
+                },
+                "firstSeen": 2.222,
+                "lastSeen": 2.222,
+                "occurrences": 1
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 2.222,
+                "selector": "div.column__item-img",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 492.94,
+                  "top": 568.32,
+                  "right": 750.19,
+                  "bottom": 919.2,
+                  "width": 257.25,
+                  "height": 350.88
+                },
+                "containerSelector": "div.column__item-imgwrap",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 495.21,
+                  "top": 588.41,
+                  "right": 747.91,
+                  "bottom": 899.11,
+                  "width": 252.7,
+                  "height": 310.7
+                },
+                "overflow": {
+                  "left": 2.27,
+                  "right": 2.28,
+                  "top": 20.09,
+                  "bottom": 20.09
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 492.94,
+                  "y": 568.32,
+                  "width": 257.25,
+                  "height": 350.88
+                },
+                "firstSeen": 2.222,
+                "lastSeen": 2.222,
+                "occurrences": 1
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 2.222,
+                "selector": "div.column__item-img",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 478.01,
+                  "top": 881.86,
+                  "right": 751.86,
+                  "bottom": 1247.06,
+                  "width": 273.84,
+                  "height": 365.2
+                },
+                "containerSelector": "div.column__item-imgwrap",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 482.22,
+                  "top": 909.11,
+                  "right": 747.65,
+                  "bottom": 1219.81,
+                  "width": 265.44,
+                  "height": 310.7
+                },
+                "overflow": {
+                  "left": 4.21,
+                  "right": 4.21,
+                  "top": 27.25,
+                  "bottom": 27.25
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 478.01,
+                  "y": 881.86,
+                  "width": 273.84,
+                  "height": 365.2
+                },
+                "firstSeen": 2.222,
+                "lastSeen": 2.222,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 2.222,
+                "selector": "div.column__item-img",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 505.59,
+                  "top": -58.76,
+                  "right": 733.52,
+                  "bottom": 263.47,
+                  "width": 227.93,
+                  "height": 322.23
+                },
+                "containerSelector": "[data-composition-id=\"codrops-onscrollcolumnsrows-index5\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 58.76
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 505.59,
+                  "y": -58.76,
+                  "width": 227.93,
+                  "height": 322.23
+                },
+                "firstSeen": 2.222,
+                "lastSeen": 2.222,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 2.222,
+                "selector": "div.column__item-img",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 478.01,
+                  "top": 881.86,
+                  "right": 751.86,
+                  "bottom": 1247.06,
+                  "width": 273.84,
+                  "height": 365.2
+                },
+                "containerSelector": "[data-composition-id=\"codrops-onscrollcolumnsrows-index5\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 167.06
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 478.01,
+                  "y": 881.86,
+                  "width": 273.84,
+                  "height": 365.2
+                },
+                "firstSeen": 2.222,
+                "lastSeen": 2.222,
+                "occurrences": 1
+              },
+              {
+                "code": "canvas_overflow",
+                "severity": "info",
+                "time": 3.111,
+                "selector": "h2.outro__title",
+                "message": "Text extends outside the composition canvas.",
+                "rect": {
+                  "left": 852.59,
+                  "top": 2643.5,
+                  "right": 1067.41,
+                  "bottom": 2679.5,
+                  "width": 214.81,
+                  "height": 36
+                },
+                "containerSelector": "[data-composition-id=\"codrops-onscrollcolumnsrows-index5\"]",
+                "text": "More you might like",
+                "fixHint": "Move the text inward, reduce its size, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 1599.5
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 852.59,
+                  "y": 2643.5,
+                  "width": 214.81,
+                  "height": 36
+                },
+                "firstSeen": 3.111,
+                "lastSeen": 3.111,
+                "occurrences": 1
+              },
+              {
+                "code": "canvas_overflow",
+                "severity": "info",
+                "time": 3.111,
+                "selector": "h3.card__title > a:nth-of-type(1)",
+                "message": "Text extends outside the composition canvas.",
+                "rect": {
+                  "left": 708.95,
+                  "top": 3009.42,
+                  "right": 875.05,
+                  "bottom": 3030.42,
+                  "width": 166.09,
+                  "height": 21
+                },
+                "containerSelector": "[data-composition-id=\"codrops-onscrollcolumnsrows-index5\"]",
+                "text": "On-Scroll SVG Filter Effect",
+                "fixHint": "Move the text inward, reduce its size, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 1950.42
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 708.95,
+                  "y": 3009.42,
+                  "width": 166.09,
+                  "height": 21
+                },
+                "firstSeen": 3.111,
+                "lastSeen": 3.111,
+                "occurrences": 1
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 3.111,
+                "selector": "div.column__item-img",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 503.7,
+                  "top": 43.33,
+                  "right": 736.06,
+                  "bottom": 370.19,
+                  "width": 232.36,
+                  "height": 326.86
+                },
+                "containerSelector": "div.column__item-imgwrap",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 504.07,
+                  "top": 51.41,
+                  "right": 735.69,
+                  "bottom": 362.11,
+                  "width": 231.62,
+                  "height": 310.7
+                },
+                "overflow": {
+                  "top": 8.08,
+                  "bottom": 8.08
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 503.7,
+                  "y": 43.33,
+                  "width": 232.36,
+                  "height": 326.86
+                },
+                "firstSeen": 3.111,
+                "lastSeen": 3.111,
+                "occurrences": 1
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 3.111,
+                "selector": "div.column__item-img",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 493.21,
+                  "top": 356.85,
+                  "right": 740.02,
+                  "bottom": 698.07,
+                  "width": 246.81,
+                  "height": 341.21
+                },
+                "containerSelector": "div.column__item-imgwrap",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 494.52,
+                  "top": 372.11,
+                  "right": 738.71,
+                  "bottom": 682.81,
+                  "width": 244.19,
+                  "height": 310.7
+                },
+                "overflow": {
+                  "top": 15.26,
+                  "bottom": 15.26
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 493.21,
+                  "y": 356.85,
+                  "width": 246.81,
+                  "height": 341.21
+                },
+                "firstSeen": 3.111,
+                "lastSeen": 3.111,
+                "occurrences": 1
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 3.111,
+                "selector": "div.column__item-img",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 490.62,
+                  "top": 670.38,
+                  "right": 753.16,
+                  "bottom": 1025.95,
+                  "width": 262.53,
+                  "height": 355.57
+                },
+                "containerSelector": "div.column__item-imgwrap",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 493.47,
+                  "top": 692.81,
+                  "right": 750.31,
+                  "bottom": 1003.52,
+                  "width": 256.85,
+                  "height": 310.7
+                },
+                "overflow": {
+                  "left": 2.85,
+                  "right": 2.85,
+                  "top": 22.43,
+                  "bottom": 22.43
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 490.62,
+                  "y": 670.38,
+                  "width": 262.53,
+                  "height": 355.57
+                },
+                "firstSeen": 3.111,
+                "lastSeen": 3.111,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 3.111,
+                "selector": "div.column__item-img",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 509.07,
+                  "top": -270.21,
+                  "right": 728.18,
+                  "bottom": 42.32,
+                  "width": 219.11,
+                  "height": 312.54
+                },
+                "containerSelector": "[data-composition-id=\"codrops-onscrollcolumnsrows-index5\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 270.21
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 509.07,
+                  "y": -270.21,
+                  "width": 219.11,
+                  "height": 312.54
+                },
+                "firstSeen": 3.111,
+                "lastSeen": 3.111,
+                "occurrences": 1
+              },
+              {
+                "code": "canvas_overflow",
+                "severity": "info",
+                "time": 4,
+                "selector": "h2.outro__title",
+                "message": "Text extends outside the composition canvas.",
+                "rect": {
+                  "left": 852.59,
+                  "top": 2044.5,
+                  "right": 1067.41,
+                  "bottom": 2080.5,
+                  "width": 214.81,
+                  "height": 36
+                },
+                "containerSelector": "[data-composition-id=\"codrops-onscrollcolumnsrows-index5\"]",
+                "text": "More you might like",
+                "fixHint": "Move the text inward, reduce its size, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 1000.5
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 852.59,
+                  "y": 2044.5,
+                  "width": 214.81,
+                  "height": 36
+                },
+                "firstSeen": 4,
+                "lastSeen": 4,
+                "occurrences": 1
+              },
+              {
+                "code": "canvas_overflow",
+                "severity": "info",
+                "time": 4,
+                "selector": "h3.card__title > a:nth-of-type(1)",
+                "message": "Text extends outside the composition canvas.",
+                "rect": {
+                  "left": 708.95,
+                  "top": 2410.42,
+                  "right": 875.05,
+                  "bottom": 2431.42,
+                  "width": 166.09,
+                  "height": 21
+                },
+                "containerSelector": "[data-composition-id=\"codrops-onscrollcolumnsrows-index5\"]",
+                "text": "On-Scroll SVG Filter Effect",
+                "fixHint": "Move the text inward, reduce its size, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 1351.42
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 708.95,
+                  "y": 2410.42,
+                  "width": 166.09,
+                  "height": 21
+                },
+                "firstSeen": 4,
+                "lastSeen": 4,
+                "occurrences": 1
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 4,
+                "selector": "div.column__item-img",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 502.91,
+                  "top": 84.77,
+                  "right": 737.13,
+                  "bottom": 413.56,
+                  "width": 234.22,
+                  "height": 328.79
+                },
+                "containerSelector": "div.column__item-imgwrap",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 503.37,
+                  "top": 93.81,
+                  "right": 736.67,
+                  "bottom": 404.52,
+                  "width": 233.3,
+                  "height": 310.7
+                },
+                "overflow": {
+                  "top": 9.04,
+                  "bottom": 9.04
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 502.91,
+                  "y": 84.77,
+                  "width": 234.22,
+                  "height": 328.79
+                },
+                "firstSeen": 4,
+                "lastSeen": 4,
+                "occurrences": 1
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 4,
+                "selector": "div.column__item-img",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 492.07,
+                  "top": 398.31,
+                  "right": 740.89,
+                  "bottom": 741.42,
+                  "width": 248.82,
+                  "height": 343.11
+                },
+                "containerSelector": "div.column__item-imgwrap",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 493.55,
+                  "top": 414.52,
+                  "right": 739.41,
+                  "bottom": 725.22,
+                  "width": 245.86,
+                  "height": 310.7
+                },
+                "overflow": {
+                  "top": 16.21,
+                  "bottom": 16.2
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 492.07,
+                  "y": 398.31,
+                  "width": 248.82,
+                  "height": 343.11
+                },
+                "firstSeen": 4,
+                "lastSeen": 4,
+                "occurrences": 1
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 4,
+                "selector": "div.column__item-img",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 489.68,
+                  "top": 711.85,
+                  "right": 754.36,
+                  "bottom": 1069.29,
+                  "width": 264.68,
+                  "height": 357.43
+                },
+                "containerSelector": "div.column__item-imgwrap",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 492.76,
+                  "top": 735.22,
+                  "right": 751.28,
+                  "bottom": 1045.92,
+                  "width": 258.51,
+                  "height": 310.7
+                },
+                "overflow": {
+                  "left": 3.08,
+                  "right": 3.08,
+                  "top": 23.37,
+                  "bottom": 23.37
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 489.68,
+                  "y": 711.85,
+                  "width": 264.68,
+                  "height": 357.43
+                },
+                "firstSeen": 4,
+                "lastSeen": 4,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 4,
+                "selector": "div.column__item-img",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 508.08,
+                  "top": -228.77,
+                  "right": 728.89,
+                  "bottom": 85.69,
+                  "width": 220.81,
+                  "height": 314.46
+                },
+                "containerSelector": "[data-composition-id=\"codrops-onscrollcolumnsrows-index5\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 228.77
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 508.08,
+                  "y": -228.77,
+                  "width": 220.81,
+                  "height": 314.46
+                },
+                "firstSeen": 4,
+                "lastSeen": 4,
+                "occurrences": 1
+              },
+              {
+                "code": "canvas_overflow",
+                "severity": "info",
+                "time": 4.889,
+                "selector": "h2.outro__title",
+                "message": "Text extends outside the composition canvas.",
+                "rect": {
+                  "left": 852.59,
+                  "top": 1467.5,
+                  "right": 1067.41,
+                  "bottom": 1503.5,
+                  "width": 214.81,
+                  "height": 36
+                },
+                "containerSelector": "[data-composition-id=\"codrops-onscrollcolumnsrows-index5\"]",
+                "text": "More you might like",
+                "fixHint": "Move the text inward, reduce its size, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 423.5
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 852.59,
+                  "y": 1467.5,
+                  "width": 214.81,
+                  "height": 36
+                },
+                "firstSeen": 4.889,
+                "lastSeen": 4.889,
+                "occurrences": 1
+              },
+              {
+                "code": "canvas_overflow",
+                "severity": "info",
+                "time": 4.889,
+                "selector": "h3.card__title > a:nth-of-type(1)",
+                "message": "Text extends outside the composition canvas.",
+                "rect": {
+                  "left": 708.95,
+                  "top": 1833.42,
+                  "right": 875.05,
+                  "bottom": 1854.42,
+                  "width": 166.09,
+                  "height": 21
+                },
+                "containerSelector": "[data-composition-id=\"codrops-onscrollcolumnsrows-index5\"]",
+                "text": "On-Scroll SVG Filter Effect",
+                "fixHint": "Move the text inward, reduce its size, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 774.42
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 708.95,
+                  "y": 1833.42,
+                  "width": 166.09,
+                  "height": 21
+                },
+                "firstSeen": 4.889,
+                "lastSeen": 4.889,
+                "occurrences": 1
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 4.889,
+                "selector": "div.column__item-img",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 506.59,
+                  "top": -165.79,
+                  "right": 729.99,
+                  "bottom": 151.53,
+                  "width": 223.4,
+                  "height": 317.32
+                },
+                "containerSelector": "div.column__item-imgwrap",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 506.65,
+                  "top": -162.48,
+                  "right": 729.92,
+                  "bottom": 148.22,
+                  "width": 223.27,
+                  "height": 310.7
+                },
+                "overflow": {
+                  "top": 3.31,
+                  "bottom": 3.31
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 506.59,
+                  "y": -165.79,
+                  "width": 223.4,
+                  "height": 317.32
+                },
+                "firstSeen": 4.889,
+                "lastSeen": 4.889,
+                "occurrences": 1
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 4.889,
+                "selector": "div.column__item-img",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 501.7,
+                  "top": 147.75,
+                  "right": 738.74,
+                  "bottom": 479.39,
+                  "width": 237.04,
+                  "height": 331.64
+                },
+                "containerSelector": "div.column__item-imgwrap",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 502.31,
+                  "top": 158.22,
+                  "right": 738.12,
+                  "bottom": 468.92,
+                  "width": 235.81,
+                  "height": 310.7
+                },
+                "overflow": {
+                  "top": 10.47,
+                  "bottom": 10.47
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 501.7,
+                  "y": 147.75,
+                  "width": 237.04,
+                  "height": 331.64
+                },
+                "firstSeen": 4.889,
+                "lastSeen": 4.889,
+                "occurrences": 1
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 4.889,
+                "selector": "div.column__item-img",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 490.32,
+                  "top": 461.27,
+                  "right": 742.23,
+                  "bottom": 807.27,
+                  "width": 251.91,
+                  "height": 346
+                },
+                "containerSelector": "div.column__item-imgwrap",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 492.08,
+                  "top": 478.92,
+                  "right": 740.48,
+                  "bottom": 789.63,
+                  "width": 248.4,
+                  "height": 310.7
+                },
+                "overflow": {
+                  "top": 17.65,
+                  "bottom": 17.64
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 490.32,
+                  "y": 461.27,
+                  "width": 251.91,
+                  "height": 346
+                },
+                "firstSeen": 4.889,
+                "lastSeen": 4.889,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 4.889,
+                "selector": "div.column__item-img",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 506.59,
+                  "top": -165.79,
+                  "right": 729.99,
+                  "bottom": 151.53,
+                  "width": 223.4,
+                  "height": 317.32
+                },
+                "containerSelector": "[data-composition-id=\"codrops-onscrollcolumnsrows-index5\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 165.79
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 506.59,
+                  "y": -165.79,
+                  "width": 223.4,
+                  "height": 317.32
+                },
+                "firstSeen": 4.889,
+                "lastSeen": 4.889,
+                "occurrences": 1
+              },
+              {
+                "code": "canvas_overflow",
+                "severity": "info",
+                "time": 5.778,
+                "selector": "h3.card__title > a:nth-of-type(1)",
+                "message": "Text extends outside the composition canvas.",
+                "rect": {
+                  "left": 708.95,
+                  "top": 1293.42,
+                  "right": 875.05,
+                  "bottom": 1314.42,
+                  "width": 166.09,
+                  "height": 21
+                },
+                "containerSelector": "[data-composition-id=\"codrops-onscrollcolumnsrows-index5\"]",
+                "text": "On-Scroll SVG Filter Effect",
+                "fixHint": "Move the text inward, reduce its size, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 234.42
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 708.95,
+                  "y": 1293.42,
+                  "width": 166.09,
+                  "height": 21
+                },
+                "firstSeen": 5.778,
+                "lastSeen": 5.778,
+                "occurrences": 1
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 5.778,
+                "selector": "div.column__item-img",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 504.17,
+                  "top": -66.66,
+                  "right": 731.77,
+                  "bottom": 255.2,
+                  "width": 227.6,
+                  "height": 321.86
+                },
+                "containerSelector": "div.column__item-imgwrap",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 504.34,
+                  "top": -61.08,
+                  "right": 731.59,
+                  "bottom": 249.63,
+                  "width": 227.25,
+                  "height": 310.7
+                },
+                "overflow": {
+                  "top": 5.58,
+                  "bottom": 5.57
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 504.17,
+                  "y": -66.66,
+                  "width": 227.6,
+                  "height": 321.86
+                },
+                "firstSeen": 5.778,
+                "lastSeen": 5.778,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 5.778,
+                "selector": "div.column__item-img",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 504.17,
+                  "top": -66.66,
+                  "right": 731.77,
+                  "bottom": 255.2,
+                  "width": 227.6,
+                  "height": 321.86
+                },
+                "containerSelector": "[data-composition-id=\"codrops-onscrollcolumnsrows-index5\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 66.66
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 504.17,
+                  "y": -66.66,
+                  "width": 227.6,
+                  "height": 321.86
+                },
+                "firstSeen": 5.778,
+                "lastSeen": 5.778,
+                "occurrences": 1
+              }
+            ],
+            "duration": 8,
+            "samples": [
+              0.444,
+              1.333,
+              2.222,
+              3.111,
+              4,
+              4.889,
+              5.778,
+              6.667,
+              7.556
+            ],
+            "transitionSamples": [],
+            "transitionSamplesDropped": 0,
+            "tolerance": 2,
+            "totalIssueCount": 38,
+            "truncated": false
+          },
+          "motion": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "enabled": false,
+            "samples": 0
+          },
+          "contrast": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "enabled": true,
+            "samples": [
+              0.444,
+              2.222,
+              4,
+              5.778,
+              7.556
+            ],
+            "checked": 3,
+            "passed": 3
+          },
+          "snapshots": {
+            "enabled": false,
+            "files": [],
+            "times": [],
+            "findingFiles": []
+          },
+          "_meta": {
+            "version": "0.7.90",
+            "latestVersion": "0.7.96",
+            "updateAvailable": true
+          }
+        },
+        "stderr": "[hyperframes] browserGpuMode auto → hardware (WebGL renderer vendor=\"Google Inc. (AMD)\" renderer=\"ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)\")"
+      },
+      "keyframes": {
+        "ok": true,
+        "json": {
+          "project": "codrops-hf-cli-GYYu1y",
+          "runtime": "all",
+          "compositions": [
+            {
+              "composition": "index.html",
+              "source": "index.html",
+              "tweens": [],
+              "traces": [],
+              "cssKeyframes": [],
+              "anime": []
+            }
+          ],
+          "_meta": {
+            "version": "0.7.90",
+            "latestVersion": "0.7.96",
+            "updateAvailable": true
+          }
+        },
+        "stderr": ""
+      },
+      "cleanup": {
+        "ok": true
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": false,
+          "check_ok": false,
+          "check_json_ok": null,
+          "check_error": "Command failed: D:\\nodejs\\node.exe D:\\Users\\Charles Kang\\Desktop\\temp\\cut-as-code\\TEST\\34-sol\\work\\cache\\hyperframes-cli\\node_modules\\hyperframes\\dist\\cli.js check D:\\Temp\\codrops-hf-cli-i6ukPp --json\n[hyperframes] browserGpuMode auto → hardware (WebGL renderer vendor=\"Google Inc. (AMD)\" renderer=\"ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)\")\n",
+          "check_stderr": "[hyperframes] browserGpuMode auto → hardware (WebGL renderer vendor=\"Google Inc. (AMD)\" renderer=\"ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)\")",
+          "keyframes_ok": true,
+          "cleanup": {
+            "ok": false,
+            "error": "EBUSY: EBUSY: resource busy or locked, rmdir 'D:\\Temp\\codrops-hf-cli-i6ukPp'"
+          }
+        },
+        {
+          "attempt": 2,
+          "ok": true,
+          "check_ok": true,
+          "check_json_ok": true,
+          "check_error": null,
+          "check_stderr": "[hyperframes] browserGpuMode auto → hardware (WebGL renderer vendor=\"Google Inc. (AMD)\" renderer=\"ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)\")",
+          "keyframes_ok": true,
+          "cleanup": {
+            "ok": true
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "visual_passed": 0,
+    "visual_failed": 0,
+    "cli_passed": 1,
+    "cli_failed": 0
+  }
+}

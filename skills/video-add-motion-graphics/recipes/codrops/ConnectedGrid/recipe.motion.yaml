@@ -1,0 +1,74 @@
+spec_version: 1
+id: "codrops-connectedgrid-index"
+name: "Connected Grid Layout Animation"
+description: "A connected image grid reconfigures panels and crops across the screen."
+surfaces: [video]
+category: "fullscreen-transition"
+tech: [html, css, js]
+canvas: [video]
+target: [fullscreen]
+intent: "fullscreen-transition"
+runtime: [css, js]
+export: [skill, html]
+dependencies: []
+tags:
+  - "codrops"
+  - "grid"
+  - "images"
+  - "layout"
+  - "transition"
+  - "chapter"
+  - "fullscreen"
+intent_keywords:
+  - "image grid transition"
+  - "editorial panel montage"
+  - "gallery chapter break"
+  - "图片网格转场"
+  - "画廊章节切换"
+best_for:
+  - "A chapter or interstitial in design reels, portfolio stories, and visual lists"
+  - "A fullscreen transition using compatible objects, scenes, textures, or non-face crops"
+avoid_when:
+  - "The cue needs a single calm focal point or long readable copy"
+  - "The underlying footage already contains dense framing or protected faces"
+structural_roles:
+  - "chapter"
+  - "interstitial"
+motion_functions:
+  - "transition"
+  - "build"
+  - "settle"
+visual_language:
+  - "editorial"
+  - "playful"
+  - "geometric"
+mechanisms:
+  - "image-grid"
+  - "panels"
+  - "layout-morph"
+rhythm_energy: "medium-high"
+information_density: "dense"
+frame_relationship: "fullscreen"
+color_tendency: "image-led"
+style_rationale: "The reviewed default fills the frame with linked image panels whose crop and arrangement change as one designed grid."
+restraint:
+  max_per_view: 1
+  notes: "Use as one frame-dominant designed cutaway; adapt content, palette, typography, framing, and timing instead of running an unchanged source showcase."
+motion:
+  duration_ms: 8000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: "index/index.html"
+implementations:
+  - tech: js
+    files: ["index/index.html", "index/hf-recipe.js", "index/hf-adapter.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/codrops/ConnectedGrid/tree/fd4abc9ca4cef1aed572d49392712425823d1840"
+  attribution_required: true
+author:
+  name: "codrops"
+  url: "https://github.com/codrops"
+version: 0.1.0

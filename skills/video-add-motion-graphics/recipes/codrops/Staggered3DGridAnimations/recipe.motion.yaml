@@ -1,0 +1,74 @@
+spec_version: 1
+id: "codrops-staggered3dgridanimations-index"
+name: "Staggered (3D) Grid Animations with Scroll-Triggered Effects"
+description: "A column of small image tiles staggers through depth against a dark field."
+surfaces: [video]
+category: "fullscreen-transition"
+tech: [html, css, js]
+canvas: [video]
+target: [fullscreen]
+intent: "fullscreen-transition"
+runtime: [css, js]
+export: [skill, html]
+dependencies: []
+tags:
+  - "codrops"
+  - "staggered"
+  - "3d-grid"
+  - "tiles"
+  - "transition"
+  - "chapter"
+  - "frame-dominant"
+intent_keywords:
+  - "staggered image grid"
+  - "3D tile transition"
+  - "dark editorial montage"
+  - "错落图片网格"
+  - "三维磁贴转场"
+best_for:
+  - "A chapter or interstitial in technology, fashion, music, and visual-essay videos"
+  - "A frame-dominant montage of related images, posters, objects, or environments"
+avoid_when:
+  - "The viewer needs one stable hero image or long readable title"
+  - "The grid would repeat protected faces or conflict with a literal documentary scene"
+structural_roles:
+  - "chapter"
+  - "interstitial"
+motion_functions:
+  - "build"
+  - "transition"
+  - "loop"
+visual_language:
+  - "futuristic"
+  - "editorial"
+  - "3d"
+mechanisms:
+  - "staggered-grid"
+  - "image-tiles"
+  - "depth"
+rhythm_energy: "medium-high"
+information_density: "dense"
+frame_relationship: "frame-dominant"
+color_tendency: "dark"
+style_rationale: "The reviewed default concentrates many small images into a staggered vertical spatial grid, a dense and unmistakably frame-dominant montage."
+restraint:
+  max_per_view: 1
+  notes: "Use as one frame-dominant designed cutaway; adapt content, palette, typography, framing, and timing instead of running an unchanged source showcase."
+motion:
+  duration_ms: 8000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: "index/index.html"
+implementations:
+  - tech: js
+    files: ["index/index.html", "index/hf-recipe.js", "index/hf-adapter.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/codrops/Staggered3DGridAnimations/tree/7c2703d41f55005c2758e1031b593d2493d392f8"
+  attribution_required: true
+author:
+  name: "codrops"
+  url: "https://github.com/codrops"
+version: 0.1.0

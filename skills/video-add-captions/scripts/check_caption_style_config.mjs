@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   captionBackgroundThemeNames,
+  captionExpressiveTreatments,
   captionHighlightThemeNames,
   captionPresetNames,
   captionStrokeThemeNames,
@@ -17,6 +18,15 @@ assert.deepEqual(captionHighlightThemeNames, ["yellow", "green", "orange", "purp
 assert.deepEqual(captionBackgroundThemeNames, ["gray", "yellow", "blue", "pink", "green"]);
 assert.deepEqual(captionStrokeThemeNames, ["black", "yellow", "blue", "pink", "green"]);
 
+assert.equal(captionExpressiveTreatments.semanticScaleByRole.normal, 1.0);
+assert.equal(captionExpressiveTreatments.semanticScaleByRole.keyword, 1.22);
+assert.equal(captionExpressiveTreatments.semanticScaleByRole.number, 1.22);
+assert.equal(captionExpressiveTreatments.semanticScaleByRole.contrast, 1.22);
+assert.equal(captionExpressiveTreatments.heroLine.color, "#F4C542");
+assert.equal(captionExpressiveTreatments.heroLine.levels.strong.scale, 1.5);
+assert.equal(captionExpressiveTreatments.heroLine.levels.hero.scale, 1.5);
+assert.equal(captionExpressiveTreatments.heroLine.canonicalLevel, "hero");
+
 const clean = resolveCaptionStyle({ preset: "clean" });
 assert.equal(clean.font.sizeRatio, 0.0416);
 assert.equal(clean.layout.paddingBottomRatio, 0.07);
@@ -32,6 +42,7 @@ const shortsYellow = resolveCaptionStyle({ preset: "shorts", highlightTheme: "ye
 assert.equal(shortsYellow.wordHighlight.activeColor, "#F8F54F");
 assert.equal(shortsYellow.font.family.startsWith("Cal_Sans"), true);
 assert.equal(shortsYellow.font.sizeRatio, 0.035);
+assert.equal(shortsYellow.layout.paddingBottomRatio, 0.2);
 assert.equal(shortsYellow.stroke.enabled, true);
 assert.equal(resolveCaptionStyle({ preset: "shorts" }).wordHighlight.activeColor, "#21D32E");
 

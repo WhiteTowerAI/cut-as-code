@@ -4,11 +4,14 @@ __pycache__/
 .env
 
 .superpowers/
+.plugin-validator-deps/
+.plugin-validator-wheel/
 
 work/
 docs/
 /tests/
-skills/video-add-graphic-motion/tests/
+/TEST/
+skills/video-add-motion-graphics/tests/
 
 .claude/worktrees/
 .worktree/
@@ -25,7 +28,8 @@ ui/tests/screenshots/visual-comparison-results.json
 
 # HyperFrames preview cache + regenerable self-check stills/gallery
 .hyperframes/
+**/.thumbnails/
 # snapshots/
 # gallery.html
 
-video-add-graphic-motion_bak/
+video-add-motion-graphics_bak/

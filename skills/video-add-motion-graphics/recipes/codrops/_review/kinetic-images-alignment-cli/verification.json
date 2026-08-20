@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-10T08:51:32.112Z",
+  "imports_root": "D:\\Users\\Charles Kang\\Desktop\\temp\\cut-as-code\\skills\\video-add-motion-graphics\\recipes\\codrops",
+  "total_variants": 1,
+  "visual": [],
+  "cli": [
+    {
+      "key": "KineticImages/index",
+      "ok": true,
+      "check": {
+        "ok": true,
+        "json": {
+          "ok": true,
+          "strict": false,
+          "lint": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "filesScanned": 1
+          },
+          "runtime": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": []
+          },
+          "layout": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "duration": 6,
+            "samples": [
+              0.333,
+              1,
+              1.667,
+              2.333,
+              3,
+              3.667,
+              4.333,
+              5,
+              5.667
+            ],
+            "transitionSamples": [],
+            "transitionSamplesDropped": 0,
+            "tolerance": 2,
+            "totalIssueCount": 0,
+            "truncated": false
+          },
+          "motion": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "enabled": false,
+            "samples": 0
+          },
+          "contrast": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "enabled": true,
+            "samples": [
+              0.333,
+              1.667,
+              3,
+              4.333,
+              5.667
+            ],
+            "checked": 0,
+            "passed": 0
+          },
+          "snapshots": {
+            "enabled": false,
+            "files": [],
+            "times": [],
+            "findingFiles": []
+          },
+          "_meta": {
+            "version": "0.7.90",
+            "latestVersion": "0.7.96",
+            "updateAvailable": true
+          }
+        },
+        "stderr": "[hyperframes] browserGpuMode auto → hardware (WebGL renderer vendor=\"Google Inc. (AMD)\" renderer=\"ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)\")"
+      },
+      "keyframes": {
+        "ok": true,
+        "json": {
+          "project": "codrops-hf-cli-kXZ5R2",
+          "runtime": "all",
+          "compositions": [
+            {
+              "composition": "index.html",
+              "source": "index.html",
+              "tweens": [],
+              "traces": [],
+              "cssKeyframes": [],
+              "anime": []
+            }
+          ],
+          "_meta": {
+            "version": "0.7.90",
+            "latestVersion": "0.7.96",
+            "updateAvailable": true
+          }
+        },
+        "stderr": ""
+      },
+      "cleanup": {
+        "ok": true
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "check_ok": true,
+          "check_json_ok": true,
+          "check_error": null,
+          "check_stderr": "[hyperframes] browserGpuMode auto → hardware (WebGL renderer vendor=\"Google Inc. (AMD)\" renderer=\"ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)\")",
+          "keyframes_ok": true,
+          "cleanup": {
+            "ok": true
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "visual_passed": 0,
+    "visual_failed": 0,
+    "cli_passed": 1,
+    "cli_failed": 0
+  }
+}

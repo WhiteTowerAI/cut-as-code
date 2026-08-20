@@ -1,0 +1,75 @@
+spec_version: 1
+id: "codrops-rotatingonscrollanimations-index"
+name: "3D Image Rotations on Scroll"
+description: "Floating image cards rotate through a dark three-dimensional editorial field."
+surfaces: [video]
+category: "fullscreen-transition"
+tech: [html, css, js]
+canvas: [video]
+target: [fullscreen]
+intent: "fullscreen-transition"
+runtime: [css, js]
+export: [skill, html]
+dependencies: []
+tags:
+  - "codrops"
+  - "rotation"
+  - "3d"
+  - "cards"
+  - "fashion"
+  - "transition"
+  - "frame-dominant"
+intent_keywords:
+  - "rotating image cards"
+  - "3D editorial transition"
+  - "fashion image montage"
+  - "旋转图片卡片"
+  - "三维编辑转场"
+best_for:
+  - "A chapter or interstitial in fashion, music, cinematic lists, and art-direction reels"
+  - "A frame-dominant montage of product, landscape, silhouette, or non-face image details"
+avoid_when:
+  - "The replacement imagery depends on readable faces or a calm literal-continuity treatment"
+  - "The cue needs sparse quiet framing or long readable text instead of moving rotating cards"
+structural_roles:
+  - "chapter"
+  - "interstitial"
+motion_functions:
+  - "transition"
+  - "build"
+  - "settle"
+visual_language:
+  - "editorial"
+  - "fashion"
+  - "3d"
+  - "cinematic"
+mechanisms:
+  - "rotating-cards"
+  - "perspective"
+  - "image-panels"
+rhythm_energy: "medium-high"
+information_density: "balanced"
+frame_relationship: "frame-dominant"
+color_tendency: "dark"
+style_rationale: "The reviewed default moves sparse image cards through depth on black, making an immersive editorial rotation sequence."
+restraint:
+  max_per_view: 1
+  notes: "Use as one frame-dominant designed cutaway; adapt content, palette, typography, framing, and timing instead of running an unchanged source showcase."
+motion:
+  duration_ms: 8000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: "index/index.html"
+implementations:
+  - tech: js
+    files: ["index/index.html", "index/hf-recipe.js", "index/hf-adapter.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/codrops/RotatingOnScrollAnimations/tree/ebbe2c9bd80237d05c709475e47aad171030e21f"
+  attribution_required: true
+author:
+  name: "codrops"
+  url: "https://github.com/codrops"
+version: 0.1.0

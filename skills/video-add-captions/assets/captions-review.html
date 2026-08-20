@@ -81,7 +81,7 @@
   <div class="toolbar-band">
     <header class="toolbar shell">
       <h1>Caption preview review</h1>
-      <strong id="review-status" aria-live="polite">0/4 checked</strong>
+      <div><strong id="review-status" aria-live="polite">0/4 checked</strong> <span id="machine-status"></span></div>
     </header>
   </div>
   <main class="shell">
@@ -92,6 +92,10 @@
         <button class="filter-button" type="button" data-filter="all" aria-pressed="true">All</button>
         <button class="filter-button" type="button" data-filter="bottom-standard" aria-pressed="false">Bottom standard</button>
         <button class="filter-button" type="button" data-filter="center-emphasis" aria-pressed="false">Center emphasis</button>
+        <button class="filter-button" type="button" data-filter="preset-bottom" aria-pressed="false">Preset bottom</button>
+        <button class="filter-button" type="button" data-filter="frame-center" aria-pressed="false">Frame center</button>
+        <button class="filter-button" type="button" data-filter="panel-center" aria-pressed="false">Panel center</button>
+        <button class="filter-button" type="button" data-filter="hero-1.5x" aria-pressed="false">Hero 1.5x</button>
         <button class="filter-button" type="button" data-filter="warnings" aria-pressed="false">Warnings</button>
       </div>
     </section>
@@ -136,10 +140,13 @@
     const REVIEW_DATA_B64 = "__CAPTION_EVIDENCE_REVIEW_DATA__";
     const reviewData = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(REVIEW_DATA_B64), c => c.charCodeAt(0))));
     const isExpressive = reviewData.presentation_mode === "expressive";
-    const labels = reviewData.samples.map(sample => sample.label);
+    const isCompositeAware = Boolean(reviewData.spatial_context);
+    const reviewSamples = reviewData.review_samples || reviewData.samples;
+    const labels = reviewSamples.map(sample => sample.sample_label || sample.label);
     const form = document.querySelector("#review-form");
     const list = document.querySelector("#evidence-list");
     const status = document.querySelector("#review-status");
+    const machineStatus = document.querySelector("#machine-status");
     const changes = document.querySelector("#changes");
     const copyButton = document.querySelector("#copy-summary");
     const output = document.querySelector("#summary-output");
@@ -172,14 +179,18 @@
         dialog.showModal();
       });
     };
-    if (isExpressive) {
+    if (isExpressive || isCompositeAware) {
       document.body.classList.add("expressive-review");
       expressiveControls.hidden = false;
     }
-    for (const sample of reviewData.samples) {
+    machineStatus.textContent = `${reviewData.machine_evidence_count || reviewData.samples.length} machine samples passed`;
+    for (const sample of reviewData.review_samples || reviewData.samples) {
       const row = document.createElement("article");
       row.className = "evidence-row";
       row.dataset.variant = sample.variant || "none";
+      row.dataset.placement = sample.resolved_placement || "none";
+      row.dataset.hero = sample.hero_line ? "hero-1.5x" : "none";
+      row.dataset.categories = (sample.categories || []).join(" ");
       row.dataset.warning = sample.warnings?.length ? "true" : "false";
       const meta = document.createElement("div");
       meta.className = "evidence-meta";
@@ -188,8 +199,14 @@
       const checkbox = document.createElement("input");
       checkbox.type = "checkbox";
       checkbox.name = "evidence";
-      checkbox.value = sample.label;
-      checkLabel.append(checkbox, document.createTextNode(sample.beat_id || sample.label));
+      checkbox.value = sample.sample_label || sample.label;
+      checkLabel.append(checkbox, document.createTextNode(sample.beat_id || sample.sample_label || sample.label));
+      for (const category of sample.categories || []) {
+        const categoryChip = document.createElement("span");
+        categoryChip.className = "variant-chip";
+        categoryChip.textContent = category;
+        meta.append(categoryChip);
+      }
       if (sample.variant) {
         const chip = document.createElement("span");
         chip.className = "variant-chip";
@@ -213,6 +230,18 @@
         addDetail(details, "Cue", sample.cue_text || "None");
         addDetail(details, "SHA-256", sample.sha256);
       }
+      if (sample.spatial_beat_id) {
+        addDetail(details, "Visual context", sample.visual_context);
+        addDetail(details, "Requested", sample.requested_variant);
+        addDetail(details, "Resolved", sample.resolved_placement);
+        addDetail(details, "Background", `${sample.background_kind}: ${sample.background_path}`);
+        addDetail(details, "Background SHA-256", sample.background_sha256);
+        addDetail(details, "Caption bbox", JSON.stringify(sample.caption_bbox));
+        addDetail(details, "Hero bbox", JSON.stringify(sample.hero_bbox));
+        addDetail(details, "Allowed rect", JSON.stringify(sample.allowed_rect_px));
+        addDetail(details, "Clearance", sample.clearance_status);
+      }
+      if (sample.hero_line) addDetail(details, "Hero level", sample.hero_line.level);
       meta.append(checkLabel, details);
       const preview = document.createElement("button");
       preview.type = "button";
@@ -253,8 +282,11 @@
           candidate.setAttribute("aria-pressed", String(candidate === button));
         }
         for (const row of document.querySelectorAll(".evidence-row")) {
-          row.hidden = filter !== "all"
-            && !(filter === "warnings" ? row.dataset.warning === "true" : row.dataset.variant === filter);
+          row.hidden = filter !== "all" && !(
+            filter === "warnings" ? row.dataset.warning === "true"
+              : row.dataset.categories.split(" ").includes(filter)
+                || row.dataset.variant === filter || row.dataset.placement === filter || row.dataset.hero === filter
+          );
         }
       });
     }
@@ -264,7 +296,10 @@
       if (decision === "revise") {
         return `Caption preview review\nReview: ${reviewData.review_id}\nDecision: revise\nChanges: ${changes.value.trim()}`;
       }
-      const approval = `Caption preview review\nReview: ${reviewData.review_id}\nDecision: approve\nEvidence: ${isExpressive ? "expressive-layout-beats" : "early, middle, late, no-caption"}`;
+      const evidence = reviewData.approval_evidence === "composite-aware"
+        ? "composite-aware"
+        : isExpressive ? "expressive-layout-beats" : "early, middle, late, no-caption";
+      const approval = `Caption preview review\nReview: ${reviewData.review_id}\nDecision: approve\nEvidence: ${evidence}`;
       const karaokeChoice = document.querySelector('input[name="karaoke"]:checked');
       return isExpressive && karaokeChoice ? `${approval}\nKaraoke: ${karaokeChoice.value}` : approval;
     };

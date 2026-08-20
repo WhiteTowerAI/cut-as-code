@@ -1,0 +1,74 @@
+spec_version: 1
+id: "codrops-scrollblurtypography-index"
+name: "Blurry Text Reveal on Scroll"
+description: "A near-black typographic reveal resolves from blur with exceptional restraint."
+surfaces: [video]
+category: "fullscreen-typography"
+tech: [html, css, js]
+canvas: [video]
+target: [fullscreen]
+intent: "fullscreen-typography"
+runtime: [css, js]
+export: [skill, html]
+dependencies: []
+tags:
+  - "codrops"
+  - "blur"
+  - "typography"
+  - "minimal"
+  - "dark"
+  - "chapter"
+  - "fullscreen"
+intent_keywords:
+  - "blurred text reveal"
+  - "minimal dark title"
+  - "quiet outro typography"
+  - "模糊文字揭示"
+  - "极简黑色片尾"
+best_for:
+  - "A chapter, interstitial, or outro in reflective essays, luxury design films, and quiet cinematic pieces"
+  - "A fullscreen reveal for one short phrase over a dark field"
+avoid_when:
+  - "The cue needs immediate high-contrast factual communication"
+  - "The title must coexist with visible footage, captions, or numerous graphics"
+structural_roles:
+  - "chapter"
+  - "interstitial"
+  - "outro"
+motion_functions:
+  - "reveal"
+  - "settle"
+visual_language:
+  - "minimal"
+  - "typographic"
+  - "dark"
+mechanisms:
+  - "blur"
+  - "text-reveal"
+  - "scroll"
+rhythm_energy: "calm"
+information_density: "sparse"
+frame_relationship: "fullscreen"
+color_tendency: "dark"
+style_rationale: "The reviewed start, middle, and end remain exceptionally sparse and dark, with blur-to-legibility providing a quiet text-only resolve."
+restraint:
+  max_per_view: 1
+  notes: "Use as one frame-dominant designed cutaway; adapt content, palette, typography, framing, and timing instead of running an unchanged source showcase."
+motion:
+  duration_ms: 8000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: "index/index.html"
+implementations:
+  - tech: js
+    files: ["index/index.html", "index/hf-recipe.js", "index/hf-adapter.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/codrops/ScrollBlurTypography/tree/3e64d4bdae65b1f291e21a9a9c4b2ac6258c45c1"
+  attribution_required: true
+author:
+  name: "codrops"
+  url: "https://github.com/codrops"
+version: 0.1.0
