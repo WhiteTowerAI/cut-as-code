@@ -733,6 +733,11 @@ def check_broll_compiler_consistency():
                 compile_values(current_plan, current_project, current_timeline)
             except ValueError as error:
                 message = str(error)
+                if label in {
+                    "operation based_on integer",
+                    "operation based_on boolean revision",
+                } and expected in message:
+                    continue
                 if "b-roll B-roll plan mismatch:" not in message or expected not in message:
                     failures.append(f"{label}: {message}")
             else:

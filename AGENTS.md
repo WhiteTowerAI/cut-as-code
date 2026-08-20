@@ -229,6 +229,7 @@ Prefer `python -m unittest` over `pytest` — the suites use `unittest` fixtures
 
 - **`CLAUDE.md` and `AGENTS.md` must stay byte-identical.** They were once hardlinked but
   are now separate files; apply every edit to both.
+- **Editor UI verification.** Work under `ui/` must use Playwright with installed Chrome for screenshot-based visual inspection and interaction verification; typecheck/build alone are insufficient.
 - `work/`, `docs/`, `/tests/`, and `.env` are gitignored — only `skills/` plus the root docs
   are tracked. A video project lives *outside* the repo and is addressed by an explicit
   project root, so scripts take paths, never assume cwd is the project.

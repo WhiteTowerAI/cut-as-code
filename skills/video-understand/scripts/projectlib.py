@@ -8,9 +8,18 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
+from contextlib import contextmanager
 from datetime import datetime
 from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
+
+from PIL import Image
+
+if os.name == "nt":
+    import msvcrt
+else:
+    import fcntl
 
 
 STATUSES = {"draft", "approved", "verified", "failed", "stale"}
@@ -34,10 +43,110 @@ def load_json(path):
         return json.load(handle)
 
 
-def write_json(path, data):
+def write_json(path, data, *, project_lease_held=False):
     path = Path(path)
+    payload = (json.dumps(data, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    project_root = _project_root_for_write(path)
+    if project_root is None or project_lease_held:
+        _atomic_write_bytes(path, payload)
+        return
+    with project_mutation_lease(project_root):
+        _atomic_write_bytes(path, payload)
+
+
+def _atomic_write_bytes(path, payload):
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    with tempfile.NamedTemporaryFile(
+        dir=path.parent, prefix=f".{path.name}.", suffix=".tmp", delete=False
+    ) as handle:
+        temporary = Path(handle.name)
+        handle.write(payload)
+        handle.flush()
+        os.fsync(handle.fileno())
+    try:
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _project_root_for_write(path):
+    absolute = path.absolute()
+    for parent in (absolute.parent, *absolute.parents):
+        if parent.name == "work":
+            return parent.parent.resolve()
+    return None
+
+
+def _is_reparse_point(path):
+    try:
+        stat = path.lstat()
+    except FileNotFoundError:
+        return False
+    return path.is_symlink() or bool(getattr(stat, "st_file_attributes", 0) & 0x400)
+
+
+def editor_state_dir(project_root, *, create=False):
+    root = Path(project_root).resolve()
+    work = root / "work"
+    if not work.is_dir() or _is_reparse_point(work):
+        raise ValueError("project work directory is missing or redirected")
+    editor = work / ".editor"
+    if editor.exists() or editor.is_symlink():
+        if not editor.is_dir() or _is_reparse_point(editor):
+            raise ValueError("project editor state directory is redirected")
+    elif create:
+        editor.mkdir()
+    if create and (not editor.is_dir() or _is_reparse_point(editor)):
+        raise ValueError("project editor state directory is redirected")
+    resolved = editor.resolve(strict=False)
+    if os.path.commonpath((str(root), str(resolved))) != str(root):
+        raise ValueError("project editor state directory escapes root")
+    return editor
+
+
+def acquire_project_lease(project_root, *, blocking=True):
+    lock_path = editor_state_dir(project_root, create=True) / "mutation.lock"
+    descriptor = None
+    try:
+        descriptor = os.open(lock_path, os.O_CREAT | os.O_RDWR)
+        if os.path.getsize(lock_path) == 0:
+            os.write(descriptor, b"\0")
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        if os.name == "nt":
+            msvcrt.locking(descriptor, msvcrt.LK_LOCK if blocking else msvcrt.LK_NBLCK, 1)
+        else:
+            flags = fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB)
+            fcntl.flock(descriptor, flags)
+    except (OSError, BlockingIOError):
+        if descriptor is not None:
+            os.close(descriptor)
+        return None
+    os.ftruncate(descriptor, 0)
+    os.lseek(descriptor, 0, os.SEEK_SET)
+    os.write(descriptor, f"{os.getpid()}\n".encode("ascii"))
+    os.fsync(descriptor)
+    return lock_path, descriptor
+
+
+def release_project_lease(lease):
+    _path, descriptor = lease
+    os.lseek(descriptor, 0, os.SEEK_SET)
+    if os.name == "nt":
+        msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+    else:
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+    os.close(descriptor)
+
+
+@contextmanager
+def project_mutation_lease(project_root):
+    lease = acquire_project_lease(project_root, blocking=True)
+    if lease is None:
+        raise OSError("could not acquire project mutation lease")
+    try:
+        yield lease
+    finally:
+        release_project_lease(lease)
 
 
 def _sha256_file(path):
@@ -70,7 +179,9 @@ def operation_map(project):
     return {operation.get("id"): operation for operation in project.get("operations", [])}
 
 
-def _validate_node(node, nodes, errors, *, allow_render=False):
+def _validate_node(
+    node, nodes, errors, *, allow_render=False, dependency_mode="require_current"
+):
     node_id = node.get("id") or "<missing-id>"
     revision = node.get("revision")
     if not isinstance(revision, int) or isinstance(revision, bool) or revision < 1:
@@ -105,10 +216,33 @@ def _validate_node(node, nodes, errors, *, allow_render=False):
     for dependency in sorted(recorded_dependencies - expected_dependencies):
         errors.append(f"{node_id} based_on has unexpected dependency: {dependency}")
     for dependency, expected_revision in based_on.items():
+        if (
+            not isinstance(expected_revision, int)
+            or isinstance(expected_revision, bool)
+            or expected_revision < 1
+        ):
+            node_kind = "review" if allow_render else "operation"
+            errors.append(f"{node_kind} based_on revisions must be positive integers")
+            continue
         current = nodes.get(dependency, {}).get("revision")
         if current is None:
             errors.append(f"{node_id} based_on missing dependency: {dependency}")
-        elif expected_revision != current:
+        elif (
+            not isinstance(current, int)
+            or isinstance(current, bool)
+            or current < 1
+        ):
+            errors.append(
+                f"revision mismatch: {node_id} based_on {dependency}={expected_revision}, current={current}"
+            )
+        elif (
+            expected_revision != current
+            and not (
+                dependency_mode == "allow_stale"
+                and node.get("status") == "stale"
+                and expected_revision < current
+            )
+        ):
             errors.append(
                 f"revision mismatch: {node_id} based_on {dependency}={expected_revision}, current={current}"
             )
@@ -183,7 +317,17 @@ def _validate_operation_outputs(operation, project_root, errors):
             errors.append(f"{operation_id} missing output: {value}")
 
 
-def validate_project(project, project_root, check_files=True, check_media=False):
+def validate_project(
+    project,
+    project_root,
+    check_files=True,
+    check_media=False,
+    *,
+    dependency_mode="require_current",
+):
+    if dependency_mode not in {"require_current", "allow_stale"}:
+        raise ValueError("dependency_mode must be 'require_current' or 'allow_stale'")
+
     errors = []
     if project.get("schema_version") != 1:
         errors.append("project schema_version must be 1")
@@ -206,7 +350,7 @@ def validate_project(project, project_root, check_files=True, check_media=False)
         "changes_audio",
     )
     for operation in operations:
-        _validate_node(operation, nodes, errors)
+        _validate_node(operation, nodes, errors, dependency_mode=dependency_mode)
         operation_id = operation.get("id") or "<missing-id>"
         target = operation.get("target")
         if not isinstance(target, dict):
@@ -282,7 +426,13 @@ def validate_project(project, project_root, check_files=True, check_media=False)
             errors.append("active sequence operations violate canonical pixel order")
 
     for review in project.get("reviews", []):
-        _validate_node(review, nodes, errors, allow_render=True)
+        _validate_node(
+            review,
+            nodes,
+            errors,
+            allow_render=True,
+            dependency_mode=dependency_mode,
+        )
 
     if check_files:
         _validate_source(project, project_root, errors, check_media=check_media)
@@ -1142,6 +1292,7 @@ def _validate_motion_graphics_plan(
     try:
         domain_errors = _motion_graphics_module().validate_plan(
             plan, timeline, project=project, project_root=project_root, verify_files=True,
+            require_library_match=False,
         )
     except Exception as exc:
         errors.append(prefix + f"domain validation failed: {exc}")
@@ -1193,6 +1344,204 @@ def _validate_motion_graphics_plan(
             errors.append(prefix + "bound file is missing")
         elif _sha256_file(path) != binding["sha256"]:
             errors.append(prefix + "bound file SHA-256 is stale")
+
+
+_DEFAULT_EDITOR_TRANSFORM = {"x": 0.5, "y": 0.5, "scale": 1.0}
+_GRAPHIC_MOTION_BOUNDS_CACHE = {}
+
+
+def _editor_transform(value):
+    if value is None:
+        return dict(_DEFAULT_EDITOR_TRANSFORM)
+    if not isinstance(value, dict) or set(value) not in (
+        {"x", "y", "scale"}, {"x", "y", "scale_x", "scale_y"},
+    ):
+        raise ValueError("editor_transform must contain x, y, and scale or scale_x and scale_y")
+    x, y = value["x"], value["y"]
+    scale_x = value.get("scale_x", value.get("scale"))
+    scale_y = value.get("scale_y", value.get("scale"))
+    if any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in (x, y, scale_x, scale_y)):
+        raise ValueError("editor_transform values must be numbers")
+    if not -2 <= x <= 3 or not -2 <= y <= 3 or not 0.1 <= scale_x <= 4 or not 0.1 <= scale_y <= 4:
+        raise ValueError("editor_transform is out of range")
+    if "scale" in value:
+        return {"x": float(x), "y": float(y), "scale": float(scale_x)}
+    return {"x": float(x), "y": float(y), "scale_x": float(scale_x), "scale_y": float(scale_y)}
+
+
+def graphic_motion_content_bounds(cue, project_root):
+    render = cue.get("render") if isinstance(cue, dict) else None
+    frames = render.get("frames") if isinstance(render, dict) else None
+    if not isinstance(frames, list) or not frames:
+        return {"x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0}
+    resolved_frames = []
+    for frame in frames:
+        value = frame.get("path") if isinstance(frame, dict) else None
+        value_path = Path(value) if isinstance(value, str) else Path()
+        path = (
+            (Path(project_root).resolve() / value_path).resolve()
+            if value_path.parts[:1] == ("work",)
+            else resolve_project_path(project_root, value)
+        )
+        if os.path.commonpath((str(Path(project_root).resolve()), str(path))) != str(Path(project_root).resolve()):
+            raise ValueError("graphic-motion frame path escapes project root")
+        stat = path.stat()
+        resolved_frames.append((path, frame.get("sha256"), stat.st_size, stat.st_mtime_ns))
+    cache_key = tuple((str(path), sha256, size, mtime) for path, sha256, size, mtime in resolved_frames)
+    cached = _GRAPHIC_MOTION_BOUNDS_CACHE.get(cache_key)
+    if cached is not None:
+        return dict(cached)
+    union = None
+    size = None
+    for path, _sha256, _file_size, _mtime in resolved_frames:
+        with Image.open(path) as image:
+            if size is None:
+                size = image.size
+            elif image.size != size:
+                raise ValueError("graphic-motion frames must share one canvas size")
+            alpha = image.getchannel("A") if "A" in image.getbands() else None
+            bounds = alpha.getbbox() if alpha is not None else image.getbbox()
+        if bounds is not None:
+            union = bounds if union is None else (
+                min(union[0], bounds[0]), min(union[1], bounds[1]),
+                max(union[2], bounds[2]), max(union[3], bounds[3]),
+            )
+    if size is None or union is None:
+        bounds = {"x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0}
+        _GRAPHIC_MOTION_BOUNDS_CACHE[cache_key] = bounds
+        return dict(bounds)
+    width, height = size
+    bounds = {
+        "x": union[0] / width,
+        "y": union[1] / height,
+        "width": (union[2] - union[0]) / width,
+        "height": (union[3] - union[1]) / height,
+    }
+    _GRAPHIC_MOTION_BOUNDS_CACHE[cache_key] = bounds
+    return dict(bounds)
+
+
+def _editor_transforms_for_contributions(operation_id, plan, contribution_count):
+    if operation_id == "graphic-motion":
+        cues = [
+            cue for cue in plan.get("cues", [])
+            if isinstance(cue, dict) and cue.get("status") == "verified"
+        ]
+    elif operation_id == "captions":
+        cues = [cue for cue in plan.get("cues", []) if isinstance(cue, dict)]
+    elif operation_id == "content-cards":
+        cues = [cue for cue in plan.get("cards", []) if isinstance(cue, dict)]
+    else:
+        return []
+    transforms = [_editor_transform(cue.get("editor_transform")) for cue in cues]
+    if len(transforms) == contribution_count:
+        return transforms
+    if all(transform == _DEFAULT_EDITOR_TRANSFORM for transform in transforms):
+        return [dict(_DEFAULT_EDITOR_TRANSFORM) for _ in range(contribution_count)]
+    raise ValueError(f"{operation_id} editor transforms require per-cue overlay assets")
+
+
+def _editor_content_bounds_for_contributions(operation_id, plan, contribution_count, project_root):
+    if operation_id == "graphic-motion":
+        cues = [
+            cue for cue in plan.get("cues", [])
+            if isinstance(cue, dict) and cue.get("status") == "verified"
+        ]
+    elif operation_id == "captions":
+        cues = [cue for cue in plan.get("cues", []) if isinstance(cue, dict)]
+    elif operation_id == "content-cards":
+        cues = [cue for cue in plan.get("cards", []) if isinstance(cue, dict)]
+    else:
+        return []
+    if len(cues) != contribution_count:
+        transforms = [_editor_transform(cue.get("editor_transform")) for cue in cues]
+        if contribution_count == 1 and all(transform == _DEFAULT_EDITOR_TRANSFORM for transform in transforms):
+            return [{"x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0}]
+        raise ValueError(f"{operation_id} content bounds require per-cue overlay assets")
+    bounds = []
+    for cue in cues:
+        value = cue.get("editor_content_bounds")
+        if value is None and operation_id == "graphic-motion":
+            value = graphic_motion_content_bounds(cue, project_root)
+        if value is None:
+            value = {"x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0}
+        if (not isinstance(value, dict) or set(value) != {"x", "y", "width", "height"}):
+            raise ValueError(f"{operation_id} editor content bounds are invalid")
+        x, y, width, height = (value[key] for key in ("x", "y", "width", "height"))
+        if (any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in (x, y, width, height))
+                or x < 0 or y < 0 or width <= 0 or height <= 0 or x + width > 1 or y + height > 1):
+            raise ValueError(f"{operation_id} editor content bounds are invalid")
+        bounds.append({"x": float(x), "y": float(y), "width": float(width), "height": float(height)})
+    return bounds
+
+
+def _expand_editor_overlay_contributions(operation_id, plan, contributions, fps):
+    """Slice one full-program image sequence into cue-scoped overlay inputs."""
+    if operation_id == "captions":
+        cues = [cue for cue in plan.get("cues", []) if isinstance(cue, dict)]
+    elif operation_id == "content-cards":
+        cues = [cue for cue in plan.get("cards", []) if isinstance(cue, dict)]
+    else:
+        return list(contributions)
+
+    overlays = [item for item in contributions if isinstance(item, dict) and item.get("kind") == "overlay"]
+    if len(cues) <= 1 or len(overlays) != 1 or len(cues) == len(overlays):
+        return list(contributions)
+    transforms = [_editor_transform(cue.get("editor_transform")) for cue in cues]
+    if all(transform == _DEFAULT_EDITOR_TRANSFORM for transform in transforms):
+        return list(contributions)
+
+    base = overlays[0]
+    if base.get("asset_type") != "image-sequence":
+        raise ValueError(f"{operation_id} editor transforms require per-cue overlay assets")
+    if not isinstance(fps, dict) or fps.get("num", 0) <= 0 or fps.get("den", 0) <= 0:
+        raise ValueError(f"{operation_id} editor transforms require a valid timeline fps")
+    if base.get("fps") != fps:
+        raise ValueError(f"{operation_id} editor overlay fps does not match timeline fps")
+    base_start_number = base.get("start_number", 1)
+    if isinstance(base_start_number, bool) or not isinstance(base_start_number, int):
+        raise ValueError(f"{operation_id} editor overlay start_number must be an integer")
+
+    rate = fps["num"] / fps["den"]
+    base_start_frame = round(float(base.get("start_s", 0)) * rate)
+    expanded = []
+    previous_end = None
+    for index, cue in enumerate(cues, 1):
+        program_range = cue.get("program_range")
+        if isinstance(program_range, dict):
+            start = program_range.get("start_s")
+            end = program_range.get("end_s")
+        else:
+            start = cue.get("program_start_s")
+            duration = cue.get("duration_s")
+            end = start + duration if isinstance(start, (int, float)) and isinstance(duration, (int, float)) else None
+        if any(isinstance(value, bool) or not isinstance(value, (int, float)) for value in (start, end)):
+            raise ValueError(f"{operation_id} cue {index} program range is invalid")
+        start, end = float(start), float(end)
+        start_frame = round(start * rate)
+        end_frame = round(end * rate)
+        if start_frame < base_start_frame or end_frame <= start_frame:
+            raise ValueError(f"{operation_id} cue {index} program range is invalid")
+        if previous_end is not None and start_frame < previous_end:
+            raise ValueError(f"{operation_id} editor transforms require non-overlapping cues")
+        previous_end = end_frame
+        item = dict(base)
+        item.update({
+            "start_s": round(start, 9),
+            "duration_s": round(end - start, 9),
+            "start_number": base_start_number + start_frame - base_start_frame,
+        })
+        expanded.append(item)
+
+    output = []
+    replaced = False
+    for contribution in contributions:
+        if contribution is base and not replaced:
+            output.extend(expanded)
+            replaced = True
+        else:
+            output.append(contribution)
+    return output
 
 
 def build_render_plan(project, project_root):
@@ -1329,6 +1678,28 @@ def build_render_plan(project, project_root):
                     )
             if len(errors) != before:
                 continue
+        editor_transforms = None
+        editor_content_bounds = None
+        if operation_id in {"captions", "content-cards", "graphic-motion"} and operation.get("plan"):
+            try:
+                editor_plan = load_json(resolve_project_path(project_root, operation["plan"]))
+                contributions = _expand_editor_overlay_contributions(
+                    operation_id, editor_plan, contributions, timeline.get("fps") if timeline else None
+                )
+                overlay_count = sum(
+                    isinstance(item, dict) and item.get("kind") == "overlay"
+                    for item in contributions
+                )
+                editor_transforms = iter(
+                    _editor_transforms_for_contributions(operation_id, editor_plan, overlay_count)
+                )
+                editor_content_bounds = iter(
+                    _editor_content_bounds_for_contributions(
+                        operation_id, editor_plan, overlay_count, project_root
+                    )
+                )
+            except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                errors.append(f"{operation_id} invalid editor transform mapping: {exc}")
         for contribution in contributions:
             if not isinstance(contribution, dict):
                 errors.append(f"{operation_id} render contribution must be an object")
@@ -1353,6 +1724,10 @@ def build_render_plan(project, project_root):
                     except (OSError, ValueError, json.JSONDecodeError) as exc:
                         errors.append(f"{operation_id} invalid caption plan: {exc}")
             item = {"operation": operation_id, **contribution}
+            if kind == "overlay" and editor_transforms is not None:
+                item["editor_transform"] = next(editor_transforms)
+                if editor_content_bounds is not None:
+                    item["content_bounds"] = next(editor_content_bounds)
 
             required_path = {
                 "timeline-transform": "input",
@@ -1575,8 +1950,12 @@ def validate_timeline(timeline, decision_ids=None):
         errors.append("program_duration_s must not be negative")
 
     clips = timeline.get("clips")
-    if not isinstance(clips, list) or not clips:
-        errors.append("timeline clips must be a non-empty list")
+    if not isinstance(clips, list):
+        errors.append("timeline clips must be a list")
+        return errors
+    if not clips:
+        if abs(program_duration) > 1e-9:
+            errors.append("an empty timeline must have zero program duration")
         return errors
 
     seen = set()
@@ -1621,6 +2000,8 @@ def validate_timeline(timeline, decision_ids=None):
         decision_ref = clip.get("decision_ref")
         if decision_ids is not None and decision_ref not in decision_ids:
             errors.append(f"{clip_id} decision_ref does not resolve: {decision_ref}")
+        if clip.get("audio_mode", "embedded") not in {"embedded", "detached", "muted"}:
+            errors.append(f"{clip_id} audio_mode is invalid")
 
         previous_source_start = source_start
         previous_source_end = source_end
@@ -1628,6 +2009,53 @@ def validate_timeline(timeline, decision_ids=None):
 
     if abs(expected_program_start - program_duration) > frame_tolerance:
         errors.append("program_duration_s does not match final program range")
+    audio_clips = timeline.get("audio_clips", [])
+    if not isinstance(audio_clips, list):
+        errors.append("timeline audio_clips must be a list")
+        return errors
+    video_by_id = {clip.get("id"): clip for clip in clips if isinstance(clip, dict)}
+    audio_ids = set()
+    program_ranges = []
+    for index, audio in enumerate(audio_clips, 1):
+        audio_id = audio.get("id") if isinstance(audio, dict) else None
+        if not isinstance(audio_id, str) or not audio_id.strip():
+            errors.append(f"audio clip {index} id must be nonblank")
+            continue
+        if audio_id in audio_ids:
+            errors.append(f"duplicate audio clip id: {audio_id}")
+        audio_ids.add(audio_id)
+        try:
+            source_start = float(audio["source_range"]["start_s"])
+            source_end = float(audio["source_range"]["end_s"])
+            program_start = float(audio["program_range"]["start_s"])
+            program_end = float(audio["program_range"]["end_s"])
+            speed = float(audio["speed"])
+        except (KeyError, TypeError, ValueError):
+            errors.append(f"{audio_id} audio ranges and speed must be numeric")
+            continue
+        if source_start < 0 or source_end <= source_start or source_end > source_duration + frame_tolerance:
+            errors.append(f"{audio_id} audio source range is invalid")
+        if program_start < -frame_tolerance or program_end <= program_start or program_end > program_duration + frame_tolerance:
+            errors.append(f"{audio_id} audio program range is invalid")
+        if speed <= 0 or abs((program_end - program_start) - (source_end - source_start) / speed) > frame_tolerance:
+            errors.append(f"{audio_id} audio duration does not match speed")
+        if not isinstance(audio.get("linked"), bool) or not isinstance(audio.get("muted"), bool):
+            errors.append(f"{audio_id} linked and muted must be boolean")
+        source_video_id = audio.get("source_video_clip_id")
+        source_video = video_by_id.get(source_video_id)
+        if not isinstance(source_video_id, str) or not source_video:
+            errors.append(f"{audio_id} source_video_clip_id does not resolve")
+        elif audio.get("linked"):
+            if source_video.get("audio_mode") != "detached":
+                errors.append(f"{audio_id} linked video must use detached audio_mode")
+            if (audio.get("source_range") != source_video.get("source_range")
+                    or audio.get("program_range") != source_video.get("program_range")):
+                errors.append(f"{audio_id} linked ranges must match its video clip")
+        program_ranges.append((program_start, program_end, audio_id))
+    program_ranges.sort()
+    for previous, current in zip(program_ranges, program_ranges[1:]):
+        if current[0] < previous[1] - frame_tolerance:
+            errors.append(f"{current[2]} audio program range overlaps {previous[2]}")
     return errors
 
 

@@ -87,6 +87,42 @@ def _grade_filter(contribution, project_root, plan_dir):
     return chain or "null", cwd
 
 
+def _overlay_transform_filters(value, content_bounds=None):
+    if value is None:
+        return None, None
+    if not isinstance(value, dict) or set(value) not in (
+        {"x", "y", "scale"}, {"x", "y", "scale_x", "scale_y"},
+    ):
+        raise ValueError("overlay editor_transform has invalid fields")
+    x, y = value["x"], value["y"]
+    scale_x = value.get("scale_x", value.get("scale"))
+    scale_y = value.get("scale_y", value.get("scale"))
+    if any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in (x, y, scale_x, scale_y)):
+        raise ValueError("overlay editor_transform values must be numbers")
+    if not -2 <= x <= 3 or not -2 <= y <= 3 or not 0.1 <= scale_x <= 4 or not 0.1 <= scale_y <= 4:
+        raise ValueError("overlay editor_transform is out of range")
+    if content_bounds is None and float(x) == 0.5 and float(y) == 0.5 and float(scale_x) == 1.0 and float(scale_y) == 1.0:
+        return None, None
+    if content_bounds is None:
+        scale_filter = None if float(scale_x) == 1.0 and float(scale_y) == 1.0 else f"scale=iw*{float(scale_x):g}:ih*{float(scale_y):g}"
+        return scale_filter, (
+            f"x='main_w*{float(x):g}-overlay_w/2':"
+            f"y='main_h*{float(y):g}-overlay_h/2'"
+        )
+    if not isinstance(content_bounds, dict) or set(content_bounds) != {"x", "y", "width", "height"}:
+        raise ValueError("overlay content_bounds is invalid")
+    bx, by, bw, bh = (float(content_bounds[key]) for key in ("x", "y", "width", "height"))
+    if bx < 0 or by < 0 or bw <= 0 or bh <= 0 or bx + bw > 1 or by + bh > 1:
+        raise ValueError("overlay content_bounds is out of range")
+    filters = f"crop=iw*{bw:g}:ih*{bh:g}:iw*{bx:g}:ih*{by:g}"
+    if float(scale_x) != 1.0 or float(scale_y) != 1.0:
+        filters += f",scale=iw*{float(scale_x):g}:ih*{float(scale_y):g}"
+    return filters, (
+        f"x='main_w*{float(x):g}+({bx:g}-0.5)*main_w*{float(scale_x):g}':"
+        f"y='main_h*{float(y):g}+({by:g}-0.5)*main_h*{float(scale_y):g}'"
+    )
+
+
 def _output_duration_s(timeline, contributions):
     return float(timeline["program_duration_s"]) + sum(
         float(item["duration_s"])
@@ -124,7 +160,10 @@ def _build(plan, project_root, plan_dir):
     graph = []
     fps = timeline["fps"]
     fps_text = f"{fps['num']}/{fps['den']}"
-    audio_filtered = bool(transforms)
+    audio_edited = bool(timeline.get("audio_clips")) or any(
+        clip.get("audio_mode", "embedded") != "embedded" for clip in timeline.get("clips", [])
+    )
+    audio_filtered = False
 
     if transforms:
         clips = timeline["clips"]
@@ -139,17 +178,13 @@ def _build(plan, project_root, plan_dir):
             graph.append(
                 f"[{index}:v:0]setpts=(PTS-STARTPTS)/{speed:.8f},fps={fps_text},settb=AVTB[v{index}]"
             )
-            audio_chain = "" if abs(speed - 1.0) < 1e-9 else atempo_chain(speed) + ","
-            graph.append(
-                f"[{index}:a:0]{audio_chain}aresample=48000,asetpts=N/SR/TB[a{index}]"
-            )
-            concat_inputs.append(f"[v{index}][a{index}]")
+            concat_inputs.append(f"[v{index}]")
         graph.append(
             "".join(concat_inputs)
-            + f"concat=n={len(clips)}:v=1:a=1[base-video][program-audio]"
+            + f"concat=n={len(clips)}:v=1:a=0[base-video]"
         )
         video_label = "base-video"
-        audio_label = "program-audio"
+        audio_label = None
         next_input = len(clips)
     else:
         command += ["-i", str(source)]
@@ -158,6 +193,56 @@ def _build(plan, project_root, plan_dir):
         video_label = "base-video"
         audio_label = None
         next_input = 1
+
+    if transforms or audio_edited:
+        audio_segments = [
+            {
+                "source_range": clip["source_range"],
+                "program_range": clip["program_range"],
+                "speed": clip.get("speed", 1.0),
+            }
+            for clip in timeline.get("clips", [])
+            if clip.get("audio_mode", "embedded") == "embedded"
+        ]
+        audio_segments.extend(
+            {
+                "source_range": clip["source_range"],
+                "program_range": clip["program_range"],
+                "speed": clip.get("speed", 1.0),
+            }
+            for clip in timeline.get("audio_clips", [])
+            if not clip.get("muted", False)
+        )
+        segment_labels = []
+        for segment_index, segment in enumerate(audio_segments):
+            start = float(segment["source_range"]["start_s"])
+            duration = float(segment["source_range"]["end_s"]) - start
+            speed = float(segment.get("speed", 1.0))
+            command += ["-ss", f"{start:.6f}", "-t", f"{duration:.6f}", "-i", str(source)]
+            audio_chain = "" if abs(speed - 1.0) < 1e-9 else atempo_chain(speed) + ","
+            label = f"timeline-audio-{segment_index}"
+            graph.append(
+                f"[{next_input}:a:0]{audio_chain}aresample=48000,asetpts=PTS-STARTPTS+"
+                f"{float(segment['program_range']['start_s']):.9f}/TB[{label}]"
+            )
+            segment_labels.append(label)
+            next_input += 1
+        duration = float(timeline["program_duration_s"])
+        if segment_labels:
+            mixed = "".join(f"[{label}]" for label in segment_labels)
+            if len(segment_labels) > 1:
+                graph.append(
+                    f"{mixed}amix=inputs={len(segment_labels)}:duration=longest:normalize=0:dropout_transition=0"
+                    f",apad,atrim=duration={duration:.9f}[program-audio]"
+                )
+            else:
+                graph.append(f"{mixed}apad,atrim=duration={duration:.9f}[program-audio]")
+        else:
+            graph.append(
+                f"anullsrc=r=48000:cl=stereo,atrim=duration={duration:.9f},asetpts=N/SR/TB[program-audio]"
+            )
+        audio_label = "program-audio"
+        audio_filtered = True
 
     base_filters = []
     composite_filters = []
@@ -194,6 +279,8 @@ def _build(plan, project_root, plan_dir):
                     "pattern": contribution.get("pattern"),
                     "start_number": contribution.get("start_number", 1),
                     "fps": contribution.get("fps"),
+                    "editor_transform": contribution.get("editor_transform"),
+                    "content_bounds": contribution.get("content_bounds"),
                     "start_frame": start_frame,
                     "end_frame": end_frame,
                 }
@@ -241,6 +328,7 @@ def _build(plan, project_root, plan_dir):
                 {
                     "path": _resolve(project_root, plan_dir, contribution["asset"]),
                     "asset_type": "file",
+                    "editor_transform": contribution.get("editor_transform"),
                     "start_frame": start_frame,
                     "end_frame": end_frame,
                 }
@@ -289,15 +377,22 @@ def _build(plan, project_root, plan_dir):
         duration_filter = ""
         if end_frame is not None:
             duration_filter = f"trim=end_frame={end_frame - start_frame},"
+        scale_filter, overlay_position = _overlay_transform_filters(
+            overlay_spec.get("editor_transform"), overlay_spec.get("content_bounds")
+        )
+        transform_filter = f"{scale_filter}," if scale_filter else ""
         graph.append(
-            f"[{next_input}:v:0]{duration_filter}setpts=PTS-STARTPTS+"
+            f"[{next_input}:v:0]{duration_filter}{transform_filter}setpts=PTS-STARTPTS+"
             f"({start_frame}*{fps['den']}/{fps['num']})/TB[{overlay_label}]"
         )
         enable = ""
         if end_frame is not None:
             enable = f":enable='between(n,{start_frame},{end_frame - 1})'"
+        overlay_filter = "overlay=" + (
+            f"{overlay_position}:" if overlay_position else ""
+        ) + "eof_action=pass:shortest=0:format=auto"
         graph.append(
-            f"[{video_label}][{overlay_label}]overlay=eof_action=pass:shortest=0:format=auto"
+            f"[{video_label}][{overlay_label}]{overlay_filter}"
             f"{enable}[{output_label}]"
         )
         video_label = output_label

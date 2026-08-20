@@ -150,18 +150,29 @@ def apply_review(plan, review):
     return updated
 
 
-def write_json_atomic(path, data):
+def write_json_atomic(path, data, *, project_lease_held=False):
     path = Path(path).resolve()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(
-        dir=path.parent, prefix=f".{path.name}.", suffix=".tmp", delete=False
-    ) as handle:
-        temporary = Path(handle.name)
-    try:
-        build_cards_plan.projectlib.write_json(temporary, data)
-        os.replace(temporary, path)
-    finally:
-        temporary.unlink(missing_ok=True)
+    project_root = build_cards_plan.projectlib._project_root_for_write(path)
+
+    def stage_and_replace(*, project_lease_held):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            dir=path.parent, prefix=f".{path.name}.", suffix=".tmp", delete=False
+        ) as handle:
+            temporary = Path(handle.name)
+        try:
+            build_cards_plan.projectlib.write_json(
+                temporary, data, project_lease_held=project_lease_held
+            )
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+    if project_root is None or project_lease_held:
+        stage_and_replace(project_lease_held=project_lease_held)
+        return
+    with build_cards_plan.projectlib.project_mutation_lease(project_root):
+        stage_and_replace(project_lease_held=True)
 
 
 def main(argv=None):
@@ -170,11 +181,26 @@ def main(argv=None):
     parser.add_argument("review")
     parser.add_argument("output", nargs="?")
     args = parser.parse_args(argv)
-    plan = json.loads(Path(args.plan).read_text(encoding="utf-8"))
-    review = json.loads(Path(args.review).read_text(encoding="utf-8"))
-    output = args.output or args.plan
-    write_json_atomic(output, apply_review(plan, review))
-    print(Path(output).resolve())
+    plan_path = Path(args.plan).resolve()
+    output = Path(args.output).resolve() if args.output else plan_path
+    project_root = build_cards_plan.projectlib._project_root_for_write(plan_path)
+
+    def apply_and_write(*, project_lease_held):
+        plan = json.loads(plan_path.read_text(encoding="utf-8"))
+        review = json.loads(Path(args.review).read_text(encoding="utf-8"))
+        output_root = build_cards_plan.projectlib._project_root_for_write(output)
+        write_json_atomic(
+            output,
+            apply_review(plan, review),
+            project_lease_held=project_lease_held and output_root == project_root,
+        )
+
+    if project_root is None:
+        apply_and_write(project_lease_held=False)
+    else:
+        with build_cards_plan.projectlib.project_mutation_lease(project_root):
+            apply_and_write(project_lease_held=True)
+    print(output)
 
 
 if __name__ == "__main__":

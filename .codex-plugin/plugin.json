@@ -1,0 +1,36 @@
+{
+  "name": "cut-as-code-editor",
+  "version": "0.1.0+codex.20260819195425",
+  "description": "Local Cut as Code video project review and editing runtime.",
+  "author": {
+    "name": "WhiteTowerAI",
+    "url": "https://github.com/WhiteTowerAI"
+  },
+  "homepage": "https://github.com/WhiteTowerAI/cut-as-code",
+  "repository": "https://github.com/WhiteTowerAI/cut-as-code",
+  "license": "MIT",
+  "keywords": [
+    "video-editing",
+    "local-editor",
+    "project-protocol"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Cut as Code Editor",
+    "shortDescription": "Review local Cut as Code projects in a localhost editor.",
+    "longDescription": "A local, protocol-backed review and supported-edit surface for Cut as Code video projects.",
+    "developerName": "WhiteTowerAI",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/WhiteTowerAI/cut-as-code",
+    "defaultPrompt": [
+      "Open a local Cut as Code project for review."
+    ],
+    "brandColor": "#2563EB"
+  }
+}

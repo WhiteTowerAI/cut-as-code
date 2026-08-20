@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "cut-as-code-editor": {
+      "command": "node",
+      "args": [
+        "./runtime/mcp.cjs"
+      ]
+    }
+  }
+}
