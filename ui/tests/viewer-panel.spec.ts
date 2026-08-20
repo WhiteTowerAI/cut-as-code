@@ -740,6 +740,12 @@ test('dragging and scaling a Viewer layer stays local until Save All and never e
   await page.route('**/v1/projects/project_transform/snapshot', (route) => route.fulfill({
     contentType: 'application/json', body: JSON.stringify({ ok: true, snapshot }),
   }))
+  await page.route('**/v1/projects/project_transform/drafts/content-cards', async (route) => {
+    if (route.request().method() === 'GET') return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ ok: false }) })
+    if (route.request().method() === 'DELETE') return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true }) })
+    const draft = route.request().postDataJSON()
+    return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, draft: { ...draft, conflict: false } }) })
+  })
   await page.route('**/v1/projects/project_transform/transactions', async (route) => {
     transactionBody = route.request().postDataJSON() as Record<string, unknown>
     const review = transactionBody.review as { editor_transform?: { x: number; y: number; scale: number } }

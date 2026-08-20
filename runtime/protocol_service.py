@@ -61,6 +61,8 @@ class ProtocolService:
             return self._get_snapshot(request)
         if verb == "get_resource":
             return self._get_resource(request)
+        if verb == "project.status":
+            return self._project_status(request)
         if verb == "plan.update":
             return self._update_plan(request)
         if verb == "timeline.edit":
@@ -70,6 +72,22 @@ class ProtocolService:
         if verb == "review.record":
             return self._record_review(request)
         return {"ok": False, "error": "unknown verb"}
+
+    def _project_status(self, request):
+        if set(request) != {"verb", "project_id"}:
+            return {"ok": False, "error": "project.status accepts only project_id"}
+        project_id = request.get("project_id")
+        invalid = self._validate_id("project_id", project_id)
+        if invalid:
+            return invalid
+        project = self._projects.get(project_id)
+        if project is None:
+            return {"ok": False, "error": "unknown project_id"}
+        lease = self._acquire_lease(project["root"])
+        if lease is None:
+            return {"ok": True, "mutation_lease": True}
+        self._release_lease(lease)
+        return {"ok": True, "mutation_lease": False}
 
     def _open_project(self, request):
         try:

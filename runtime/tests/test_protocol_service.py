@@ -119,6 +119,25 @@ class ProtocolServiceTests(unittest.TestCase):
         self.assertNotEqual(plan_before["etag"], plan_after["etag"])
         self.assertEqual(plan_before["id"], plan_after["id"])
 
+    def test_project_status_reports_an_external_mutation_lease(self):
+        opened = self.service.handle_request(
+            {"verb": "open_project", "project_root": str(self.root)}
+        )
+        project_id = opened["project_id"]
+        self.assertEqual(
+            {"ok": True, "mutation_lease": False},
+            self.service.handle_request({"verb": "project.status", "project_id": project_id}),
+        )
+
+        lease = self.service._acquire_lease(self.root)
+        try:
+            self.assertEqual(
+                {"ok": True, "mutation_lease": True},
+                self.service.handle_request({"verb": "project.status", "project_id": project_id}),
+            )
+        finally:
+            self.service._release_lease(lease)
+
     def test_timeline_edits_are_authoritative_and_keep_active_dependents_current(self):
         self._configure_cut_project()
         opened = self.service.handle_request(

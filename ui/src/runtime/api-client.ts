@@ -1,4 +1,4 @@
-import type { ContentCardsReview, ResourceResponse, RuntimeExportJob, RuntimeExportResponse, RuntimeMutationResponse, RuntimeReadSet, RuntimeResourceContent, RuntimeSnapshot, RuntimeTimelineReadSet, SnapshotResponse } from './types'
+import type { ContentCardsReview, ResourceResponse, RuntimeDraft, RuntimeExportJob, RuntimeExportResponse, RuntimeMutationResponse, RuntimeReadSet, RuntimeResourceContent, RuntimeSnapshot, RuntimeTimelineReadSet, SnapshotResponse } from './types'
 import type { TimelineEditCommand } from '../editor/timeline-edit'
 
 export class RuntimeConflictError extends Error {
@@ -35,6 +35,29 @@ export class RuntimeApiClient {
     const events = new EventSource(`/v1/projects/${encodeURIComponent(this.projectId)}/events`)
     events.addEventListener('project-change', onChange)
     return () => events.close()
+  }
+
+  async getDraft(operationId: string): Promise<RuntimeDraft | null> {
+    const response = await fetch(this.draftPath(operationId), { credentials: 'same-origin' })
+    if (response.status === 404) return null
+    const value = await response.json() as { ok?: boolean; draft?: RuntimeDraft; error?: string }
+    if (!response.ok || !value.ok || !value.draft) throw new Error(value.error ?? 'Could not restore draft')
+    return value.draft
+  }
+
+  async persistDraft(operationId: string, draft: Pick<RuntimeDraft, 'baseRevision' | 'changes'>): Promise<RuntimeDraft> {
+    const response = await fetch(this.draftPath(operationId), {
+      method: 'PUT', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(draft),
+    })
+    const value = await response.json() as { ok?: boolean; draft?: RuntimeDraft; error?: string }
+    if (!response.ok || !value.ok || !value.draft) throw new Error(value.error ?? 'Could not preserve draft')
+    return value.draft
+  }
+
+  async discardDraft(operationId: string): Promise<void> {
+    const response = await fetch(this.draftPath(operationId), { method: 'DELETE', credentials: 'same-origin' })
+    if (!response.ok) throw new Error('Could not discard preserved draft')
   }
 
   async startExport(): Promise<RuntimeExportJob> {
@@ -114,6 +137,10 @@ export class RuntimeApiClient {
     if (response.status === 409 && value.snapshot) throw new RuntimeConflictError(value.snapshot)
     if (!response.ok || !value.ok) throw new Error(value.error ?? 'Protocol mutation failed')
     return value
+  }
+
+  private draftPath(operationId: string) {
+    return `/v1/projects/${encodeURIComponent(this.projectId)}/drafts/${encodeURIComponent(operationId)}`
   }
 
 

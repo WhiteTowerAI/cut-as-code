@@ -13,6 +13,12 @@ const LAUNCH_TTL_MS = 60_000
 const PROTOCOL_CALL_TIMEOUT_MS = 30_000
 const MAX_IMPORT_BYTES = 2 * 1024 * 1024 * 1024
 const IMPORT_EXTENSIONS = new Set(['.mp4', '.mov', '.webm', '.mp3', '.wav', '.jpg', '.jpeg', '.png', '.webp', '.gif'])
+const DRAFT_OPERATIONS = new Set(['content-cards', 'captions', 'graphic-motion'])
+const DRAFT_FIELDS = Object.freeze({
+  'content-cards': new Set(['cueId', 'copy', 'layout', 'placement', 'enabled', 'transform', 'contentBounds']),
+  captions: new Set(['cueId', 'text', 'transform', 'contentBounds']),
+  'graphic-motion': new Set(['cueId', 'enabled', 'transform', 'contentBounds']),
+})
 const HTTP_ROUTE_ALLOWLIST = Object.freeze([
   Object.freeze({ id: 'launch', methods: Object.freeze(['GET']), pattern: /^\/$/ }),
   Object.freeze({ id: 'meta', methods: Object.freeze(['GET']), pattern: /^\/v1\/meta$/ }),
@@ -28,14 +34,16 @@ const HTTP_ROUTE_ALLOWLIST = Object.freeze([
   Object.freeze({ id: 'file', methods: Object.freeze(['GET']), pattern: /^\/v1\/projects\/([^/]+)\/(media|artifacts)\/((?:asset|artifact)_[a-f0-9]+)$/ }),
   Object.freeze({ id: 'layer-frame', methods: Object.freeze(['GET', 'HEAD']), pattern: /^\/v1\/projects\/([^/]+)\/layers\/(layer_[a-f0-9]+)\/frames\/(\d+)$/ }),
   Object.freeze({ id: 'events', methods: Object.freeze(['GET']), pattern: /^\/v1\/projects\/([^/]+)\/events$/ }),
+  Object.freeze({ id: 'draft', methods: Object.freeze(['GET', 'PUT', 'DELETE']), pattern: /^\/v1\/projects\/([^/]+)\/drafts\/([^/]+)$/ }),
   Object.freeze({ id: 'static', methods: Object.freeze(['GET', 'HEAD']), pattern: /^(?!\/v1(?:\/|$)).+$/ }),
 ])
-const PROTOCOL_VERB_ALLOWLIST = Object.freeze(['open_project', 'get_snapshot', 'get_resource', 'timeline.edit', 'plan.update', 'review.record'])
+const PROTOCOL_VERB_ALLOWLIST = Object.freeze(['open_project', 'get_snapshot', 'get_resource', 'project.status', 'timeline.edit', 'plan.update', 'review.record'])
 
 async function main() {
   const options = parseArguments(process.argv.slice(2))
   const root = await canonicalDirectory(options.projectRoot)
   const uiRoot = await canonicalDirectory(options.uiRoot)
+  const dataRoot = await canonicalDirectory(options.dataRoot)
   const protocol = await startProtocolService(__dirname)
   const opened = await protocol.call({ verb: 'open_project', project_root: root })
   if (!opened.ok) throw new Error(opened.error || 'could not open project')
@@ -45,15 +53,22 @@ async function main() {
     uiRoot,
     protocol,
     projectId: opened.project_id,
+    projectKey: crypto.createHash('sha256').update(root).digest('hex'),
+    draftsRoot: path.join(dataRoot, 'drafts'),
     launches: new Map(),
     sessions: new Set(),
     clients: new Set(),
     media: new Map(),
     artifacts: new Map(),
     layers: new Map(),
+    layerRefresh: null,
     exportJob: { status: 'idle' },
     exportProcess: null,
+    activeMutations: 0,
+    quiescing: false,
+    lastActivityAt: Date.now(),
   }
+  await fsp.mkdir(state.draftsRoot, { recursive: true, mode: 0o700 })
   await refreshFiles(state, false)
 
   const server = http.createServer((request, response) => {
@@ -79,10 +94,11 @@ async function main() {
     projectId: state.projectId,
   }
   process.stdout.write(JSON.stringify(ready) + '\n')
-  void refreshLayerSequences(state)
+  state.layerRefresh = refreshLayerSequences(state)
+  void state.layerRefresh.finally(() => { state.layerRefresh = null })
 
   const control = readline.createInterface({ input: process.stdin, crlfDelay: Infinity })
-  control.on('line', (line) => handleControl(state, line))
+  control.on('line', (line) => { void handleControl(state, line) })
 
   let closing = false
   const close = async () => {
@@ -101,6 +117,7 @@ async function main() {
 }
 
 async function handleRequest(state, request, response) {
+  state.lastActivityAt = Date.now()
   if (request.headers.host !== state.host) return json(response, 400, { ok: false, error: 'invalid host' })
   const url = new URL(request.url, state.origin)
   const route = routeForRequest(request.method, url.pathname)
@@ -127,7 +144,7 @@ async function handleRequest(state, request, response) {
     const launch = typeof token === 'string' ? state.launches.get(token) : null
     const directNavigation = request.headers['sec-fetch-mode'] === 'navigate'
       && request.headers['sec-fetch-dest'] === 'document'
-      && request.headers['sec-fetch-site'] === 'none'
+      && ['none', 'same-site'].includes(request.headers['sec-fetch-site'])
     for (const [launchToken, value] of state.launches) {
       if (launchIsExpired(value, now)) state.launches.delete(launchToken)
     }
@@ -137,19 +154,30 @@ async function handleRequest(state, request, response) {
     state.launches.delete(token)
     const session = crypto.randomBytes(32).toString('base64url')
     state.sessions.add(session)
-    response.setHeader('Set-Cookie', `cut_session=${session}; HttpOnly; SameSite=Strict; Path=/`)
+    const projectCookie = sessionCookieName(state.projectId)
+    response.setHeader('Set-Cookie', [
+      `${projectCookie}=${session}; HttpOnly; SameSite=Strict; Path=/`,
+      `cut_session=${session}; HttpOnly; SameSite=Strict; Path=/`,
+    ])
     response.writeHead(303, { Location: `/?project=${encodeURIComponent(state.projectId)}`, 'Cache-Control': 'no-store' })
     return response.end()
   }
 
   if (route.id !== 'static') {
     if (!authorized(state, request)) return json(response, 401, { ok: false, error: 'unauthorized' })
+    const mutationRequest = ['transaction', 'timeline-edit', 'review', 'export-start', 'import'].includes(route.id)
+      || (route.id === 'draft' && request.method !== 'GET')
+    if (state.quiescing && (mutationRequest || route.id === 'events')) {
+      return json(response, 503, { ok: false, error: 'editor runtime is preparing an update handoff' })
+    }
+    if (mutationRequest) trackMutationRequest(state, response)
     if (route.id === 'meta') {
       return json(response, 200, { ok: true, projectId: state.projectId, readOnly: true })
     }
     const match = route.match
     if (route.id === 'snapshot' && match[1] === state.projectId) {
       await refreshFiles(state, false)
+      if (state.layerRefresh) await state.layerRefresh
       const result = await state.protocol.call({ verb: 'get_snapshot', project_id: state.projectId })
       attachPublicFiles(state, result)
       return json(response, result.ok ? 200 : 400, result)
@@ -157,7 +185,7 @@ async function handleRequest(state, request, response) {
     if (route.id === 'transaction' && match[1] === state.projectId) {
       if (request.headers.origin !== state.origin) return json(response, 403, { ok: false, error: 'invalid origin' })
       const body = await readJson(request)
-      const result = await state.protocol.call({
+      const result = await protocolMutation(state, {
         verb: 'plan.update', project_id: state.projectId, operation: body.operation,
         read_set: body.readSet, review: body.review,
       })
@@ -167,7 +195,7 @@ async function handleRequest(state, request, response) {
     if (route.id === 'timeline-edit' && match[1] === state.projectId) {
       if (request.headers.origin !== state.origin) return json(response, 403, { ok: false, error: 'invalid origin' })
       const body = await readJson(request)
-      const result = await state.protocol.call({
+      const result = await protocolMutation(state, {
         verb: 'timeline.edit', project_id: state.projectId,
         read_set: body.readSet, command: body.command,
       })
@@ -177,7 +205,7 @@ async function handleRequest(state, request, response) {
     if (route.id === 'review' && match[1] === state.projectId) {
       if (request.headers.origin !== state.origin) return json(response, 403, { ok: false, error: 'invalid origin' })
       const body = await readJson(request)
-      const result = await state.protocol.call({
+      const result = await protocolMutation(state, {
         verb: 'review.record', project_id: state.projectId, operation: body.operation,
         read_set: body.readSet, decision: body.decision,
       })
@@ -261,6 +289,30 @@ async function handleRequest(state, request, response) {
       state.clients.add(response)
       request.once('close', () => state.clients.delete(response))
       return
+    }
+    if (route.id === 'draft' && match[1] === state.projectId) {
+      const operationId = decodeURIComponent(match[2])
+      if (!DRAFT_OPERATIONS.has(operationId)) return json(response, 404, { ok: false, error: 'unsupported draft operation' })
+      const file = draftPath(state, operationId)
+      if (request.method === 'GET') {
+        const draft = await readJsonFile(file)
+        if (!draft) return json(response, 404, { ok: false, error: 'draft not found' })
+        return json(response, 200, { ok: true, draft: await currentDraft(state, operationId, draft) })
+      }
+      if (request.headers.origin !== state.origin) return json(response, 403, { ok: false, error: 'invalid origin' })
+      if (request.method === 'DELETE') {
+        return trackedWork(state, async () => {
+          await fsp.unlink(file).catch((error) => { if (error?.code !== 'ENOENT') throw error })
+          return json(response, 200, { ok: true, removed: true })
+        })
+      }
+      return trackedWork(state, async () => {
+        const body = await readJson(request)
+        const draft = validateDraft(operationId, body)
+        const stored = { schemaVersion: 1, projectId: state.projectId, operationId, ...draft, updatedAt: new Date().toISOString() }
+        await writeJsonAtomic(file, stored)
+        return json(response, 200, { ok: true, draft: await currentDraft(state, operationId, stored) })
+      })
     }
     return json(response, 404, { ok: false, error: 'not found' })
   }
@@ -383,16 +435,59 @@ function routeForRequest(method, pathname) {
   return null
 }
 
-function handleControl(state, line) {
+async function handleControl(state, line) {
   let request
   try { request = JSON.parse(line) } catch { return process.stdout.write(`${JSON.stringify({ id: null, ok: false, error: 'invalid control message' })}\n`) }
-  if (!Number.isInteger(request.id) || request.command !== 'arm_launch') {
+  if (!Number.isInteger(request.id) || !['arm_launch', 'status', 'quiesce', 'resume'].includes(request.command)) {
     return process.stdout.write(`${JSON.stringify({ id: request.id ?? null, ok: false, error: 'unsupported control command' })}\n`)
+  }
+  if (request.command === 'status') {
+    const draftFiles = await fsp.readdir(state.draftsRoot).catch(() => [])
+    const hasDraft = draftFiles.some((name) => name.startsWith(`${state.projectKey}.`) && name.endsWith('.json'))
+    const activeWork = state.exportJob.status === 'running' || state.activeMutations > 0
+    const lease = await state.protocol.call({ verb: 'project.status', project_id: state.projectId })
+    return process.stdout.write(`${JSON.stringify({
+      id: request.id, ok: true, clients: state.clients.size, hasDraft,
+      activeWork, mutationLease: !lease.ok || lease.mutation_lease === true,
+      lastActivityAt: state.lastActivityAt,
+    })}\n`)
+  }
+  if (request.command === 'quiesce' || request.command === 'resume') {
+    state.quiescing = request.command === 'quiesce'
+    return process.stdout.write(`${JSON.stringify({ id: request.id, ok: true, quiescing: state.quiescing })}\n`)
+  }
+  if (state.quiescing) {
+    return process.stdout.write(`${JSON.stringify({ id: request.id, ok: false, error: 'editor runtime is preparing an update handoff' })}\n`)
   }
   const token = crypto.randomBytes(32).toString('base64url')
   state.launches.set(token, { projectId: state.projectId, expiresAt: Date.now() + LAUNCH_TTL_MS })
   const url = `${state.origin}/?project=${encodeURIComponent(state.projectId)}&launch=${token}`
   process.stdout.write(`${JSON.stringify({ id: request.id, ok: true, url })}\n`)
+}
+
+async function protocolMutation(state, request) {
+  return trackedWork(state, () => state.protocol.call(request))
+}
+
+async function trackedWork(state, action) {
+  state.activeMutations += 1
+  try {
+    return await action()
+  } finally {
+    state.activeMutations -= 1
+  }
+}
+
+function trackMutationRequest(state, response) {
+  state.activeMutations += 1
+  let finished = false
+  const finish = () => {
+    if (finished) return
+    finished = true
+    state.activeMutations -= 1
+  }
+  response.once('finish', finish)
+  response.once('close', finish)
 }
 
 function watchProject(state) {
@@ -819,7 +914,62 @@ async function serveStatic(root, pathname, method, response) {
 
 function authorized(state, request) {
   const cookies = Object.fromEntries((request.headers.cookie || '').split(';').map((part) => part.trim().split('=')))
-  return typeof cookies.cut_session === 'string' && state.sessions.has(cookies.cut_session)
+  const session = cookies[sessionCookieName(state.projectId)] || cookies.cut_session
+  return typeof session === 'string' && state.sessions.has(session)
+}
+
+function draftPath(state, operationId) {
+  return path.join(state.draftsRoot, `${state.projectKey}.${operationId}.json`)
+}
+
+async function currentDraft(state, operationId, draft) {
+  const result = await state.protocol.call({ verb: 'get_snapshot', project_id: state.projectId })
+  const revision = result.snapshot?.view?.operations?.find((operation) => operation.id === operationId)?.revision
+  return { ...draft, conflict: !Number.isInteger(revision) || revision !== draft.baseRevision }
+}
+
+function validateDraft(operationId, value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('invalid draft')
+  if (!Number.isInteger(value.baseRevision) || value.baseRevision < 0 || !Array.isArray(value.changes) || value.changes.length > 1_000) {
+    throw new Error('invalid draft')
+  }
+  const allowed = DRAFT_FIELDS[operationId]
+  for (const change of value.changes) {
+    if (!change || typeof change !== 'object' || Array.isArray(change) || !Object.keys(change).length) throw new Error('invalid draft change')
+    for (const [field, fieldValue] of Object.entries(change)) {
+      if (!allowed.has(field)) throw new Error('invalid draft field')
+      if (field === 'cueId' && (typeof fieldValue !== 'string' || !fieldValue.trim() || fieldValue.length > 256)) throw new Error('invalid draft cue')
+      if ((field === 'copy' || field === 'text') && (typeof fieldValue !== 'string' || fieldValue.length > 100_000)) throw new Error('invalid draft text')
+      if (field === 'enabled' && typeof fieldValue !== 'boolean') throw new Error('invalid draft enabled state')
+      if ((field === 'layout' || field === 'placement') && (typeof fieldValue !== 'string' || fieldValue.length > 64)) throw new Error(`invalid draft ${field}`)
+      if ((field === 'transform' || field === 'contentBounds') && !finiteNumberRecord(fieldValue)) throw new Error(`invalid draft ${field}`)
+    }
+  }
+  return { baseRevision: value.baseRevision, changes: value.changes }
+}
+
+function finiteNumberRecord(value) {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    && Object.keys(value).length > 0 && Object.keys(value).length <= 8
+    && Object.values(value).every((item) => typeof item === 'number' && Number.isFinite(item))
+}
+
+async function writeJsonAtomic(file, value) {
+  const temporary = `${file}.${crypto.randomBytes(8).toString('hex')}.tmp`
+  await fsp.writeFile(temporary, JSON.stringify(value) + '\n', { encoding: 'utf8', mode: 0o600, flag: 'wx' })
+  try {
+    await fsp.rename(temporary, file)
+  } finally {
+    await fsp.unlink(temporary).catch(() => {})
+  }
+}
+
+async function readJsonFile(file) {
+  try { return JSON.parse(await fsp.readFile(file, 'utf8')) } catch { return null }
+}
+
+function sessionCookieName(projectId) {
+  return `cut_session_${crypto.createHash('sha256').update(projectId).digest('hex').slice(0, 16)}`
 }
 
 function readJson(request) {
@@ -998,6 +1148,7 @@ function parseArguments(args) {
   for (let index = 0; index < args.length; index += 2) {
     if (args[index] === '--project-root') options.projectRoot = args[index + 1]
     else if (args[index] === '--ui-root') options.uiRoot = args[index + 1]
+    else if (args[index] === '--data-root') options.dataRoot = args[index + 1]
     else throw new Error(`unknown argument: ${args[index]}`)
   }
   return options

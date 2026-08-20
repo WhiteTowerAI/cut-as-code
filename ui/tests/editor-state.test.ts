@@ -241,6 +241,33 @@ test('one save preserves and submits edits for multiple cues in the same operati
   expect(store.getState().hasUnsavedChanges()).toBe(false)
 })
 
+test('discard waits for older draft writes so a slow PUT cannot restore deleted work', async () => {
+  const calls: string[] = []
+  let releaseFirst!: () => void
+  const store = createEditorStore({
+    project, activeTab: 'captions', selection: null, currentTimeS: 0,
+    isPlaying: false, timelineZoom: 1, snapEnabled: true, openMenu: null,
+  }, {
+    save: async () => project,
+    review: async () => project,
+    persistDraft: async (_operationId, draft) => {
+      const text = String(draft.changes.at(-1)?.text)
+      calls.push(`put:${text}`)
+      if (text === 'First pending') await new Promise<void>((resolve) => { releaseFirst = resolve })
+    },
+    discardDraft: async () => { calls.push('delete') },
+  })
+
+  store.getState().editOperationDraft('captions', { cueId: 'cue-001', text: 'First pending' })
+  await expect.poll(() => calls).toEqual(['put:First pending'])
+  store.getState().editOperationDraft('captions', { cueId: 'cue-001', text: 'Latest pending' })
+  store.getState().discardOperationDraft('captions')
+
+  releaseFirst()
+  await expect.poll(() => calls).toEqual(['put:First pending', 'put:Latest pending', 'delete'])
+  expect(store.getState().getOperationDraft('captions')).toBeNull()
+})
+
 test('Save All submits every dirty operation in canonical order and clears export blockers', async () => {
   const projectWithMotion: EditorProjectView = {
     ...project,
@@ -574,12 +601,14 @@ test('editable captions can reject a current preview with an explicit rationale'
 
 test('a newer caption edit keeps its second-cue binding after an in-flight save completes', async () => {
   let resolveSave!: (project: EditorProjectView) => void
+  const persisted: { baseRevision: number; changes: readonly unknown[] }[] = []
   const store = createEditorStore({
     project, activeTab: 'captions', selection: { kind: 'caption', id: 'cue-002' }, currentTimeS: 0,
     isPlaying: false, timelineZoom: 1, snapEnabled: true, openMenu: null,
   }, {
     save: async () => new Promise((resolve) => { resolveSave = resolve }),
     review: async () => project,
+    persistDraft: async (_operationId, draft) => { persisted.push(draft) },
   })
 
   store.getState().editOperationDraft('captions', { cueId: 'cue-002', text: 'Submitted caption' })
@@ -604,9 +633,14 @@ test('a newer caption edit keeps its second-cue binding after an in-flight save 
   await saving
 
   expect(store.getState().getOperationDraft('captions')).toMatchObject({
+    baseRevision: 3,
     dirty: true,
     pending: false,
     fields: { cueId: 'cue-002', text: 'Newer caption' },
+  })
+  expect(persisted.at(-1)).toEqual({
+    baseRevision: 3,
+    changes: [{ cueId: 'cue-002', text: 'Newer caption' }],
   })
 })
 

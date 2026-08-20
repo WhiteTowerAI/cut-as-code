@@ -405,6 +405,28 @@ export function EditorShell({ runtime }: { runtime?: RuntimeProjectStatus }) {
     bridge.sync(runtime.snapshot)
     store.getState().setProject(projectFromSnapshot(null, runtime.snapshot))
   }, [bridge, runtime, scenario.initialState.project, store])
+  useEffect(() => {
+    if (!runtime) return
+    let active = true
+    const operationIds = runtime.snapshot.view.operations?.map((operation) => operation.id)
+      .filter((operationId) => ['content-cards', 'captions', 'graphic-motion'].includes(operationId)) ?? []
+    void Promise.all(operationIds.map(async (operationId) => ({
+      operationId,
+      draft: await runtime.client.getDraft(operationId),
+    }))).then((drafts) => {
+      if (!active) return
+      for (const { operationId, draft } of drafts) {
+        if (draft) store.getState().restoreOperationDraft(operationId, {
+          baseRevision: draft.baseRevision,
+          fields: draft.changes.at(-1) as ContentCardsDraftChange,
+          changes: draft.changes as readonly ContentCardsDraftChange[],
+          dirty: true,
+          conflict: draft.conflict,
+        })
+      }
+    }).catch(() => {})
+    return () => { active = false }
+  }, [runtime?.projectId, store])
   const viewerScenarios = new Set(['1-282', '57-152', '1-1026', '1-528', '123-79'])
   const timelineScenarios = new Set(['1-324', '1-1115', '1-754', '123-167', 'timeline-editing', 'audio-context-actions'])
   const isViewerScenario = viewerScenarios.has(scenarioId)
@@ -468,6 +490,10 @@ function runtimeAdapter(client: RuntimeApiClient, initial: RuntimeSnapshot) {
     return project
   }
   return {
+    persistDraft: async (operationId: string, draft: { baseRevision: number; changes: readonly ContentCardsDraftChange[] }) => {
+      await client.persistDraft(operationId, draft)
+    },
+    discardDraft: async (operationId: string) => client.discardDraft(operationId),
     sync: (next: RuntimeSnapshot) => { snapshot = next },
     timelineEdit: async (command: TimelineEditCommand) => {
       try {

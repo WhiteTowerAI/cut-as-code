@@ -245,3 +245,10 @@ export type SnapshotResponse = Readonly<{
   ok: boolean
   snapshot: RuntimeSnapshot
 }>
+
+export type RuntimeDraft = Readonly<{
+  baseRevision: number
+  changes: readonly Readonly<Record<string, unknown>>[]
+  conflict: boolean
+  updatedAt?: string
+}>

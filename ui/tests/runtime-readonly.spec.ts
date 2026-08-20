@@ -69,6 +69,8 @@ test('binds to loopback and redeems distinct one-time browser launches to a clea
   expect(rejected.headers()['content-type']).toBe('text/html; charset=utf-8')
   expect(await rejected.text()).toContain('Editor launch unavailable')
   expect((await browserNavigation(replay, secondLaunch)).status()).toBe(303)
+  const pickerLaunch = await armLaunch(startedSidecar)
+  expect((await browserNavigation(first, pickerLaunch, 'document', 'same-site')).status()).toBe(303)
   await first.dispose()
   await replay.dispose()
 })
@@ -1759,10 +1761,13 @@ function isolatedURL(message: ReadyMessage) {
 }
 
 async function startSidecar(root: string): Promise<StartedSidecar> {
+  const dataRoot = path.join(root, '.editor-data')
+  await mkdir(dataRoot, { recursive: true })
   const child = spawn(process.execPath, [
     path.join(repositoryRoot, 'runtime', 'sidecar.cjs'),
     '--project-root', root,
     '--ui-root', path.join(uiRoot, 'dist'),
+    '--data-root', dataRoot,
   ], {
     cwd: repositoryRoot,
     env: { ...process.env, CAC_PYTHON: process.env.CAC_PYTHON ?? bundledPython },

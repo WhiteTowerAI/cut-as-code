@@ -46,7 +46,7 @@ function Copy-AllowlistedTree {
 
 function Assert-PackageContents {
     param([Parameter(Mandatory = $true)][string]$Root)
-    $requiredFiles = @('.codex-plugin\plugin.json', '.mcp.json', 'LICENSE', 'PACKAGE_AUDIT.json', 'README.md', 'SBOM.spdx.json', 'THIRD_PARTY_NOTICES.md', 'runtime\mcp.cjs', 'runtime\project_snapshot.py', 'runtime\protocol_service.py', 'runtime\sidecar.cjs', 'ui\dist\index.html')
+    $requiredFiles = @('.codex-plugin\plugin.json', '.mcp.json', 'hooks\hooks.json', 'hooks\launch-editor.cjs', 'LICENSE', 'PACKAGE_AUDIT.json', 'README.md', 'SBOM.spdx.json', 'THIRD_PARTY_NOTICES.md', 'runtime\hub-client.cjs', 'runtime\hub-trust.cjs', 'runtime\hub.cjs', 'runtime\mcp.cjs', 'runtime\project_snapshot.py', 'runtime\protocol_service.py', 'runtime\sidecar.cjs', 'ui\dist\index.html')
     foreach ($requiredFile in $requiredFiles) {
         if (-not (Test-Path -LiteralPath (Join-Path $Root $requiredFile) -PathType Leaf)) { throw "Package is missing required file: $requiredFile" }
     }
@@ -102,6 +102,7 @@ try {
     New-Item -ItemType Directory -Force -Path $packageRoot | Out-Null
     foreach ($file in @('.mcp.json', 'LICENSE', 'README.md')) { Copy-Item -LiteralPath (Join-Path $repoRoot $file) -Destination (Join-Path $packageRoot $file) -Force }
     Copy-AllowlistedTree -Source (Join-Path $repoRoot '.codex-plugin') -Destination (Join-Path $packageRoot '.codex-plugin')
+    Copy-AllowlistedTree -Source (Join-Path $repoRoot 'hooks') -Destination (Join-Path $packageRoot 'hooks')
     Copy-AllowlistedTree -Source (Join-Path $repoRoot 'runtime') -Destination (Join-Path $packageRoot 'runtime')
     Copy-AllowlistedTree -Source (Join-Path $repoRoot 'ui\dist') -Destination (Join-Path $packageRoot 'ui\dist')
     foreach ($skillName in $skillNames) {

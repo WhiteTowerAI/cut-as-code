@@ -29,7 +29,7 @@
     ],
     "websiteURL": "https://github.com/WhiteTowerAI/cut-as-code",
     "defaultPrompt": [
-      "Open a local Cut as Code project for review."
+      "Open Cut as Code Editor"
     ],
     "brandColor": "#2563EB"
   }
