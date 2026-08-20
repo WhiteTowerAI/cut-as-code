@@ -1,0 +1,74 @@
+spec_version: 1
+id: "codrops-fullscreenclipeffect-index"
+name: "Fullscreen Clip Animation"
+description: "An image is revealed through repeated rounded clip shapes across a color field."
+surfaces: [video]
+category: "fullscreen-transition"
+tech: [html, css, js]
+canvas: [video]
+target: [fullscreen]
+intent: "fullscreen-transition"
+runtime: [css, js]
+export: [skill, html]
+dependencies: []
+tags:
+  - "codrops"
+  - "clip-path"
+  - "shapes"
+  - "reveal"
+  - "images"
+  - "transition"
+  - "fullscreen"
+intent_keywords:
+  - "shape clip transition"
+  - "playful image reveal"
+  - "editorial section break"
+  - "形状裁切转场"
+  - "图片揭示动画"
+best_for:
+  - "A chapter or interstitial in playful design, travel, food, or product storytelling"
+  - "A fullscreen image reveal using one object, scene, or texture"
+avoid_when:
+  - "The production needs restrained realism or long-form explanatory continuity"
+  - "The crop must retain a protected face or several small details"
+structural_roles:
+  - "chapter"
+  - "interstitial"
+motion_functions:
+  - "reveal"
+  - "transition"
+  - "settle"
+visual_language:
+  - "playful"
+  - "editorial"
+  - "geometric"
+mechanisms:
+  - "clip-path"
+  - "repeated-shapes"
+  - "image-reveal"
+rhythm_energy: "medium-high"
+information_density: "balanced"
+frame_relationship: "fullscreen"
+color_tendency: "flexible"
+style_rationale: "The visible frame is constructed from repeated clipped apertures that reveal imagery as a deliberate graphic transition."
+restraint:
+  max_per_view: 1
+  notes: "Use as one frame-dominant designed cutaway; adapt content, palette, typography, framing, and timing instead of running an unchanged source showcase."
+motion:
+  duration_ms: 6000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: "index/index.html"
+implementations:
+  - tech: js
+    files: ["index/index.html", "index/hf-recipe.js", "index/hf-adapter.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/codrops/FullscreenClipEffect/tree/c0a27bffdeb0ba066babeec46f1231581e15274b"
+  attribution_required: true
+author:
+  name: "codrops"
+  url: "https://github.com/codrops"
+version: 0.1.0

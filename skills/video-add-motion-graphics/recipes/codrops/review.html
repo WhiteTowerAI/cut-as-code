@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codrops HyperFrames Review</title>
+  <link rel="icon" href="data:,">
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      background: #101214;
+      color: #f2f3f4;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: #101214; }
+    body { min-height: 100vh; display: grid; grid-template-columns: 292px minmax(0, 1fr); overflow: hidden; }
+    button, input, select { font: inherit; }
+    button, select, input[type="search"] {
+      color: inherit;
+      background: #1b1f22;
+      border: 1px solid #3a4045;
+    }
+    button, select { min-height: 36px; }
+    button { cursor: pointer; }
+    button:hover, button:focus-visible, select:focus-visible, input:focus-visible { border-color: #e0b84f; outline: none; }
+    .sidebar { min-width: 0; min-height: 0; display: flex; flex-direction: column; border-right: 1px solid #34393d; background: #171a1c; }
+    .sidebar-head { padding: 18px 16px 14px; border-bottom: 1px solid #34393d; }
+    .brand { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    .brand strong { font-size: 15px; font-weight: 720; }
+    .count { color: #aeb5ba; font: 12px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: nowrap; }
+    .search { width: 100%; height: 38px; margin-top: 14px; padding: 0 11px; border-radius: 4px; }
+    .project-list { min-width: 0; min-height: 0; overflow: auto; padding: 7px; }
+    .project-button {
+      width: 100%; min-height: 42px; padding: 7px 9px; border: 0; border-left: 3px solid transparent;
+      background: transparent; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center;
+      gap: 8px; text-align: left; border-radius: 3px;
+    }
+    .project-button:hover { background: #22272a; }
+    .project-button[aria-current="true"] { background: #2a2d28; border-left-color: #e0b84f; }
+    .project-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+    .variant-count { color: #929aa0; font: 11px ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .workspace { min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 62px minmax(0, 1fr) 58px; }
+    .toolbar, .transport { display: flex; align-items: center; gap: 10px; padding: 0 16px; border-color: #34393d; background: #15181a; }
+    .toolbar { border-bottom: 1px solid #34393d; }
+    .toolbar h1 { min-width: 0; margin: 0 auto 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; font-weight: 680; }
+    .variant-select { width: min(280px, 35vw); padding: 0 30px 0 10px; border-radius: 4px; }
+    .icon-button { width: 38px; padding: 0; display: inline-grid; place-items: center; border-radius: 4px; text-decoration: none; }
+    .source-link { color: inherit; background: #1b1f22; border: 1px solid #3a4045; }
+    .preview-shell { min-height: 0; display: grid; place-items: center; padding: 18px; overflow: hidden; background: #0b0d0e; }
+    .stage { position: relative; width: min(100%, calc((100vh - 156px) * 16 / 9)); aspect-ratio: 16 / 9; overflow: hidden; background: #050606; border: 1px solid #34393d; }
+    iframe { position: absolute; inset: 0 auto auto 0; width: 1920px; height: 1080px; border: 0; transform-origin: 0 0; background: transparent; }
+    .loading { position: absolute; inset: 0; display: grid; place-items: center; background: #101315; color: #b8bec2; font-size: 13px; }
+    .loading[hidden] { display: none; }
+    .transport { border-top: 1px solid #34393d; }
+    .transport button { width: 38px; padding: 0; border-radius: 4px; }
+    .scrubber { flex: 1; min-width: 80px; accent-color: #e0b84f; }
+    .time { width: 108px; color: #b9c0c4; text-align: right; font: 12px ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .empty { padding: 18px 10px; color: #929aa0; font-size: 13px; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+    @media (max-width: 760px) {
+      body { min-height: 100dvh; grid-template-columns: 1fr; grid-template-rows: 176px minmax(0, 1fr); overflow: auto; }
+      .sidebar { overflow: hidden; border-right: 0; border-bottom: 1px solid #34393d; }
+      .sidebar-head { padding: 10px 12px; }
+      .search { margin-top: 8px; }
+      .project-list { width: 100%; display: flex; overflow-x: auto; overflow-y: hidden; gap: 4px; }
+      .project-button { flex: 0 0 190px; }
+      .workspace { min-height: 560px; grid-template-rows: auto minmax(0, 1fr) 58px; }
+      .toolbar { min-height: 94px; padding: 10px 12px; display: grid; grid-template-columns: minmax(0, 1fr) 38px; }
+      .toolbar h1 { width: 100%; }
+      .variant-select { grid-column: 1 / -1; width: 100%; }
+      .preview-shell { padding: 10px; }
+      .stage { width: 100%; }
+      .transport { padding: 0 8px; gap: 6px; }
+      .time { width: 88px; }
+    }
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-head">
+      <div class="brand"><strong>Codrops HyperFrames</strong><span class="count" id="count">Loading</span></div>
+      <label class="sr-only" for="search">Search projects</label>
+      <input class="search" id="search" type="search" placeholder="Search projects" autocomplete="off">
+    </div>
+    <nav class="project-list" id="project-list" aria-label="Projects"></nav>
+  </aside>
+  <main class="workspace">
+    <header class="toolbar">
+      <h1 id="title">Codrops HyperFrames</h1>
+      <label class="sr-only" for="variant">Variant</label>
+      <select class="variant-select" id="variant" aria-label="Variant"></select>
+      <a class="icon-button source-link" id="source" href="#" target="_blank" rel="noreferrer" title="Open original demo" aria-label="Open original demo">&#8599;</a>
+    </header>
+    <section class="preview-shell" aria-label="Preview">
+      <div class="stage" id="stage">
+        <iframe id="preview" title="HyperFrames preview"></iframe>
+        <div class="loading" id="loading">Loading preview</div>
+      </div>
+    </section>
+    <footer class="transport">
+      <button id="previous" title="Previous project" aria-label="Previous project">&lt;</button>
+      <button id="play" title="Play" aria-label="Play">&gt;</button>
+      <button id="reset" title="Reset" aria-label="Reset">0</button>
+      <button id="next" title="Next project" aria-label="Next project">&gt;|</button>
+      <label class="sr-only" for="scrubber">Time</label>
+      <input class="scrubber" id="scrubber" type="range" min="0" max="6" step="0.01" value="0">
+      <output class="time" id="time">0.00 / 6.00</output>
+    </footer>
+  </main>
+  <script>
+    const PROJECTS = ["3DCarousel","3DStackMotion","ColumnScroll","ConnectedGrid","CoverPageTransition","DecorativeLetterAnimations","FullscreenClipEffect","FullscreenScroll","GridToSlider","ImageExpansionTypography","ImageToGridTransition","IntroGridMotionTransition","KineticImages","KineticTypePageTransition","LayerMotionSlideshow","LayersAnimation","LinesToLayout","OneElementScroll","OnScrollColumnsRows","OnScrollFilter","OnScrollLayoutFormations","OnScrollLetterAnimations","OnScrollTypographyAnimations","PixelTransition","PreviewContentTransition","RepeatingImageTransition","RotatingOnScrollAnimations","Scroll3DGrid","ScrollBasedLayoutAnimations","ScrollBlurTypography","ScrollSpiral","ShapesSlideshow","SlideshowAnimations","Staggered3DGridAnimations","TextBlockTransitions","TypeShuffleAnimation","UnrevealEffects"];
+    const elements = Object.fromEntries([
+      "count", "search", "project-list", "title", "variant", "source", "stage", "preview",
+      "loading", "previous", "play", "reset", "next", "scrubber", "time",
+    ].map((id) => [id, document.getElementById(id)]));
+    let catalog = [];
+    let projectIndex = 0;
+    let variantIndex = 0;
+    let duration = 6;
+    let currentTime = 0;
+    let playing = false;
+    let frameReady = false;
+    let animationFrame = 0;
+    let previousTick = 0;
+    let lastSeekTick = 0;
+
+    const encodePath = (value) => value.split("/").map(encodeURIComponent).join("/");
+    const activeProject = () => catalog[projectIndex];
+    const activeVariant = () => activeProject()?.receipt.variants[variantIndex];
+
+    function fitPreview() {
+      const scale = elements.stage.clientWidth / 1920;
+      elements.preview.style.transform = `scale(${scale})`;
+    }
+
+    function updateTime() {
+      elements.scrubber.max = String(duration);
+      elements.scrubber.value = String(currentTime);
+      elements.time.value = `${currentTime.toFixed(2)} / ${duration.toFixed(2)}`;
+      elements.time.textContent = elements.time.value;
+    }
+
+    function dispatchSeek(time) {
+      if (!frameReady || !elements.preview.contentWindow) return;
+      const target = Math.max(0, Math.min(duration, Number(time) || 0));
+      const child = elements.preview.contentWindow;
+      const event = new child.CustomEvent("hf-seek", {
+        detail: { time: target, waitUntil() {} },
+      });
+      child.dispatchEvent(event);
+    }
+
+    function setPlaying(next) {
+      playing = Boolean(next);
+      elements.play.textContent = playing ? "II" : ">";
+      elements.play.title = playing ? "Pause" : "Play";
+      elements.play.setAttribute("aria-label", elements.play.title);
+      previousTick = 0;
+      cancelAnimationFrame(animationFrame);
+      if (playing) animationFrame = requestAnimationFrame(tick);
+    }
+
+    function tick(now) {
+      if (!playing) return;
+      if (!previousTick) previousTick = now;
+      const elapsed = (now - previousTick) / 1000;
+      previousTick = now;
+      currentTime += elapsed;
+      if (currentTime >= duration) currentTime %= duration;
+      if (now - lastSeekTick >= 1000 / 30) {
+        dispatchSeek(currentTime);
+        updateTime();
+        lastSeekTick = now;
+      }
+      animationFrame = requestAnimationFrame(tick);
+    }
+
+    function writeHash() {
+      const project = activeProject();
+      const variant = activeVariant();
+      if (!project || !variant) return;
+      const hash = new URLSearchParams({ project: project.name, variant: variant.name });
+      history.replaceState(null, "", `#${hash}`);
+    }
+
+    function renderProjects() {
+      const query = elements.search.value.trim().toLowerCase();
+      elements["project-list"].replaceChildren();
+      for (const [index, project] of catalog.entries()) {
+        if (query && !project.name.toLowerCase().includes(query)) continue;
+        const button = document.createElement("button");
+        button.className = "project-button";
+        button.type = "button";
+        button.setAttribute("aria-current", String(index === projectIndex));
+        const name = document.createElement("span");
+        name.className = "project-name";
+        name.textContent = project.name;
+        const count = document.createElement("span");
+        count.className = "variant-count";
+        count.textContent = String(project.receipt.variants.length);
+        button.append(name, count);
+        button.addEventListener("click", () => selectProject(index, 0));
+        elements["project-list"].append(button);
+      }
+      if (!elements["project-list"].childElementCount) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "No projects";
+        elements["project-list"].append(empty);
+      }
+    }
+
+    function loadVariant(index, autoplay = true) {
+      const project = activeProject();
+      variantIndex = Math.max(0, Math.min(project.receipt.variants.length - 1, index));
+      const variant = activeVariant();
+      duration = Number(variant.duration_s) || 6;
+      currentTime = 0;
+      frameReady = false;
+      elements.loading.hidden = false;
+      elements.title.textContent = project.name;
+      elements.variant.value = String(variantIndex);
+      elements.source.href = project.receipt.demo_url || project.receipt.source_url || "#";
+      setPlaying(false);
+      updateTime();
+      writeHash();
+      elements.preview.onload = () => {
+        frameReady = true;
+        elements.loading.hidden = true;
+        fitPreview();
+        dispatchSeek(0);
+        if (autoplay) setPlaying(true);
+      };
+      elements.preview.src = `${encodeURIComponent(project.name)}/hyperframes/${encodePath(variant.output)}`;
+    }
+
+    function selectProject(index, requestedVariant = 0, autoplay = true) {
+      projectIndex = (index + catalog.length) % catalog.length;
+      const project = activeProject();
+      elements.variant.replaceChildren(...project.receipt.variants.map((variant, index) => {
+        const option = document.createElement("option");
+        option.value = String(index);
+        option.textContent = variant.name;
+        return option;
+      }));
+      renderProjects();
+      loadVariant(requestedVariant, autoplay);
+    }
+
+    async function initialize() {
+      try {
+        catalog = await Promise.all(PROJECTS.map(async (name) => {
+          const response = await fetch(`${encodeURIComponent(name)}/hyperframes/conversion.json`, { cache: "no-store" });
+          if (!response.ok) throw new Error(`${name}: HTTP ${response.status}`);
+          return { name, receipt: await response.json() };
+        }));
+        const variants = catalog.reduce((total, project) => total + project.receipt.variants.length, 0);
+        elements.count.textContent = `${catalog.length} / ${variants}`;
+        const hash = new URLSearchParams(location.hash.slice(1));
+        const requestedProject = Math.max(0, catalog.findIndex((project) => project.name === hash.get("project")));
+        const requestedVariant = Math.max(0, catalog[requestedProject].receipt.variants.findIndex((variant) => variant.name === hash.get("variant")));
+        selectProject(requestedProject, requestedVariant);
+      } catch (error) {
+        elements.loading.textContent = error.message;
+        elements.count.textContent = "Load failed";
+      }
+    }
+
+    elements.search.addEventListener("input", renderProjects);
+    elements.variant.addEventListener("change", () => loadVariant(Number(elements.variant.value)));
+    elements.previous.addEventListener("click", () => selectProject(projectIndex - 1, 0));
+    elements.next.addEventListener("click", () => selectProject(projectIndex + 1, 0));
+    elements.play.addEventListener("click", () => setPlaying(!playing));
+    elements.reset.addEventListener("click", () => {
+      setPlaying(false);
+      currentTime = 0;
+      dispatchSeek(0);
+      updateTime();
+    });
+    elements.scrubber.addEventListener("input", () => {
+      currentTime = Number(elements.scrubber.value);
+      dispatchSeek(currentTime);
+      updateTime();
+    });
+    window.addEventListener("resize", fitPreview);
+    new ResizeObserver(fitPreview).observe(elements.stage);
+    initialize();
+  </script>
+</body>
+</html>

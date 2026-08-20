@@ -123,6 +123,14 @@ def _overlay_transform_filters(value, content_bounds=None):
     )
 
 
+def _output_duration_s(timeline, contributions):
+    return float(timeline["program_duration_s"]) + sum(
+        float(item["duration_s"])
+        for item in contributions
+        if item.get("kind") == "timeline-insert"
+    )
+
+
 def _build(plan, project_root, plan_dir):
     if plan.get("schema_version") != 1:
         raise ValueError("render plan schema_version must be 1")
@@ -132,6 +140,10 @@ def _build(plan, project_root, plan_dir):
     if timeline_errors:
         raise ValueError("invalid timeline: " + "; ".join(timeline_errors))
     contributions = plan.get("contributions", [])
+    has_timeline_inserts = any(
+        item.get("kind") == "timeline-insert"
+        for item in contributions if isinstance(item, dict)
+    )
     transforms = [item for item in contributions if item.get("kind") == "timeline-transform"]
     if len(transforms) > 1:
         raise ValueError("only one timeline-transform is supported")
@@ -176,7 +188,8 @@ def _build(plan, project_root, plan_dir):
         next_input = len(clips)
     else:
         command += ["-i", str(source)]
-        graph.append("[0:v:0]setpts=PTS-STARTPTS[base-video]")
+        video_clock = f",fps={fps_text},settb=AVTB" if has_timeline_inserts else ""
+        graph.append(f"[0:v:0]setpts=PTS-STARTPTS{video_clock}[base-video]")
         video_label = "base-video"
         audio_label = None
         next_input = 1
@@ -234,6 +247,7 @@ def _build(plan, project_root, plan_dir):
     base_filters = []
     composite_filters = []
     overlays = []
+    timeline_inserts = []
     audio_filters = []
     constraints = {}
     lut_cwd = None
@@ -269,6 +283,27 @@ def _build(plan, project_root, plan_dir):
                     "content_bounds": contribution.get("content_bounds"),
                     "start_frame": start_frame,
                     "end_frame": end_frame,
+                }
+            )
+        elif kind == "timeline-insert":
+            anchor_s = float(contribution.get("anchor_s", -1))
+            duration_s = float(contribution.get("duration_s", 0))
+            if (
+                anchor_s < 0
+                or anchor_s > float(timeline["program_duration_s"])
+                or duration_s <= 0
+                or contribution.get("audio") != {"mode": "silence"}
+            ):
+                raise ValueError("timeline-insert contract is invalid")
+            timeline_inserts.append(
+                {
+                    "path": _resolve(project_root, plan_dir, contribution["asset"]),
+                    "asset_type": contribution.get("asset_type", "file"),
+                    "pattern": contribution.get("pattern"),
+                    "start_number": contribution.get("start_number", 1),
+                    "fps": contribution.get("fps"),
+                    "anchor_s": anchor_s,
+                    "duration_s": duration_s,
                 }
             )
         elif kind == "audio-filter":
@@ -368,6 +403,130 @@ def _build(plan, project_root, plan_dir):
         graph.append(f"[{video_label}]{chain}[{output_label}]")
         video_label = output_label
 
+    if audio_filters:
+        audio_filtered = True
+        source_audio = f"[{audio_label}]" if audio_label else "[0:a:0]"
+        graph.append(f"{source_audio}{','.join(audio_filters)}[filtered-audio]")
+        audio_label = "filtered-audio"
+
+    if timeline_inserts:
+        timeline_inserts.sort(key=lambda item: item["anchor_s"])
+        anchors = [item["anchor_s"] for item in timeline_inserts]
+        if len(anchors) != len(set(anchors)):
+            raise ValueError("timeline-insert anchors must be unique")
+
+        audio_filtered = True
+        source_audio = f"[{audio_label}]" if audio_label else "[0:a:0]"
+        graph.append(
+            f"{source_audio}aresample=48000,"
+            "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,"
+            "asetpts=N/SR/TB[insert-base-audio]"
+        )
+        audio_label = "insert-base-audio"
+
+        base_duration = float(timeline["program_duration_s"])
+        parts = []
+        cursor = 0.0
+        for insert in timeline_inserts:
+            if insert["anchor_s"] > cursor:
+                parts.append({"kind": "base", "start_s": cursor, "end_s": insert["anchor_s"]})
+            parts.append({"kind": "insert", "insert": insert})
+            cursor = insert["anchor_s"]
+        if cursor < base_duration:
+            parts.append({"kind": "base", "start_s": cursor, "end_s": base_duration})
+
+        base_parts = [part for part in parts if part["kind"] == "base"]
+        if len(base_parts) > 1:
+            video_splits = [f"insert-base-v-{index}" for index in range(len(base_parts))]
+            audio_splits = [f"insert-base-a-{index}" for index in range(len(base_parts))]
+            graph.append(
+                f"[{video_label}]split={len(base_parts)}"
+                + "".join(f"[{label}]" for label in video_splits)
+            )
+            graph.append(
+                f"[{audio_label}]asplit={len(base_parts)}"
+                + "".join(f"[{label}]" for label in audio_splits)
+            )
+        elif base_parts:
+            video_splits = [video_label]
+            audio_splits = [audio_label]
+        else:
+            video_splits = []
+            audio_splits = []
+
+        concat_inputs = []
+        base_index = 0
+        insert_index = 0
+        for part in parts:
+            if part["kind"] == "base":
+                start_s, end_s = part["start_s"], part["end_s"]
+                video_part = f"timeline-base-v-{base_index}"
+                audio_part = f"timeline-base-a-{base_index}"
+                graph.append(
+                    f"[{video_splits[base_index]}]trim=start={start_s:.9f}:end={end_s:.9f},"
+                    f"setpts=PTS-STARTPTS,settb=AVTB,setsar=1,format=yuv420p[{video_part}]"
+                )
+                graph.append(
+                    f"[{audio_splits[base_index]}]atrim=start={start_s:.9f}:end={end_s:.9f},"
+                    f"asetpts=N/SR/TB[{audio_part}]"
+                )
+                concat_inputs.append(f"[{video_part}][{audio_part}]")
+                base_index += 1
+                continue
+
+            insert = part["insert"]
+            asset = insert["path"]
+            if insert["asset_type"] == "image-sequence":
+                pattern = insert["pattern"]
+                if not asset.is_dir() or not pattern or Path(pattern).name != pattern:
+                    raise ValueError(f"image-sequence timeline insert is invalid: {asset}")
+                pattern_path = (asset / pattern).resolve()
+                if pattern_path.parent != asset.resolve():
+                    raise ValueError(f"image-sequence pattern escapes insert directory: {pattern}")
+                start_number = insert["start_number"]
+                try:
+                    first_frame = asset / (pattern % start_number)
+                except (TypeError, ValueError) as exc:
+                    raise ValueError(f"image-sequence pattern is invalid: {pattern}") from exc
+                if not first_frame.is_file():
+                    raise ValueError(f"image-sequence first frame is missing: {first_frame}")
+                fps_value = insert["fps"]
+                if not isinstance(fps_value, dict) or fps_value != timeline["fps"]:
+                    raise ValueError("image-sequence timeline insert fps must match timeline fps")
+                command += [
+                    "-framerate", f"{fps_value['num']}/{fps_value['den']}",
+                    "-start_number", str(start_number), "-i", str(pattern_path),
+                ]
+            else:
+                if not asset.is_file():
+                    raise ValueError(f"timeline insert is missing: {asset}")
+                command += ["-i", str(asset)]
+
+            video_part = f"timeline-insert-v-{insert_index}"
+            audio_part = f"timeline-insert-a-{insert_index}"
+            insert_duration = insert["duration_s"]
+            graph.append(
+                f"[{next_input}:v:0]trim=duration={insert_duration:.9f},"
+                f"setpts=PTS-STARTPTS,fps={fps_text},settb=AVTB,setsar=1,"
+                f"format=yuv420p[{video_part}]"
+            )
+            graph.append(
+                f"anullsrc=channel_layout=stereo:sample_rate=48000,"
+                f"atrim=duration={insert_duration:.9f},asetpts=N/SR/TB[{audio_part}]"
+            )
+            concat_inputs.append(f"[{video_part}][{audio_part}]")
+            next_input += 1
+            insert_index += 1
+
+        output_video = f"video-{len(graph)}"
+        output_audio = "timeline-insert-audio"
+        graph.append(
+            "".join(concat_inputs)
+            + f"concat=n={len(parts)}:v=1:a=1[{output_video}][{output_audio}]"
+        )
+        video_label = output_video
+        audio_label = output_audio
+
     if constraints.get("width") or constraints.get("height") or constraints.get("fps"):
         filters = []
         if constraints.get("width") or constraints.get("height"):
@@ -378,16 +537,11 @@ def _build(plan, project_root, plan_dir):
         graph.append(f"[{video_label}]{','.join(filters)}[{output_label}]")
         video_label = output_label
 
-    if audio_filters:
-        audio_filtered = True
-        source_audio = f"[{audio_label}]" if audio_label else "[0:a:0]"
-        graph.append(f"{source_audio}{','.join(audio_filters)}[filtered-audio]")
-        audio_label = "filtered-audio"
-
+    output_duration_s = _output_duration_s(timeline, contributions)
     output_label = f"video-{len(graph)}"
     graph.append(
         f"[{video_label}]tpad=stop_mode=clone:stop_duration="
-        f"{float(timeline['program_duration_s']):.6f}[{output_label}]"
+        f"{output_duration_s:.6f}[{output_label}]"
     )
     video_label = output_label
 
@@ -404,7 +558,7 @@ def _build(plan, project_root, plan_dir):
         "-crf", str(constraints.get("crf", 20)),
         "-pix_fmt", constraints.get("pix_fmt", "yuv420p"),
         "-movflags", "+faststart",
-        "-t", f"{float(timeline['program_duration_s']):.6f}", str(output),
+        "-t", f"{output_duration_s:.6f}", str(output),
     ]
     return command, lut_cwd, output
 
@@ -421,7 +575,8 @@ def render(plan, project_root, plan_dir=None):
     subprocess.run(command, cwd=cwd, check=True)
     timeline = _load(_resolve(project_root, plan_dir, plan["timeline"]))
     source = _resolve(project_root, plan_dir, plan["source"])
-    _verify_delivery(output, timeline, source)
+    expected_duration_s = _output_duration_s(timeline, plan.get("contributions", []))
+    _verify_delivery(output, timeline, source, expected_duration_s=expected_duration_s)
     return output
 
 
@@ -437,12 +592,16 @@ def _probe_delivery(path):
     return json.loads(result.stdout)
 
 
-def _verify_delivery(output, timeline, source=None):
+def _verify_delivery(output, timeline, source=None, expected_duration_s=None):
     info = _probe_delivery(output)
     fps = timeline["fps"]
     tolerance = fps["den"] / fps["num"]
     actual = float(info["format"]["duration"])
-    expected = float(timeline["program_duration_s"])
+    expected = (
+        float(expected_duration_s)
+        if expected_duration_s is not None
+        else float(timeline["program_duration_s"])
+    )
     if abs(actual - expected) > tolerance:
         raise ValueError(
             f"delivery duration mismatch: expected {expected:.6f}, actual {actual:.6f}"

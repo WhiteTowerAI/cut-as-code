@@ -14,7 +14,7 @@ Plugin data is private state for the current OS user and is the Hub discovery tr
 - 🎨 **Color grade** — candidate looks to review, then a baked LUT.
 - 🎬 **B-roll** — reviewed visual cutaways from local media or Pexels.
 - 💬 **Captions** — word-timed, preset styles with optional karaoke.
-- 🃏 **Graphic motion cards** — titles, lower thirds, stats, quotes, and calls to action.
+- 🃏 **Motion graphics cards** — titles, lower thirds, stats, quotes, and calls to action.
 - 📱 **To TikTok/YouTube shorts** — extract moments and reframe them for 9:16 vertical.
 
 ## How It Works
@@ -47,7 +47,7 @@ Watch this 2-minute walkthrough to see how to interact with an AI coding agent a
 
 > **Prompt:** For [video-path], use /video-understand, /video-to-shorts, /video-add-captions, and /video-add-content-cards.
 >
-> **Agent:** Proposes short-form candidates, and displays captions and content cards with graphic motion for your review, and delivers the final edit.
+> **Agent:** Proposes short-form candidates, and displays captions and content cards with motion graphics for your review, and delivers the final edit.
 
 <table>
   <tr>
