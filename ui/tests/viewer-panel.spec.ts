@@ -321,7 +321,7 @@ test('activity log explains export blockers and records export failure details',
   await expect(copyLog).toHaveText('Copied')
 })
 
-test('runtime Viewer uses real sequence geometry, contain fit, read-only aspect, and fullscreen', async ({ page }) => {
+test('runtime Viewer uses real sequence geometry, selectable preview aspect, and fullscreen', async ({ page }) => {
   await page.route('**/v1/projects/project_geometry/snapshot', (route) => route.fulfill({
     contentType: 'application/json',
     body: JSON.stringify({ ok: true, snapshot: runtimeSnapshot() }),
@@ -351,9 +351,12 @@ test('runtime Viewer uses real sequence geometry, contain fit, read-only aspect,
   await expect(canvas.locator('video')).toHaveCSS('object-fit', 'contain')
 
   await page.getByRole('button', { name: 'Aspect ratio' }).click()
-  await expect(page.getByRole('menuitemradio', { name: /16:9/ })).toBeChecked()
-  await expect(page.getByRole('menuitemradio', { name: /9:16/ })).not.toBeChecked()
-  await expect(page.getByRole('menuitemradio', { name: /16:9/ })).toBeDisabled()
+  await expect(page.getByRole('menuitemradio', { name: /Original/ })).toBeChecked()
+  await page.getByRole('menuitemradio', { name: /9:16/ }).click()
+  await expect.poll(async () => {
+    const portraitBox = await canvas.boundingBox()
+    return portraitBox!.height / portraitBox!.width
+  }).toBeGreaterThan(1)
 
   await page.getByRole('button', { name: 'Fit preview' }).click()
   await expect(canvas).toHaveAttribute('data-fit-mode', 'fit')

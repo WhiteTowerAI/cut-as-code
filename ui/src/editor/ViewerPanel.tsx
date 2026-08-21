@@ -443,22 +443,9 @@ const aspectOptions = [
   { ratio: '4:3', note: 'Standard / presentations', shape: 'classic' },
 ] as const
 
-function displayAspectRatio(width?: number, height?: number) {
-  if (!width || !height) return 'Original'
-  const ratio = width / height
-  const candidates = [
-    ['16:9', 16 / 9],
-    ['9:16', 9 / 16],
-    ['1:1', 1],
-    ['4:5', 4 / 5],
-    ['4:3', 4 / 3],
-  ] as const
-  return candidates.find(([, value]) => Math.abs(ratio - value) < 0.01)?.[0] ?? 'Original'
-}
-
 type ViewerAspect = 'Original' | '16:9' | '9:16' | '1:1' | '4:5' | '4:3'
 
-function AspectRatioMenu({ selectedRatio, onSelect, readOnly = false }: { selectedRatio: ViewerAspect; onSelect: (ratio: ViewerAspect) => void; readOnly?: boolean }) {
+function AspectRatioMenu({ selectedRatio, onSelect }: { selectedRatio: ViewerAspect; onSelect: (ratio: ViewerAspect) => void }) {
   return (
     <div className="viewer-menu viewer-aspect-menu" role="menu" aria-label="Aspect ratio">
       {aspectOptions.map((option, index) => (
@@ -469,7 +456,6 @@ function AspectRatioMenu({ selectedRatio, onSelect, readOnly = false }: { select
           aria-checked={option.ratio === selectedRatio}
           type="button"
           onClick={() => onSelect(option.ratio)}
-          disabled={readOnly}
           key={option.ratio}
         >
           <span className="viewer-aspect-check">{option.ratio === selectedRatio && <Check aria-hidden size={16} />}</span>
@@ -1181,8 +1167,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
       {openMenu === 'viewer-more' && <MoreMenu />}
       {openMenu === 'aspect-ratio' && (
         <AspectRatioMenu
-          selectedRatio={runtime ? displayAspectRatio(sequenceGeometry?.width, sequenceGeometry?.height) as ViewerAspect : viewerAspect}
-          readOnly={runtime}
+          selectedRatio={viewerAspect}
           onSelect={(ratio) => { setViewerAspect(ratio); setOpenMenu(null); setViewerZoom(1) }}
         />
       )}
