@@ -1770,6 +1770,12 @@ process.stdout.write(JSON.stringify([
         self.assertLess(listen, ready)
         self.assertLess(ready, layers)
 
+    def test_sidecar_keeps_layer_sequences_when_bounds_analysis_is_unavailable(self) -> None:
+        source = (REPOSITORY_ROOT / "runtime" / "sidecar.cjs").read_text(encoding="utf-8")
+        bounds = source[source.index("async function addSequenceBounds"):source.index("function runProcess")]
+        self.assertIn("try {", bounds)
+        self.assertIn("} catch {\n    return\n  }", bounds)
+
     def test_protocol_call_timeout_allows_full_project_validation(self) -> None:
         script = r"""
 const { PROTOCOL_CALL_TIMEOUT_MS } = require(process.argv[1]);

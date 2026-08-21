@@ -639,8 +639,13 @@ async function addSequenceBounds(sequences) {
   if (!sequences.size) return
   const groups = Object.fromEntries([...sequences].map(([id, sequence]) => [id, [...sequence.frames.values()].map((frame) => frame.path)]))
   const executable = process.env.CAC_PYTHON || 'python'
-  const output = await runProcess(executable, [path.join(__dirname, 'sequence_bounds.py')], JSON.stringify(groups))
-  const bounds = JSON.parse(output.stdout)
+  let bounds
+  try {
+    const output = await runProcess(executable, [path.join(__dirname, 'sequence_bounds.py')], JSON.stringify(groups))
+    bounds = JSON.parse(output.stdout)
+  } catch {
+    return
+  }
   for (const [id, sequence] of sequences) sequence.contentBounds = bounds[id]
 }
 
