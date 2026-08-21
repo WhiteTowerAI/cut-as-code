@@ -361,7 +361,6 @@ function requiredPackagedFile(root, packagedPath) {
 }
 
 function isFirstPartyOrGeneratedAsset(packagedPath) {
-  if (packagedPath === 'hooks/launch-editor.cjs') return true
   if (/^runtime\/(?:hub|hub-client|hub-trust|mcp|sidecar)\.cjs$/.test(packagedPath)) return true
   if (/^skills\/video-add-motion-graphics\/recipes\/animxyz\/[^/]+\/hyperframes\/hf-(?:adapter|recipe)\.js$/.test(packagedPath)) return true
   return new Set([

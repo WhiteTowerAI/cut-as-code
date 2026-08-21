@@ -1236,6 +1236,8 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
 
   function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
     if (!hasMedia || event.button !== 0) return
+    event.preventDefault()
+    window.getSelection()?.removeAllRanges()
     event.currentTarget.setPointerCapture(event.pointerId)
     seekFromPointer(event)
   }

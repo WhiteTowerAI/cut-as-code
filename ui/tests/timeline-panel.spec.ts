@@ -769,11 +769,23 @@ test('timeline drag clamps at duration and zoom controls stay in bounds', async 
   await page.goto('/?scenario=1-324')
 
   const surface = page.locator('[data-timeline-surface]')
+  await page.evaluate(() => {
+    const text = document.createElement('span')
+    text.id = 'selection-fixture'
+    text.textContent = 'Previously selected text'
+    document.body.append(text)
+    const range = document.createRange()
+    range.selectNodeContents(text)
+    window.getSelection()?.addRange(range)
+  })
+  await expect.poll(() => page.evaluate(() => window.getSelection()?.toString().length)).toBeGreaterThan(0)
+  await expect(page.locator('.timeline-body')).toHaveCSS('user-select', 'none')
   await surface.hover({ position: { x: 100, y: 100 } })
   await page.mouse.down()
   await page.mouse.move(1200, 100)
   await page.mouse.up()
   await expect(page.getByLabel('Playhead time')).toContainText('00:20')
+  expect(await page.evaluate(() => window.getSelection()?.toString())).toBe('')
 
   const zoomIn = page.getByRole('button', { name: 'Zoom in timeline' })
   const zoomOut = page.getByRole('button', { name: 'Zoom out timeline' })

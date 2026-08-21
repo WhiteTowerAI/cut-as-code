@@ -25,12 +25,12 @@ const { resolveSelectedProject } = require(process.argv[1]);
         with tempfile.TemporaryDirectory(prefix="cut hub picker ") as temporary:
             parent = Path(temporary)
             self._project(parent / "registered")
-            self._project(parent / "candidate")
+            self._project(parent / "nested" / "candidate")
             result = subprocess.run(
                 ["node", "-e", script, str(ROOT / "runtime" / "hub.cjs"), str(parent)],
                 cwd=ROOT, check=True, capture_output=True, text=True, timeout=20,
             )
-            self.assertEqual(parent / "candidate", Path(json.loads(result.stdout)["selected"]))
+            self.assertEqual(parent / "nested" / "candidate", Path(json.loads(result.stdout)["selected"]))
 
     def test_creates_scaffold_without_overwriting_and_discovers_unregistered_sibling(self):
         with tempfile.TemporaryDirectory(prefix="cut hub projects ") as temporary:
