@@ -2100,6 +2100,8 @@ button {
 
 .timeline-empty-state p { margin: 0; }
 
+.timeline-body { user-select: none; }
+
 .timeline-playhead {
   position: absolute;
   top: -10px;

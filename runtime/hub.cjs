@@ -472,20 +472,29 @@ async function discoverProjects(state) {
   const registeredRoots = new Set(state.registry.projects.map((project) => project.root))
   const parents = [...new Set(state.registry.projects.map((project) => path.dirname(project.root)))]
   const candidates = []
-  for (const parent of parents) {
+  const pending = parents.map((root) => ({ root, depth: 0 }))
+  const visited = new Set()
+  while (pending.length) {
+    const { root: parent, depth } = pending.shift()
+    if (visited.has(parent)) continue
+    visited.add(parent)
     const entries = await fsp.readdir(parent, { withFileTypes: true }).catch(() => [])
     for (const entry of entries.slice(0, 250)) {
       if (!entry.isDirectory()) continue
       const value = path.join(parent, entry.name)
       let root
-      try { root = await canonicalProjectRoot(value) } catch { continue }
-      if (registeredRoots.has(root) || candidates.some((candidate) => candidate.root === root)) continue
-      candidates.push({
-        candidateId: projectFingerprint(root, 24),
-        displayName: path.basename(root),
-        rootFingerprint: projectFingerprint(root),
-        root,
-      })
+      try { root = await canonicalProjectRoot(value) } catch {
+        if (depth < 2) pending.push({ root: value, depth: depth + 1 })
+        continue
+      }
+      if (!registeredRoots.has(root) && !candidates.some((candidate) => candidate.root === root)) {
+        candidates.push({
+          candidateId: projectFingerprint(root, 24),
+          displayName: path.basename(root),
+          rootFingerprint: projectFingerprint(root),
+          root,
+        })
+      }
     }
   }
   return candidates.sort((left, right) => left.displayName.localeCompare(right.displayName))
