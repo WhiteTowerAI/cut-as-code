@@ -4,6 +4,7 @@ const crypto = require('node:crypto')
 const fs = require('node:fs')
 const fsp = require('node:fs/promises')
 const http = require('node:http')
+const os = require('node:os')
 const path = require('node:path')
 const { spawn } = require('node:child_process')
 const readline = require('node:readline')
@@ -1156,15 +1157,35 @@ function parseArguments(args) {
 
 async function startProtocolService(runtimeRoot) {
   const script = path.join(runtimeRoot, 'protocol_service.py')
-  const candidates = [process.env.CAC_PYTHON, process.platform === 'win32' ? 'python.exe' : 'python3', 'python'].filter(Boolean)
+  const candidates = [
+    process.env.CAC_PYTHON,
+    process.platform === 'win32'
+      ? path.join(os.homedir(), '.cache', 'codex-runtimes', 'codex-primary-runtime', 'dependencies', 'python', 'python.exe')
+      : null,
+    process.platform === 'win32' ? 'python.exe' : 'python3',
+    'python',
+  ].filter((executable, index, all) => executable && all.indexOf(executable) === index)
   let child
   for (const executable of candidates) {
     try {
-      child = spawn(executable, [script], { cwd: runtimeRoot, stdio: ['pipe', 'pipe', 'pipe'] })
+      const candidate = spawn(executable, [script], { cwd: runtimeRoot, stdio: ['pipe', 'pipe', 'pipe'] })
       await new Promise((resolve, reject) => {
-        child.once('spawn', resolve)
-        child.once('error', reject)
+        let settled = false
+        const finish = (callback, value) => {
+          if (settled) return
+          settled = true
+          clearTimeout(timer)
+          candidate.off('error', onError)
+          candidate.off('exit', onExit)
+          callback(value)
+        }
+        const onError = (error) => finish(reject, error)
+        const onExit = (code, signal) => finish(reject, new Error(`Python runtime exited during startup (${code ?? signal})`))
+        const timer = setTimeout(() => finish(resolve), 250)
+        candidate.once('error', onError)
+        candidate.once('exit', onExit)
       })
+      child = candidate
       break
     } catch { child = null }
   }
