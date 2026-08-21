@@ -410,6 +410,15 @@ const { readTrustedLocator, hubPaths } = require(process.argv[2]);
                     timeout=20,
                 )
 
+    def test_editor_launch_hook_uses_powershell_environment_syntax(self) -> None:
+        hooks = json.loads((REPOSITORY_ROOT / "hooks" / "hooks.json").read_text(encoding="utf-8"))
+        launch = hooks["hooks"]["UserPromptSubmit"][0]["hooks"][0]
+
+        self.assertEqual(
+            launch["commandWindows"],
+            'node "$env:PLUGIN_ROOT\\hooks\\launch-editor.cjs"',
+        )
+
     def test_editor_drafts_survive_runtime_restart_without_mutating_project(self) -> None:
         with tempfile.TemporaryDirectory(prefix="cut editor drafts ") as temporary:
             temporary_root = Path(temporary)
