@@ -187,7 +187,7 @@ class OverlayFrameBoundaryTests(unittest.TestCase):
         overlay = {"x": 0.5, "y": 0.5, "scale": 1.0}
         self.assertEqual((None, None), render_project._overlay_transform_filters(overlay))
 
-    def test_graphic_motion_crops_visible_bounds_before_nonuniform_scaling(self):
+    def test_motion_graphics_crops_visible_bounds_before_nonuniform_scaling(self):
         transform = {"x": 0.6, "y": 0.4, "scale_x": 1.5, "scale_y": 0.75}
         bounds = {"x": 0.1, "y": 0.2, "width": 0.25, "height": 0.3}
 

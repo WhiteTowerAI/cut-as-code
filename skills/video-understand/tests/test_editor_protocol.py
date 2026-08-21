@@ -252,7 +252,7 @@ class EditorProtocolFreshnessTests(unittest.TestCase):
             }),
         )
 
-    def test_graphic_motion_render_contribution_includes_union_alpha_bounds(self):
+    def test_motion_graphics_render_contribution_includes_union_alpha_bounds(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             frames = root / "work" / "frames"
@@ -277,7 +277,7 @@ class EditorProtocolFreshnessTests(unittest.TestCase):
 
             self.assertEqual(
                 {"x": 0.1, "y": 0.125, "width": 0.6, "height": 0.625},
-                projectlib.graphic_motion_content_bounds(cue, root),
+                projectlib.motion_graphics_content_bounds(cue, root),
             )
 
     def test_validate_project_rejects_stale_dependency_by_default(self):

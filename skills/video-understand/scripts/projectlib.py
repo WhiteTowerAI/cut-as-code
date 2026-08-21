@@ -1347,7 +1347,7 @@ def _validate_motion_graphics_plan(
 
 
 _DEFAULT_EDITOR_TRANSFORM = {"x": 0.5, "y": 0.5, "scale": 1.0}
-_GRAPHIC_MOTION_BOUNDS_CACHE = {}
+_MOTION_GRAPHICS_BOUNDS_CACHE = {}
 
 
 def _editor_transform(value):
@@ -1369,7 +1369,7 @@ def _editor_transform(value):
     return {"x": float(x), "y": float(y), "scale_x": float(scale_x), "scale_y": float(scale_y)}
 
 
-def graphic_motion_content_bounds(cue, project_root):
+def motion_graphics_content_bounds(cue, project_root):
     render = cue.get("render") if isinstance(cue, dict) else None
     frames = render.get("frames") if isinstance(render, dict) else None
     if not isinstance(frames, list) or not frames:
@@ -1388,7 +1388,7 @@ def graphic_motion_content_bounds(cue, project_root):
         stat = path.stat()
         resolved_frames.append((path, frame.get("sha256"), stat.st_size, stat.st_mtime_ns))
     cache_key = tuple((str(path), sha256, size, mtime) for path, sha256, size, mtime in resolved_frames)
-    cached = _GRAPHIC_MOTION_BOUNDS_CACHE.get(cache_key)
+    cached = _MOTION_GRAPHICS_BOUNDS_CACHE.get(cache_key)
     if cached is not None:
         return dict(cached)
     union = None
@@ -1408,7 +1408,7 @@ def graphic_motion_content_bounds(cue, project_root):
             )
     if size is None or union is None:
         bounds = {"x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0}
-        _GRAPHIC_MOTION_BOUNDS_CACHE[cache_key] = bounds
+        _MOTION_GRAPHICS_BOUNDS_CACHE[cache_key] = bounds
         return dict(bounds)
     width, height = size
     bounds = {
@@ -1417,7 +1417,7 @@ def graphic_motion_content_bounds(cue, project_root):
         "width": (union[2] - union[0]) / width,
         "height": (union[3] - union[1]) / height,
     }
-    _GRAPHIC_MOTION_BOUNDS_CACHE[cache_key] = bounds
+    _MOTION_GRAPHICS_BOUNDS_CACHE[cache_key] = bounds
     return dict(bounds)
 
 
@@ -1462,7 +1462,7 @@ def _editor_content_bounds_for_contributions(operation_id, plan, contribution_co
     for cue in cues:
         value = cue.get("editor_content_bounds")
         if value is None and operation_id == "motion-graphics":
-            value = graphic_motion_content_bounds(cue, project_root)
+            value = motion_graphics_content_bounds(cue, project_root)
         if value is None:
             value = {"x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0}
         if (not isinstance(value, dict) or set(value) != {"x", "y", "width", "height"}):
