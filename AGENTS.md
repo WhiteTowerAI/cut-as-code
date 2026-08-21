@@ -28,7 +28,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 cut-as-code is a stack of agentic video-editing skills plus its local Editor Plugin and
 browser UI. Each directory under `skills/<name>/` is a self-contained skill: a `SKILL.md`
 (the agent playbook — read it first), plus `scripts/`, `examples/`, and `reference/`.
-Plugin runtime code lives under `.codex-plugin/`, `hooks/`, `runtime/`, and `ui/`; the
+Plugin runtime code lives under `.codex-plugin/`, `runtime/`, and `ui/`; the
 stable desktop bootstrap lives under `launcher/`. There is no root build, package manifest,
 lint config, or aggregate test suite. Scripts and checks run ad hoc. When you change a skill,
 the SKILL.md *is* the spec; keep it and its scripts in sync.

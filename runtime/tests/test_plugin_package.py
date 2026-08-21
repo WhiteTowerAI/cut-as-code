@@ -382,75 +382,6 @@ const root = process.argv[2];
             finally:
                 self._stop_mcp(process)
 
-    def test_editor_launch_hook_matches_only_exact_prompt_and_reconnects(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="cut editor hook ") as temporary:
-            plugin_data = Path(temporary) / "plugin data"
-            script = r"""
-const { runHook } = require(process.argv[1]);
-const { readTrustedLocator, hubPaths } = require(process.argv[2]);
-(async () => {
-  const opened = [];
-  const dependencies = { openBrowser: async (url) => opened.push(url) };
-  const unrelated = await runHook({ hook_event_name: 'UserPromptSubmit', prompt: 'Open another tool' }, dependencies);
-  const first = await runHook({ hook_event_name: 'UserPromptSubmit', prompt: 'Open Cut as Code Editor' }, dependencies);
-  const firstLocator = await readTrustedLocator(hubPaths(process.env.PLUGIN_DATA).locator);
-  const second = await runHook({ hook_event_name: 'UserPromptSubmit', prompt: 'Open Cut as Code Editor' }, dependencies);
-  const secondLocator = await readTrustedLocator(hubPaths(process.env.PLUGIN_DATA).locator);
-  process.stdout.write(JSON.stringify({ unrelated, first, second, opened, firstPid: firstLocator.pid, secondPid: secondLocator.pid }));
-})().catch((error) => { process.stderr.write(String(error)); process.exit(1); });
-"""
-            environment = {
-                **os.environ,
-                "PLUGIN_ROOT": str(REPOSITORY_ROOT),
-                "PLUGIN_DATA": str(plugin_data),
-            }
-            try:
-                result = subprocess.run(
-                    [
-                        "node", "-e", script,
-                        str(REPOSITORY_ROOT / "hooks" / "launch-editor.cjs"),
-                        str(REPOSITORY_ROOT / "runtime" / "hub-client.cjs"),
-                    ],
-                    cwd=REPOSITORY_ROOT,
-                    env=environment,
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    timeout=30,
-                )
-                evidence = json.loads(result.stdout)
-                self.assertIsNone(evidence["unrelated"])
-                expected = {"decision": "block", "reason": "Cut as Code Editor opened."}
-                self.assertEqual(evidence["first"], expected)
-                self.assertEqual(evidence["second"], expected)
-                self.assertEqual(len(evidence["opened"]), 2)
-                self.assertEqual(
-                    urllib.parse.urlsplit(evidence["opened"][0]).netloc,
-                    urllib.parse.urlsplit(evidence["opened"][1]).netloc,
-                )
-                self.assertEqual(evidence["firstPid"], evidence["secondPid"])
-            finally:
-                subprocess.run(
-                    ["node", str(REPOSITORY_ROOT / "runtime" / "hub-client.cjs"), "shutdown"],
-                    cwd=REPOSITORY_ROOT,
-                    env=environment,
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    timeout=20,
-                )
-
-    def test_editor_launch_hook_uses_powershell_environment_syntax(self) -> None:
-        hooks = json.loads((REPOSITORY_ROOT / "hooks" / "hooks.json").read_text(encoding="utf-8"))
-        launch = hooks["hooks"]["UserPromptSubmit"][0]["hooks"][0]
-
-        self.assertEqual(
-            launch["commandWindows"],
-            'node "$env:PLUGIN_ROOT\\hooks\\launch-editor.cjs"',
-        )
-
     def test_editor_drafts_survive_runtime_restart_without_mutating_project(self) -> None:
         with tempfile.TemporaryDirectory(prefix="cut editor drafts ") as temporary:
             temporary_root = Path(temporary)
@@ -1062,8 +993,6 @@ const { ensureHub, hubPaths, readTrustedLocator } = require(process.argv[1]);
             required = {
                 ".codex-plugin/plugin.json",
                 ".mcp.json",
-                "hooks/hooks.json",
-                "hooks/launch-editor.cjs",
                 "LICENSE",
                 "PACKAGE_AUDIT.json",
                 "README.md",
