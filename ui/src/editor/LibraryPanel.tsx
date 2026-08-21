@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
-import { Plus, Search, Upload } from 'lucide-react'
+import { Plus, Search, Trash2, Upload } from 'lucide-react'
 import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand/vanilla'
 import type { AssetView, EditorOperationView, EditorSelection, LibraryTab } from './editor-model'
@@ -8,6 +8,7 @@ import { draftFieldsForCue, type EditorState } from './editor-store'
 type LibraryPanelProps = {
   store: StoreApi<EditorState>
   importAssets?: (files: readonly File[]) => Promise<void>
+  deleteAsset?: (assetId: string) => Promise<void>
 }
 
 type TileItem = {
@@ -139,12 +140,14 @@ function TileGrid({
   selectedId,
   onSelect,
   assetSize = false,
+  onDelete,
 }: {
   items: readonly TileItem[]
   kind: NonNullable<EditorSelection>['kind']
   selectedId?: string
   onSelect: (selection: NonNullable<EditorSelection>) => void
   assetSize?: boolean
+  onDelete?: (item: TileItem) => void
 }) {
   const gridClassName = assetSize
     ? 'library-grid library-grid--assets'
@@ -153,17 +156,21 @@ function TileGrid({
   return (
     <div className={gridClassName}>
       {items.map((item) => (
-        <button
-          className={assetSize ? 'library-tile library-tile--asset' : 'library-tile'}
-          type="button"
-          key={item.id}
-          data-asset-id={assetSize ? item.id : undefined}
-          aria-pressed={selectedId === item.id}
-          onClick={() => onSelect({ kind, id: item.id })}
-        >
-          <Preview item={item} />
-          <span className="library-tile-label" title={item.label}>{item.label}</span>
-        </button>
+        <div className="library-tile-wrap" key={item.id}>
+          <button
+            className={assetSize ? 'library-tile library-tile--asset' : 'library-tile'}
+            type="button"
+            data-asset-id={assetSize ? item.id : undefined}
+            aria-pressed={selectedId === item.id}
+            onClick={() => onSelect({ kind, id: item.id })}
+          >
+            <Preview item={item} />
+            <span className="library-tile-label" title={item.label}>{item.label}</span>
+          </button>
+          {assetSize && onDelete ? <button className="library-asset-delete" type="button" aria-label={`Delete ${item.label}`} title={`Delete ${item.label}`} onClick={() => onDelete(item)}>
+            <Trash2 aria-hidden="true" size={15} />
+          </button> : null}
+        </div>
       ))}
     </div>
   )
@@ -186,13 +193,14 @@ function RuntimeEmpty({ children }: { children: ReactNode }) {
   return <div className="library-runtime-empty" role="status">{children}</div>
 }
 
-function AssetsPanel({ store, importAssets }: LibraryPanelProps) {
+function AssetsPanel({ store, importAssets, deleteAsset }: LibraryPanelProps) {
   const project = useStore(store, (state) => state.project)
   const selection = useStore(store, (state) => state.selection)
   const select = useStore(store, (state) => state.select)
   const runtime = Boolean(project?.runtime)
   const assetTiles = project?.assets.map((asset) => tileForAsset(asset, runtime)) ?? []
   const [importError, setImportError] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const importInputRef = useRef<HTMLInputElement>(null)
   const normalizedQuery = query.trim().toLocaleLowerCase()
@@ -216,6 +224,19 @@ function AssetsPanel({ store, importAssets }: LibraryPanelProps) {
     event.preventDefault()
     void importFiles([...event.dataTransfer.files])
   }
+  const deleteTile = async (item: TileItem) => {
+    if (!deleteAsset || deletingId) return
+    setImportError(null)
+    setDeletingId(item.id)
+    try {
+      await deleteAsset(item.id)
+      if (selection?.kind === 'asset' && selection.id === item.id) select(null)
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : 'Could not delete asset')
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   return (
     <>
@@ -227,7 +248,7 @@ function AssetsPanel({ store, importAssets }: LibraryPanelProps) {
       />
       <input ref={importInputRef} className="asset-file-input" type="file" accept="video/mp4,video/quicktime,video/webm,audio/mpeg,audio/wav,image/jpeg,image/png,image/webp,image/gif" multiple onChange={importFromInput} />
       {visibleAssetTiles.length ? (
-        <TileGrid items={visibleAssetTiles} kind="asset" selectedId={selection?.id} onSelect={select} assetSize />
+        <TileGrid items={visibleAssetTiles} kind="asset" selectedId={selection?.id} onSelect={select} assetSize onDelete={deleteAsset ? (item) => { void deleteTile(item) } : undefined} />
       ) : assetTiles.length ? (
         <RuntimeEmpty>No assets match "{query.trim()}"</RuntimeEmpty>
       ) : (
@@ -246,7 +267,7 @@ function ThemeControls() {
       <div className="caption-theme-row">
         <span>Theme</span>
         {['outline', 'yellow', 'green', 'cyan', 'pink'].map((theme) => (
-          <button key={theme} type="button" className={`theme-swatch theme-swatch--${theme}`} aria-label={`${theme} theme`} />
+          <button key={theme} type="button" className={`theme-swatch theme-swatch--${theme}`} aria-label={`${theme} theme`} title={`${theme} theme`} />
         ))}
       </div>
       <label className="word-highlight-row">
@@ -402,7 +423,7 @@ function PanelContent({ activeTab, store, operation }: { activeTab: LibraryTab; 
   return <MotionPanel store={store} />
 }
 
-export function LibraryPanel({ store, importAssets }: LibraryPanelProps) {
+export function LibraryPanel({ store, importAssets, deleteAsset }: LibraryPanelProps) {
   const activeTab = useStore(store, (state) => state.activeTab)
   const visibleActiveTab: LibraryTab = activeTab === 'assets' ? activeTab : 'assets'
   const setActiveTab = useStore(store, (state) => state.setActiveTab)
@@ -463,7 +484,7 @@ export function LibraryPanel({ store, importAssets }: LibraryPanelProps) {
         role="tabpanel"
         aria-labelledby={`library-tab-${visibleActiveTab}`}
       >
-        <AssetsPanel store={store} importAssets={importAssets} />
+        <AssetsPanel store={store} importAssets={importAssets} deleteAsset={deleteAsset} />
       </div>
     </section>
   )

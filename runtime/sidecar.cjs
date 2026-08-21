@@ -32,6 +32,7 @@ const HTTP_ROUTE_ALLOWLIST = Object.freeze([
   Object.freeze({ id: 'export-action', methods: Object.freeze(['POST']), pattern: /^\/v1\/projects\/([^/]+)\/exports\/(open|reveal)$/ }),
   Object.freeze({ id: 'resource', methods: Object.freeze(['GET']), pattern: /^\/v1\/projects\/([^/]+)\/resources\/(res_[a-f0-9]+)$/ }),
   Object.freeze({ id: 'import', methods: Object.freeze(['POST']), pattern: /^\/v1\/projects\/([^/]+)\/imports$/ }),
+  Object.freeze({ id: 'asset-delete', methods: Object.freeze(['DELETE']), pattern: /^\/v1\/projects\/([^/]+)\/assets\/(asset_[a-f0-9]+)$/ }),
   Object.freeze({ id: 'file', methods: Object.freeze(['GET']), pattern: /^\/v1\/projects\/([^/]+)\/(media|artifacts)\/((?:asset|artifact)_[a-f0-9]+)$/ }),
   Object.freeze({ id: 'layer-frame', methods: Object.freeze(['GET', 'HEAD']), pattern: /^\/v1\/projects\/([^/]+)\/layers\/(layer_[a-f0-9]+)\/frames\/(\d+)$/ }),
   Object.freeze({ id: 'events', methods: Object.freeze(['GET']), pattern: /^\/v1\/projects\/([^/]+)\/events$/ }),
@@ -265,6 +266,21 @@ async function handleRequest(state, request, response) {
         return json(response, result.ok ? 201 : 400, { ...result, import: imported })
       } catch (error) {
         return json(response, 400, { ok: false, error: error instanceof Error ? error.message : 'could not import file' })
+      }
+    }
+    if (route.id === 'asset-delete' && match[1] === state.projectId) {
+      if (request.headers.origin !== state.origin) return json(response, 403, { ok: false, error: 'invalid origin' })
+      try {
+        const current = await state.protocol.call({ verb: 'get_snapshot', project_id: state.projectId })
+        if (!current.ok) return json(response, 400, current)
+        await deleteImportedAsset(state.root, state.media, match[2], current.snapshot)
+        await refreshFiles(state, false)
+        const result = await state.protocol.call({ verb: 'get_snapshot', project_id: state.projectId })
+        attachPublicFiles(state, result)
+        notifyProjectChange(state)
+        return json(response, result.ok ? 200 : 400, result)
+      } catch (error) {
+        return json(response, 400, { ok: false, error: error instanceof Error ? error.message : 'could not delete asset' })
       }
     }
     if (route.id === 'file' && match[1] === state.projectId) {
@@ -724,6 +740,19 @@ async function collectFiles(root, directories, prefix) {
     }
   }
   return result
+}
+
+async function deleteImportedAsset(root, registry, assetId, snapshot) {
+  const item = registry.get(assetId)
+  if (!item) throw new Error('unknown asset')
+  if (snapshot?.view?.source_media_id === assetId) throw new Error('The project source asset cannot be deleted')
+  const timeline = snapshot?.view?.timeline
+  const clips = [...(timeline?.clips ?? []), ...(timeline?.audio_clips ?? [])]
+  if (clips.some((clip) => clip?.source_asset_id === assetId)) throw new Error('Remove this asset from the timeline before deleting it')
+  const input = await importDirectory(root)
+  const real = await fsp.realpath(item.path)
+  if (!isContained(input, real) || (await fsp.lstat(item.path)).isSymbolicLink()) throw new Error('asset path is unsafe')
+  await fsp.unlink(real)
 }
 
 async function* walk(directory) {
@@ -1233,7 +1262,7 @@ async function startProtocolService(runtimeRoot) {
   }
 }
 
-module.exports = { HTTP_ROUTE_ALLOWLIST, LAUNCH_TTL_MS, PROTOCOL_CALL_TIMEOUT_MS, MAX_IMPORT_BYTES, launchIsExpired, routeForRequest, openExportPath, summarizeExportFailure, cueIdFor, writeImportedFile }
+module.exports = { HTTP_ROUTE_ALLOWLIST, LAUNCH_TTL_MS, PROTOCOL_CALL_TIMEOUT_MS, MAX_IMPORT_BYTES, launchIsExpired, routeForRequest, openExportPath, summarizeExportFailure, cueIdFor, writeImportedFile, deleteImportedAsset }
 
 if (require.main === module) {
   main().catch((error) => {

@@ -331,6 +331,38 @@ const root = process.argv[2];
             self.assertEqual(b"first", (root / "input" / "clip.mp4").read_bytes())
             self.assertEqual(b"second", (root / "input" / "clip-2.mp4").read_bytes())
 
+    def test_delete_imported_asset_removes_only_an_unreferenced_input_file(self) -> None:
+        script = r"""
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const { deleteImportedAsset } = require(process.argv[1]);
+const root = process.argv[2];
+(async () => {
+  const input = path.join(root, 'input');
+  await fs.mkdir(input, { recursive: true });
+  const file = path.join(input, 'clip.mp4');
+  await fs.writeFile(file, 'clip');
+  const assets = new Map([['asset_clip', { path: file }]]);
+  let timelineError = '';
+  try { await deleteImportedAsset(root, assets, 'asset_clip', { view: { timeline: { clips: [{ source_asset_id: 'asset_clip' }], audio_clips: [] } } }); } catch (error) { timelineError = error.message; }
+  let sourceError = '';
+  try { await deleteImportedAsset(root, assets, 'asset_clip', { view: { source_media_id: 'asset_clip' } }); } catch (error) { sourceError = error.message; }
+  await deleteImportedAsset(root, assets, 'asset_clip', { view: { timeline: { clips: [], audio_clips: [] } } });
+  process.stdout.write(JSON.stringify({ exists: await fs.stat(file).then(() => true, () => false), sourceError, timelineError }));
+})().catch((error) => { process.stderr.write(error.stack); process.exitCode = 1; });
+"""
+        with tempfile.TemporaryDirectory(prefix="cut editor delete ") as temporary:
+            root = Path(temporary) / "project"
+            root.mkdir()
+            result = subprocess.run(
+                ["node", "-e", script, str(REPOSITORY_ROOT / "runtime" / "sidecar.cjs"), str(root)],
+                check=True, capture_output=True, text=True, encoding="utf-8", timeout=20,
+            )
+        deleted = json.loads(result.stdout)
+        self.assertFalse(deleted["exists"])
+        self.assertEqual("The project source asset cannot be deleted", deleted["sourceError"])
+        self.assertEqual("Remove this asset from the timeline before deleting it", deleted["timelineError"])
+
     def test_invalid_open_browser_is_a_correlated_invalid_params_error(self) -> None:
         with tempfile.TemporaryDirectory(prefix="cut invalid browser flag ") as temporary:
             project_root = Path(temporary) / "project"
@@ -1198,6 +1230,7 @@ process.stdout.write(JSON.stringify({
             ["POST", "/v1/projects/project_a/exports/open"],
             ["GET", "/v1/projects/project_a/resources/res_a1"],
             ["POST", "/v1/projects/project_a/imports"],
+            ["DELETE", "/v1/projects/project_a/assets/asset_a1"],
             ["GET", "/v1/projects/project_a/media/asset_a1"],
             ["GET", "/v1/projects/project_a/artifacts/artifact_a1"],
             ["GET", "/v1/projects/project_a/layers/layer_a1/frames/1"],
@@ -1229,11 +1262,11 @@ process.stdout.write(JSON.stringify({
         audit = json.loads(result.stdout)
         self.assertEqual(
             audit["declared"],
-            ["launch", "meta", "snapshot", "transaction", "timeline-edit", "review", "export-start", "export-status", "export-action", "resource", "import", "file", "layer-frame", "events", "draft", "static"],
+            ["launch", "meta", "snapshot", "transaction", "timeline-edit", "review", "export-start", "export-status", "export-action", "resource", "import", "asset-delete", "file", "layer-frame", "events", "draft", "static"],
         )
         self.assertEqual(
             audit["actual"],
-            ["launch", "meta", "snapshot", "transaction", "timeline-edit", "review", "export-start", "export-status", "export-action", "resource", "import", "file", "file", "layer-frame", "events", "draft", "draft", "draft", "static", "static", None, None, None, None],
+            ["launch", "meta", "snapshot", "transaction", "timeline-edit", "review", "export-start", "export-status", "export-action", "resource", "import", "asset-delete", "file", "file", "layer-frame", "events", "draft", "draft", "draft", "static", "static", None, None, None, None],
         )
 
     def _assert_unknown_third_party_asset_is_rejected(

@@ -187,6 +187,24 @@ test('browser file selection immediately adds the imported asset to My Assets', 
   }
 })
 
+test('deletes an unused imported asset from My Assets', async ({ page }) => {
+  const isolated = await startSidecar(projectRoot)
+  try {
+    await page.goto(await armLaunch(isolated))
+    await expect.poll(() => page.locator('html').getAttribute('data-runtime-state')).toBe('ready')
+
+    await page.locator('input.asset-file-input').first().setInputFiles({
+      name: 'remove-me.wav', mimeType: 'audio/wav', buffer: Buffer.from('temporary audio'),
+    })
+    const asset = page.locator('[data-asset-id]').filter({ hasText: 'remove-me.wav' })
+    await expect(asset).toBeVisible()
+    await page.getByRole('button', { name: 'Delete remove-me.wav' }).click()
+    await expect(asset).toHaveCount(0)
+  } finally {
+    await stopSidecar(isolated.process)
+  }
+})
+
 test('streams confined media by opaque ID with HTTP byte ranges', async () => {
   const isolated = await authenticatedSidecar()
   try {

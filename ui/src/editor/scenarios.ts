@@ -320,7 +320,7 @@ function state(overrides: Partial<EditorInitialState> = {}): EditorInitialState 
     isPlaying: false,
     playbackRange: null,
     timelineZoom: 1,
-    snapEnabled: true,
+    snapEnabled: false,
     openMenu: null,
     ...overrides,
   }

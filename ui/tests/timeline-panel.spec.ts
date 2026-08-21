@@ -338,6 +338,33 @@ test('timeline selection and click seek update one store playhead', async ({ pag
   await expect(clip).toHaveAttribute('aria-pressed', 'true')
 })
 
+test('cursor and magnet tools are mutually exclusive and magnet snaps the playhead to a clip edge', async ({ page }) => {
+  await page.setViewportSize({ width: 1008, height: 444 })
+  await page.goto('/?scenario=1-324')
+
+  const cursor = page.getByRole('button', { name: 'Select tool' })
+  const magnet = page.getByRole('button', { name: 'Toggle snap' })
+  await expect(cursor).toHaveAttribute('aria-pressed', 'true')
+  await expect(magnet).toHaveAttribute('aria-pressed', 'false')
+  await expect(cursor).toHaveAttribute('title', 'Select and position timeline items')
+  await expect(magnet).toHaveAttribute('title', 'Magnetic snapping off')
+  await magnet.click()
+  await expect(cursor).toHaveAttribute('aria-pressed', 'false')
+  await expect(magnet).toHaveAttribute('aria-pressed', 'true')
+  await expect(magnet).toHaveAttribute('title', 'Magnetic snapping on')
+
+  const surface = page.locator('[data-timeline-surface]')
+  const surfaceBox = await surface.boundingBox()
+  expect(surfaceBox).not.toBeNull()
+  await surface.click({ position: { x: timeToPx(6.05, 20, 876), y: 40 } })
+  await expect(page.getByLabel('Playhead time')).toHaveText('00:06')
+  await expect(page.locator('.timeline-playhead span')).toBeVisible()
+
+  await cursor.click()
+  await expect(cursor).toHaveAttribute('aria-pressed', 'true')
+  await expect(magnet).toHaveAttribute('aria-pressed', 'false')
+})
+
 test('timeline context menu keeps the playhead stable and supports keyboard navigation', async ({ page }) => {
   await page.setViewportSize({ width: 1008, height: 444 })
   await page.goto('/?scenario=timeline-editing')
@@ -665,6 +692,9 @@ test('selected video exposes two drag handles and previews a frame-snapped rippl
   await page.mouse.move(handleBox!.x + handleBox!.width / 2, handleBox!.y + handleBox!.height / 2)
   await page.mouse.down()
   await page.mouse.move(handleBox!.x + handleBox!.width / 2 + 44, handleBox!.y + handleBox!.height / 2)
+  const draggingHandle = await page.getByRole('button', { name: 'Trim clip start' }).boundingBox()
+  expect(draggingHandle).not.toBeNull()
+  expect(draggingHandle!.x - handleBox!.x).toBeCloseTo(44, 0)
   await expect(page.locator('.timeline-trim-readout')).toContainText('In ')
   await expect(page.locator('.timeline-trim-readout')).toContainText('Duration ')
   await page.mouse.up()
@@ -696,10 +726,13 @@ test('dragging a video edge moves every later timeline element together', async 
   await page.mouse.move(handleBox!.x + handleBox!.width / 2, handleBox!.y + handleBox!.height / 2)
   await page.mouse.down()
   await page.mouse.move(handleBox!.x + handleBox!.width / 2 + 44, handleBox!.y + handleBox!.height / 2)
+  const draggingHandle = await page.getByRole('button', { name: 'Trim clip end' }).boundingBox()
   const previewVideo = await laterVideo.boundingBox()
   const previewCard = await laterCard.boundingBox()
-  expect(previewVideo!.x - beforeVideo!.x).toBeCloseTo(previewCard!.x - beforeCard!.x, 1)
-  expect(previewVideo!.x).toBeGreaterThan(beforeVideo!.x)
+  expect(draggingHandle).not.toBeNull()
+  expect(draggingHandle!.x - handleBox!.x).toBeCloseTo(44, 0)
+  expect(previewVideo!.x).toBeCloseTo(beforeVideo!.x, 1)
+  expect(previewCard!.x).toBeCloseTo(beforeCard!.x, 1)
   await page.mouse.up()
 
   const savedVideo = await laterVideo.boundingBox()
@@ -725,8 +758,8 @@ test('timeline seek roundtrips the playhead between the two video spans', async 
   await expect(page.getByLabel('Playhead time')).toHaveText('00:06')
   const playhead = await page.locator('.timeline-playhead').boundingBox()
   expect(playhead).not.toBeNull()
-  const snappedTimeS = Math.round((280 / 876 * 20) * 30) / 30
-  expect(playhead!.x).toBeCloseTo(surfaceBox!.x + timeToPx(snappedTimeS, 20, 876), 1)
+  const cursorTimeS = (280 / 876) * 20
+  expect(playhead!.x).toBeCloseTo(surfaceBox!.x + timeToPx(cursorTimeS, 20, 876), 1)
   expect(playhead!.x).toBeGreaterThan(firstVideo!.x + firstVideo!.width)
   expect(playhead!.x).toBeLessThan(secondVideo!.x)
 })

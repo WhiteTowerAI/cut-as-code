@@ -20,7 +20,6 @@ import {
   Check,
   Copy,
   Crop,
-  Focus,
   Maximize2,
   MoreHorizontal,
   Pause,
@@ -371,6 +370,7 @@ function SelectionToolbar({
         className="viewer-toolbar-more"
         type="button"
         aria-label="More viewer actions"
+        title="More viewer actions"
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={onToggle}
@@ -547,10 +547,11 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
       availableWidth / previewGeometry.width,
       availableHeight / previewGeometry.height,
     )
-    setFitSize({
+    const nextSize = {
       width: Math.max(1, Math.floor(previewGeometry.width * scale * viewerZoom)),
       height: Math.max(1, Math.floor(previewGeometry.height * scale * viewerZoom)),
-    })
+    }
+    setFitSize((current) => current?.width === nextSize.width && current.height === nextSize.height ? current : nextSize)
   }, [previewGeometry, viewerZoom])
 
   useEffect(() => {
@@ -561,6 +562,15 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     observer.observe(stage)
     return () => observer.disconnect()
   }, [fitPreview, sequenceGeometry])
+
+  useEffect(() => {
+    const stage = stageRef.current
+    if (!stage || !fitSize) return
+    stage.scrollTo({
+      left: Math.max(0, (stage.scrollWidth - stage.clientWidth) / 2),
+      top: Math.max(0, (stage.scrollHeight - stage.clientHeight) / 2),
+    })
+  }, [fitSize])
 
   function enterFullscreen() {
     const stage = stageRef.current
@@ -992,7 +1002,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
       ) : null}
       <div className="viewer-stage" ref={stageRef}>
         {hasTimeline ? (
-          <>
+          <div className="viewer-stage-content" style={fitSize ? { width: fitSize.width + 48, height: fitSize.height + 48 } : undefined}>
             <div
               className={sequenceGeometry ? 'viewer-canvas viewer-canvas--fitted' : 'viewer-canvas'}
               data-sequence-width={sequenceGeometry?.width}
@@ -1124,7 +1134,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
                 <SelectionToolbar open={openMenu === 'viewer-more'} onToggle={() => toggleMenu('viewer-more')} />
               </>
             )}
-          </>
+          </div>
         ) : <div className="viewer-empty-state" role="status">Project video unavailable</div>}
       </div>
       {currentArtifacts.length ? <ArtifactGallery artifacts={currentArtifacts} primaryArtifactId={primaryArtifact?.id} /> : null}
@@ -1141,7 +1151,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
           aria-label={isPlaying ? 'Pause' : 'Play'}
           disabled={!canPlay}
           title={unsupportedPlaybackRate === undefined
-            ? undefined
+            ? (isPlaying ? 'Pause playback' : 'Play preview')
             : `Playback rate ${unsupportedPlaybackRate} cannot be represented by this browser. Use timeline seeking for manual review.`}
           onClick={togglePlayback}
         >
@@ -1149,19 +1159,19 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
         </button>
         <div className="viewer-playback-right">
           {!runtime && <button type="button" aria-label="Capture frame" disabled title="Frame capture is not available in project protocol V1."><ScanLine aria-hidden size={21} /></button>}
-          <button type="button" aria-label="Zoom out viewer" onClick={() => setViewerZoom((value) => Math.max(0.5, Number((value - 0.25).toFixed(2))))} disabled={!sequenceGeometry || viewerZoom <= 0.5}><ZoomOut aria-hidden size={18} /></button>
+          <button type="button" aria-label="Zoom out viewer" title="Zoom out viewer" onClick={() => setViewerZoom((value) => Math.max(0.5, Number((value - 0.25).toFixed(2))))} disabled={!sequenceGeometry || viewerZoom <= 0.5}><ZoomOut aria-hidden size={18} /></button>
           <output className="viewer-zoom-level" aria-label="Viewer zoom">{Math.round(viewerZoom * 100)}%</output>
-          <button type="button" aria-label="Zoom in viewer" onClick={() => setViewerZoom((value) => Math.min(2, Number((value + 0.25).toFixed(2))))} disabled={!sequenceGeometry || viewerZoom >= 2}><ZoomIn aria-hidden size={18} /></button>
-          <button type="button" aria-label="Fit preview" onClick={() => { setViewerZoom(1); fitPreview() }} disabled={!sequenceGeometry}><Focus aria-hidden size={21} /></button>
+          <button type="button" aria-label="Zoom in viewer" title="Zoom in viewer" onClick={() => setViewerZoom((value) => Math.min(3, Number((value + 0.25).toFixed(2))))} disabled={!sequenceGeometry || viewerZoom >= 3}><ZoomIn aria-hidden size={18} /></button>
           <button
             className="viewer-aspect-trigger"
             type="button"
             aria-label="Aspect ratio"
+            title="Choose viewer aspect ratio"
             aria-haspopup="menu"
             aria-expanded={openMenu === 'aspect-ratio'}
             onClick={() => toggleMenu('aspect-ratio')}
           ><Ratio aria-hidden size={22} /></button>
-          <button type="button" aria-label="Fullscreen" onClick={enterFullscreen} disabled={!hasTimeline}><Maximize2 aria-hidden size={21} /></button>
+          <button type="button" aria-label="Fullscreen" title="Enter fullscreen viewer" onClick={enterFullscreen} disabled={!hasTimeline}><Maximize2 aria-hidden size={21} /></button>
         </div>
       </footer>
       {openMenu === 'viewer-more' && <MoreMenu />}

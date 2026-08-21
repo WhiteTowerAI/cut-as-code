@@ -116,6 +116,25 @@ test('viewer aspect, zoom, and workspace splitters are interactive', async ({ pa
   await page.getByRole('button', { name: 'Zoom in viewer' }).click()
   await expect(page.getByLabel('Viewer zoom')).toHaveText('125%')
   expect((await canvas.boundingBox())!.height).toBeGreaterThan(portrait!.height)
+  await expect(page.getByRole('button', { name: 'Fit preview' })).toHaveCount(0)
+  const stage = page.locator('.viewer-stage')
+  await expect.poll(() => stage.evaluate((element) => ({
+    scrollHeight: element.scrollHeight,
+    clientHeight: element.clientHeight,
+    scrollTop: element.scrollTop,
+  }))).toMatchObject({ scrollTop: expect.any(Number) })
+  const overflow = await stage.evaluate((element) => ({
+    scrollHeight: element.scrollHeight,
+    clientHeight: element.clientHeight,
+    scrollTop: element.scrollTop,
+  }))
+  expect(overflow.scrollHeight).toBeGreaterThan(overflow.clientHeight)
+  expect(overflow.scrollTop).toBeGreaterThan(0)
+  await stage.evaluate((element) => { element.scrollTop = 0 })
+  await expect.poll(() => stage.evaluate((element) => element.scrollTop)).toBe(0)
+  for (let index = 0; index < 7; index += 1) await page.getByRole('button', { name: 'Zoom in viewer' }).click()
+  await expect(page.getByLabel('Viewer zoom')).toHaveText('300%')
+  await expect(page.getByRole('button', { name: 'Zoom in viewer' })).toBeDisabled()
 
   const library = page.getByRole('region', { name: 'Library' })
   const libraryBefore = await library.boundingBox()
@@ -358,7 +377,7 @@ test('runtime Viewer uses real sequence geometry, selectable preview aspect, and
     return portraitBox!.height / portraitBox!.width
   }).toBeGreaterThan(1)
 
-  await page.getByRole('button', { name: 'Fit preview' }).click()
+  await expect(page.getByRole('button', { name: 'Fit preview' })).toHaveCount(0)
   await expect(canvas).toHaveAttribute('data-fit-mode', 'fit')
   await page.getByRole('button', { name: 'Fullscreen' }).click()
   await expect(page.locator('html')).toHaveAttribute('data-fullscreen-target', /viewer-stage/)

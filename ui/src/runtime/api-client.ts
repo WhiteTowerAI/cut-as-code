@@ -101,6 +101,16 @@ export class RuntimeApiClient {
     return snapshot
   }
 
+  async deleteAsset(assetId: string): Promise<RuntimeSnapshot> {
+    if (!/^asset_[a-f0-9]+$/.test(assetId)) throw new Error('Invalid asset ID')
+    const response = await fetch(`/v1/projects/${encodeURIComponent(this.projectId)}/assets/${encodeURIComponent(assetId)}`, {
+      method: 'DELETE', credentials: 'same-origin',
+    })
+    const value = await response.json() as SnapshotResponse & { error?: string }
+    if (!response.ok || !value.ok) throw new Error(value.error ?? 'Could not delete asset')
+    return value.snapshot
+  }
+
   async updateContentCards(readSet: RuntimeReadSet, review: ContentCardsReview) {
     return this.updatePlan('content-cards', readSet, review)
   }

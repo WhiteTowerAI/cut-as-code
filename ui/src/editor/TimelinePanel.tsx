@@ -323,13 +323,13 @@ function Clip({
           <button
             type="button"
             className="timeline-trim-handle timeline-trim-handle--start"
-            aria-label="Trim audio start"
+            aria-label="Trim audio start" title="Drag to trim audio start"
             onPointerDown={(event) => onTrimStart(event, clip, 'start', 'audio')}
           ><span aria-hidden /></button>
           <button
             type="button"
             className="timeline-trim-handle timeline-trim-handle--end"
-            aria-label="Trim audio end"
+            aria-label="Trim audio end" title="Drag to trim audio end"
             onPointerDown={(event) => onTrimStart(event, clip, 'end', 'audio')}
           ><span aria-hidden /></button>
         </>
@@ -384,6 +384,7 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
   const gutterRef = useRef<HTMLDivElement>(null)
   const rulerScrollRef = useRef<HTMLDivElement>(null)
   const trimSourceRef = useRef<number | null>(null)
+  const trimDeltaRef = useRef(0)
   const audioMoveStartRef = useRef<number | null>(null)
   const [runtimeTimelineWidthPx, setRuntimeTimelineWidthPx] = useState(TIMELINE_WIDTH_PX)
   const viewDurationRef = useRef(project?.durationS ?? 0)
@@ -496,46 +497,69 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
 
   useEffect(() => {
     if (!trimDrag || !project) return
+    const sourceAtDelta = (deltaProgramS: number) => trimDrag.kind === 'audio'
+      ? trimAudioSourceAtProgramDelta(project, trimDrag.clipId, trimDrag.edge, deltaProgramS)
+      : trimSourceAtProgramDelta(project, trimDrag.clipId, trimDrag.edge, deltaProgramS)
+    const previewAtSource = (sourceS: number) => ({
+      ...project,
+      tracks: project.tracks.map((track) => ({
+        ...track,
+        clips: track.clips?.map((clip) => {
+          if (clip.id !== trimDrag.clipId) return clip
+          const originalSourceS = trimDrag.edge === 'start' ? clip.sourceRange.startS : clip.sourceRange.endS
+          const programDeltaS = (sourceS - originalSourceS) / (clip.speed && clip.speed > 0 ? clip.speed : 1)
+          return {
+            ...clip,
+            sourceRange: trimDrag.edge === 'start'
+              ? { ...clip.sourceRange, startS: sourceS }
+              : { ...clip.sourceRange, endS: sourceS },
+            programRange: trimDrag.edge === 'start'
+              ? { ...clip.programRange, startS: clip.programRange.startS + programDeltaS }
+              : { ...clip.programRange, endS: clip.programRange.endS + programDeltaS },
+          }
+        }),
+      })),
+    })
     const handlePointerMove = (event: globalThis.PointerEvent) => {
       if (event.pointerId !== trimDrag.pointerId) return
-      let deltaProgramS = (event.clientX - trimDrag.startClientX) / (viewWidthPx * timelineZoom) * viewDurationS
-      if (snapEnabled) {
-        const clip = project.tracks.flatMap((track) => track.clips ?? []).find((candidate) => candidate.id === trimDrag.clipId)
-        if (clip) {
-          const boundaryS = (trimDrag.edge === 'start' ? clip.programRange.startS : clip.programRange.endS) + deltaProgramS
+      const deltaProgramS = (event.clientX - trimDrag.startClientX) / (viewWidthPx * timelineZoom) * viewDurationS
+      const sourceS = sourceAtDelta(deltaProgramS)
+      if (sourceS === null) return
+      trimDeltaRef.current = deltaProgramS
+      trimSourceRef.current = sourceS
+      setTrimPreview({ project: previewAtSource(sourceS), sourceS })
+    }
+    const handlePointerUp = (event: globalThis.PointerEvent) => {
+      if (event.pointerId !== trimDrag.pointerId) return
+      const clip = project.tracks.flatMap((track) => track.clips ?? []).find((candidate) => candidate.id === trimDrag.clipId)
+      let deltaProgramS = trimDeltaRef.current
+      if (clip) {
+        const originalBoundaryS = trimDrag.edge === 'start' ? clip.programRange.startS : clip.programRange.endS
+        const frameDurationS = project.fps.denominator / project.fps.numerator
+        const frameBoundaryS = Math.round((originalBoundaryS + deltaProgramS) / frameDurationS) * frameDurationS
+        deltaProgramS += frameBoundaryS - (originalBoundaryS + deltaProgramS)
+        if (snapEnabled) {
+          const boundaryS = originalBoundaryS + deltaProgramS
           const targets = [currentTimeS, 0, project.durationS, ...project.tracks.flatMap((track) => (track.clips ?? []).flatMap((candidate) => [candidate.programRange.startS, candidate.programRange.endS]))]
           const thresholdS = SNAP_THRESHOLD_PX / (viewWidthPx * timelineZoom) * viewDurationS
           deltaProgramS += snapTimelineTime(boundaryS, targets, thresholdS) - boundaryS
         }
       }
-      const sourceS = trimDrag.kind === 'audio'
-        ? trimAudioSourceAtProgramDelta(project, trimDrag.clipId, trimDrag.edge, deltaProgramS)
-        : trimSourceAtProgramDelta(project, trimDrag.clipId, trimDrag.edge, deltaProgramS)
-      if (sourceS === null) return
-      trimSourceRef.current = sourceS
-      try {
-        const preview = applyTimelineEdit(project, trimDrag.kind === 'audio'
-          ? { type: 'trim-audio', audioClipId: trimDrag.clipId, edge: trimDrag.edge, sourceS }
-          : { type: 'trim', clipId: trimDrag.clipId, edge: trimDrag.edge, sourceS }).project
-        setTrimPreview({ project: preview, sourceS })
-      } catch {
-        setTrimPreview(null)
-      }
-    }
-    const handlePointerUp = (event: globalThis.PointerEvent) => {
-      if (event.pointerId !== trimDrag.pointerId) return
-      const sourceS = trimSourceRef.current ?? trimDrag.sourceS
+      const sourceS = sourceAtDelta(deltaProgramS) ?? trimSourceRef.current ?? trimDrag.sourceS
+      const command = trimDrag.kind === 'audio'
+        ? { type: 'trim-audio' as const, audioClipId: trimDrag.clipId, edge: trimDrag.edge, sourceS }
+        : { type: 'trim' as const, clipId: trimDrag.clipId, edge: trimDrag.edge, sourceS }
+      trimDeltaRef.current = 0
       trimSourceRef.current = null
       setTrimDrag(null)
-      setTrimPreview(null)
       if (Math.abs(sourceS - trimDrag.sourceS) > 1e-7) {
-        void editTimeline(trimDrag.kind === 'audio'
-          ? { type: 'trim-audio', audioClipId: trimDrag.clipId, edge: trimDrag.edge, sourceS }
-          : { type: 'trim', clipId: trimDrag.clipId, edge: trimDrag.edge, sourceS })
-      }
+        try { setTrimPreview({ project: applyTimelineEdit(project, command).project, sourceS }) } catch { setTrimPreview(null) }
+        void editTimeline(command).finally(() => setTrimPreview(null))
+      } else setTrimPreview(null)
     }
     const handlePointerCancel = (event: globalThis.PointerEvent) => {
       if (event.pointerId !== trimDrag.pointerId) return
+      trimDeltaRef.current = 0
       trimSourceRef.current = null
       setTrimDrag(null)
       setTrimPreview(null)
@@ -602,6 +626,7 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
     event.stopPropagation()
     if (!timelineEditable || timelinePending) return
     const sourceS = edge === 'start' ? clip.sourceRange.startS : clip.sourceRange.endS
+    trimDeltaRef.current = 0
     trimSourceRef.current = sourceS
     setTrimDrag({ pointerId: event.pointerId, clipId: clip.id, edge, startClientX: event.clientX, sourceS, kind })
     setTrimPreview({ project: project!, sourceS })
@@ -627,11 +652,20 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
     if (!surface) return
     const rect = surface.getBoundingClientRect()
     const pixelX = event.clientX - rect.left + surface.scrollLeft
-    seek(pxToTime(pixelX, viewDurationS, viewWidthPx, {
+    const timeS = pxToTime(pixelX, viewDurationS, viewWidthPx, {
       zoom: timelineZoom,
       fps: project?.fps,
       snapEnabled,
-    }))
+    })
+    if (!snapEnabled) return seek(timeS)
+    const targets = [
+      0,
+      durationS,
+      ...timelineMarkers.map((marker) => marker.timeS),
+      ...tracks.flatMap((track) => (track.clips ?? []).flatMap((clip) => [clip.programRange.startS, clip.programRange.endS])),
+    ]
+    const thresholdS = SNAP_THRESHOLD_PX / (viewWidthPx * timelineZoom) * viewDurationS
+    seek(snapTimelineTime(timeS, targets, thresholdS))
   }
 
   function contextTimeFromClientX(clientX: number) {
@@ -1236,8 +1270,8 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
     <section className={`timeline-panel${hasMedia ? '' : ' timeline-panel--empty'}`} role="region" aria-label="Timeline">
       <header className="timeline-toolbar" aria-label="Timeline tools">
         {!runtime && <button type="button" aria-label="Add track" disabled={!hasMedia}><Plus aria-hidden size={18} /></button>}
-        <button type="button" aria-label="Select tool"><MousePointer2 aria-hidden size={18} /></button>
-        <button className={snapEnabled ? 'is-active' : ''} type="button" aria-label="Toggle snap" aria-pressed={snapEnabled} onClick={() => setSnapEnabled(!snapEnabled)}><Magnet aria-hidden size={18} /></button>
+        <button className={snapEnabled ? '' : 'is-active'} type="button" aria-label="Select tool" title="Select and position timeline items" aria-pressed={!snapEnabled} onClick={() => setSnapEnabled(false)}><MousePointer2 aria-hidden size={18} /></button>
+        <button className={snapEnabled ? 'is-active' : ''} type="button" aria-label="Toggle snap" title={snapEnabled ? 'Magnetic snapping on' : 'Magnetic snapping off'} aria-pressed={snapEnabled} onClick={() => setSnapEnabled(!snapEnabled)}><Magnet aria-hidden size={18} /></button>
         {(hasMedia || timelinePast.length > 0 || timelineFuture.length > 0) && (
           <>
             <span className="timeline-toolbar-divider" />
@@ -1256,9 +1290,9 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
         {timelinePending && <span className="timeline-edit-status" role="status">Saving timeline…</span>}
         {!timelinePending && timelineError && <span className="timeline-edit-status timeline-edit-status--error" role="alert" title={timelineError}>{timelineError}</span>}
         <span className="timeline-toolbar-spacer" />
-        <button type="button" aria-label="Fit timeline" onClick={() => setTimelineZoom(1)}><Ruler aria-hidden size={20} /></button>
-        <button type="button" aria-label="Zoom out timeline" disabled={timelineZoom <= MIN_ZOOM} onClick={() => setTimelineZoom(timelineZoom - ZOOM_STEP)}><ZoomOut aria-hidden size={20} /></button>
-        <button type="button" aria-label="Zoom in timeline" disabled={timelineZoom >= MAX_ZOOM} onClick={() => setTimelineZoom(timelineZoom + ZOOM_STEP)}><ZoomIn aria-hidden size={20} /></button>
+        <button type="button" aria-label="Fit timeline" title="Fit timeline to available width" onClick={() => setTimelineZoom(1)}><Ruler aria-hidden size={20} /></button>
+        <button type="button" aria-label="Zoom out timeline" title="Zoom out timeline" disabled={timelineZoom <= MIN_ZOOM} onClick={() => setTimelineZoom(timelineZoom - ZOOM_STEP)}><ZoomOut aria-hidden size={20} /></button>
+        <button type="button" aria-label="Zoom in timeline" title="Zoom in timeline" disabled={timelineZoom >= MAX_ZOOM} onClick={() => setTimelineZoom(timelineZoom + ZOOM_STEP)}><ZoomIn aria-hidden size={20} /></button>
       </header>
       <div className="timeline-body">
         {hasMedia && (

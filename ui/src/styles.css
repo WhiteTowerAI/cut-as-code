@@ -344,6 +344,37 @@ button {
   cursor: pointer;
 }
 
+.library-tile-wrap {
+  position: relative;
+  width: 144px;
+  height: 72px;
+}
+
+.library-tile-wrap:has(.library-tile--asset) { height: 118px; }
+
+.library-asset-delete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid #4a4f5c;
+  border-radius: 4px;
+  color: #f4f5f7;
+  background: rgb(18 20 24 / 88%);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.library-tile-wrap:hover .library-asset-delete,
+.library-tile-wrap:focus-within .library-asset-delete { opacity: 1; }
+
+.library-asset-delete:hover { color: #ff8a8a; border-color: #ff6b6b; }
+.library-asset-delete:focus-visible { opacity: 1; outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
 .library-tile--asset {
   grid-template-rows: 96px 22px;
   height: 118px;
@@ -868,13 +899,21 @@ button {
 
 .viewer-stage {
   position: relative;
-  display: grid;
-  place-items: center;
   width: 100%;
   height: 600px;
   flex: none;
-  overflow: hidden;
+  overflow: auto;
   background: #262626;
+}
+
+.viewer-stage-content {
+  position: relative;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  min-width: 100%;
+  min-height: 100%;
+  padding: 24px;
 }
 
 .viewer-canvas {
@@ -1019,8 +1058,7 @@ button {
 }
 
 .viewer-canvas--fitted {
-  max-width: calc(100% - 48px);
-  max-height: calc(100% - 48px);
+  flex: none;
   background: #050506;
 }
 
@@ -2074,11 +2112,13 @@ button {
 .timeline-playhead span {
   position: absolute;
   top: 0;
-  left: -4px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #fff;
+  left: -5px;
+  width: 0;
+  height: 0;
+  border-top: 8px solid #fff;
+  border-right: 6px solid transparent;
+  border-bottom: 0;
+  border-left: 6px solid transparent;
 }
 
 .timeline-playhead-time { position: absolute; top: 2px; left: 12px; z-index: 3; color: #8f939d; font-size: 9px; }
@@ -2483,6 +2523,7 @@ button {
 }
 
 .editor-shell--workspace .library-tile,
+.editor-shell--workspace .library-tile-wrap,
 .editor-shell--workspace .library-preview {
   width: 100%;
 }

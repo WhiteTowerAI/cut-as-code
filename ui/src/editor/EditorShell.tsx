@@ -343,6 +343,10 @@ function Workspace({
             const snapshot = await runtime.client.importFiles(files)
             store.getState().setProject(projectFromSnapshot(null, snapshot))
           } : undefined}
+          deleteAsset={runtime ? async (assetId) => {
+            const snapshot = await runtime.client.deleteAsset(assetId)
+            store.getState().setProject(projectFromSnapshot(null, snapshot))
+          } : undefined}
         />
         <ViewerPanel store={store} />
         <button className="workspace-splitter workspace-splitter--vertical" type="button" aria-label="Resize library and viewer" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); resizeRef.current = { kind: 'library', startX: event.clientX, startY: event.clientY, startValue: libraryWidth } }} onPointerMove={(event) => { const resizeState = resizeRef.current; if (resizeState?.kind === 'library') setLibraryWidth(Math.min(520, Math.max(240, resizeState.startValue + event.clientX - resizeState.startX))) }} />
@@ -483,6 +487,10 @@ export function EditorShell({ runtime }: { runtime?: RuntimeProjectStatus }) {
           store={store}
           importAssets={runtime ? async (files) => {
             const snapshot = await runtime.client.importFiles(files)
+            store.getState().setProject(projectFromSnapshot(null, snapshot))
+          } : undefined}
+          deleteAsset={runtime ? async (assetId) => {
+            const snapshot = await runtime.client.deleteAsset(assetId)
             store.getState().setProject(projectFromSnapshot(null, snapshot))
           } : undefined}
         />
