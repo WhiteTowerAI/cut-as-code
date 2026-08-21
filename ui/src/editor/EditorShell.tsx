@@ -346,9 +346,9 @@ function Workspace({
         />
         <ViewerPanel store={store} />
         <button className="workspace-splitter workspace-splitter--vertical" type="button" aria-label="Resize library and viewer" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); resizeRef.current = { kind: 'library', startX: event.clientX, startY: event.clientY, startValue: libraryWidth } }} onPointerMove={(event) => { const resizeState = resizeRef.current; if (resizeState?.kind === 'library') setLibraryWidth(Math.min(520, Math.max(240, resizeState.startValue + event.clientX - resizeState.startX))) }} />
+        <button className="workspace-splitter workspace-splitter--horizontal" type="button" aria-label="Resize viewer and timeline" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); resizeRef.current = { kind: 'timeline', startX: event.clientX, startY: event.clientY, startValue: timelineHeight } }} onPointerMove={(event) => { const resizeState = resizeRef.current; if (resizeState?.kind === 'timeline') setTimelineHeight(Math.min(560, Math.max(180, resizeState.startValue + resizeState.startY - event.clientY))) }} />
       </div>
       <div className="workspace-timeline">
-        <button className="workspace-splitter workspace-splitter--horizontal" type="button" aria-label="Resize viewer and timeline" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); resizeRef.current = { kind: 'timeline', startX: event.clientX, startY: event.clientY, startValue: timelineHeight } }} onPointerMove={(event) => { const resizeState = resizeRef.current; if (resizeState?.kind === 'timeline') setTimelineHeight(Math.min(560, Math.max(180, resizeState.startValue + resizeState.startY - event.clientY))) }} />
         <TimelinePanel store={store} />
       </div>
     </div>

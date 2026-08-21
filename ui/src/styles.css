@@ -2418,6 +2418,7 @@ button {
 }
 
 .workspace-primary {
+  position: relative;
   display: grid;
   grid-template-columns: var(--library-width, clamp(280px, 26vw, 400px)) minmax(0, 1fr);
   gap: 12px;
@@ -2444,8 +2445,8 @@ button {
   border: 0;
   background: transparent;
 }
-.workspace-splitter--vertical { top: 12px; bottom: 12px; left: calc(var(--library-width, 320px) + 6px); width: 8px; cursor: col-resize; }
-.workspace-splitter--horizontal { top: 0; right: 12px; left: 12px; height: 12px; cursor: row-resize; }
+.workspace-splitter--vertical { top: 12px; bottom: 12px; left: calc(var(--library-width, 320px) + 12px); width: 12px; cursor: col-resize; }
+.workspace-splitter--horizontal { right: 12px; bottom: 0; left: 12px; height: 12px; cursor: row-resize; }
 .workspace-splitter:hover { background: rgb(113 185 168 / 18%); }
 
 .editor-shell--workspace .library-panel,
