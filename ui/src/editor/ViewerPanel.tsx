@@ -30,6 +30,8 @@ import {
   ScanLine,
   Trash2,
   Volume2,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react'
 import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand/vanilla'
@@ -454,8 +456,9 @@ function displayAspectRatio(width?: number, height?: number) {
   return candidates.find(([, value]) => Math.abs(ratio - value) < 0.01)?.[0] ?? 'Original'
 }
 
-function AspectRatioMenu({ width, height, readOnly }: { width?: number; height?: number; readOnly?: boolean }) {
-  const selectedRatio = displayAspectRatio(width, height)
+type ViewerAspect = 'Original' | '16:9' | '9:16' | '1:1' | '4:5' | '4:3'
+
+function AspectRatioMenu({ selectedRatio, onSelect, readOnly = false }: { selectedRatio: ViewerAspect; onSelect: (ratio: ViewerAspect) => void; readOnly?: boolean }) {
   return (
     <div className="viewer-menu viewer-aspect-menu" role="menu" aria-label="Aspect ratio">
       {aspectOptions.map((option, index) => (
@@ -465,6 +468,7 @@ function AspectRatioMenu({ width, height, readOnly }: { width?: number; height?:
           role="menuitemradio"
           aria-checked={option.ratio === selectedRatio}
           type="button"
+          onClick={() => onSelect(option.ratio)}
           disabled={readOnly}
           key={option.ratio}
         >
@@ -514,6 +518,8 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
   const projectVideoRef = useRef<HTMLVideoElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const [fitSize, setFitSize] = useState<Readonly<{ width: number; height: number }>>()
+  const [viewerZoom, setViewerZoom] = useState(1)
+  const [viewerAspect, setViewerAspect] = useState<ViewerAspect>('Original')
   const finalFrameStateRef = useRef<FinalFrameState | null>(null)
   const nativeProgramTimeRef = useRef<number | null>(null)
   const activeClipRef = useRef<ClipView | null>(null)
@@ -542,20 +548,24 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     selection?.id === layer.cueId && selection.kind === layerSelectionKind(layer),
   )
 
+  const previewGeometry = viewerAspect === 'Original' || !sequenceGeometry
+    ? sequenceGeometry
+    : { ...sequenceGeometry, width: viewerAspect === '16:9' ? 16 : viewerAspect === '9:16' ? 9 : viewerAspect === '1:1' ? 1 : viewerAspect === '4:5' ? 4 : 4, height: viewerAspect === '16:9' ? 9 : viewerAspect === '9:16' ? 16 : viewerAspect === '1:1' ? 1 : viewerAspect === '4:5' ? 5 : 3 }
+
   const fitPreview = useCallback(() => {
     const stage = stageRef.current
-    if (!stage || !sequenceGeometry) return
+    if (!stage || !previewGeometry) return
     const availableWidth = Math.max(1, stage.clientWidth - 48)
     const availableHeight = Math.max(1, stage.clientHeight - 48)
     const scale = Math.min(
-      availableWidth / sequenceGeometry.width,
-      availableHeight / sequenceGeometry.height,
+      availableWidth / previewGeometry.width,
+      availableHeight / previewGeometry.height,
     )
     setFitSize({
-      width: Math.max(1, Math.floor(sequenceGeometry.width * scale)),
-      height: Math.max(1, Math.floor(sequenceGeometry.height * scale)),
+      width: Math.max(1, Math.floor(previewGeometry.width * scale * viewerZoom)),
+      height: Math.max(1, Math.floor(previewGeometry.height * scale * viewerZoom)),
     })
-  }, [sequenceGeometry])
+  }, [previewGeometry, viewerZoom])
 
   useEffect(() => {
     fitPreview()
@@ -1153,7 +1163,10 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
         </button>
         <div className="viewer-playback-right">
           {!runtime && <button type="button" aria-label="Capture frame" disabled title="Frame capture is not available in project protocol V1."><ScanLine aria-hidden size={21} /></button>}
-          <button type="button" aria-label="Fit preview" onClick={fitPreview} disabled={!sequenceGeometry}><Focus aria-hidden size={21} /></button>
+          <button type="button" aria-label="Zoom out viewer" onClick={() => setViewerZoom((value) => Math.max(0.5, Number((value - 0.25).toFixed(2))))} disabled={!sequenceGeometry || viewerZoom <= 0.5}><ZoomOut aria-hidden size={18} /></button>
+          <output className="viewer-zoom-level" aria-label="Viewer zoom">{Math.round(viewerZoom * 100)}%</output>
+          <button type="button" aria-label="Zoom in viewer" onClick={() => setViewerZoom((value) => Math.min(2, Number((value + 0.25).toFixed(2))))} disabled={!sequenceGeometry || viewerZoom >= 2}><ZoomIn aria-hidden size={18} /></button>
+          <button type="button" aria-label="Fit preview" onClick={() => { setViewerZoom(1); fitPreview() }} disabled={!sequenceGeometry}><Focus aria-hidden size={21} /></button>
           <button
             className="viewer-aspect-trigger"
             type="button"
@@ -1168,9 +1181,9 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
       {openMenu === 'viewer-more' && <MoreMenu />}
       {openMenu === 'aspect-ratio' && (
         <AspectRatioMenu
-          width={sequenceGeometry?.width}
-          height={sequenceGeometry?.height}
-          readOnly={Boolean(sequenceGeometry)}
+          selectedRatio={runtime ? displayAspectRatio(sequenceGeometry?.width, sequenceGeometry?.height) as ViewerAspect : viewerAspect}
+          readOnly={runtime}
+          onSelect={(ratio) => { setViewerAspect(ratio); setOpenMenu(null); setViewerZoom(1) }}
         />
       )}
     </section>

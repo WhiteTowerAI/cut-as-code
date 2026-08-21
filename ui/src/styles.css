@@ -1024,6 +1024,8 @@ button {
   background: #050506;
 }
 
+.viewer-zoom-level { width: 38px; color: #b9c0ca; font-size: 10px; text-align: center; }
+
 .viewer-empty-state {
   display: grid;
   place-items: center;
@@ -2084,8 +2086,7 @@ button {
 .timeline-disabled-command { display: grid; place-items: center; width: 28px; height: 28px; flex: none; }
 
 .editor-shell--workspace {
-  display: grid;
-  grid-template-rows: 52px minmax(0, 1fr) clamp(220px, 34dvh, 380px);
+  display: block;
   place-items: stretch;
   position: relative;
   width: 100vw;
@@ -2096,9 +2097,19 @@ button {
   background: #0c0d0f;
 }
 
-.editor-shell--workspace:has(.workspace-review) {
-  grid-template-rows: 52px auto minmax(0, 1fr) clamp(220px, 34dvh, 380px);
+.workspace-layout {
+  display: grid;
+  grid-template-rows: 52px minmax(0, 1fr) var(--timeline-height, clamp(220px, 34dvh, 380px));
+  width: 100%;
+  height: 100%;
+  min-height: 0;
 }
+
+.editor-shell--workspace:has(.workspace-review) {
+  grid-template-rows: none;
+}
+
+.editor-shell--workspace:has(.workspace-review) .workspace-layout { grid-template-rows: 52px auto minmax(0, 1fr) var(--timeline-height, clamp(220px, 34dvh, 380px)); }
 
 .workspace-operation-bar {
   display: flex;
@@ -2408,7 +2419,7 @@ button {
 
 .workspace-primary {
   display: grid;
-  grid-template-columns: clamp(280px, 26vw, 400px) minmax(0, 1fr);
+  grid-template-columns: var(--library-width, clamp(280px, 26vw, 400px)) minmax(0, 1fr);
   gap: 12px;
   min-width: 0;
   min-height: 0;
@@ -2418,12 +2429,24 @@ button {
 }
 
 .workspace-timeline {
+  position: relative;
   min-width: 0;
   min-height: 0;
   height: auto;
   padding: 0 12px 12px;
   overflow: hidden;
 }
+
+.workspace-splitter {
+  position: absolute;
+  z-index: 10;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.workspace-splitter--vertical { top: 12px; bottom: 12px; left: calc(var(--library-width, 320px) + 6px); width: 8px; cursor: col-resize; }
+.workspace-splitter--horizontal { top: 0; right: 12px; left: 12px; height: 12px; cursor: row-resize; }
+.workspace-splitter:hover { background: rgb(113 185 168 / 18%); }
 
 .editor-shell--workspace .library-panel,
 .editor-shell--workspace .viewer-panel {

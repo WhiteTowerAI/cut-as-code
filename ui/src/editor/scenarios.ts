@@ -330,7 +330,7 @@ const scenarios: readonly EditorScenario[] = [
   {
     id: '1-60',
     initialState: state({
-      project: twentySecondProject,
+      project: { ...twentySecondProject, sequenceGeometry: { width: 1280, height: 720 } },
       selection: { kind: 'video', id: 'video-2' },
       currentTimeS: timeAtFigmaPx(280),
     }),

@@ -100,6 +100,45 @@ test('runtime workspace exactly fills common desktop viewports without document 
   }
 })
 
+test('viewer aspect, zoom, and workspace splitters are interactive', async ({ page }) => {
+  await page.route('**/v1/projects/project_controls/snapshot', (route) => route.fulfill({
+    contentType: 'application/json', body: JSON.stringify({ ok: true, snapshot: runtimeSnapshot() }),
+  }))
+  await page.goto('/?scenario=1-60')
+
+  const canvas = page.locator('.viewer-canvas')
+  const original = await canvas.boundingBox()
+  await page.getByRole('button', { name: 'Aspect ratio' }).click()
+  await page.getByRole('menuitemradio', { name: /9:16/ }).click()
+  const portrait = await canvas.boundingBox()
+  expect(portrait!.height).toBeGreaterThan(portrait!.width)
+
+  await page.getByRole('button', { name: 'Zoom in viewer' }).click()
+  await expect(page.getByLabel('Viewer zoom')).toHaveText('125%')
+  expect((await canvas.boundingBox())!.height).toBeGreaterThan(portrait!.height)
+
+  const library = page.getByRole('region', { name: 'Library' })
+  const libraryBefore = await library.boundingBox()
+  const vertical = page.getByRole('button', { name: 'Resize library and viewer' })
+  const verticalBox = await vertical.boundingBox()
+  await page.mouse.move(verticalBox!.x + 4, verticalBox!.y + 20)
+  await page.mouse.down()
+  await page.mouse.move(verticalBox!.x + 84, verticalBox!.y + 20)
+  await page.mouse.up()
+  expect((await library.boundingBox())!.width).toBeGreaterThan(libraryBefore!.width + 50)
+
+  const timeline = page.getByRole('region', { name: 'Timeline' })
+  const timelineBefore = await timeline.boundingBox()
+  const horizontal = page.getByRole('button', { name: 'Resize viewer and timeline' })
+  const horizontalBox = await horizontal.boundingBox()
+  await page.mouse.move(horizontalBox!.x + 40, horizontalBox!.y + 5)
+  await page.mouse.down()
+  await page.mouse.move(horizontalBox!.x + 40, horizontalBox!.y - 70, { steps: 10 })
+  await page.mouse.up()
+  expect((await timeline.boundingBox())!.height).toBeGreaterThan(timelineBefore!.height + 40)
+  expect(original).not.toBeNull()
+})
+
 test('timeline track headers align row-for-row and share vertical wheel scrolling', async ({ page }) => {
   const base = runtimeSnapshot()
   await page.route('**/v1/projects/project_timeline_rows/snapshot', (route) => route.fulfill({

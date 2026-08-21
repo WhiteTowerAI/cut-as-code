@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { isTimeInHalfOpenRange, pxToTime, timeToPx } from '../src/editor/TimelinePanel'
+import { isTimeInHalfOpenRange, pxToTime, snapTimelineTime, timeToPx } from '../src/editor/TimelinePanel'
 import { applyTimelineEdit, trimSourceAtProgramDelta } from '../src/editor/timeline-edit'
 import { getScenario } from '../src/editor/scenarios'
 
@@ -7,6 +7,12 @@ test('clip ranges include their start and exclude their exact end', () => {
   expect(isTimeInHalfOpenRange(4, 4, 8)).toBe(true)
   expect(isTimeInHalfOpenRange(7.999, 4, 8)).toBe(true)
   expect(isTimeInHalfOpenRange(8, 4, 8)).toBe(false)
+})
+
+test('magnetic snapping uses the nearest boundary inside the visual threshold', () => {
+  expect(snapTimelineTime(4.94, [0, 5, 10], 0.1)).toBe(5)
+  expect(snapTimelineTime(4.7, [0, 5, 10], 0.1)).toBe(4.7)
+  expect(snapTimelineTime(5.04, [5, 5.05], 0.1)).toBe(5.05)
 })
 
 test('Timeline fixture keeps visual inset out of protocol clip ranges', () => {

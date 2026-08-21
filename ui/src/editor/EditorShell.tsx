@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ComponentType } from 'react'
+import { useEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties } from 'react'
 import { useStore } from 'zustand'
 import {
   ArrowDownToLine,
@@ -107,6 +107,21 @@ function Workspace({
   runtime?: RuntimeProjectStatus
   showDiagnostics?: boolean
 }) {
+  const [libraryWidth, setLibraryWidth] = useState(320)
+  const [timelineHeight, setTimelineHeight] = useState(300)
+  const resizeRef = useRef<{ kind: 'library' | 'timeline'; startX: number; startY: number; startValue: number } | null>(null)
+  useEffect(() => {
+    const move = (event: PointerEvent) => {
+      const resizeState = resizeRef.current
+      if (!resizeState) return
+      if (resizeState.kind === 'library') setLibraryWidth(Math.min(520, Math.max(240, resizeState.startValue + event.clientX - resizeState.startX)))
+      else setTimelineHeight(Math.min(560, Math.max(180, resizeState.startValue + resizeState.startY - event.clientY)))
+    }
+    const stop = () => { resizeRef.current = null }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', stop)
+    return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', stop) }
+  }, [])
   const [exportJob, setExportJob] = useState<RuntimeExportJob>({ status: 'idle' })
   const [exportError, setExportError] = useState<string | null>(null)
   const [exportActionPending, setExportActionPending] = useState<'open' | 'reveal' | null>(null)
@@ -241,7 +256,7 @@ function Workspace({
         : exportJob.status === 'failed' ? exportJob.error ?? 'Export failed'
           : exportConnectionError ?? '')
   return (
-    <>
+    <div className="workspace-layout" style={{ '--timeline-height': `${timelineHeight}px` } as CSSProperties}>
       <header className="workspace-operation-bar">
         {runtime ? (
           <>
@@ -321,7 +336,7 @@ function Workspace({
           <ProtocolResourceInspector resources={runtime.snapshot.resources} client={runtime.client} />
         </div>
       ) : null}
-      <div className="workspace-primary">
+      <div className="workspace-primary" style={{ '--library-width': `${libraryWidth}px` } as CSSProperties}>
         <LibraryPanel
           store={store}
           importAssets={runtime ? async (files) => {
@@ -330,11 +345,13 @@ function Workspace({
           } : undefined}
         />
         <ViewerPanel store={store} />
+        <button className="workspace-splitter workspace-splitter--vertical" type="button" aria-label="Resize library and viewer" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); resizeRef.current = { kind: 'library', startX: event.clientX, startY: event.clientY, startValue: libraryWidth } }} onPointerMove={(event) => { const resizeState = resizeRef.current; if (resizeState?.kind === 'library') setLibraryWidth(Math.min(520, Math.max(240, resizeState.startValue + event.clientX - resizeState.startX))) }} />
       </div>
       <div className="workspace-timeline">
+        <button className="workspace-splitter workspace-splitter--horizontal" type="button" aria-label="Resize viewer and timeline" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); resizeRef.current = { kind: 'timeline', startX: event.clientX, startY: event.clientY, startValue: timelineHeight } }} onPointerMove={(event) => { const resizeState = resizeRef.current; if (resizeState?.kind === 'timeline') setTimelineHeight(Math.min(560, Math.max(180, resizeState.startValue + resizeState.startY - event.clientY))) }} />
         <TimelinePanel store={store} />
       </div>
-    </>
+    </div>
   )
 }
 

@@ -61,6 +61,7 @@ const MAX_ZOOM = 2
 const ZOOM_STEP = 0.25
 const RULER_LABEL_INTERVALS_S = [1, 2, 5, 10, 15, 30, 60, 120, 300] as const
 const MIN_RULER_LABEL_SPACING_PX = 64
+const SNAP_THRESHOLD_PX = 8
 type RationalFps = Readonly<{ numerator: number; denominator: number }>
 type MappingOptions = Readonly<{
   zoom?: number
@@ -76,6 +77,15 @@ function mappingZoom(options: number | MappingOptions) {
 function clamp(value: number, minimum: number, maximum: number) {
   if (!Number.isFinite(value)) return minimum
   return Math.min(Math.max(value, minimum), maximum)
+}
+
+export function snapTimelineTime(timeS: number, targets: readonly number[], thresholdS: number) {
+  const nearest = targets.reduce<number | null>((best, target) => (
+    Math.abs(target - timeS) <= thresholdS && (best === null || Math.abs(target - timeS) < Math.abs(best - timeS))
+      ? target
+      : best
+  ), null)
+  return nearest ?? timeS
 }
 
 export function isTimeInHalfOpenRange(timeS: number, startS: number, endS: number) {
@@ -488,7 +498,16 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
     if (!trimDrag || !project) return
     const handlePointerMove = (event: globalThis.PointerEvent) => {
       if (event.pointerId !== trimDrag.pointerId) return
-      const deltaProgramS = (event.clientX - trimDrag.startClientX) / (viewWidthPx * timelineZoom) * viewDurationS
+      let deltaProgramS = (event.clientX - trimDrag.startClientX) / (viewWidthPx * timelineZoom) * viewDurationS
+      if (snapEnabled) {
+        const clip = project.tracks.flatMap((track) => track.clips ?? []).find((candidate) => candidate.id === trimDrag.clipId)
+        if (clip) {
+          const boundaryS = (trimDrag.edge === 'start' ? clip.programRange.startS : clip.programRange.endS) + deltaProgramS
+          const targets = [currentTimeS, 0, project.durationS, ...project.tracks.flatMap((track) => (track.clips ?? []).flatMap((candidate) => [candidate.programRange.startS, candidate.programRange.endS]))]
+          const thresholdS = SNAP_THRESHOLD_PX / (viewWidthPx * timelineZoom) * viewDurationS
+          deltaProgramS += snapTimelineTime(boundaryS, targets, thresholdS) - boundaryS
+        }
+      }
       const sourceS = trimDrag.kind === 'audio'
         ? trimAudioSourceAtProgramDelta(project, trimDrag.clipId, trimDrag.edge, deltaProgramS)
         : trimSourceAtProgramDelta(project, trimDrag.clipId, trimDrag.edge, deltaProgramS)
@@ -529,15 +548,24 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
       window.removeEventListener('pointerup', handlePointerUp)
       window.removeEventListener('pointercancel', handlePointerCancel)
     }
-  }, [editTimeline, project, timelineZoom, trimDrag, viewDurationS, viewWidthPx])
+  }, [currentTimeS, editTimeline, project, snapEnabled, timelineZoom, trimDrag, viewDurationS, viewWidthPx])
 
   useEffect(() => {
     if (!audioMoveDrag || !project) return
     const handlePointerMove = (event: globalThis.PointerEvent) => {
       if (event.pointerId !== audioMoveDrag.pointerId) return
       const deltaProgramS = (event.clientX - audioMoveDrag.startClientX) / (viewWidthPx * timelineZoom) * viewDurationS
-      const startS = moveAudioStartAtProgramDelta(project, audioMoveDrag.clipId, deltaProgramS)
+      let startS = moveAudioStartAtProgramDelta(project, audioMoveDrag.clipId, deltaProgramS)
       if (startS === null) return
+      if (snapEnabled) {
+        const clip = project.tracks.flatMap((track) => track.clips ?? []).find((candidate) => candidate.id === audioMoveDrag.clipId)
+        const targets = [currentTimeS, 0, project.durationS, ...project.tracks.flatMap((track) => (track.clips ?? []).flatMap((candidate) => [candidate.programRange.startS, candidate.programRange.endS]))]
+        const thresholdS = SNAP_THRESHOLD_PX / (viewWidthPx * timelineZoom) * viewDurationS
+        const duration = clip ? clip.programRange.endS - clip.programRange.startS : 0
+        const snappedStart = snapTimelineTime(startS, targets, thresholdS)
+        const snappedEnd = snapTimelineTime(startS + duration, targets, thresholdS) - duration
+        startS = Math.abs(snappedStart - startS) <= Math.abs(snappedEnd - startS) ? snappedStart : snappedEnd
+      }
       audioMoveStartRef.current = startS
       try {
         setTrimPreview({ project: applyTimelineEdit(project, {
@@ -567,7 +595,7 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
       window.removeEventListener('pointerup', handlePointerUp)
       window.removeEventListener('pointercancel', handlePointerCancel)
     }
-  }, [audioMoveDrag, editTimeline, project, timelineZoom, viewDurationS, viewWidthPx])
+  }, [audioMoveDrag, currentTimeS, editTimeline, project, snapEnabled, timelineZoom, viewDurationS, viewWidthPx])
 
   function startTrim(event: PointerEvent<HTMLButtonElement>, clip: ClipView, edge: TimelineTrimEdge, kind: 'video' | 'audio' = 'video') {
     event.preventDefault()
