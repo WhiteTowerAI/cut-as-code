@@ -219,6 +219,20 @@ async function handleRequest(state, request, response) {
       return json(response, 400, { ok: false, error: error instanceof Error ? error.message : 'could not create project' })
     }
   }
+  if (request.method === 'POST' && url.pathname === '/v1/hub/projects/select') {
+    if (request.headers.origin !== `http://${state.host}`) return json(response, 403, { ok: false, error: 'invalid origin' })
+    const body = await readRequestJson(request)
+    if (!body || typeof body !== 'object' || Array.isArray(body) || typeof body.name !== 'string' || !body.name.trim()) {
+      return json(response, 400, { ok: false, error: 'selected project folder name is required' })
+    }
+    try {
+      const root = await resolveSelectedProject(state, body.name)
+      await registerProject(state, root, pendingProjectId(root))
+      return json(response, 200, { ok: true })
+    } catch (error) {
+      return json(response, 400, { ok: false, error: error instanceof Error ? error.message : 'could not select project folder' })
+    }
+  }
   const candidateRegister = /^\/v1\/hub\/candidates\/([a-f0-9]{24})\/register$/.exec(url.pathname)
   if (request.method === 'POST' && candidateRegister) {
     if (request.headers.origin !== `http://${state.host}`) return json(response, 403, { ok: false, error: 'invalid origin' })
@@ -290,6 +304,14 @@ async function handleRequest(state, request, response) {
     return serveStatic(state.uiRoot, url.pathname, request.method, response)
   }
   return json(response, 404, { ok: false, error: 'not found' })
+}
+
+async function resolveSelectedProject(state, nameValue) {
+  const value = nameValue.trim()
+  if (!value || path.basename(value) !== value || value === '.' || value === '..') throw new Error('invalid selected project folder')
+  const match = (await discoverProjects(state)).find((candidate) => candidate.displayName === value)
+  if (!match) throw new Error(`Project folder "${value}" was not found next to the registered projects`)
+  return await canonicalProjectRoot(match.root)
 }
 
 async function openProject(state, projectRoot) {
@@ -862,7 +884,7 @@ function parseArguments(args) {
   return options
 }
 
-module.exports = { canonicalProjectRoot, createProjectScaffold, discoverProjects, parseArguments, publicCandidates }
+module.exports = { canonicalProjectRoot, createProjectScaffold, discoverProjects, parseArguments, publicCandidates, resolveSelectedProject }
 
 if (require.main === module) {
   main().catch((error) => {

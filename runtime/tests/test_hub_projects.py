@@ -12,6 +12,26 @@ import projectlib
 
 
 class HubProjectsTests(unittest.TestCase):
+    def test_browser_folder_name_resolves_to_unregistered_project(self):
+        script = r"""
+const path = require('node:path');
+const { resolveSelectedProject } = require(process.argv[1]);
+(async () => {
+  const parent = process.argv[2];
+  const selected = await resolveSelectedProject({ registry: { projects: [{ root: path.join(parent, 'registered') }] } }, 'candidate');
+  process.stdout.write(JSON.stringify({ selected }));
+})().catch((error) => { process.stderr.write(String(error)); process.exit(1); });
+"""
+        with tempfile.TemporaryDirectory(prefix="cut hub picker ") as temporary:
+            parent = Path(temporary)
+            self._project(parent / "registered")
+            self._project(parent / "candidate")
+            result = subprocess.run(
+                ["node", "-e", script, str(ROOT / "runtime" / "hub.cjs"), str(parent)],
+                cwd=ROOT, check=True, capture_output=True, text=True, timeout=20,
+            )
+            self.assertEqual(parent / "candidate", Path(json.loads(result.stdout)["selected"]))
+
     def test_creates_scaffold_without_overwriting_and_discovers_unregistered_sibling(self):
         with tempfile.TemporaryDirectory(prefix="cut hub projects ") as temporary:
             parent = Path(temporary)

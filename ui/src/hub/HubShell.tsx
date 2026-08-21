@@ -1,5 +1,5 @@
-import { Check, Clock3, ExternalLink, FolderOpen, FolderPlus, Plus, Power, RefreshCw, X } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { Clock3, ExternalLink, FolderOpen, FolderPlus, Plus, Power, RefreshCw, X } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 type HubProject = Readonly<{
   projectId: string
@@ -19,11 +19,8 @@ type HubCandidate = Readonly<{
 export function HubShell() {
   const [projects, setProjects] = useState<readonly HubProject[]>([])
   const [candidates, setCandidates] = useState<readonly HubCandidate[]>([])
-  const [suggestedParent, setSuggestedParent] = useState('')
-  const [creating, setCreating] = useState(false)
-  const [projectName, setProjectName] = useState('')
-  const [projectParent, setProjectParent] = useState('')
-  const [projectSource, setProjectSource] = useState('')
+  const [selectingProject, setSelectingProject] = useState(false)
+  const projectFolderInputRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState<string>()
   const [loading, setLoading] = useState(true)
   const [updatePending, setUpdatePending] = useState<{ runtimeVersion: string; compatible?: boolean; reasons: string[] } | null>(null)
@@ -37,8 +34,6 @@ export function HubShell() {
       if (!response.ok || !value.ok || !Array.isArray(value.projects)) throw new Error(value.error || 'Could not load projects')
       setProjects(value.projects)
       setCandidates(Array.isArray(value.candidates) ? value.candidates : [])
-      setSuggestedParent(value.suggestedParent ?? '')
-      setProjectParent((current) => current || value.suggestedParent || '')
       setUpdatePending(value.updatePending ?? null)
       document.documentElement.dataset.runtimeState = 'hub-ready'
     } catch (caught) {
@@ -68,17 +63,20 @@ export function HubShell() {
     }
   }
 
-  const createProject = async (event: React.FormEvent) => {
-    event.preventDefault()
+  const selectProject = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = [...event.currentTarget.files ?? []]
+    event.currentTarget.value = ''
+    const folderName = files[0]?.webkitRelativePath.split('/')[0]?.trim()
+    if (!folderName) return
     try {
+      setSelectingProject(true)
       setError(undefined)
-      await post('/v1/hub/projects', { name: projectName, parent: projectParent, source: projectSource })
-      setProjectName('')
-      setProjectSource('')
-      setCreating(false)
+      await post('/v1/hub/projects/select', { name: folderName })
       await refresh()
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not create project')
+      setError(caught instanceof Error ? caught.message : 'Could not select project folder')
+    } finally {
+      setSelectingProject(false)
     }
   }
 
@@ -140,22 +138,13 @@ export function HubShell() {
           </div>
           <div className="hub-heading-actions">
             <span className="hub-project-count">{projects.length}</span>
-            <button className="hub-command-button" type="button" onClick={() => setCreating((value) => !value)} aria-expanded={creating}>
-              {creating ? <X size={15} /> : <Plus size={15} />}
-              {creating ? 'Cancel' : 'New project'}
+            <input ref={projectFolderInputRef} className="hub-folder-input" type="file" {...{ webkitdirectory: '', directory: '' }} multiple onChange={(event) => void selectProject(event)} />
+            <button className="hub-command-button" type="button" onClick={() => projectFolderInputRef.current?.click()} disabled={selectingProject} title="Select a Cut as Code project folder">
+              <Plus size={15} />
+              New project
             </button>
           </div>
         </div>
-
-        {creating ? (
-          <form className="hub-create-form" onSubmit={(event) => void createProject(event)} data-hub-create-form>
-            <span className="hub-project-icon" aria-hidden><FolderPlus size={18} /></span>
-            <label>Project name<input value={projectName} onChange={(event) => setProjectName(event.target.value)} required autoFocus /></label>
-            <label>Parent folder<input value={projectParent} onChange={(event) => setProjectParent(event.target.value)} required placeholder={suggestedParent || 'Absolute folder path'} /></label>
-            <label>Source video<input value={projectSource} onChange={(event) => setProjectSource(event.target.value)} required placeholder="Absolute video path" /></label>
-            <button className="hub-command-button is-primary" type="submit"><Check size={15} />Create</button>
-          </form>
-        ) : null}
 
         {loading ? <div className="hub-state" role="status">Loading projects...</div> : null}
         {error ? <div className="hub-state hub-state-error" role="alert">{error}</div> : null}
