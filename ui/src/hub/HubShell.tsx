@@ -1,4 +1,4 @@
-import { Clock3, ExternalLink, FolderOpen, Power, RefreshCw, X } from 'lucide-react'
+import { Check, Clock3, ExternalLink, FolderOpen, FolderPlus, Plus, Power, RefreshCw, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
 type HubProject = Readonly<{
@@ -10,8 +10,20 @@ type HubProject = Readonly<{
   running: boolean
 }>
 
+type HubCandidate = Readonly<{
+  candidateId: string
+  displayName: string
+  rootFingerprint: string
+}>
+
 export function HubShell() {
   const [projects, setProjects] = useState<readonly HubProject[]>([])
+  const [candidates, setCandidates] = useState<readonly HubCandidate[]>([])
+  const [suggestedParent, setSuggestedParent] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [projectName, setProjectName] = useState('')
+  const [projectParent, setProjectParent] = useState('')
+  const [projectSource, setProjectSource] = useState('')
   const [error, setError] = useState<string>()
   const [loading, setLoading] = useState(true)
   const [updatePending, setUpdatePending] = useState<{ runtimeVersion: string; compatible?: boolean; reasons: string[] } | null>(null)
@@ -21,9 +33,12 @@ export function HubShell() {
     setError(undefined)
     try {
       const response = await fetch('/v1/hub/projects', { credentials: 'same-origin' })
-      const value = await response.json() as { ok?: boolean; projects?: HubProject[]; updatePending?: { runtimeVersion: string; compatible?: boolean; reasons: string[] } | null; error?: string }
+      const value = await response.json() as { ok?: boolean; projects?: HubProject[]; candidates?: HubCandidate[]; suggestedParent?: string; updatePending?: { runtimeVersion: string; compatible?: boolean; reasons: string[] } | null; error?: string }
       if (!response.ok || !value.ok || !Array.isArray(value.projects)) throw new Error(value.error || 'Could not load projects')
       setProjects(value.projects)
+      setCandidates(Array.isArray(value.candidates) ? value.candidates : [])
+      setSuggestedParent(value.suggestedParent ?? '')
+      setProjectParent((current) => current || value.suggestedParent || '')
       setUpdatePending(value.updatePending ?? null)
       document.documentElement.dataset.runtimeState = 'hub-ready'
     } catch (caught) {
@@ -33,6 +48,39 @@ export function HubShell() {
       setLoading(false)
     }
   }, [])
+
+  const post = async (path: string, body: object) => {
+    const response = await fetch(path, {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    })
+    const value = await response.json() as { ok?: boolean; error?: string }
+    if (!response.ok || !value.ok) throw new Error(value.error ?? 'Project action failed')
+  }
+
+  const registerCandidate = async (candidate: HubCandidate) => {
+    try {
+      setError(undefined)
+      await post(`/v1/hub/candidates/${candidate.candidateId}/register`, {})
+      await refresh()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not register project')
+    }
+  }
+
+  const createProject = async (event: React.FormEvent) => {
+    event.preventDefault()
+    try {
+      setError(undefined)
+      await post('/v1/hub/projects', { name: projectName, parent: projectParent, source: projectSource })
+      setProjectName('')
+      setProjectSource('')
+      setCreating(false)
+      await refresh()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not create project')
+    }
+  }
 
   useEffect(() => { void refresh() }, [refresh])
 
@@ -90,8 +138,24 @@ export function HubShell() {
             <h2 id="hub-projects-title">Projects</h2>
             <p>Registered Cut as Code projects</p>
           </div>
-          <span className="hub-project-count">{projects.length}</span>
+          <div className="hub-heading-actions">
+            <span className="hub-project-count">{projects.length}</span>
+            <button className="hub-command-button" type="button" onClick={() => setCreating((value) => !value)} aria-expanded={creating}>
+              {creating ? <X size={15} /> : <Plus size={15} />}
+              {creating ? 'Cancel' : 'New project'}
+            </button>
+          </div>
         </div>
+
+        {creating ? (
+          <form className="hub-create-form" onSubmit={(event) => void createProject(event)} data-hub-create-form>
+            <span className="hub-project-icon" aria-hidden><FolderPlus size={18} /></span>
+            <label>Project name<input value={projectName} onChange={(event) => setProjectName(event.target.value)} required autoFocus /></label>
+            <label>Parent folder<input value={projectParent} onChange={(event) => setProjectParent(event.target.value)} required placeholder={suggestedParent || 'Absolute folder path'} /></label>
+            <label>Source video<input value={projectSource} onChange={(event) => setProjectSource(event.target.value)} required placeholder="Absolute video path" /></label>
+            <button className="hub-command-button is-primary" type="submit"><Check size={15} />Create</button>
+          </form>
+        ) : null}
 
         {loading ? <div className="hub-state" role="status">Loading projects...</div> : null}
         {error ? <div className="hub-state hub-state-error" role="alert">{error}</div> : null}
@@ -123,6 +187,25 @@ export function HubShell() {
               </article>
             ))}
           </div>
+        ) : null}
+
+        {!loading && candidates.length > 0 ? (
+          <section className="hub-candidates" aria-labelledby="hub-candidates-title">
+            <div className="hub-subsection-heading">
+              <div><h2 id="hub-candidates-title">Available projects</h2><p>Detected nearby, not registered</p></div>
+              <span className="hub-project-count">{candidates.length}</span>
+            </div>
+            <div className="hub-project-list">
+              {candidates.map((candidate) => (
+                <article className="hub-project hub-candidate" key={candidate.candidateId} data-hub-candidate>
+                  <span className="hub-project-icon is-candidate" aria-hidden><FolderPlus size={18} /></span>
+                  <div className="hub-project-copy"><h3>{candidate.displayName}</h3><p>{candidate.rootFingerprint}</p></div>
+                  <span className="hub-status">Unregistered</span>
+                  <button className="hub-command-button" type="button" onClick={() => void registerCandidate(candidate)}><Plus size={15} />Register</button>
+                </article>
+              ))}
+            </div>
+          </section>
         ) : null}
       </section>
     </main>

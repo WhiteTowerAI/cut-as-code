@@ -199,7 +199,37 @@ async function handleRequest(state, request, response) {
   }
   if (!browserAuthorized(state, request)) return browserLaunchError(response)
   if (request.method === 'GET' && url.pathname === '/v1/hub/projects') {
-    return json(response, 200, { ok: true, projects: await publicProjects(state), updatePending: publicUpdatePending(state) })
+    const candidates = await discoverProjects(state)
+    return json(response, 200, {
+      ok: true,
+      projects: await publicProjects(state),
+      candidates: publicCandidates(candidates),
+      suggestedParent: suggestedProjectParent(state, candidates),
+      updatePending: publicUpdatePending(state),
+    })
+  }
+  if (request.method === 'POST' && url.pathname === '/v1/hub/projects') {
+    if (request.headers.origin !== `http://${state.host}`) return json(response, 403, { ok: false, error: 'invalid origin' })
+    const body = await readRequestJson(request)
+    try {
+      const root = await createProjectScaffold(body?.parent, body?.name, body?.source)
+      await registerProject(state, root, pendingProjectId(root))
+      return json(response, 201, { ok: true, project: await publicProject(state, state.registry.projects.find((item) => item.root === root)) })
+    } catch (error) {
+      return json(response, 400, { ok: false, error: error instanceof Error ? error.message : 'could not create project' })
+    }
+  }
+  const candidateRegister = /^\/v1\/hub\/candidates\/([a-f0-9]{24})\/register$/.exec(url.pathname)
+  if (request.method === 'POST' && candidateRegister) {
+    if (request.headers.origin !== `http://${state.host}`) return json(response, 403, { ok: false, error: 'invalid origin' })
+    const body = await readRequestJson(request)
+    if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length !== 0) {
+      return json(response, 400, { ok: false, error: 'register accepts no parameters' })
+    }
+    const candidate = (await discoverProjects(state)).find((item) => item.candidateId === candidateRegister[1])
+    if (!candidate) return json(response, 404, { ok: false, error: 'project candidate not found' })
+    await registerProject(state, candidate.root, pendingProjectId(candidate.root))
+    return json(response, 200, { ok: true })
   }
   if (request.method === 'GET' && url.pathname === '/v1/hub/meta') {
     return json(response, 200, {
@@ -400,18 +430,155 @@ async function publicProjects(state) {
   return Promise.all(state.registry.projects
     .slice()
     .sort((left, right) => right.lastOpenedAt.localeCompare(left.lastOpenedAt))
-    .map(async (project) => {
-      let available = false
-      try { available = await canonicalProjectRoot(project.root) === project.root } catch {}
-      return {
-        projectId: project.projectId,
-        displayName: project.displayName,
-        rootFingerprint: project.rootFingerprint,
-        lastOpenedAt: project.lastOpenedAt,
-        available,
-        running: state.sidecars.has(project.root),
+    .map((project) => publicProject(state, project)))
+}
+
+async function publicProject(state, project) {
+  let available = false
+  try { available = await canonicalProjectRoot(project.root) === project.root } catch {}
+  return {
+    projectId: project.projectId,
+    displayName: project.displayName,
+    rootFingerprint: project.rootFingerprint,
+    lastOpenedAt: project.lastOpenedAt,
+    available,
+    running: state.sidecars.has(project.root),
+  }
+}
+
+async function discoverProjects(state) {
+  const registeredRoots = new Set(state.registry.projects.map((project) => project.root))
+  const parents = [...new Set(state.registry.projects.map((project) => path.dirname(project.root)))]
+  const candidates = []
+  for (const parent of parents) {
+    const entries = await fsp.readdir(parent, { withFileTypes: true }).catch(() => [])
+    for (const entry of entries.slice(0, 250)) {
+      if (!entry.isDirectory()) continue
+      const value = path.join(parent, entry.name)
+      let root
+      try { root = await canonicalProjectRoot(value) } catch { continue }
+      if (registeredRoots.has(root) || candidates.some((candidate) => candidate.root === root)) continue
+      candidates.push({
+        candidateId: projectFingerprint(root, 24),
+        displayName: path.basename(root),
+        rootFingerprint: projectFingerprint(root),
+        root,
+      })
+    }
+  }
+  return candidates.sort((left, right) => left.displayName.localeCompare(right.displayName))
+}
+
+function publicCandidates(candidates) {
+  return candidates.map(({ root, ...candidate }) => candidate)
+}
+
+function suggestedProjectParent(state, candidates) {
+  const root = state.registry.projects[0]?.root || candidates[0]?.root
+  return root ? path.dirname(root) : ''
+}
+
+async function createProjectScaffold(parentValue, nameValue, sourceValue, options = {}) {
+  const parent = await canonicalDirectory(parentValue)
+  const source = await canonicalFile(sourceValue)
+  const name = typeof nameValue === 'string' ? nameValue.trim() : ''
+  if (!name || name === '.' || name === '..' || /[<>:"/\\|?*\u0000-\u001f]/.test(name)
+      || /[. ]$/.test(name) || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name)) {
+    throw new Error('project name contains invalid characters')
+  }
+  const root = path.join(parent, name)
+  if (path.dirname(root) !== parent) throw new Error('project location is invalid')
+  try {
+    await fsp.mkdir(root, { recursive: false, mode: 0o700 })
+  } catch (error) {
+    if (error?.code === 'EEXIST') throw new Error('project already exists')
+    throw error
+  }
+  try {
+    await Promise.all(['input', 'review', 'final', 'work'].map((directory) => fsp.mkdir(path.join(root, directory), { mode: 0o700 })))
+    const probe = await (options.probeMedia || probeMedia)(source)
+    const sourceName = path.basename(source)
+    const projectSource = path.join(root, 'input', sourceName)
+    await fsp.copyFile(source, projectSource)
+    const normalizedMtime = Math.floor(Date.now() / 1000)
+    await fsp.utimes(projectSource, normalizedMtime, normalizedMtime)
+    const sourceStat = await fsp.stat(projectSource, { bigint: true })
+    await writeJsonAtomic(path.join(root, 'work', 'timeline.json'), {
+      schema_version: 1,
+      source_duration_s: probe.duration,
+      program_duration_s: probe.duration,
+      fps: probe.fps,
+      clips: [{
+        id: 'clip-1',
+        source_range: { start_s: 0, end_s: probe.duration },
+        program_range: { start_s: 0, end_s: probe.duration },
+        speed: 1,
+      }],
+    })
+    await writeJsonAtomic(path.join(root, 'work', 'project.json'), {
+      schema_version: 1,
+      project_id: `project-${crypto.randomBytes(8).toString('hex')}`,
+      revision: 1,
+      source: {
+        path: `../input/${sourceName}`,
+        fingerprint: { size: Number(sourceStat.size), modified_ns: Number(sourceStat.mtimeNs), duration_s: probe.duration },
+      },
+      active_sequence: 'main',
+      sequences: { main: { timeline: 'timeline.json', operations: [] } },
+      operations: [],
+      reviews: [],
+      render: { status: 'draft' },
+    })
+    return await canonicalProjectRoot(root)
+  } catch (error) {
+    await fsp.rm(root, { recursive: true, force: true }).catch(() => {})
+    throw error
+  }
+}
+
+async function canonicalFile(value) {
+  if (typeof value !== 'string' || !value.trim()) throw new Error('source media path is required')
+  const real = await fsp.realpath(path.resolve(value))
+  if (!(await fsp.stat(real)).isFile()) throw new Error('source media path must be a file')
+  return real
+}
+
+function probeMedia(source) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.env.CAC_FFPROBE || 'ffprobe', [
+      '-v', 'error', '-select_streams', 'v:0',
+      '-show_entries', 'stream=r_frame_rate:format=duration', '-of', 'json', source,
+    ], { windowsHide: true })
+    let stdout = ''
+    let stderr = ''
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    child.stdout.on('data', (chunk) => { stdout += chunk })
+    child.stderr.on('data', (chunk) => { stderr += chunk })
+    child.once('error', () => reject(new Error('ffprobe is required to create a project')))
+    child.once('close', (code) => {
+      if (code !== 0) return reject(new Error(stderr.trim() || 'source media could not be read'))
+      try {
+        const value = JSON.parse(stdout)
+        const duration = Number(value.format?.duration)
+        const parts = String(value.streams?.[0]?.r_frame_rate || '').split('/').map(Number)
+        if (!Number.isFinite(duration) || duration <= 0 || parts.length !== 2 || !parts[0] || !parts[1]) {
+          throw new Error('source media must contain a readable video stream')
+        }
+        resolve({ duration, fps: { num: parts[0], den: parts[1] } })
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error('source media could not be read'))
       }
-    }))
+    })
+  })
+}
+
+function projectFingerprint(root, length = 16) {
+  return crypto.createHash('sha256').update(root).digest('hex').slice(0, length)
+}
+
+function pendingProjectId(root) {
+  return `project_pending_${projectFingerprint(root, 24)}`
 }
 
 function redeemLaunch(state, request, response, url) {
@@ -695,7 +862,7 @@ function parseArguments(args) {
   return options
 }
 
-module.exports = { canonicalProjectRoot, parseArguments }
+module.exports = { canonicalProjectRoot, createProjectScaffold, discoverProjects, parseArguments, publicCandidates }
 
 if (require.main === module) {
   main().catch((error) => {
