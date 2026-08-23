@@ -62,6 +62,7 @@ const ZOOM_STEP = 0.25
 const RULER_LABEL_INTERVALS_S = [1, 2, 5, 10, 15, 30, 60, 120, 300] as const
 const MIN_RULER_LABEL_SPACING_PX = 64
 const SNAP_THRESHOLD_PX = 8
+const FILMSTRIP_FRAME_SPACING_PX = 72
 type RationalFps = Readonly<{ numerator: number; denominator: number }>
 type MappingOptions = Readonly<{
   zoom?: number
@@ -230,6 +231,9 @@ function TrackHeader({
 function Clip({
   track,
   clip,
+  mediaUrl,
+  mediaWidth,
+  mediaHeight,
   durationS,
   timelineZoom,
   timelineWidthPx,
@@ -244,6 +248,9 @@ function Clip({
 }: {
   track: TrackView
   clip: ClipView
+  mediaUrl?: string
+  mediaWidth?: number
+  mediaHeight?: number
   durationS: number
   timelineZoom: number
   timelineWidthPx: number
@@ -272,6 +279,15 @@ function Clip({
     timelineZoom,
   )
   const programDurationS = clip.programRange.endS - clip.programRange.startS
+  const speed = clip.speed && clip.speed > 0 ? clip.speed : 1
+  const deltaSourceS = durationS * FILMSTRIP_FRAME_SPACING_PX / (timelineWidthPx * timelineZoom)
+  const firstSampleIndex = Math.floor(clip.sourceRange.startS / deltaSourceS)
+  const lastSampleIndex = Math.ceil(clip.sourceRange.endS / deltaSourceS) - 1
+  const sampleIndices = Array.from(
+    { length: Math.max(0, lastSampleIndex - firstSampleIndex + 1) },
+    (_, index) => firstSampleIndex + index,
+  )
+  const waveformBarCount = Math.min(160, Math.max(12, Math.ceil(width / 4)))
   return (
     <div
       className={`timeline-clip-shell timeline-clip-shell--${kind}${trimming ? ' is-trimming' : ''}`}
@@ -290,6 +306,48 @@ function Clip({
         }}
         onContextMenu={(event) => onContextMenu(event, track, clip)}
       >
+        {kind === 'video' ? (
+          <span className="timeline-filmstrip" aria-hidden>
+            {sampleIndices.map((sampleIndex) => {
+              const sourceTimeS = (sampleIndex + 0.5) * deltaSourceS
+              const centerPx = (sourceTimeS - clip.sourceRange.startS) / speed / durationS * timelineWidthPx * timelineZoom
+              return mediaUrl ? (
+                <video
+                  key={sampleIndex}
+                  className="timeline-filmstrip-frame"
+                  data-source-time-s={sourceTimeS}
+                  src={mediaUrl}
+                  muted
+                  preload="metadata"
+                  style={{
+                    left: `${centerPx}px`,
+                    aspectRatio: `${mediaWidth ?? 16} / ${mediaHeight ?? 9}`,
+                  }}
+                  onLoadedMetadata={(event) => { event.currentTarget.currentTime = sourceTimeS }}
+                />
+              ) : <img
+                key={sampleIndex}
+                className="timeline-filmstrip-frame"
+                data-source-time-s={sourceTimeS}
+                src="/fixtures/viewer-poster.png"
+                style={{
+                  left: `${centerPx}px`,
+                  aspectRatio: `${mediaWidth ?? 16} / ${mediaHeight ?? 9}`,
+                  objectPosition: 'center',
+                }}
+              />
+            })}
+          </span>
+        ) : null}
+        {kind === 'audio' ? (
+          <span className="timeline-waveform" aria-hidden>
+            {Array.from({ length: waveformBarCount }, (_, index) => {
+              const sample = clip.sourceRange.startS + index / waveformBarCount * (clip.sourceRange.endS - clip.sourceRange.startS)
+              const amplitude = 18 + Math.abs(Math.sin(sample * 2.13) * 42 + Math.sin(sample * 5.71) * 25)
+              return <span key={index} style={{ height: `${Math.min(88, amplitude)}%` }} />
+            })}
+          </span>
+        ) : null}
         {(kind === 'caption' || kind === 'card' || kind === 'motion-graphics') && (
           <span className="timeline-caption-cue">{clip.summary || clip.displayName || 'Untitled cue'}</span>
         )}
@@ -1407,6 +1465,9 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
                       key={clip.id}
                       track={track}
                       clip={clip}
+                      mediaUrl={presentedProject?.assets.find((asset) => asset.id === clip.sourceAssetId)?.url}
+                      mediaWidth={presentedProject?.assets.find((asset) => asset.id === clip.sourceAssetId)?.width}
+                      mediaHeight={presentedProject?.assets.find((asset) => asset.id === clip.sourceAssetId)?.height}
                       durationS={viewDurationS}
                       timelineZoom={timelineZoom}
                       timelineWidthPx={viewWidthPx}

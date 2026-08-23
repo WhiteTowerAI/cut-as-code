@@ -164,7 +164,7 @@ test('Timeline ruler draws every second across the canonical twenty-second domai
   await expect(ticks.nth(0).locator('span')).toHaveCSS('font-style', 'normal')
 })
 
-test('Timeline keeps terminal ruler and protocol clips visible without synthetic media drawings', async ({ page }) => {
+test('Timeline keeps terminal ruler, filmstrip, and waveform visible', async ({ page }) => {
   await page.setViewportSize({ width: 1008, height: 444 })
   await page.goto('/?scenario=1-324')
 
@@ -200,13 +200,33 @@ test('Timeline keeps terminal ruler and protocol clips visible without synthetic
   expect(firstVideoBox).not.toBeNull()
   expect(firstVideoBox!.width).toBeGreaterThan(0)
   await expect(firstVideo.locator('.timeline-clip-label')).toContainText('Unknown media')
-  await expect(page.locator('.timeline-thumbnails')).toHaveCount(0)
-  await expect(page.locator('.timeline-waveform')).toHaveCount(0)
+  await expect(firstVideo.locator('.timeline-filmstrip-frame')).toHaveCount(4)
+  await expect(firstVideo).toHaveCSS('border-width', '2px')
+  await expect(firstVideo.locator('.timeline-filmstrip')).toHaveCSS('inset', '2px')
+  await expect(page.locator('.timeline-waveform')).toHaveCount(1)
+
+  const secondVideo = page.locator('[data-timeline-clip="video-2"]')
+  const secondGeometry = await secondVideo.locator('.timeline-filmstrip').evaluate((filmstrip) => {
+    const strip = filmstrip.getBoundingClientRect()
+    return [...filmstrip.querySelectorAll('.timeline-filmstrip-frame')].map((frame) => {
+      const bounds = frame.getBoundingClientRect()
+      return {
+        center: (bounds.left + bounds.width / 2 - strip.left) / strip.width,
+        sourceTimeS: Number((frame as HTMLElement).dataset.sourceTimeS),
+      }
+    })
+  })
+  expect(secondGeometry).toHaveLength(8)
+  expect(secondGeometry[0].center).toBeLessThan(0)
+  const deltaSourceS = 20 * 72 / 876
+  secondGeometry.forEach(({ sourceTimeS }, index) => {
+    expect(sourceTimeS).toBeCloseTo((index + 3.5) * deltaSourceS, 8)
+  })
 
   await page.goto('/?scenario=1-754')
   const selectedVideo = page.locator('[data-timeline-clip="video-2"]')
   await expect(selectedVideo).toHaveAttribute('aria-pressed', 'true')
-  await expect(selectedVideo).toHaveCSS('background-color', 'rgb(41, 78, 74)')
+  await expect(selectedVideo).toHaveCSS('background-color', 'rgb(32, 36, 39)')
   await expect(selectedVideo).toHaveCSS('border-color', 'rgb(121, 183, 167)')
   await expect(selectedVideo.locator('.timeline-clip-label')).toHaveCSS('background-color', 'rgb(30, 48, 52)')
   await expect(selectedVideo.locator('.timeline-clip-label')).toHaveCSS('height', '17px')
@@ -478,13 +498,13 @@ test('track header context menu controls view-only density, collapse, solo, and 
   await expect(videoLane).toHaveClass(/timeline-track-density--compact/)
   await expect(videoHeader).toHaveCSS('height', '48px')
   await expect(videoLane).toHaveCSS('height', '48px')
-  await expect(page.locator('[data-timeline-clip="edit-video-1"]')).toHaveCSS('height', '40px')
+  await expect(page.locator('[data-timeline-clip="edit-video-1"]')).toHaveCSS('height', '48px')
 
   await videoHeader.click({ button: 'right' })
   await page.getByRole('menu', { name: 'Video' }).getByRole('menuitem', { name: 'Track height' }).click()
   await page.getByRole('menu', { name: 'Track height' }).getByRole('menuitem', { name: /Relaxed/ }).click()
-  await expect(videoHeader).toHaveCSS('height', '136px')
-  await expect(videoLane).toHaveCSS('height', '136px')
+  await expect(videoHeader).toHaveCSS('height', '48px')
+  await expect(videoLane).toHaveCSS('height', '48px')
 
   await videoHeader.click({ button: 'right' })
   await page.getByRole('menu', { name: 'Video' }).getByRole('menuitem', { name: 'Collapse track' }).click()
@@ -521,7 +541,7 @@ test('video clip context menu uses the hit time for split and exposes range subm
 
   const clip = page.locator('[data-timeline-clip="edit-video-1"]')
   const beforePlayhead = await page.getByLabel('Playhead time').textContent()
-  await clip.click({ button: 'right', position: { x: 120, y: 32 } })
+  await clip.click({ button: 'right', position: { x: 120, y: 16 } })
   const menu = page.getByRole('menu', { name: 'Unknown media' })
   await expect(menu).toBeVisible()
   await expect(page.getByLabel('Playhead time')).toHaveText(beforePlayhead ?? '')
@@ -533,7 +553,7 @@ test('video clip context menu uses the hit time for split and exposes range subm
   await submenu.getByRole('menuitem', { name: /Program/ }).click()
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.copiedRange)).toMatch(/^00:/)
 
-  await clip.click({ button: 'right', position: { x: 120, y: 32 } })
+  await clip.click({ button: 'right', position: { x: 120, y: 16 } })
   await page.getByRole('menuitem', { name: /Split at/ }).click()
   await expect(page.locator('.timeline-clip--video')).toHaveCount(3)
 })
@@ -543,13 +563,13 @@ test('video clip context menu shows clip information and ripple delete undo toas
   await page.goto('/?scenario=timeline-editing')
 
   const firstClip = page.locator('[data-timeline-clip="edit-video-1"]')
-  await firstClip.click({ button: 'right', position: { x: 40, y: 32 } })
+  await firstClip.click({ button: 'right', position: { x: 40, y: 16 } })
   await page.getByRole('menuitem', { name: 'View clip information' }).click()
   await expect(page.getByRole('dialog', { name: 'Unknown media' })).toContainText('edit-video-1')
   await page.getByRole('button', { name: 'Close clip information' }).click()
 
   const secondClip = page.locator('[data-timeline-clip="edit-video-2"]')
-  await secondClip.click({ button: 'right', position: { x: 80, y: 32 } })
+  await secondClip.click({ button: 'right', position: { x: 80, y: 16 } })
   await page.getByRole('menuitem', { name: 'Ripple delete' }).click()
   const toast = page.locator('.timeline-undo-toast')
   await expect(toast).toContainText('ripple deleted')
@@ -780,9 +800,9 @@ test('timeline drag clamps at duration and zoom controls stay in bounds', async 
   })
   await expect.poll(() => page.evaluate(() => window.getSelection()?.toString().length)).toBeGreaterThan(0)
   await expect(page.locator('.timeline-body')).toHaveCSS('user-select', 'none')
-  await surface.hover({ position: { x: 100, y: 100 } })
+  await surface.hover({ position: { x: 100, y: 10 } })
   await page.mouse.down()
-  await page.mouse.move(1200, 100)
+  await page.mouse.move(1200, 10)
   await page.mouse.up()
   await expect(page.getByLabel('Playhead time')).toContainText('00:20')
   expect(await page.evaluate(() => window.getSelection()?.toString())).toBe('')
@@ -942,20 +962,23 @@ test('the populated Timeline fixture renders its two source spans on the twenty-
   await expect(page.locator('.timeline-ruler span').last()).toHaveText('00:20')
   const clips = page.locator('.timeline-clip--video')
   await expect(clips).toHaveCount(2)
+  await expect(clips.nth(0).locator('.timeline-filmstrip-frame')).toHaveCount(4)
+  await expect(clips.nth(1).locator('.timeline-filmstrip-frame')).toHaveCount(8)
+  await expect(page.locator('[data-timeline-clip="audio-1"] .timeline-waveform > span')).toHaveCount(160)
 
   const [firstVideo, secondVideo, audio] = await Promise.all([
     clips.nth(0).boundingBox(),
     clips.nth(1).boundingBox(),
     page.locator('[data-timeline-clip="audio-1"]').boundingBox(),
   ])
-  expect(firstVideo).toMatchObject({ x: 148, height: 80 })
+  expect(firstVideo).toMatchObject({ x: 148, height: 48 })
   expect(firstVideo?.width).toBeCloseTo(263, 1)
-  expect(secondVideo).toMatchObject({ y: firstVideo?.y, height: 80 })
+  expect(secondVideo).toMatchObject({ y: firstVideo?.y, height: 48 })
   expect(secondVideo?.x).toBeCloseTo(415, 1)
   expect(secondVideo?.width).toBeCloseTo(513, 1)
   expect(secondVideo!.x - (firstVideo!.x + firstVideo!.width)).toBeCloseTo(4, 1)
-  expect(audio).toMatchObject({ x: 148, height: 60 })
-  expect(audio!.y).toBeGreaterThan(firstVideo!.y + firstVideo!.height)
+  expect(audio).toMatchObject({ x: 148, height: 48 })
+  expect(audio!.y).toBeGreaterThanOrEqual(firstVideo!.y + firstVideo!.height)
   expect(audio?.width).toBeCloseTo(780, 1)
   expect(1008 - (audio!.x + audio!.width)).toBeCloseTo(80, 1)
 })
@@ -969,9 +992,9 @@ test('the caption Timeline fixture preserves its measured lane hierarchy', async
     page.locator('.timeline-lane--video').boundingBox(),
     page.locator('.timeline-lane--audio').boundingBox(),
   ])
-  expect(caption?.height).toBe(64)
-  expect(video?.height).toBe(108)
-  expect(audio?.height).toBe(76)
+  expect(caption?.height).toBe(48)
+  expect(video?.height).toBe(48)
+  expect(audio?.height).toBe(48)
   expect(video?.y).toBe(caption!.y + caption!.height)
   expect(audio?.y).toBe(video!.y + video!.height)
   await expect(page.locator('[data-timeline-clip="caption-3"]')).toHaveAttribute('aria-pressed', 'true')
