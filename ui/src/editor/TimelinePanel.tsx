@@ -558,26 +558,50 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
     const sourceAtDelta = (deltaProgramS: number) => trimDrag.kind === 'audio'
       ? trimAudioSourceAtProgramDelta(project, trimDrag.clipId, trimDrag.edge, deltaProgramS)
       : trimSourceAtProgramDelta(project, trimDrag.clipId, trimDrag.edge, deltaProgramS)
-    const previewAtSource = (sourceS: number) => ({
-      ...project,
-      tracks: project.tracks.map((track) => ({
-        ...track,
-        clips: track.clips?.map((clip) => {
-          if (clip.id !== trimDrag.clipId) return clip
-          const originalSourceS = trimDrag.edge === 'start' ? clip.sourceRange.startS : clip.sourceRange.endS
-          const programDeltaS = (sourceS - originalSourceS) / (clip.speed && clip.speed > 0 ? clip.speed : 1)
-          return {
-            ...clip,
-            sourceRange: trimDrag.edge === 'start'
-              ? { ...clip.sourceRange, startS: sourceS }
-              : { ...clip.sourceRange, endS: sourceS },
-            programRange: trimDrag.edge === 'start'
-              ? { ...clip.programRange, startS: clip.programRange.startS + programDeltaS }
-              : { ...clip.programRange, endS: clip.programRange.endS + programDeltaS },
-          }
-        }),
-      })),
-    })
+    const previewAtSource = (sourceS: number) => {
+      if (trimDrag.kind === 'audio') {
+        return {
+          ...project,
+          tracks: project.tracks.map((track) => ({
+            ...track,
+            clips: track.clips?.map((clip) => {
+              if (clip.id !== trimDrag.clipId) return clip
+              const originalSourceS = trimDrag.edge === 'start' ? clip.sourceRange.startS : clip.sourceRange.endS
+              const programDeltaS = (sourceS - originalSourceS) / (clip.speed && clip.speed > 0 ? clip.speed : 1)
+              return {
+                ...clip,
+                sourceRange: trimDrag.edge === 'start'
+                  ? { ...clip.sourceRange, startS: sourceS }
+                  : { ...clip.sourceRange, endS: sourceS },
+                programRange: trimDrag.edge === 'start'
+                  ? { ...clip.programRange, startS: clip.programRange.startS + programDeltaS }
+                  : { ...clip.programRange, endS: clip.programRange.endS + programDeltaS },
+              }
+            }),
+          })),
+        }
+      }
+      const committed = applyTimelineEdit(project, {
+        type: 'trim', clipId: trimDrag.clipId, edge: trimDrag.edge, sourceS,
+      }).project
+      if (trimDrag.edge !== 'start') return committed
+      const original = project.tracks
+        .flatMap((track) => track.clips ?? [])
+        .find((clip) => clip.id === trimDrag.clipId)
+      if (!original) return committed
+      const speed = original.speed && original.speed > 0 ? original.speed : 1
+      const startS = original.programRange.startS + (sourceS - original.sourceRange.startS) / speed
+      const targetRange = { startS, endS: original.programRange.endS }
+      return {
+        ...committed,
+        tracks: committed.tracks.map((track) => ({
+          ...track,
+          clips: track.clips?.map((clip) => clip.id === trimDrag.clipId || clip.linkedClipId === trimDrag.clipId
+            ? { ...clip, programRange: targetRange }
+            : clip),
+        })),
+      }
+    }
     const handlePointerMove = (event: globalThis.PointerEvent) => {
       if (event.pointerId !== trimDrag.pointerId) return
       const deltaProgramS = (event.clientX - trimDrag.startClientX) / (viewWidthPx * timelineZoom) * viewDurationS

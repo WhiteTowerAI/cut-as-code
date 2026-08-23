@@ -335,6 +335,66 @@ class ProtocolServiceTests(unittest.TestCase):
         layer = trimmed["snapshot"]["view"]["layers"][0]
         self.assertEqual({"start_s": 0.65, "end_s": 0.8}, layer["program_range"])
 
+    def test_timeline_trim_ripples_active_graphics_without_cut_dependencies(self):
+        self._configure_cut_project()
+        project = json.loads(self.project_path.read_text(encoding="utf-8"))
+        captions = next(item for item in project["operations"] if item["id"] == "captions")
+        captions.update({"depends_on": [], "based_on": {}})
+        plans = {
+            "captions": (self.plan, {
+                "cues": [
+                    {"id": "caption-before", "program_range": {"start_s": 0.2, "end_s": 0.3}},
+                    {"id": "caption-after", "program_range": {"start_s": 0.75, "end_s": 0.85}},
+                ],
+            }),
+            "content-cards": (self.root / "work" / "content-cards" / "cards-plan.json", {
+                "cards": [{"id": "card-after", "program_start_s": 0.75, "duration_s": 0.1}],
+            }),
+            "motion-graphics": (self.root / "work" / "motion-graphics" / "motion-graphics-plan.json", {
+                "cues": [{"id": "motion-after", "program_range": {"start_s": 0.75, "end_s": 0.85}}],
+            }),
+        }
+        for operation_id, (path, plan) in plans.items():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(plan), encoding="utf-8")
+            if operation_id != "captions":
+                project["operations"].append({
+                    "id": operation_id, "revision": 1, "status": "approved",
+                    "depends_on": [], "based_on": {},
+                    "target": {"sequence": "main", "scope": "graphics"},
+                    "effects": {
+                        "changes_timeline": False, "changes_geometry": False,
+                        "changes_video_pixels": True, "changes_audio": False,
+                    },
+                    "plan": str(path.relative_to(self.root / "work")).replace("\\", "/"),
+                    "outputs": [],
+                })
+        project["sequences"]["main"]["operations"] = [
+            "cut", "captions", "content-cards", "motion-graphics",
+        ]
+        self.project_path.write_text(json.dumps(project), encoding="utf-8")
+        opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+        split = self.service.handle_request({
+            "verb": "timeline.edit", "project_id": opened["project_id"],
+            "read_set": self._timeline_read_set(opened["snapshot"]),
+            "command": {"type": "split", "clip_id": "clip-1", "at_s": 0.5},
+        })
+        self.assertTrue(split["ok"], split)
+        trimmed = self.service.handle_request({
+            "verb": "timeline.edit", "project_id": opened["project_id"],
+            "read_set": self._timeline_read_set(split["snapshot"]),
+            "command": {"type": "trim", "clip_id": "clip-1", "edge": "end", "source_s": 0.4},
+        })
+        self.assertTrue(trimmed["ok"], trimmed)
+
+        caption_cues = json.loads(self.plan.read_text(encoding="utf-8"))["cues"]
+        self.assertEqual({"start_s": 0.2, "end_s": 0.3}, caption_cues[0]["program_range"])
+        self.assertEqual({"start_s": 0.65, "end_s": 0.75}, caption_cues[1]["program_range"])
+        card = json.loads(plans["content-cards"][0].read_text(encoding="utf-8"))["cards"][0]
+        self.assertEqual(0.65, card["program_start_s"])
+        motion = json.loads(plans["motion-graphics"][0].read_text(encoding="utf-8"))["cues"][0]
+        self.assertEqual({"start_s": 0.65, "end_s": 0.75}, motion["program_range"])
+
     def test_timeline_trim_removes_and_restore_bounds_recovers_caption_words(self):
         self._configure_cut_project()
         self.plan.write_text(json.dumps({
@@ -366,8 +426,8 @@ class ProtocolServiceTests(unittest.TestCase):
         })
         self.assertTrue(trimmed["ok"], trimmed)
         cue = json.loads(self.plan.read_text(encoding="utf-8"))["cues"][0]
-        self.assertEqual(("one", 0.2, 0.4), (cue["text"], cue["start"], cue["end"]))
-        self.assertEqual(["two", "three"], [word["word"] for word in cue["editor_removed_words"]])
+        self.assertEqual(("one two three", 0.2, 0.8), (cue["text"], cue["start"], cue["end"]))
+        self.assertNotIn("editor_removed_words", cue)
 
         restored = self.service.handle_request({
             "verb": "timeline.edit", "project_id": opened["project_id"],

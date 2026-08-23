@@ -287,21 +287,47 @@ test('timeline domain split, ripple delete, trim, and inverse commands preserve 
 })
 
 test('ripple trim shifts every later track element and layer together', () => {
-  const project = getScenario('timeline-editing')!.initialState.project!
+  const base = getScenario('timeline-editing')!.initialState.project!
+  const project = {
+    ...base,
+    tracks: [...base.tracks,
+      {
+        id: 'edit-captions', name: 'Captions', kind: 'caption' as const,
+        clips: [
+          { id: 'edit-caption-before', trackId: 'edit-captions', sourceRange: { startS: 4, endS: 5 }, programRange: { startS: 4, endS: 5 } },
+          { id: 'edit-caption-after', trackId: 'edit-captions', sourceRange: { startS: 16, endS: 17 }, programRange: { startS: 16, endS: 17 } },
+        ],
+      },
+      {
+        id: 'edit-motion', name: 'Motion Graphics', kind: 'motion-graphics' as const,
+        clips: [{ id: 'edit-motion-after', trackId: 'edit-motion', sourceRange: { startS: 16, endS: 17 }, programRange: { startS: 16, endS: 17 } }],
+      },
+    ],
+  }
   const endTrim = applyTimelineEdit(project, {
     type: 'trim', clipId: 'edit-video-1', edge: 'end', sourceS: 10,
   })
   const endCard = endTrim.project.tracks.find((track) => track.kind === 'card')!.clips![0]
+  const captions = endTrim.project.tracks.find((track) => track.kind === 'caption')!.clips!
+  const motion = endTrim.project.tracks.find((track) => track.kind === 'motion-graphics')!.clips![0]
   expect(endCard.programRange).toEqual({ startS: 18, endS: 20 })
+  expect(captions[0].programRange).toEqual({ startS: 4, endS: 5 })
+  expect(captions[1].programRange).toEqual({ startS: 18, endS: 19 })
+  expect(motion.programRange).toEqual({ startS: 18, endS: 19 })
   expect(endTrim.project.layers![0].programRange).toEqual({ startS: 18, endS: 20 })
   expect(endTrim.project.tracks.find((track) => track.kind === 'video')!.clips![1].programRange.startS).toBe(10)
 
   const startTrim = applyTimelineEdit(project, {
-    type: 'trim', clipId: 'edit-video-1', edge: 'start', sourceS: 2,
+    type: 'trim', clipId: 'edit-video-2', edge: 'start', sourceS: 14,
   })
   const startCard = startTrim.project.tracks.find((track) => track.kind === 'card')!.clips![0]
+  const startCaptions = startTrim.project.tracks.find((track) => track.kind === 'caption')!.clips!
+  const startMotion = startTrim.project.tracks.find((track) => track.kind === 'motion-graphics')!.clips![0]
   expect(startCard.programRange).toEqual({ startS: 14, endS: 16 })
-  expect(startTrim.project.tracks.find((track) => track.kind === 'video')!.clips![1].programRange.startS).toBe(6)
+  expect(startCaptions[0].programRange).toEqual({ startS: 4, endS: 5 })
+  expect(startCaptions[1].programRange).toEqual({ startS: 14, endS: 15 })
+  expect(startMotion.programRange).toEqual({ startS: 14, endS: 15 })
+  expect(startTrim.project.tracks.find((track) => track.kind === 'video')!.clips![1].programRange.startS).toBe(8)
 })
 
 test('restoring media bounds is one undoable edit and ripples later elements', () => {
@@ -751,8 +777,8 @@ test('dragging a video edge moves every later timeline element together', async 
   const previewCard = await laterCard.boundingBox()
   expect(draggingHandle).not.toBeNull()
   expect(draggingHandle!.x - handleBox!.x).toBeCloseTo(44, 0)
-  expect(previewVideo!.x).toBeCloseTo(beforeVideo!.x, 1)
-  expect(previewCard!.x).toBeCloseTo(beforeCard!.x, 1)
+  expect(previewVideo!.x - beforeVideo!.x).toBeCloseTo(previewCard!.x - beforeCard!.x, 1)
+  expect(previewCard!.x).toBeGreaterThan(beforeCard!.x)
   await page.mouse.up()
 
   const savedVideo = await laterVideo.boundingBox()

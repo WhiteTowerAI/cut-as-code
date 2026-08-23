@@ -470,6 +470,10 @@ class ProtocolService:
             "set-audio-state", "set-audio-state-with-clip", "set-audio-clip",
         }
         affected_operation_ids = {"cut"}
+        if not audio_only:
+            affected_operation_ids.update(
+                active_operation_ids.intersection({"captions", "content-cards", "motion-graphics"})
+            )
         changed = True
         while changed:
             changed = False
@@ -490,8 +494,12 @@ class ProtocolService:
                 if not entry:
                     continue
                 try:
-                    remapped = self._remap_operation_plan(
-                        operation_id, entry["plan"], timeline, updated_timeline
+                    remapped = (
+                        self._shift_operation_plan(operation_id, entry["plan"], *ripple)
+                        if command.get("type") == "trim" and ripple
+                        else self._remap_operation_plan(
+                            operation_id, entry["plan"], timeline, updated_timeline
+                        )
                     )
                 except ValueError as exc:
                     return {"ok": False, "error": f"timeline edit cannot remap {operation_id}: {exc}"}
@@ -541,8 +549,10 @@ class ProtocolService:
                     and isinstance(cue.get("render"), dict)
                 ]
             elif not audio_only and ripple and operation_id in active_operation_ids and "render" in operation:
-                operation["render"] = self._remap_render_timing(
-                    operation["render"], timeline, updated_timeline
+                operation["render"] = (
+                    self._shift_render_timing(operation["render"], *ripple)
+                    if command.get("type") == "trim"
+                    else self._remap_render_timing(operation["render"], timeline, updated_timeline)
                 )
             if "plan_sha256" in operation:
                 operation["plan_sha256"] = self._canonical_hash(plan)
@@ -974,11 +984,19 @@ class ProtocolService:
                 cls._shift_program_start(card, boundary, delta)
         elif operation_id == "captions":
             for cue in shifted.get("cues", []):
-                if not cls._shift_program_range(cue, boundary, delta):
-                    cls._shift_start_end(cue, boundary, delta)
+                moved = cls._shift_program_range(cue, boundary, delta)
+                if not moved:
+                    moved = cls._shift_start_end(cue, boundary, delta)
+                if moved:
+                    cls._shift_start_end(cue, float("-inf"), delta)
+                    for word in cue.get("words", []):
+                        cls._shift_program_range(word, float("-inf"), delta)
+            for beat in shifted.get("presentation", {}).get("layout_beats", []):
+                cls._shift_program_range(beat, boundary, delta)
         elif operation_id == "motion-graphics":
             for cue in shifted.get("cues", []):
-                cls._shift_program_range(cue, boundary, delta)
+                if cls._shift_program_range(cue, boundary, delta) and isinstance(cue.get("render"), dict):
+                    cue["render"] = cls._shift_render_timing(cue["render"], float("-inf"), delta)
         elif operation_id == "b-roll":
             for shot in shifted.get("shots", []):
                 if cls._shift_program_range(shot, boundary, delta):
