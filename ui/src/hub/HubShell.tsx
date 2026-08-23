@@ -147,11 +147,18 @@ export function HubShell() {
         </div>
 
         {loading ? <div className="hub-state" role="status">Loading projects...</div> : null}
-        {error ? <div className="hub-state hub-state-error" role="alert">{error}</div> : null}
+        {error ? (
+          <div className="hub-state hub-state-error" role="alert">
+            <span>{error}</span>
+            <button className="hub-close-button" type="button" onClick={() => setError(undefined)} title="Dismiss error" aria-label="Dismiss error">
+              <X size={16} />
+            </button>
+          </div>
+        ) : null}
         {!loading && !error && projects.length === 0 ? (
           <div className="hub-state">No registered projects</div>
         ) : null}
-        {!loading && !error && projects.length > 0 ? (
+        {!loading && projects.length > 0 ? (
           <div className="hub-project-list">
             {projects.map((project) => (
               <article className="hub-project" key={project.projectId} data-hub-project>

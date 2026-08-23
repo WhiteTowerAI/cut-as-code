@@ -14,6 +14,39 @@ test('shows the project Hub without a runtime project identity', async ({ page }
   await expect(page.locator('[data-editor-shell]')).toHaveCount(0)
 })
 
+test('keeps registered projects usable when a Hub action fails', async ({ page }) => {
+  await page.route('**/v1/hub/projects', (route) => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({
+      ok: true,
+      projects: [{ projectId: 'project_1', displayName: 'Existing cut', rootFingerprint: 'abc', lastOpenedAt: '2026-08-21T00:00:00Z', available: true, running: false }],
+      candidates: [], updatePending: null,
+    }),
+  }))
+  await page.route('**/v1/hub/projects/select', (route) => route.fulfill({
+    status: 400, contentType: 'application/json',
+    body: JSON.stringify({ ok: false, error: 'Project folder "33-cc" was not found next to the registered projects' }),
+  }))
+  await page.goto('/')
+
+  await page.locator('.hub-folder-input').evaluate((input) => {
+    const file = new File(['{}'], 'project.json', { type: 'application/json' })
+    Object.defineProperty(file, 'webkitRelativePath', { value: '33-cc/work/project.json' })
+    const transfer = new DataTransfer()
+    transfer.items.add(file)
+    Object.defineProperty(input, 'files', { value: transfer.files, configurable: true })
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })
+
+  await expect(page.getByRole('alert')).toContainText('33-cc')
+  await expect(page.getByText('Existing cut', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Refresh projects' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Quit Editor Service' })).toBeVisible()
+  await page.getByRole('button', { name: 'Dismiss error' }).click()
+  await expect(page.getByRole('alert')).toHaveCount(0)
+  await expect(page.getByText('Existing cut', { exact: true })).toBeVisible()
+})
+
 test('registers discovered projects and selects a project folder from the Hub', async ({ page }) => {
   let created = false
   let registered = false
