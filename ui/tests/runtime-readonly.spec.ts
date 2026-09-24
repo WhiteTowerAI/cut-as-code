@@ -542,6 +542,113 @@ test('browser displays current Agent review image, video, and sandboxed HTML fro
   }
 })
 
+test('audio edits persist and drive native preview mute, independent playback, and deletion', async ({ page }) => {
+  const root = await createProjectFixture()
+  let isolated: StartedSidecar | undefined
+  try {
+    await execFileAsync('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=160x90:rate=30',
+      '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000', '-t', '6',
+      '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', path.join(root, 'input', 'source.mp4')])
+    const projectPath = path.join(root, 'work', 'project.json')
+    const project = JSON.parse(await readFile(projectPath, 'utf8'))
+    const mediaStat = await stat(path.join(root, 'input', 'source.mp4'), { bigint: true })
+    project.source.fingerprint = { size: Number(mediaStat.size), modified_ns: '__SOURCE_MTIME__', duration_s: 6 }
+    project.sequences.main.operations = ['cut']
+    project.operations = [{ id: 'cut', revision: 1, status: 'verified', depends_on: [], based_on: {},
+      target: { sequence: 'main', scope: 'full' }, outputs: [],
+      effects: { changes_timeline: true, changes_geometry: false, changes_video_pixels: true, changes_audio: true } }]
+    await writeFile(projectPath, JSON.stringify(project).replace('"__SOURCE_MTIME__"', mediaStat.mtimeNs.toString()))
+    await writeFile(path.join(root, 'work', 'timeline.json'), JSON.stringify({
+      schema_version: 1, source_duration_s: 6, program_duration_s: 6, fps: { num: 30, den: 1 },
+      clips: [0, 3].map((start, i) => ({ id: `clip-${i + 1}`, speed: 1,
+        source_range: { start_s: start, end_s: start + 3 }, program_range: { start_s: start, end_s: start + 3 } })),
+    }))
+    isolated = await startSidecar(root)
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto(await armLaunch(isolated))
+    const opened = await page.request.get(`${isolatedURL(isolated.ready)}/v1/projects/${isolated.ready.projectId}/snapshot`)
+    const snapshot = (await opened.json()).snapshot
+    expect(snapshot.read_only, JSON.stringify(snapshot.errors)).toBe(false)
+    const source = page.locator('video[data-project-media]')
+    await expect.poll(() => source.evaluate(video => video.readyState)).toBeGreaterThanOrEqual(2)
+    const originalAudio = page.locator('[data-timeline-clip="clip-1:embedded-audio"]')
+    await originalAudio.locator('..').getByRole('button', { name: 'Mute audio', exact: true }).click()
+    await expect.poll(() => source.evaluate(video => video.muted)).toBe(true)
+    await originalAudio.click({ button: 'right', position: { x: 8, y: 30 } })
+    await page.getByRole('menuitem', { name: 'Detach audio', exact: true }).click()
+    const audio = page.locator('audio[data-timeline-audio="clip-1:audio"]')
+    const audioClip = page.locator('[data-timeline-clip="clip-1:audio"]')
+    await expect(audioClip).toHaveAttribute('data-muted', 'true')
+    await expect.poll(() => audio.evaluate(media => media.muted)).toBe(true)
+    await audio.evaluate(async (media) => {
+      const context = new AudioContext()
+      const analyser = context.createAnalyser()
+      context.createMediaElementSource(media).connect(analyser)
+      analyser.connect(context.destination)
+      await context.resume()
+      Object.assign(window, { audioLevel: () => {
+        const samples = new Float32Array(analyser.fftSize)
+        analyser.getFloatTimeDomainData(samples)
+        return Math.max(...samples.map(Math.abs))
+      } })
+    })
+    const level = () => page.evaluate(() => (window as unknown as { audioLevel: () => number }).audioLevel())
+    await page.getByRole('button', { name: 'Play', exact: true }).click()
+    await expect.poll(() => source.evaluate(media => media.currentTime)).toBeGreaterThan(0.15)
+    await expect.poll(level).toBeLessThan(0.001)
+    await audioClip.locator('..').getByRole('button', { name: 'Unmute audio', exact: true }).click()
+    await expect.poll(() => audio.evaluate(media => media.muted)).toBe(false)
+    await expect.poll(() => source.evaluate(video => video.muted)).toBe(true)
+    await expect.poll(() => audio.evaluate(media => media.paused)).toBe(false)
+    await expect.poll(() => audio.evaluate(media => media.currentTime)).toBeGreaterThan(0.15)
+    await expect.poll(level).toBeGreaterThan(0.01)
+    await page.getByRole('button', { name: 'Pause', exact: true }).click()
+    await expect.poll(() => audio.evaluate(media => media.paused)).toBe(true)
+    await audioClip.click({ button: 'right', position: { x: 8, y: 30 } })
+    await page.getByRole('menuitem', { name: 'Unlink audio and video', exact: true }).click()
+    await expect(audioClip).toHaveAttribute('data-linked', 'false')
+    const box = (await audioClip.boundingBox())!
+    await audioClip.click({ button: 'right', position: { x: box.width / 3, y: 30 } })
+    await page.getByRole('menuitem', { name: 'Trim audio out point to here', exact: true }).click()
+    await expect.poll(async () => (await audioClip.boundingBox())!.width).toBeLessThan(box.width / 2)
+    const trimmed = (await audioClip.boundingBox())!
+    await page.mouse.move(trimmed.x + trimmed.width / 2, trimmed.y + trimmed.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(trimmed.x + trimmed.width / 2 + 150, trimmed.y + trimmed.height / 2)
+    await page.mouse.up()
+    await expect.poll(async () => JSON.parse(await readFile(path.join(root, 'work', 'timeline.json'), 'utf8'))
+      .audio_clips[0].program_range.start_s).toBeGreaterThan(0)
+    const canvas = page.locator('[data-timeline-surface]')
+    await canvas.click({ position: { x: 1, y: 180 } })
+    await page.getByRole('button', { name: 'Play', exact: true }).click()
+    await expect.poll(() => audio.evaluate(media => media.paused)).toBe(true)
+    await expect.poll(() => audio.evaluate(media => media.paused)).toBe(false)
+    await expect.poll(() => audio.evaluate(media => media.paused), { timeout: 5000 }).toBe(true)
+    await page.getByRole('button', { name: 'Pause', exact: true }).click()
+    await audioClip.locator('..').getByRole('button', { name: 'Mute audio', exact: true }).click()
+    await expect(audioClip).toHaveAttribute('data-muted', 'true')
+    await page.screenshot({ path: test.info().outputPath('audio-muted.png') })
+    await page.getByRole('region', { name: 'Timeline', exact: true }).screenshot({ path: test.info().outputPath('audio-timeline.png') })
+    await page.reload()
+    await expect(audioClip).toHaveAttribute('data-muted', 'true')
+    await audioClip.focus()
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('Delete')
+    await expect(audioClip).toHaveCount(0)
+    await expect(originalAudio).toHaveCount(0)
+    await expect(page.locator('[data-timeline-clip="clip-1"]')).toBeVisible()
+    await expect(audio).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeEnabled()
+    await page.keyboard.press('Control+z')
+    await expect.poll(async () => ({ count: await audioClip.count(), error: await page.locator('.timeline-edit-status--error').allTextContents() }))
+      .toEqual({ count: 1, error: [] })
+    await expect(audioClip).toHaveAttribute('data-muted', 'true')
+  } finally {
+    if (isolated) await stopSidecar(isolated.process)
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('browser projects opaque project media into a playable Viewer and shared timeline', async ({ page }) => {
   const isolated = await startSidecar(projectRoot)
   try {

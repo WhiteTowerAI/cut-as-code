@@ -1481,9 +1481,22 @@ button {
   cursor: pointer;
 }
 
-.timeline-toolbar button:hover:not(:disabled),
-.timeline-toolbar button.is-active {
+.timeline-toolbar button:hover:not(:disabled) {
   background: #424248;
+}
+
+.timeline-toolbar button.is-active {
+  color: #bce5db;
+  background: var(--color-selection);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+
+.timeline-zoom-level {
+  min-width: 40px;
+  color: #c5c9d0;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 .timeline-toolbar button:disabled,
@@ -2096,12 +2109,19 @@ button {
 .timeline-clip--video[aria-pressed='true'] .timeline-clip-label { background: #1e3034; }
 .timeline-clip-speed { float: right; }
 
-.timeline-clip--audio .timeline-clip-label { top: 4px; right: 32px; bottom: auto; left: 9px; color: #d6efe9; background: transparent; }
+.timeline-clip--audio .timeline-clip-label { top: 4px; right: 52px; bottom: auto; left: 9px; color: #d6efe9; background: transparent; }
+.timeline-clip--audio[data-muted='true'] .timeline-waveform { opacity: 0.2; }
+.timeline-clip--audio[data-muted='true'] .timeline-clip-label { color: #a3b4b0; }
+.timeline-audio-mute { display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 4px; color: #b8ded5; background: #203b35; cursor: pointer; }
+.timeline-audio-mute:hover:not(:disabled), .timeline-audio-mute[aria-pressed='true'] { color: #fff; background: #52615d; }
+.timeline-audio-mute:disabled { opacity: 0.5; cursor: not-allowed; }
+.viewer-audio-error { position: absolute; z-index: 5; bottom: 52px; left: 12px; padding: 6px 10px; color: #ffb6b6; background: #25272c; font-size: 12px; }
 .timeline-audio-state {
   position: absolute;
-  top: 7px;
+  top: 4px;
   right: 8px;
   display: inline-flex;
+  align-items: center;
   gap: 4px;
   color: #b8ded5;
 }

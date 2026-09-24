@@ -644,6 +644,32 @@ class ProtocolServiceTests(unittest.TestCase):
         self.assertEqual(["clip-1"], [clip["id"] for clip in timeline["clips"]])
         self.assertEqual({"start_s": 0.0, "end_s": 1.0}, timeline["clips"][0]["program_range"])
 
+    def test_audio_mute_survives_detach_attach_and_reload(self):
+        self._configure_cut_project()
+        opened = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+        snapshot = opened["snapshot"]
+        for command, mode, muted in [
+            ({"type": "mute-video-audio", "clip_id": "clip-1", "muted": True}, "muted", None),
+            ({"type": "detach-audio", "clip_id": "clip-1"}, "detached", True),
+            ({"type": "attach-audio", "clip_id": "clip-1"}, "muted", None),
+            ({"type": "mute-video-audio", "clip_id": "clip-1", "muted": False}, "embedded", None),
+            ({"type": "detach-audio", "clip_id": "clip-1"}, "detached", False),
+        ]:
+            with self.subTest(command=command):
+                result = self.service.handle_request({
+                    "verb": "timeline.edit", "project_id": opened["project_id"],
+                    "read_set": self._timeline_read_set(snapshot), "command": command,
+                })
+                self.assertTrue(result["ok"], result)
+                reloaded = self.service.handle_request({"verb": "open_project", "project_root": str(self.root)})
+                snapshot = reloaded["snapshot"]
+                timeline = json.loads(self.timeline.read_text(encoding="utf-8"))
+                self.assertEqual(mode, timeline["clips"][0]["audio_mode"])
+                if muted is not None:
+                    self.assertEqual(muted, timeline["audio_clips"][0]["muted"])
+                else:
+                    self.assertEqual([], timeline.get("audio_clips", []))
+
     def test_detached_audio_commands_are_atomic_and_linked_edits_sync(self):
         self._configure_cut_project()
         timeline = json.loads(self.timeline.read_text(encoding="utf-8"))

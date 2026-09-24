@@ -51,6 +51,7 @@ import {
   trimAudioSourceAtProgramDelta,
   trimSourceAtProgramDelta,
   moveAudioStartAtProgramDelta,
+  type TimelineEditCommand,
   type TimelineTrimEdge,
 } from './timeline-edit'
 
@@ -244,6 +245,7 @@ function Clip({
   trimming,
   onTrimStart,
   onAudioMoveStart,
+  onMute,
   onContextMenu,
 }: {
   track: TrackView
@@ -261,6 +263,7 @@ function Clip({
   trimming: TimelineTrimEdge | null
   onTrimStart: (event: PointerEvent<HTMLButtonElement>, clip: ClipView, edge: TimelineTrimEdge, kind?: 'video' | 'audio') => void
   onAudioMoveStart: (event: PointerEvent<HTMLButtonElement>, clip: ClipView) => void
+  onMute: (clip: ClipView) => void
   onContextMenu: (event: ReactMouseEvent<HTMLButtonElement>, track: TrackView, clip: ClipView) => void
 }) {
   const kind = track.kind
@@ -298,9 +301,11 @@ function Clip({
         className={`timeline-clip timeline-clip--${kind}`}
         data-timeline-clip={id}
         {...(kind === 'audio' && !clip.implicit ? { 'data-linked': String(Boolean(clip.linked)) } : {})}
+        data-muted={kind === 'audio' ? Boolean(clip.muted) : undefined}
         aria-label={`${track.name} ${kind === 'video' || kind === 'audio' ? 'clip' : 'cue'}`}
         aria-pressed={selected}
         onPointerDown={() => select({ kind, id })}
+        onClick={() => select({ kind, id })}
         onPointerDownCapture={(event) => {
           if (kind === 'audio' && !clip.implicit && !clip.linked && event.button === 0) onAudioMoveStart(event, clip)
         }}
@@ -392,11 +397,17 @@ function Clip({
           ><span aria-hidden /></button>
         </>
       )}
-      {kind === 'audio' && !clip.implicit && (
-        <span className="timeline-audio-state" aria-hidden>
-          {clip.linked ? <Link size={12} /> : <Link2Off size={12} />}
-          {clip.muted ? <VolumeX size={12} /> : null}
-        </span>
+      {kind === 'audio' && clip.implicit !== undefined && (
+        <div className="timeline-audio-state">
+          <span title={clip.implicit ? 'Original video audio' : clip.linked ? 'Linked to video' : 'Independent audio'}>
+            {clip.linked ? <Link aria-hidden size={12} /> : <Link2Off aria-hidden size={12} />}
+          </span>
+          <button type="button" className="timeline-audio-mute" aria-label={clip.muted ? 'Unmute audio' : 'Mute audio'}
+            title={clip.muted ? 'Unmute audio' : 'Mute audio'} aria-pressed={Boolean(clip.muted)} disabled={!editable}
+            onPointerDown={(event) => event.stopPropagation()} onClick={() => onMute(clip)}>
+            {clip.muted ? <VolumeX aria-hidden size={13} /> : <Volume2 aria-hidden size={13} />}
+          </button>
+        </div>
       )}
       {kind === 'video' && trimming && (
         <output className={`timeline-trim-readout timeline-trim-readout--${trimming}`} aria-live="polite">
@@ -505,12 +516,26 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
   const selectedVideo = selection?.kind === 'video'
     ? project?.tracks.find((track) => track.kind === 'video')?.clips?.find((clip) => clip.id === selection.id)
     : undefined
+  const selectedAudio = selection?.kind === 'audio'
+    ? project?.tracks.find((track) => track.kind === 'audio')?.clips?.find((clip) => clip.id === selection.id)
+    : undefined
+  const deleteCommand: TimelineEditCommand | undefined = selectedVideo
+    ? { type: 'delete', clipId: selectedVideo.id }
+    : selectedAudio && !selectedAudio.implicit && !selectedAudio.linked
+      ? { type: 'delete-audio', audioClipId: selectedAudio.id } : undefined
   const splitEnabled = Boolean(
     timelineEditable && selectedVideo && canSplitClip(project!, selectedVideo.id, currentTimeS) && !timelinePending,
   )
   const deleteEnabled = Boolean(
-    timelineEditable && selectedVideo && !timelinePending,
+    timelineEditable && deleteCommand && !timelinePending,
   )
+
+  function toggleAudioMute(clip: ClipView) {
+    select({ kind: 'audio', id: clip.id })
+    if (clip.implicit && clip.linkedClipId) {
+      void editTimeline({ type: 'mute-video-audio', clipId: clip.linkedClipId, muted: !clip.muted })
+    } else void editTimeline({ type: 'mute-audio', audioClipId: clip.id, muted: !clip.muted })
+  }
 
   useEffect(() => {
     if (!deleteNotice) return
@@ -536,7 +561,8 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null
-      if (target?.matches('input, textarea, [contenteditable="true"]')) return
+      if (event.defaultPrevented || event.isComposing || event.altKey
+        || target?.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="menu"], [role="dialog"]')) return
       const modifier = event.ctrlKey || event.metaKey
       if (modifier && event.key.toLowerCase() === 'z') {
         event.preventDefault()
@@ -544,14 +570,14 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
         else void undoTimeline()
         return
       }
-      if ((event.key === 'Delete' || event.key === 'Backspace') && deleteEnabled && selectedVideo) {
+      if ((event.key === 'Delete' || event.key === 'Backspace') && !modifier && !event.repeat && deleteEnabled && deleteCommand) {
         event.preventDefault()
-        void editTimeline({ type: 'delete', clipId: selectedVideo.id })
+        void editTimeline(deleteCommand)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [deleteEnabled, editTimeline, redoTimeline, selectedVideo, undoTimeline])
+  }, [deleteEnabled, editTimeline, redoTimeline, selectedVideo, selectedAudio, undoTimeline])
 
   useEffect(() => {
     if (!trimDrag || !project) return
@@ -1188,10 +1214,7 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
           label: clip.muted ? 'Unmute audio' : 'Mute audio',
           icon: clip.muted ? Volume2 : VolumeX,
           disabled: !editable,
-          onSelect: () => {
-            if (clip.implicit && video) void editTimeline({ type: 'mute-video-audio', clipId: video.id, muted: !clip.muted })
-            else void editTimeline({ type: 'mute-audio', audioClipId: clip.id, muted: !clip.muted })
-          },
+          onSelect: () => toggleAudioMute(clip),
         },
         {
           id: 'copy-audio-range',
@@ -1354,7 +1377,7 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
     <section className={`timeline-panel${hasMedia ? '' : ' timeline-panel--empty'}`} role="region" aria-label="Timeline">
       <header className="timeline-toolbar" aria-label="Timeline tools">
         {!runtime && <button type="button" aria-label="Add track" disabled={!hasMedia}><Plus aria-hidden size={18} /></button>}
-        <button className={snapEnabled ? '' : 'is-active'} type="button" aria-label="Select tool" title="Select and position timeline items" aria-pressed={!snapEnabled} onClick={() => setSnapEnabled(false)}><MousePointer2 aria-hidden size={18} /></button>
+        <button className="is-active" type="button" aria-label="Select tool" title="Select and position timeline items" aria-pressed={true}><MousePointer2 aria-hidden size={18} /></button>
         <button className={snapEnabled ? 'is-active' : ''} type="button" aria-label="Toggle snap" title={snapEnabled ? 'Magnetic snapping on' : 'Magnetic snapping off'} aria-pressed={snapEnabled} onClick={() => setSnapEnabled(!snapEnabled)}><Magnet aria-hidden size={18} /></button>
         {(hasMedia || timelinePast.length > 0 || timelineFuture.length > 0) && (
           <>
@@ -1368,14 +1391,19 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
             {!runtime && <DisabledTimelineCommand name="Duplicate" descriptionId="timeline-duplicate-description"><Copy aria-hidden size={18} /></DisabledTimelineCommand>}
             {!runtime && <DisabledTimelineCommand name="Copy" descriptionId="timeline-copy-description"><Copy aria-hidden size={18} /></DisabledTimelineCommand>}
             {!runtime && <DisabledTimelineCommand name="Reorder tracks" descriptionId="timeline-reorder-description"><ArrowUpDown aria-hidden size={18} /></DisabledTimelineCommand>}
-            <button type="button" aria-label="Delete clip" title={timelineEditable ? 'Delete selected clip (Delete)' : 'This project has no editable cut operation'} disabled={!deleteEnabled} onClick={() => selectedVideo && void editTimeline({ type: 'delete', clipId: selectedVideo.id })}><Trash2 aria-hidden size={18} /></button>
+            <button type="button" aria-label="Delete clip" title={timelineEditable ? selectedAudio ? 'Ripple delete audio (Delete)' : 'Delete selected clip (Delete)' : 'This project has no editable cut operation'} disabled={!deleteEnabled} onClick={() => deleteCommand && void editTimeline(deleteCommand)}><Trash2 aria-hidden size={18} /></button>
           </>
         )}
         {timelinePending && <span className="timeline-edit-status" role="status">Saving timeline…</span>}
         {!timelinePending && timelineError && <span className="timeline-edit-status timeline-edit-status--error" role="alert" title={timelineError}>{timelineError}</span>}
         <span className="timeline-toolbar-spacer" />
-        <button type="button" aria-label="Fit timeline" title="Fit timeline to available width" onClick={() => setTimelineZoom(1)}><Ruler aria-hidden size={20} /></button>
+        <button type="button" aria-label="Fit timeline" title="Fit timeline to available width" onClick={() => {
+          setTimelineZoom(1)
+          if (surfaceRef.current) surfaceRef.current.scrollLeft = 0
+          if (rulerScrollRef.current) rulerScrollRef.current.scrollLeft = 0
+        }}><Ruler aria-hidden size={20} /></button>
         <button type="button" aria-label="Zoom out timeline" title="Zoom out timeline" disabled={timelineZoom <= MIN_ZOOM} onClick={() => setTimelineZoom(timelineZoom - ZOOM_STEP)}><ZoomOut aria-hidden size={20} /></button>
+        <output className="timeline-zoom-level" aria-label="Timeline zoom">{Math.round(timelineZoom * 100)}%</output>
         <button type="button" aria-label="Zoom in timeline" title="Zoom in timeline" disabled={timelineZoom >= MAX_ZOOM} onClick={() => setTimelineZoom(timelineZoom + ZOOM_STEP)}><ZoomIn aria-hidden size={20} /></button>
       </header>
       <div className="timeline-body">
@@ -1498,13 +1526,14 @@ export function TimelinePanel({ store }: TimelinePanelProps) {
                       presentationInsetPx={presentationInsetPx}
                       selection={selection}
                       select={select}
-                      editable={timelineEditable && (
+                      editable={timelineEditable && !timelinePending && (
                         track.kind === 'video'
-                        || (track.kind === 'audio' && !clip.implicit && !clip.linked)
+                        || track.kind === 'audio'
                       )}
                       trimming={trimDrag?.clipId === clip.id ? trimDrag.edge : null}
                       onTrimStart={startTrim}
                       onAudioMoveStart={startAudioMove}
+                      onMute={toggleAudioMute}
                       onContextMenu={openClipContextMenu}
                     />
                   ))}

@@ -43,6 +43,47 @@ const runtimeSnapshot = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 })
 
+test('Space uses the preview play control and respects inputs, menus, and disabled playback', async ({ page }) => {
+  await page.route('**/v1/projects/project_keyboard/snapshot', (route) => route.fulfill({
+    contentType: 'application/json', body: JSON.stringify({ ok: true, snapshot: runtimeSnapshot() }),
+  }))
+  await page.goto('/?project=project_keyboard')
+  const play = page.getByRole('button', { name: 'Play', exact: true })
+  await expect(play).toBeEnabled()
+  await expect(play).toHaveAttribute('aria-keyshortcuts', 'Space')
+  // Observe the shared control; media decoding is covered by playback checks.
+  await play.evaluate((element) => {
+    element.addEventListener('click', (event) => {
+      event.stopImmediatePropagation()
+      element.setAttribute('data-clicks', String(Number(element.getAttribute('data-clicks') ?? 0) + 1))
+    })
+  })
+  await page.locator('[data-timeline-surface]').focus()
+  await page.keyboard.press('Space')
+  await expect(play).toHaveAttribute('data-clicks', '1')
+  await page.locator('[data-timeline-clip="clip-1"]').focus()
+  await page.keyboard.press('Space')
+  await expect(play).toHaveAttribute('data-clicks', '2')
+  await page.keyboard.down('Space')
+  await page.keyboard.down('Space')
+  await page.keyboard.up('Space')
+  await expect(play).toHaveAttribute('data-clicks', '3')
+  const search = page.getByRole('textbox').first()
+  await search.fill('clip')
+  await search.press('Space')
+  await expect(search).toHaveValue('clip ')
+  await expect(play).toHaveAttribute('data-clicks', '3')
+  await page.getByRole('button', { name: 'Aspect ratio', exact: true }).click()
+  await page.getByRole('menuitemradio').first().focus()
+  await page.keyboard.press('Space')
+  await expect(play).toHaveAttribute('data-clicks', '3')
+  await page.goto('/?scenario=1-60')
+  await expect(play).toBeDisabled()
+  await page.locator('[data-timeline-surface]').focus()
+  await page.keyboard.press('Space')
+  await expect(play).toBeDisabled()
+})
+
 test('production runtime shows explicit loading and error surfaces without fixture fallback', async ({ page }) => {
   let releaseSnapshot: (() => void) | undefined
   await page.route('**/v1/projects/project_loading/snapshot', async (route) => {

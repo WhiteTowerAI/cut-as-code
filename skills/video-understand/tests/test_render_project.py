@@ -138,6 +138,25 @@ class OverlayFrameBoundaryTests(unittest.TestCase):
             self.assertTrue(output.is_file())
             self.assertLess(abs(_mean_volume(output) - _mean_volume(source)), 1.5)
 
+            audio = timeline["audio_clips"][0]
+            audio.update({"linked": False, "source_range": {"start_s": 0, "end_s": 0.25},
+                          "program_range": {"start_s": 0.5, "end_s": 0.75}})
+            (root / "work" / "timeline.json").write_text(json.dumps(timeline), encoding="utf-8")
+            render_project.render(plan, root)
+            self.assertLess(max(map(abs, _audio_samples(output, 0.05, 0.2))), 10)
+            self.assertGreater(max(map(abs, _audio_samples(output, 0.55, 0.15))), 1000)
+
+            audio["muted"] = True
+            (root / "work" / "timeline.json").write_text(json.dumps(timeline), encoding="utf-8")
+            render_project.render(plan, root)
+            self.assertLess(max(map(abs, _audio_samples(output, 0.55, 0.15))), 10)
+
+            timeline["audio_clips"] = []
+            timeline["clips"][0]["audio_mode"] = "muted"
+            (root / "work" / "timeline.json").write_text(json.dumps(timeline), encoding="utf-8")
+            render_project.render(plan, root)
+            self.assertLess(max(map(abs, _audio_samples(output, 0.1))), 10)
+
     def test_overlay_editor_transform_scales_and_positions_from_normalized_center(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

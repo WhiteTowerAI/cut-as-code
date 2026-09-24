@@ -769,6 +769,7 @@ class ProtocolService:
             source = video(command["clip_id"])
             if source.get("audio_mode", "embedded") == "detached":
                 raise ValueError("audio is already detached")
+            muted = source.get("audio_mode") == "muted"
             source["audio_mode"] = "detached"
             audio_clips.append({
                 "id": f"{source['id']}:audio",
@@ -777,7 +778,7 @@ class ProtocolService:
                 "speed": source.get("speed", 1.0),
                 "source_video_clip_id": source["id"],
                 "linked": True,
-                "muted": False,
+                "muted": muted,
                 **({"source_asset_id": source["source_asset_id"]} if source.get("source_asset_id") else {}),
             })
         elif command_type == "attach-audio":
@@ -786,7 +787,7 @@ class ProtocolService:
             if source.get("audio_mode") != "detached" or len(matches) != 1 or not matches[0].get("linked"):
                 raise ValueError("only linked detached audio can be attached")
             audio_clips.remove(matches[0])
-            source["audio_mode"] = "embedded"
+            source["audio_mode"] = "muted" if matches[0].get("muted") else "embedded"
         elif command_type == "mute-video-audio":
             source = video(command["clip_id"])
             if source.get("audio_mode") == "detached" or not isinstance(command["muted"], bool):

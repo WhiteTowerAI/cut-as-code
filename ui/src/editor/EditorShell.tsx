@@ -686,7 +686,7 @@ export function projectFromSnapshot(base: EditorProjectView | null, snapshot: Ru
     muted: clip.muted,
     implicit: false,
   })) ?? []
-  const implicitAudioClips = hasAudio ? videoClips.filter((clip) => !detachedAudioIds.has(clip.id)).map((clip) => ({
+  const implicitAudioClips = hasAudio ? videoClips.filter((clip) => clip.audioMode !== 'detached' && !detachedAudioIds.has(clip.id)).map((clip) => ({
     ...clip,
     id: `${clip.id}:embedded-audio`,
     trackId: 'track-audio',

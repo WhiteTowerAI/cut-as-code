@@ -48,8 +48,32 @@ test('detached audio supports unlink, trim, move, mute, relink, and attach', () 
   expect(audio.programRange).toEqual({ startS: 0, endS: 8 })
   expect(audio.sourceRange).toEqual({ startS: 0, endS: 8 })
   const attached = applyTimelineEdit(relinked.project, { type: 'attach-audio', clipId: 'edit-video-1' })
-  expect(attached.project.tracks.find((track) => track.kind === 'video')!.clips![0].audioMode).toBe('embedded')
+  expect(attached.project.tracks.find((track) => track.kind === 'video')!.clips![0].audioMode).toBe('muted')
   expect(attached.project.tracks.find((track) => track.kind === 'audio')!.clips![0].implicit).toBe(true)
+  expect(attached.project.tracks.find((track) => track.kind === 'audio')!.clips![0].muted).toBe(true)
+  const restored = applyTimelineEdit(attached.project, attached.inverse)
+  expect(restored.project.tracks.find((track) => track.kind === 'audio')!.clips![0].muted).toBe(true)
+})
+
+test('audio mute, delete, and undo work from the clip controls and keyboard', async ({ page }) => {
+  await page.goto('/?scenario=audio-context-actions')
+  const audio = page.locator('[data-timeline-clip="edit-video-1:embedded-audio"]')
+  await audio.locator('..').getByRole('button', { name: 'Mute audio', exact: true }).click()
+  await expect(audio).toHaveAttribute('data-muted', 'true')
+  await expect(audio.locator('.timeline-waveform')).toHaveCSS('opacity', '0.2')
+  await page.keyboard.press('Control+z')
+  await expect(audio).toHaveAttribute('data-muted', 'false')
+  await audio.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Detach audio', exact: true }).click()
+  const detached = page.locator('[data-timeline-clip="edit-video-1:audio"]')
+  await detached.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Unlink audio and video', exact: true }).click()
+  await detached.focus()
+  await page.keyboard.press('Delete')
+  await expect(detached).toHaveCount(0)
+  await expect(page.locator('[data-timeline-clip="edit-video-1"]')).toBeVisible()
+  await page.keyboard.press('Control+z')
+  await expect(detached).toBeVisible()
 })
 
 test('linked detached audio follows video edits and survives delete undo', () => {
@@ -384,7 +408,7 @@ test('timeline selection and click seek update one store playhead', async ({ pag
   await expect(clip).toHaveAttribute('aria-pressed', 'true')
 })
 
-test('cursor and magnet tools are mutually exclusive and magnet snaps the playhead to a clip edge', async ({ page }) => {
+test('selection keeps snapping independent and magnet snaps the playhead to a clip edge', async ({ page }) => {
   await page.setViewportSize({ width: 1008, height: 444 })
   await page.goto('/?scenario=1-324')
 
@@ -395,7 +419,7 @@ test('cursor and magnet tools are mutually exclusive and magnet snaps the playhe
   await expect(cursor).toHaveAttribute('title', 'Select and position timeline items')
   await expect(magnet).toHaveAttribute('title', 'Magnetic snapping off')
   await magnet.click()
-  await expect(cursor).toHaveAttribute('aria-pressed', 'false')
+  await expect(cursor).toHaveAttribute('aria-pressed', 'true')
   await expect(magnet).toHaveAttribute('aria-pressed', 'true')
   await expect(magnet).toHaveAttribute('title', 'Magnetic snapping on')
 
@@ -408,7 +432,27 @@ test('cursor and magnet tools are mutually exclusive and magnet snaps the playhe
 
   await cursor.click()
   await expect(cursor).toHaveAttribute('aria-pressed', 'true')
+  await expect(magnet).toHaveAttribute('aria-pressed', 'true')
+  await magnet.click()
   await expect(magnet).toHaveAttribute('aria-pressed', 'false')
+})
+
+test('keyboard activation selects clips and fit resets zoom and horizontal scroll', async ({ page }) => {
+  await page.setViewportSize({ width: 1008, height: 444 })
+  await page.goto('/?scenario=1-324')
+  const clip = page.locator('[data-timeline-clip="video-2"]')
+  await clip.focus()
+  await page.keyboard.press('Enter')
+  await expect(clip).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'Zoom in timeline' }).click()
+  await expect(page.getByLabel('Timeline zoom', { exact: true })).toHaveText('125%')
+  const surface = page.locator('[data-timeline-surface]')
+  await surface.evaluate((element) => { element.scrollLeft = 150 })
+  await expect.poll(() => surface.evaluate((element) => element.scrollLeft)).toBe(150)
+  await page.getByRole('button', { name: 'Fit timeline' }).click()
+  await expect(page.getByLabel('Timeline zoom', { exact: true })).toHaveText('100%')
+  await expect.poll(() => surface.evaluate((element) => element.scrollLeft)).toBe(0)
+  await expect.poll(() => page.locator('.timeline-ruler-scroll').evaluate((element) => element.scrollLeft)).toBe(0)
 })
 
 test('timeline context menu keeps the playhead stable and supports keyboard navigation', async ({ page }) => {
