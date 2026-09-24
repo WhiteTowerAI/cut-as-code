@@ -222,8 +222,8 @@ def _build(plan, project_root, plan_dir):
             audio_chain = "" if abs(speed - 1.0) < 1e-9 else atempo_chain(speed) + ","
             label = f"timeline-audio-{segment_index}"
             graph.append(
-                f"[{next_input}:a:0]{audio_chain}aresample=48000,asetpts=PTS-STARTPTS+"
-                f"{float(segment['program_range']['start_s']):.9f}/TB[{label}]"
+                f"[{next_input}:a:0]{audio_chain}aresample=48000,asetpts=PTS-STARTPTS,"
+                f"adelay={round(float(segment['program_range']['start_s']) * 48000)}S:all=1[{label}]"
             )
             segment_labels.append(label)
             next_input += 1

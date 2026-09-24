@@ -227,7 +227,8 @@ function supportsNativePlaybackRate(playbackRate: number) {
   }
 }
 
-function applyClipPlaybackRate(video: HTMLVideoElement, clip: ClipView) {
+function applyClipPlaybackSettings(video: HTMLVideoElement, clip: ClipView) {
+  video.muted = clip.audioMode === 'muted' || clip.audioMode === 'detached'
   const playbackRate = playbackRateForClip(clip)
   if (playbackRate !== null && Math.abs(video.playbackRate - playbackRate) > 0.001) {
     try {
@@ -445,6 +446,41 @@ const aspectOptions = [
 
 type ViewerAspect = 'Original' | '16:9' | '9:16' | '1:1' | '4:5' | '4:3'
 
+function TimelineAudio({ clip, url, timeS, playing }: {
+  clip: ClipView; url?: string; timeS: number; playing: boolean
+}) {
+  const mediaRef = useRef<HTMLAudioElement>(null)
+  const [ready, setReady] = useState(false)
+  const [error, setError] = useState(false)
+  const active = timeS >= clip.programRange.startS && timeS < clip.programRange.endS
+  useEffect(() => {
+    const audio = mediaRef.current
+    if (!audio) return
+    if (!ready || error) { audio.pause(); return }
+    if (!active || clip.muted) { audio.pause(); return }
+    const rate = playbackRateForClip(clip)
+    if (rate === null) return
+    try { audio.playbackRate = rate } catch { audio.pause(); setError(true); return }
+    const sourceS = clip.sourceRange.startS + (timeS - clip.programRange.startS) * rate
+    // ponytail: native clocks resync above 80 ms; use Web Audio for sample-accurate preview.
+    if (audio.paused || !playing || Math.abs(audio.currentTime - sourceS) > 0.08 * rate) audio.currentTime = sourceS
+    if (!playing) { audio.pause(); return }
+    if (audio.paused) void audio.play().catch((reason: unknown) => {
+      if (!(reason instanceof DOMException && reason.name === 'AbortError')) setError(true)
+    })
+  }, [active, clip, error, playing, ready, timeS])
+  useEffect(() => {
+    const audio = mediaRef.current
+    return () => { audio?.pause() }
+  }, [])
+  return <>
+    <audio ref={mediaRef} src={url} preload="auto" muted={Boolean(clip.muted)} data-timeline-audio={clip.id}
+      onLoadedMetadata={() => setReady(true)} onError={() => setError(true)} />
+    {active && !clip.muted && (error || !url)
+      ? <span role="alert" className="viewer-audio-error">Audio preview unavailable: {clip.displayName || 'Audio'}</span> : null}
+  </>
+}
+
 function AspectRatioMenu({ selectedRatio, onSelect }: { selectedRatio: ViewerAspect; onSelect: (ratio: ViewerAspect) => void }) {
   return (
     <div className="viewer-menu viewer-aspect-menu" role="menu" aria-label="Aspect ratio">
@@ -501,7 +537,10 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     ? project.assets.find((asset) => asset.id === project.sourceAssetId && asset.kind === 'video' && asset.mediaType?.startsWith('video/') && asset.url)
     : undefined
   const videoClips = project?.tracks.find((track) => track.kind === 'video')?.clips ?? []
+  const detachedAudio = project?.tracks.filter((track) => track.kind === 'audio')
+    .flatMap((track) => track.clips ?? []).filter((clip) => clip.implicit === false) ?? []
   const projectVideoRef = useRef<HTMLVideoElement>(null)
+  const playButtonRef = useRef<HTMLButtonElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const [fitSize, setFitSize] = useState<Readonly<{ width: number; height: number }>>()
   const [viewerZoom, setViewerZoom] = useState(1)
@@ -512,7 +551,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
   const holdingBoundaryRef = useRef(false)
   const cancelBoundaryHoldRef = useRef<(() => boolean) | null>(null)
   const layerPointerRef = useRef<LayerPointerState | null>(null)
-  const unsupportedPlaybackRate = videoClips
+  const unsupportedPlaybackRate = [...videoClips, ...detachedAudio.filter((clip) => !clip.muted)]
     .map(playbackRateForClip)
     .find((playbackRate) => playbackRate !== null && !supportsNativePlaybackRate(playbackRate))
   const canPlay = Boolean(projectVideo && videoClips.length && unsupportedPlaybackRate === undefined)
@@ -592,7 +631,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
       const finalSourceTimeS = lastPresentedSourceTime(finalClip, sourceFrameDurationS)
       activeClipRef.current = finalClip
       finalFrameStateRef.current = { sourceTimeS: finalSourceTimeS }
-      applyClipPlaybackRate(video, finalClip)
+      applyClipPlaybackSettings(video, finalClip)
       if (Math.abs(video.currentTime - finalSourceTimeS) >= 0.0001) {
         createPlaybackController(video).seek(finalSourceTimeS)
       }
@@ -603,7 +642,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     const sourceTimeS = programTimeToSourceTime(programTimeS, videoClips)
     if (!video || !clip || sourceTimeS === null) return
     activeClipRef.current = clip
-    applyClipPlaybackRate(video, clip)
+    applyClipPlaybackSettings(video, clip)
     if (Math.abs(video.currentTime - sourceTimeS) < 0.01) return
     createPlaybackController(video).seek(sourceTimeS)
   }
@@ -650,7 +689,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
     }
     const activeClip = activeClipRef.current ?? sourceClipAtTime(video.currentTime, videoClips)
     if (!activeClip || video.currentTime < activeClip.sourceRange.startS || video.currentTime >= activeClip.sourceRange.endS) return
-    applyClipPlaybackRate(video, activeClip)
+    applyClipPlaybackSettings(video, activeClip)
     const programTimeS = sourceTimeToProgramTimeInClip(video.currentTime, activeClip)
     if (programTimeS !== null) publishNativeProgramTime(programTimeS)
   }
@@ -658,7 +697,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
   function transitionToNextClip(video: HTMLVideoElement, nextClip: ClipView) {
     finalFrameStateRef.current = null
     activeClipRef.current = nextClip
-    applyClipPlaybackRate(video, nextClip)
+    applyClipPlaybackSettings(video, nextClip)
     createPlaybackController(video).seek(nextClip.sourceRange.startS)
     publishNativeProgramTime(nextClip.programRange.startS)
   }
@@ -689,7 +728,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
       else finishPlayingClip(video, activeClip)
       return true
     }
-    applyClipPlaybackRate(video, activeClip)
+    applyClipPlaybackSettings(video, activeClip)
     const programTimeS = sourceTimeToProgramTimeInClip(presentedSourceTimeS, activeClip)
     if (programTimeS !== null) publishNativeProgramTime(programTimeS)
     return presentedSourceTimeS >= lastPresentedSourceTime(activeClip, sourceFrameDurationS) - sourceFrameDurationS / 100
@@ -860,11 +899,18 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
   }
 
   useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => {
+    const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setOpenMenu(null)
+      if (event.key !== ' ' || event.defaultPrevented || event.repeat || event.isComposing
+        || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return
+      const target = event.target as HTMLElement | null
+      if (target?.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="menu"], [role="dialog"], a, button:not([data-timeline-clip]), [role="tab"], video, audio')) return
+      if (!playButtonRef.current || playButtonRef.current.disabled) return
+      event.preventDefault()
+      playButtonRef.current.click()
     }
-    window.addEventListener('keydown', closeOnEscape)
-    return () => window.removeEventListener('keydown', closeOnEscape)
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
   }, [setOpenMenu])
 
   function beginLayerPointer(
@@ -995,6 +1041,10 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
   return (
     <section className="viewer-panel" role="region" aria-label="Viewer">
       <header className="viewer-titlebar">Viewer</header>
+      {detachedAudio.map((clip) => {
+        const url = project?.assets.find((asset) => asset.id === (clip.sourceAssetId ?? project.sourceAssetId))?.url
+        return <TimelineAudio key={`${clip.id}:${url}`} clip={clip} url={url} timeS={currentTimeS} playing={isPlaying && canPlay} />
+      })}
       {contentCardsOperation?.preview ? (
         <output aria-label="Preview artifact metadata" style={{ display: 'block', padding: '4px 12px', color: '#a9adb9', background: '#17191e', fontSize: 11 }}>
           Existing preview artifact: {contentCardsOperation.preview.status} (revision {contentCardsOperation.preview.revision})
@@ -1015,6 +1065,7 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
                   ref={projectVideoRef}
                   data-project-media
                   src={projectVideo.url}
+                  muted={['muted', 'detached'].includes(programClipAtTime(currentTimeS, videoClips)?.audioMode ?? '')}
                   aria-label={projectVideo.name}
                   onLoadedMetadata={(event) => seekProjectVideo(currentTimeS)}
                   onTimeUpdate={(event) => syncProgramTime(event.currentTarget)}
@@ -1147,11 +1198,13 @@ export function ViewerPanel({ store }: ViewerPanelProps) {
         </div>
         <button
           className="viewer-play-button"
+          ref={playButtonRef}
           type="button"
           aria-label={isPlaying ? 'Pause' : 'Play'}
+          aria-keyshortcuts="Space"
           disabled={!canPlay}
           title={unsupportedPlaybackRate === undefined
-            ? (isPlaying ? 'Pause playback' : 'Play preview')
+            ? (isPlaying ? 'Pause playback (Space)' : 'Play preview (Space)')
             : `Playback rate ${unsupportedPlaybackRate} cannot be represented by this browser. Use timeline seeking for manual review.`}
           onClick={togglePlayback}
         >

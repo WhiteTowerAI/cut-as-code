@@ -227,7 +227,7 @@ function updateTracks(project: EditorProjectView, clips: readonly ClipView[], ri
         linkedClipId: video.id,
         linked: true,
         implicit,
-        muted: implicit && video.audioMode === 'muted' ? true : existing?.muted ?? false,
+        muted: implicit ? video.audioMode === 'muted' : existing?.muted ?? false,
       }]
     })
     return {
@@ -402,13 +402,13 @@ export function applyTimelineEdit(project: EditorProjectView, command: TimelineE
       id: `${video.id}:embedded-audio`,
       linked: true,
       implicit: true,
-      muted: false,
+      muted: Boolean(detached.muted),
     }
     return {
       project: updateAudioTrack(
         project,
         currentAudio.map((candidate) => candidate.id === detached.id ? implicit : candidate),
-        clips.map((candidate) => candidate.id === video.id ? { ...candidate, audioMode: 'embedded' as const } : candidate),
+        clips.map((candidate) => candidate.id === video.id ? { ...candidate, audioMode: detached.muted ? 'muted' as const : 'embedded' as const } : candidate),
       ),
       inverse: { type: 'set-audio-state', clipId: video.id, audioMode: 'detached', audioClip: detached },
       selection: { kind: 'video', id: video.id },
@@ -562,7 +562,7 @@ export function applyTimelineEdit(project: EditorProjectView, command: TimelineE
     ))
     return {
       project: updateAudioTrack(project, next),
-      inverse: { type: 'insert-audio', index, clip: audio },
+      inverse: { type: 'insert-audio', index: currentAudio.slice(0, index).filter((clip) => !clip.implicit).length, clip: audio },
       selection: null,
     }
   }
@@ -576,9 +576,10 @@ export function applyTimelineEdit(project: EditorProjectView, command: TimelineE
         ? { ...candidate, programRange: { startS: rounded(candidate.programRange.startS + durationS), endS: rounded(candidate.programRange.endS + durationS) } }
         : candidate
     ))
-    shifted.splice(Math.min(Math.max(command.index, 0), shifted.length), 0, command.clip)
+    const detached = shifted.filter((clip) => !clip.implicit)
+    detached.splice(Math.min(Math.max(command.index, 0), detached.length), 0, command.clip)
     return {
-      project: updateAudioTrack(project, shifted),
+      project: updateAudioTrack(project, [...shifted.filter((clip) => clip.implicit), ...detached]),
       inverse: { type: 'delete-audio', audioClipId: command.clip.id },
       selection: audioSelection(command.clip.id),
     }
