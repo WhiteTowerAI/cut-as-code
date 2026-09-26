@@ -14,7 +14,8 @@ Plugin data is private state for the current OS user and is the Hub discovery tr
 - 🎨 **Color grade** — candidate looks to review, then a baked LUT.
 - 🎬 **B-roll** — reviewed visual cutaways from local media or Pexels.
 - 💬 **Captions** — word-timed, preset styles with optional karaoke.
-- 🃏 **Motion graphics cards** — titles, lower thirds, stats, quotes, and calls to action.
+- 🃏 **Content cards** — titles, lower thirds, stats, quotes, and calls to action.
+- ✨ **Motion graphics** — reviewed animations from the local recipe library.
 - 📱 **To TikTok/YouTube shorts** — extract moments and reframe them for 9:16 vertical.
 
 ## How It Works
@@ -119,14 +120,18 @@ Each directory under `skills/` is a self-contained agent skill. Its `SKILL.md` i
 
 | Skill | Purpose |
 |---|---|
+| `/cut-as-code` | Start or resume a project and route the requested work to the right skills. |
 | `/video-understand` | Probe media, generate a word-level transcript, analyze speech, and build reusable evidence for downstream skills. |
 | `/video-cut` | Create reviewed keep/drop decisions, generate the canonical timeline, render a compact first cut, and verify its boundaries. |
 | `/video-color-grade` | Assess footage, generate named looks, review the alternatives, record a selection, and bake or apply a portable LUT. |
 | `/video-add-b-roll` | Add selective transcript-timed visual cutaways from your own footage or Pexels, with reviewed candidates and recorded provenance. |
 | `/video-add-captions` | Render preset-driven, word-timed captions with optional karaoke highlighting. |
 | `/video-add-content-cards` | Add selective transcript-timed titles, lower thirds, statistics, lists, quotes, chapter cards, and calls to action. |
+| `/video-add-motion-graphics` | Adapt local animation recipes into reviewed overlays or full-frame timeline inserts. |
 | `/video-to-shorts` | Find and extract approved horizontal shorts, then optionally create reviewed 9:16 vertical deliveries. |
 | `/video-edit-compare` | Compare the original source with the actual final delivery on the original source clock. |
+
+The bundled Editor Plugin opens projects in a local browser timeline for review and supported edits. Browse [motion graphics recipes](skills/video-add-motion-graphics/recipes/) and the [content card gallery](skills/video-add-content-cards/examples/gallery-animated.html) when choosing a style.
 
 ## Quick Start
 
