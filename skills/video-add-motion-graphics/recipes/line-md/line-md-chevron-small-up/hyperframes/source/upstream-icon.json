@@ -1,0 +1,5 @@
+{
+  "prefix": "line-md",
+  "name": "chevron-small-up",
+  "body": "<path d=\"M12 9l-5 5M12 9l5 5\" stroke=\"currentColor\" fill=\"none\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-dasharray=\"10\"><animate attributeName=\"stroke-dashoffset\" dur=\"0.4s\" fill=\"freeze\" values=\"10;0\"/></path>"
+}

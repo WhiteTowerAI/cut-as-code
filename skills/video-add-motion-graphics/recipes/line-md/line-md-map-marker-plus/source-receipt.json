@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-map-marker-plus",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "24d8bb143c64ccf1541a100c2e496ee9a0399f6cc40737c25796a0ec0fd3feab",
+    "icon.svg": "b6ea71f14c3883ba2be7baadd73ff13a14bb74c4e01e8640101cfa97dbd23b77",
+    "upstream-icon.json": "34a80016fd4cce35f58c3f55982e905fe46f9703adde087669734ee63cbb128b"
+  }
+}

@@ -1,0 +1,76 @@
+spec_version: 1
+id: "codrops-scrollspiral-index"
+name: "WebGL Scroll Spiral"
+description: "A WebGL spiral warps full-frame image texture into an abstract vortex."
+surfaces: [video]
+category: "fullscreen-transition"
+tech: [html, css, js]
+canvas: [video]
+target: [fullscreen]
+intent: "fullscreen-transition"
+runtime: [css, js]
+export: [skill, html]
+dependencies: []
+tags:
+  - "codrops"
+  - "webgl"
+  - "spiral"
+  - "distortion"
+  - "abstract"
+  - "transition"
+  - "fullscreen"
+intent_keywords:
+  - "abstract spiral transition"
+  - "WebGL vortex interstitial"
+  - "experimental visual essay"
+  - "抽象螺旋转场"
+  - "WebGL 漩涡间场"
+best_for:
+  - "An interstitial, chapter, or outro in sci-fi, music, experimental, and abstract visual-essay edits"
+  - "A fullscreen texture transition using graphics, environments, or non-identifying image detail"
+avoid_when:
+  - "The cue needs literal narration support, readable faces, or sober business context"
+  - "The source image must remain geometrically faithful and legible"
+structural_roles:
+  - "interstitial"
+  - "chapter"
+  - "outro"
+motion_functions:
+  - "transition"
+  - "loop"
+  - "build"
+visual_language:
+  - "experimental"
+  - "futuristic"
+  - "cinematic"
+mechanisms:
+  - "webgl"
+  - "spiral"
+  - "distortion"
+  - "texture"
+rhythm_energy: "medium-high"
+information_density: "sparse"
+frame_relationship: "fullscreen"
+color_tendency: "flexible"
+style_rationale: "The reviewed variants show an image-driven vortex in several treatments, visibly transforming the whole frame rather than decorating footage."
+restraint:
+  max_per_view: 1
+  notes: "Use as one frame-dominant designed cutaway; adapt content, palette, typography, framing, and timing instead of running an unchanged source showcase."
+motion:
+  duration_ms: 8000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: "index/index.html"
+implementations:
+  - tech: js
+    files: ["index/index.html", "index/hf-recipe.js", "index/hf-adapter.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/codrops/ScrollSpiral/tree/3889131fea11ce6b818a1f7e2299cf100f56180d"
+  attribution_required: true
+author:
+  name: "codrops"
+  url: "https://github.com/codrops"
+version: 0.1.0

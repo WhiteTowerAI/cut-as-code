@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-moon-to-sunny-outline-transition",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "0eceb922e3d1aaa45dd754e5683e3d073414f14c130ac2dac5f299363f9fc611",
+    "icon.svg": "d2f8932592dca7267ec9b33e9607a434bb592753c29fed59dd5b17c1283f51c9",
+    "upstream-icon.json": "cca06b256cbea51c7cc6a665f125387fc1685a74e1e0f4b94e955cdeb2355044"
+  }
+}

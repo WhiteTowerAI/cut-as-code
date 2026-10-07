@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-briefcase-check-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "bbec9b4bbce2a3908c868e0dfbbe90b22c91c888516d3b49c90120b23fe84ced",
+    "icon.svg": "8f3a321d8913aa12636b90d897f54eedaaa124840924b38171de85686fae09bc",
+    "upstream-icon.json": "34c2f4b1914e98623bb964d60492a610addff778d9810b7130ee84db4885dfcf"
+  }
+}

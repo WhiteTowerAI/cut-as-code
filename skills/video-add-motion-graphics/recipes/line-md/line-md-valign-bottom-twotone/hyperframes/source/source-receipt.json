@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-valign-bottom-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "33822dc45d3258ced9890ba0a2c8ddf24692450f8edce844f6b890ecbc2345aa",
+    "icon.svg": "333e39aadd9d98ef88cf45243776cefb6ed6a51223600fc5ecf4b3d36d024615",
+    "upstream-icon.json": "7ad96a75c401fd0020182367c9e24fddf89713096833154801ffcbebf77b6f93"
+  }
+}

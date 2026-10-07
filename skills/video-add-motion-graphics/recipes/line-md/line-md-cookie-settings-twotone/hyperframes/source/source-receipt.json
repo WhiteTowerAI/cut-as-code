@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-cookie-settings-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "e6422f1df247692ac3efc8307c94fdea8b3c2494bb22cdf9a5f470a96a226117",
+    "icon.svg": "c20169f59c44330440c4bffd8db181495ae7ff9a8064f04936938f219c0ceec6",
+    "upstream-icon.json": "b774edcbcc4c057710e3c4cd5b8a4f292481544462aabfa9beeb79ca65218f81"
+  }
+}

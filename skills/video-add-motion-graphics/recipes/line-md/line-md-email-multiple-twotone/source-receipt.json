@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-email-multiple-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "d5cefcf274cd78d602308934ad70dbbeb636e431ee72a73ad65c0f2e30d5ca7e",
+    "icon.svg": "6024ac87605415bbf12c5a4a43f570554061451c98f58014761afd2af1f72a82",
+    "upstream-icon.json": "431ddc61ca7abbaae441b21a195493d56b09f31bfb9091fde3d96ce1dfe4d2ff"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "orb",
+  "surface": "web",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "d0952793c646268ca2391be070cc086e23581e4eb065ad8c9317976620c58ae7"
+}

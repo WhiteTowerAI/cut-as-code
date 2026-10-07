@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-hazard-lights-off-filled-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "1ed27b4bc1f6f01d898d92a749647e5129fe0db377f7cff58d35897e585dd472",
+    "icon.svg": "83716f1495ed50ebee0eac5a338d55528aeba76a2c843a10ecd4e20f335cba1f",
+    "upstream-icon.json": "89e3c92aa3574f8a1d329b3db5b1ecfc313c925528226c94c9096041fd1e2684"
+  }
+}

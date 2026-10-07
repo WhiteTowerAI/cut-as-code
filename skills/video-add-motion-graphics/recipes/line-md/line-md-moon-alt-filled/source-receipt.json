@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-moon-alt-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "e9b342cdbc5f41ccabdbedb1d9c67b59ce45059d5c76fb204480679f18047d27",
+    "icon.svg": "6a2168be42abdba6904ea7b69060df3b2a213fe4c335885c2ec54b4bbf208aae",
+    "upstream-icon.json": "8d363213cd52b429e9b8edda110f79b0a7afef9ac4fb2d22d1148d1145421026"
+  }
+}

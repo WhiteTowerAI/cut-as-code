@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-square-filled-to-confirm-square-filled-transition",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "69e2660a768192764e8cd3ecde24aaa8f1ebf74b431601d406c77f9c1921ef39",
+    "icon.svg": "38efd0b032af8d1ccfd5c748c1e0abfba6aec1b790665da6fbadabbe78d92822",
+    "upstream-icon.json": "6c495090961aac473c4944b396bb84c80311b660107ee387cf29ba99f9d6d7b8"
+  }
+}

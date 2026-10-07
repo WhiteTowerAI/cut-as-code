@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-pixelfed-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "56b9456e0cd099907f0691698a9ac17d568341eca621ab49585ef062dffa07af",
+    "icon.svg": "11c652633e69f189d74bcd6712e75a413146ffdf372744f7e7d8158c07b6384f",
+    "upstream-icon.json": "a876fb0fd5cb6542218c54a01e2d3880355b5d4a363ddc57a75a1e470bb0d885"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-sun-rising-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "8c5796c3a62767b68f842fe5839a3014f6ac92223359b4ef2f40b13fd651f6b9",
+    "icon.svg": "3fa20ed4b47551332446c8602ccd2c5e09e297300f2f15f64401aae6a1758493",
+    "upstream-icon.json": "82424742e6d71acd6f0d5470b6aa0ffd95d94a7def2dc2ee187d8ae613009e56"
+  }
+}

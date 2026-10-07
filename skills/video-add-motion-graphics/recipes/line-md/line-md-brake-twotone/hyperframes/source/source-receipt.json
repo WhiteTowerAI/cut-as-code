@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-brake-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "47eadf98f25d6ea308c9cc0be8a259e5baecf04370b102275dab9aca95a1913e",
+    "icon.svg": "8ec49eb3ba4fcecce407d1155dac9180a3b95fe36ba6de050130b2761c20d805",
+    "upstream-icon.json": "e6359e17e62de3985c4a19592d6136451e053dc8a3cce1062cbbb37c6475c765"
+  }
+}

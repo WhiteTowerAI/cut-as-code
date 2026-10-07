@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "project_id": "OnScrollTypographyAnimations",
+  "demo_url": "http://tympanus.net/Development/OnScrollTypographyAnimations/",
+  "article_url": "https://tympanus.net/codrops/2023/01/18/on-scroll-typography-animations/",
+  "source_url": "https://github.com/codrops/OnScrollTypographyAnimations/",
+  "source_commit": "af28d61d1f8d3d117f5d1e9b09d5209e20a1a212",
+  "license": {
+    "type": "MIT",
+    "evidence": "repository-file",
+    "file": "LICENSE",
+    "sha256": "85131f2bb7714dc895ff5d7d68db65acc5ad0e5dfd72162869fc8d63dec06056"
+  },
+  "source_copy": "source",
+  "variants": [
+    {
+      "name": "index",
+      "composition_id": "codrops-onscrolltypographyanimations-index",
+      "source_entry": "src/index.html",
+      "runtime_entry": "dist/index.html",
+      "source_sha256": "d6114fae04a8b2c6a715fb611d5585b168dfb5ef4ed7e72f8e65ee2d0dfb95bf",
+      "runtime_sha256": "d079a052ff0105718be9979674f31e0829d54cdbdbeefbb2b59069854be81be1",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index/index.html"
+    },
+    {
+      "name": "index2",
+      "composition_id": "codrops-onscrolltypographyanimations-index2",
+      "source_entry": "src/index2.html",
+      "runtime_entry": "dist/index2.html",
+      "source_sha256": "e82613e425490f576e3a64079a99a06de9098f7d8a89160e129bc25277b35143",
+      "runtime_sha256": "438c46c1ae243581c0174c53ce2599281084e3e0afe6538d4c4cc8e0a8cb5ead",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index2/index.html"
+    }
+  ]
+}

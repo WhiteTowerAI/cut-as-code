@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "threads",
+  "surface": "web",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "38b948184ed36c0763a5402a74948202f88ce88edd76aabe1cb35cc6d9c381cb"
+}

@@ -1,0 +1,5 @@
+{
+  "prefix": "line-md",
+  "name": "filter-twotone",
+  "body": "<path d=\"M5 4h14l-5 6.5v9.5l-4 -4v-5.5Z\" stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" fill-opacity=\"0\" stroke-dasharray=\"54\"><animate attributeName=\"stroke-dashoffset\" dur=\"0.6s\" fill=\"freeze\" values=\"54;0\"/><animate attributeName=\"fill-opacity\" begin=\"0.7s\" dur=\"0.15s\" fill=\"freeze\" to=\"0.3\"/></path>"
+}

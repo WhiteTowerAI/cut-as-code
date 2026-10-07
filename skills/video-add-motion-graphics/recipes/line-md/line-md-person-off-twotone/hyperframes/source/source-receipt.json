@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-person-off-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "f79b6cb4fba725a1a15c3d868c9d17f36e4833c484c02f59dc9f188416531b4c",
+    "icon.svg": "72a4859e6f05ddd83b63a1192fc9934525e5d1bf4b6dfb9d1f921c6248bafa92",
+    "upstream-icon.json": "5616759b2ced61436a4f2475f0874d03c8a9291e1d3b04cb1e4b9683e4bde3fd"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "radar",
+  "surface": "web",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "9ea076415308e8c50b59302d8757f7ad72372ff728800c732413d8bbf2e22ecf"
+}

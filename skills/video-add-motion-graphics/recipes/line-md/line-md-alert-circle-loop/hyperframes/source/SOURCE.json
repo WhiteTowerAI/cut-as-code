@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "source_id": "line-md",
+  "display_name": "Line MD",
+  "website": "https://icon-sets.iconify.design/line-md/",
+  "repository": "https://github.com/cyberalien/line-md",
+  "revision": "2ed22555cee9c1e50d4269865681d01ee8cffd7c",
+  "package": {
+    "name": "line-md",
+    "version": "3.0.5",
+    "tarball_file": null,
+    "tarball_sha256": null
+  },
+  "license": {
+    "spdx": "MIT",
+    "file": "LICENSE.line-md"
+  },
+  "selection_count": 1222,
+  "conversion": "Original implementation or SVG preserved and wrapped for deterministic HyperFrames seeking."
+}

@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="icon" href="data:,">
+  <script defer src="./hf-recipe.js" data-hf-recipe></script>
+  <script defer src="./hf-adapter.js" data-hf-adapter></script>
+  <base href="../source/">
+
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Rotating On-Scroll Animations | Demo 3 | Codrops</title>
+  
+  
+  <link rel="stylesheet" href="_remote/86dd8f95a8c7459206b0.css">
+  <link rel="stylesheet" type="text/css" href="css/base.css" />
+  
+
+  <style data-hf-codrops-frame>
+    html { width: 1920px; height: 1080px; scrollbar-width: none; }
+    body[data-composition-id] { margin: 0; width: 1920px; min-height: 1080px; position: relative; }
+    ::-webkit-scrollbar { display: none; }
+  </style>
+<style data-hf-codrops-chrome>
+html, body { overflow-anchor: none !important; }
+html, body, body * { cursor: none !important; }
+.codrops-header,
+.codrops-links,
+.github,
+.sponsor,
+[class*="sponsor"],
+.demos,
+.effects,
+.trigger,
+.frame__links,
+.frame__tags,
+.frame__nav,
+.frame__info,
+.frame__demo,
+.frame__demos,
+.frame__archive,
+.frame__github,
+.frame__author,
+.frame__hire,
+.frame--footer,
+.frame .modal,
+.frame__title,
+.frame__title-back,
+.frame__back,
+.frame__prev,
+.slidenav,
+.slides-nav,
+.nav__arrow,
+.cover__button,
+.content__enter,
+.enter,
+.item__enter,
+.content__nav,
+.content__footer,
+.intro__title-sub,
+.intro__info,
+.credits,
+.related,
+footer,
+.footer,
+.copyright,
+.cursor { display: none !important; }
+[data-composition-id^="codrops-scrollbasedlayoutanimations-"] .caption,
+[data-composition-id^="codrops-scrollbasedlayoutanimations-"] .project--details:has(a[href*="twitter.com/intent/tweet"]),
+[data-composition-id^="codrops-scrollspiral-"] .content__text,
+[data-composition-id^="codrops-scrollspiral-"] .main-title,
+[data-composition-id^="codrops-scrollspiral-"] .main-tagline,
+[data-composition-id^="codrops-scrollspiral-"] .media-item { visibility: hidden !important; }
+body[data-composition-id^="codrops-scrollspiral-"].loading::before,
+body[data-composition-id^="codrops-scrollspiral-"].loading::after,
+[data-composition-id^="codrops-scrollspiral-"] .content--main::before,
+[data-composition-id^="codrops-scrollspiral-"] .content--main::after { display: none !important; }
+[data-composition-id^="codrops-layermotionslideshow-"] .slide--layout-2 .slide__text-description {
+  color: rgb(94, 94, 94) !important;
+}
+</style></head>
+<body class="demo-3 loading" data-composition-id="codrops-rotatingonscrollanimations-index3" data-start="0" data-width="1920" data-height="1080" data-duration="8" data-no-timeline>
+
+  <main>
+    <header class="frame">
+      <h1 class="frame__title">Rotating On-Scroll Animations inspired by <a href="https://www.instagram.com/p/DT-snsfDakn/?img_index=1" target="_blank">Jason Booth</a></h1>
+      <nav class="frame__links">
+        <a href="https://tympanus.net/codrops/?p=116660">Article</a>
+        <a href="https://tympanus.net/codrops/hub/">All demos</a>
+        <a href="https://github.com/codrops/RotatingOnScrollAnimations">GitHub</a>
+      </nav>
+      <nav class="frame__tags">
+        <a href="https://tympanus.net/codrops/hub/tag/scroll/">#scroll</a>
+        <a href="https://tympanus.net/codrops/hub/tag/gsap/">#gsap</a>
+      </nav>
+      <nav class="frame__demos">
+        <a href="index.html">Variation 1</a>
+        <a href="index2.html">Variation 2</a>
+        <span>Variation 3</span>
+        <a href="index4.html">Variation 4</a>
+        <a href="index5.html">Variation 5</a>
+      </nav>
+    </header>
+    <div class="gallery">
+      <div class="gallery__item" style="background-image: url('assets/15.webp')"></div>
+      <div class="gallery__item" style="background-image: url('assets/04.webp')"></div>
+      <div class="gallery__item" style="background-image: url('assets/12.webp')"></div>
+      <div class="gallery__item" style="background-image: url('assets/19.webp')"></div>
+      <div class="gallery__item" style="background-image: url('assets/01.webp')"></div>
+      <div class="gallery__item" style="background-image: url('assets/09.webp')"></div>
+      <div class="gallery__item" style="background-image: url('assets/17.webp')"></div>
+      <div class="gallery__item" style="background-image: url('assets/06.webp')"></div>
+      <div class="gallery__item" style="background-image: url('assets/20.webp')"></div>
+      <div class="gallery__item" style="background-image: url('assets/11.webp')"></div>
+      <div class="gallery__item" style="background-image: url('assets/03.webp')"></div>
+      <div class="gallery__item" style="background-image: url('assets/14.webp')"></div>
+      <div class="gallery__item" style="background-image: url('assets/08.webp')"></div>
+      <div class="gallery__item" style="background-image: url('assets/02.webp')"></div>
+      <div class="gallery__item" style="background-image: url('assets/18.webp')"></div>
+      <div class="gallery__item" style="background-image: url('assets/05.webp')"></div>
+      <div class="gallery__item" style="background-image: url('assets/13.webp')"></div>
+      <div class="gallery__item" style="background-image: url('assets/10.webp')"></div>
+      <div class="gallery__item" style="background-image: url('assets/07.webp')"></div>
+      <div class="gallery__item" style="background-image: url('assets/16.webp')"></div>
+    </div>
+    <div class="mark font-3">
+      <div class="mark__inner">
+        <span>Rin Kagawa</span> <span>/</span>
+        <span>Akito Nishimura</span> <span>/</span>
+        <span>Hina Sugawara</span> <span>/</span>
+        <span>Taiga Uchimura</span> <span>/</span>
+        <span>Sakura Aizawa</span> <span>/</span>
+        <span>Yuya Kawashima</span> <span>/</span>
+        <span>Rio Matsunaga</span> <span>/</span>
+        <span>Kazuma Hirata</span> <span>/</span>
+        <span>Mei Okamoto</span> <span>/</span>
+        <span>Shota Fukuda</span>
+      </div>
+    </div>
+  </main>
+  
+  
+  
+  
+  
+
+</body>
+</html>

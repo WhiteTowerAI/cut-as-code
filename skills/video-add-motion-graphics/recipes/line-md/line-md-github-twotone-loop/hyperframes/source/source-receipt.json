@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-github-twotone-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "37f1c1e8d8bd98778c01d568cce063a6bd4b705bd2ba56177f3fc0a7cddb2108",
+    "icon.svg": "06189fe24734f15507c18d28acd677355217b80a294f2d7c9a5d4dad91bfa22c",
+    "upstream-icon.json": "6c5860a906690f270733b9bc9d5a9b7af1c7fcc115e4938cdf14352c2c8b308e"
+  }
+}

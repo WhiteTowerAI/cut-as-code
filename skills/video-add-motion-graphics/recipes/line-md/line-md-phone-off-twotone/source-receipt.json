@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-phone-off-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "869ee6d5e2ac45d78c1d1d9c779ce8417d9254ab2087b846eda6b6db29a83c64",
+    "icon.svg": "37d9063fc4764e0da483d3e744c3de42cfbade9e050afdbf39952cd831ab07c3",
+    "upstream-icon.json": "2cc65e2bfbe1a01d13d14956aff7554271c535386a5d87454b94a79e79743fb8"
+  }
+}

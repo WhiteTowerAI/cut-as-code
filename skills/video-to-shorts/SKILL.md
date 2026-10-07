@@ -285,7 +285,7 @@ python "$SkillRoot\scripts\plan.py" `
 - work transcript/report paths and `../final/shorts/*.mp4` delivery paths.
 
 The first run is the end of the planning phase. Stop here and continue requested
-captions, content cards, graphic motion, and other remaining main-sequence operations
+captions, content cards, motion graphics, and other remaining main-sequence operations
 in canonical order. Do not run
 `extract_shorts.py` and do not create `final.mp4` from this skill.
 

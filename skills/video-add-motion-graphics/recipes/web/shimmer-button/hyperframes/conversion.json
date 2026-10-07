@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "shimmer-button",
+  "surface": "web",
+  "runtime": [
+    "css"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "css",
+  "source_manifest_sha256": "b3e945bcaadbd3b6e42e8e1a4a8eece7da62c5d0d5a5a6f28bd045e127ad7903"
+}

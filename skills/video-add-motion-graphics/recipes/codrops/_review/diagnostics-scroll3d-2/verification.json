@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-07T05:10:27.574Z",
+  "imports_root": "D:\\Users\\Charles Kang\\Desktop\\temp\\cut-as-code\\skills\\video-add-motion-graphics\\recipes\\codrops",
+  "total_variants": 1,
+  "visual": [
+    {
+      "key": "Scroll3DGrid/index",
+      "times": [
+        0.1,
+        4,
+        7.9
+      ],
+      "frames": [
+        {
+          "hash": "1e2feea7a4c8d4d5343cf34ee4bdd192fec7667565c583f13a58d886f1be8ed0",
+          "range": 151,
+          "paintedRatio": 0.005417,
+          "time": 0.1
+        },
+        {
+          "hash": "4ae66771ef61d3dc500720b0088954dfbb1e24b5e7d0127c8065543e97656c9f",
+          "range": 255,
+          "paintedRatio": 0.221076,
+          "time": 4
+        },
+        {
+          "hash": "a0bf29dd96481fad1c6daeedd1cf1c6792a503d934406d3330ecffe911820afe",
+          "range": 219,
+          "paintedRatio": 0.005764,
+          "time": 7.9
+        }
+      ],
+      "repeatHash": "4ae66771ef61d3dc500720b0088954dfbb1e24b5e7d0127c8065543e97656c9f",
+      "repeatChangedPixelRatio": 0,
+      "changedPixelRatios": [
+        0.226788,
+        0.225677
+      ],
+      "errors": [],
+      "requestFailures": [],
+      "cursorHidden": true,
+      "visibleTextFlags": [],
+      "visibleControls": [],
+      "nonblank": true,
+      "changed": true,
+      "deterministic": true,
+      "runtimeClean": true,
+      "chromeClean": true,
+      "ok": true
+    }
+  ],
+  "cli": [],
+  "summary": {
+    "visual_passed": 1,
+    "visual_failed": 0,
+    "cli_passed": 0,
+    "cli_failed": 0
+  }
+}

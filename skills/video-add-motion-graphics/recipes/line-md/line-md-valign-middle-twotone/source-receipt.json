@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-valign-middle-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "e641fa1327ae0c0692b0a88769d0f1f7e8196e114155e8459f0861cc32e09ef1",
+    "icon.svg": "40af3716abfd2c10780af17d9b6fd6c8951808d5296598cb88799d1103f73e07",
+    "upstream-icon.json": "db2f9dc87af9ac8ebf83ae70a3ec2d9889af82c743c5dcfc4a732ecd2aae789d"
+  }
+}

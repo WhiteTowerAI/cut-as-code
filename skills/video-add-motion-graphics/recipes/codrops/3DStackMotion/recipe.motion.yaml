@@ -1,0 +1,77 @@
+spec_version: 1
+id: "codrops-3dstackmotion-index"
+name: "On-Scroll 3D Stack Motion Effect"
+description: "A futuristic full-frame poster/card grid gives way to a centered SYNTHETICA SAPIENS title on dark purple before ending in a near-empty dark state."
+surfaces: [video]
+category: "fullscreen-opener"
+tech: [html, css, js]
+canvas: [video]
+target: [fullscreen]
+intent: "fullscreen-opener"
+runtime: [css, js]
+export: [skill, html]
+dependencies: []
+tags:
+  - "codrops"
+  - "futuristic"
+  - "poster-grid"
+  - "image-cards"
+  - "typography"
+  - "opener"
+  - "fullscreen"
+intent_keywords:
+  - "futuristic poster opener"
+  - "Synthetica Sapiens title transition"
+  - "dark editorial card grid"
+  - "未来感海报开场"
+  - "科技标题转场"
+best_for:
+  - "An opener, chapter, or interstitial in technology, music, sci-fi, and design-forward videos"
+  - "A fullscreen title handoff that can move from a graphic card grid into one short centered phrase"
+avoid_when:
+  - "The video needs literal continuous footage, a sober documentary tone, or a naturalistic environment"
+  - "The visual system cannot support a dense poster/card opening followed by a dark title hold"
+structural_roles:
+  - "opener"
+  - "chapter"
+  - "interstitial"
+motion_functions:
+  - "reveal"
+  - "transition"
+  - "settle"
+visual_language:
+  - "futuristic"
+  - "typographic"
+  - "editorial"
+  - "dark"
+mechanisms:
+  - "poster-grid"
+  - "image-cards"
+  - "centered-title"
+  - "dark-hold"
+rhythm_energy: "medium-high"
+information_density: "balanced"
+frame_relationship: "fullscreen"
+color_tendency: "dark"
+style_rationale: "The reviewed start is a dense futuristic poster/card grid, the middle isolates SYNTHETICA SAPIENS on dark purple, and the end leaves a near-empty dark screen; this is a title-led full-frame handoff, not an isolated-plane animation."
+restraint:
+  max_per_view: 1
+  notes: "Use as one frame-dominant designed cutaway; adapt content, palette, typography, framing, and timing instead of running an unchanged source showcase."
+motion:
+  duration_ms: 8000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: "index/index.html"
+implementations:
+  - tech: js
+    files: ["index/index.html", "index/hf-recipe.js", "index/hf-adapter.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/codrops/3DStackMotion/tree/75cbda91ed26d31aeeb5a5b9887848e5a7005c7f"
+  attribution_required: true
+author:
+  name: "codrops"
+  url: "https://github.com/codrops"
+version: 0.1.0

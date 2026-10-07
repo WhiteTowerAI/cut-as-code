@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-heart-twotone-half",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "520be9746292659be1e2dc048012add8d7423aea48260f7d840709206343cbb2",
+    "icon.svg": "1a897a99cc95ac9129dd6893748200501cb107c42f75833f29658fec23ea57a1",
+    "upstream-icon.json": "06ed819b442dd2150a9221909380dded6b9f1743f75e4cae96823f2dd4fb69cc"
+  }
+}

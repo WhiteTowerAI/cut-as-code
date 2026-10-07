@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-emoji-frown-open-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "29a5ba2e6e3e2aeab7b6d5ac6321ef8b58f4cf5600f9754c53f8b02b72e30592",
+    "icon.svg": "397d85396af1a98691c9636159672302182508242c86967e2af29277bac64c89",
+    "upstream-icon.json": "6c935dc94c6839fea5109d7f7ccd798e4a3f29471e65cdfacff742f93ffaf49c"
+  }
+}

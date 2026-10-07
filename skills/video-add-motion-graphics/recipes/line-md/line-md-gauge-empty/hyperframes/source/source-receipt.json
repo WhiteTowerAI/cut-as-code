@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-gauge-empty",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "9bbaae851a720e9efec07e7397cf723de9a799fb6f68e1408a40dc2f31d4323b",
+    "icon.svg": "a0a193820db7d86d859cf1305b25dd26e26e8a36a573099d67d3832855911a94",
+    "upstream-icon.json": "5e82958bf01573d98145c4af5b8243e6b93fa097aa9f563fd57bf0c1df9ebe05"
+  }
+}

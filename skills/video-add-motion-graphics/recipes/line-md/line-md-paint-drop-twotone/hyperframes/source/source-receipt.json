@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-paint-drop-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "14ed582077de1ae807e2682a58fa9f84410784ef1b215258eb4cf7410caac67a",
+    "icon.svg": "ebc5a88da3a4f6f7a929871e9995bc68688a916ede6e76af289a8fa6e9479175",
+    "upstream-icon.json": "45d4750e143d7e0f20f95d90f4a07760d6d65b49831a6468c5451672ad23a1dc"
+  }
+}

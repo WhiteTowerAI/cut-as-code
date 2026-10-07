@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "recipe_id": "true-focus",
+  "surface": "web",
+  "runtime": [
+    "css",
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "acd0fdde675a7663d87a740c9bd98cc003e92a23062791ddb1d0644f69f93c14"
+}

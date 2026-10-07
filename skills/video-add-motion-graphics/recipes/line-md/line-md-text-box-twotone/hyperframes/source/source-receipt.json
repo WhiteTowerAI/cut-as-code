@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-text-box-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "32d26944daf054e29f575f9cb868b615f2c4a3d5791dabb7d58ffc01a12f9a95",
+    "icon.svg": "fb5960e01b8f303fcc7105ebde1a2d9ce72f2d4a2eaeb3eb43bdcf29a98625f4",
+    "upstream-icon.json": "fb323d86e79326fb4c107b0c9dea8e4ef0fd99bcc27f11a8bb336056c2667a25"
+  }
+}

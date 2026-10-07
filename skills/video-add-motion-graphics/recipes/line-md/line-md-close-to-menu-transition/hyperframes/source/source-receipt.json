@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-close-to-menu-transition",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "f82a117f0bc638238d867374abf5916d9f88e67d0c391d0087c0dd01b07977c0",
+    "icon.svg": "0145679e3a76bd6db131808ef2ed5f10fe7d20fd7f9e8556ff15f45c576e2c14",
+    "upstream-icon.json": "f90ae216c1d568c95d0f1a6cf880c5d54d89ca592f0b21a287ee3d293c83c3d7"
+  }
+}

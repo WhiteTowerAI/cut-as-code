@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "recipe_id": "circular-text",
+  "surface": "web",
+  "runtime": [
+    "css",
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "4c1d647bb2aab16fac3af3cdec11525ae54016b1666e975e846b8820b248d31f"
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-alert-square-twotone-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "00842377f384427657d5fc7ded7fc30aaa09a3113a2f6565eec3d9716d77b42f",
+    "icon.svg": "2f9feaf1282216063ead18bd6b67f0c6d35303cf2857c27b4482280ed681de91",
+    "upstream-icon.json": "c685d37527ab0d4823bc43608ad3d4d46c7b4417f5aa68e45ffa6d7f3267d881"
+  }
+}

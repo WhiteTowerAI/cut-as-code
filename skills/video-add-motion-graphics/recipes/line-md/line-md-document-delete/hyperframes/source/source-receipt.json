@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-document-delete",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "bd0f83b739cf7e015c277edb642d9ceb43e79686fd453fdb8207d821b3e9fd35",
+    "icon.svg": "a7d74db2e21e1e2c17bcf82236f98ada9e58491fd4cdf89b6003167929f81d52",
+    "upstream-icon.json": "1de08faea7fb8e3e786c2c3fc4f4307ad50dd3547ef837bc2288badd6ff9204a"
+  }
+}

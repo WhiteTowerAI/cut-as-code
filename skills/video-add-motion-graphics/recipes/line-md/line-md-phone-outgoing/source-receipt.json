@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-phone-outgoing",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "1d58457e8771239ec1ab929ea700e5eafe1254d9f55a9fee8167f19ca495f367",
+    "icon.svg": "4910b8adc5877d54e629de71500d81e43bd6f1202ea6dd0ed026d66c4c02a010",
+    "upstream-icon.json": "5fb42bac8b418db8acc3cc32e705cae2ea48ed63fd439d40f43efd39ff945ca5"
+  }
+}

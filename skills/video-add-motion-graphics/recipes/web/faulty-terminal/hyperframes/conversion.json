@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "faulty-terminal",
+  "surface": "web",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "01d4d8f69222119cf3bd10179facd2016277fad52cdc9be211351f9f3728e9a2"
+}

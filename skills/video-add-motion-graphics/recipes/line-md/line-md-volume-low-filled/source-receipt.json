@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-volume-low-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "f5184a88994b9062994d8b725cff667b0e73e3fe742ea8e4cd3fc8e09ce22d86",
+    "icon.svg": "ad17914dbd03d25f978ee59eabdff9208dc72dc6ad25293091314b9e701ad951",
+    "upstream-icon.json": "e41257b2edcbfdb04f8eb191b77136cb3cd37e33c2ed657542ccb825d860c4ca"
+  }
+}

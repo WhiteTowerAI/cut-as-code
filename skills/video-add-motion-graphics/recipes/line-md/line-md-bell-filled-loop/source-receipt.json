@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-bell-filled-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "9301d11dd33385e777ebe8efa78c5b6ac1b42e1b5015447e12701b3314cad384",
+    "icon.svg": "35eda10eae70c242545bb5d5717e6760abf6994015c164eff1f556bad00f8d80",
+    "upstream-icon.json": "40011358530fdace24dc811ef9e9976cc7e655d6321855bc5d04c0e6c1c2ed0b"
+  }
+}

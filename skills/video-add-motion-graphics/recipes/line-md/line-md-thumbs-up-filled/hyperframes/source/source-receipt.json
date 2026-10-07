@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-thumbs-up-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "9cf06c3989d4e4a581aada030c4e4f39e37622930695f61a064ddd3e3e5a86da",
+    "icon.svg": "08cad6ed460fcf1b21b47c7e013480e09f6da6644d8218ff1a3631d847bfb54c",
+    "upstream-icon.json": "654de6c4895fe156d7b472ee6df7a888c160ec4a1505e618385a9e84ea7b7490"
+  }
+}

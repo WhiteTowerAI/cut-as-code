@@ -1,0 +1,111 @@
+spec_version: 1
+id: "codrops-kineticimages-index"
+name: "Kinetic Images"
+description: "A deterministic Three.js image choreography maps replaceable imagery onto cylinders, a folded paper ribbon, or a spiral surface for cinematic full-frame editorial beats."
+surfaces: [video]
+category: "fullscreen-opener"
+tech: [three.js, webgl, js]
+canvas: [video]
+target: [fullscreen]
+intent: "fullscreen-opener"
+runtime: [three.js, webgl, js]
+export: [skill, html]
+dependencies: []
+tags:
+  - "codrops"
+  - "opener"
+  - "chapter"
+  - "interstitial"
+  - "outro"
+  - "transition"
+  - "cinematic"
+  - "editorial"
+  - "fashion"
+  - "experimental"
+  - "futuristic"
+  - "image-led"
+  - "three.js"
+  - "webgl"
+  - "frame-dominant"
+intent_keywords:
+  - "cinematic film commentary"
+  - "director analysis opener"
+  - "cinematography chapter"
+  - "fashion image montage"
+  - "sci-fi visual essay"
+  - "suspense transition"
+  - "stylized film list"
+  - "影视解说"
+  - "导演分析开场"
+  - "摄影分析章节"
+  - "电影盘点"
+  - "时尚图片拼贴"
+  - "科幻视觉随笔"
+  - "悬疑转场"
+best_for:
+  - "An opener or chapter break in stylized film commentary, director or cinematography analysis, film lists, fashion edits, science-fiction or suspense pieces, and visual essays"
+  - "A frame-dominant cutaway built from scenes, props, environments, silhouettes, or poster details rather than key readable faces"
+  - "A focused adaptation that selects one scene mode: cylinders for energetic openings or montages, paper for chapters or reflective endings, and spiral for abstract transitions or outros"
+avoid_when:
+  - "The video is documentary, news, corporate, or otherwise depends on literal restrained continuity"
+  - "The replacement images depend on readable faces, or the underlying shot is already dense"
+  - "The full animated path would intersect a protected face or head, subtitles, captions, or other required text"
+  - "The production cue would run the complete three-mode showcase instead of selecting one mode"
+structural_roles:
+  - "opener"
+  - "chapter"
+  - "interstitial"
+  - "outro"
+motion_functions:
+  - "build"
+  - "transition"
+  - "settle"
+visual_language:
+  - "cinematic"
+  - "editorial"
+  - "fashion"
+  - "experimental"
+  - "futuristic"
+mechanisms:
+  - "image-collage"
+  - "cylinders"
+  - "folded-paper"
+  - "spiral"
+  - "three.js"
+  - "webgl"
+rhythm_energy: "medium-high"
+information_density: "balanced"
+frame_relationship: "frame-dominant"
+color_tendency: "image-led"
+style_rationale: "The dimensional image surfaces read as authored cinematic montage rather than a neutral transition. They are strongest as a full-frame opening or section beat, can resolve into an ending, and are too visually dominant for a small overlay."
+modes:
+  cylinders:
+    roles: ["opener", "chapter"]
+    energy: "high"
+  paper:
+    roles: ["chapter", "outro"]
+    energy: "medium"
+  spiral:
+    roles: ["interstitial", "outro"]
+    energy: "medium"
+restraint:
+  max_per_view: 1
+  notes: "Use as one frame-dominant designed cutaway; adapt content and select one intentional mode instead of running a source showcase."
+motion:
+  duration_ms: 6000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: "index/index.html"
+implementations:
+  - tech: three.js
+    files: ["index/index.html", "index/hf-recipe.js", "index/hf-adapter.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot. Select one KineticImages mode for a production cue."
+license:
+  spdx: MIT
+  upstream: "https://github.com/DGFX/codrops-kinetic-images/tree/965dda362a8f9e5d522ed675493897200d273e49"
+  attribution_required: true
+author:
+  name: "DGFX"
+  url: "https://github.com/DGFX"
+version: 0.1.0

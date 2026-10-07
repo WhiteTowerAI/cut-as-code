@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "click-spark",
+  "surface": "web",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "664e77ff112de0ca877b4088c354414dd12bc1172339bd05a0e7f95921f03697"
+}

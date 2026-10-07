@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-switch-off-to-switch-transition",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "789fe01897115d154fc8e5ce2b32ddac130442e7445a5f3405b082c82ef21522",
+    "icon.svg": "1c8ab79305a796e5766becb652dfb6c3cfb711a49080a552f0cb5e0ed4244b05",
+    "upstream-icon.json": "d5903970d8a17ddaaf25c97d29dd095d201ccde57b8e1981f4b3d79fa0e91891"
+  }
+}

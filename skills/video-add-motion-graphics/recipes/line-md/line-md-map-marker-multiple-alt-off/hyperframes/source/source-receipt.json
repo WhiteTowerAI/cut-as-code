@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-map-marker-multiple-alt-off",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "052da4dabea8e02ac1392da0f9678b91e50be2597424e631ee9867db594b58e6",
+    "icon.svg": "14c2dcb48e1fd3d98d9a2ed7c307c52de7c4b97834059b26d0bdb39ed788c9eb",
+    "upstream-icon.json": "c5a5b029ad48d97cf9bdf7cfcec607ebfca8d4a9b07ae952e84e453bdc5af62d"
+  }
+}

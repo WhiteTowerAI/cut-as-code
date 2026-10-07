@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-folder-music",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "5526ed4745fa33ab9781add6cb532277b9c110df78ac123e88a6127b9e78d1b0",
+    "icon.svg": "b8c356d1e563e62ed5fab027c11684546ba1417dc90f7888ccbdd806402004c3",
+    "upstream-icon.json": "e4743b373d4bd2b8ade3895140361e963f01dd52ea3748216f3723314898a737"
+  }
+}

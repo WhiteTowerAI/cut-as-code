@@ -1,0 +1,58 @@
+spec_version: 1
+id: confetti-slow-fall
+name: "Slow Falling Confetti"
+description: "Gentle confetti drifting down for a sustained celebratory hold."
+surfaces: [video]
+category: sticker-celebration
+tech: [js]
+canvas: [video]
+target: [overlay]
+intent: sticker-celebration
+runtime: ["js"]
+export: [skill, html]
+dependencies: []
+tags: ["confetti", "slow-fall", "full-frame", "gentle", "slow", "celebration", "festive", "positive"]
+intent_keywords:
+  - "slow confetti"
+  - "gentle celebration"
+  - "celebration"
+  - "celebrate"
+  - "achievement"
+  - "milestone"
+  - "launch"
+  - "won"
+  - "festive reveal"
+  - "slow confetti icon"
+  - "缓慢彩带"
+  - "柔和庆祝"
+  - "庆祝"
+  - "赢了"
+  - "喜庆揭晓"
+  - "成就"
+best_for:
+  - "A spoken reference to slow confetti needs a compact, immediately recognizable cue"
+  - "A genuine positive achievement or announcement deserves a festive visual payoff"
+avoid_when:
+  - "The spoken meaning does not refer to slow confetti or a close synonym"
+  - "The event is neutral, negative, sensitive, or not genuinely celebratory"
+restraint:
+  max_per_view: 1
+  notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."
+motion:
+  duration_ms: 6000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: preview.html
+implementations:
+  - tech: js
+    files: ["vendor.js", "effect.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt placement, scale, palette, and timing to the shot."
+license:
+  spdx: ISC
+  upstream: "https://github.com/catdad/canvas-confetti/blob/20eebad51dde793070c373d594099a7ed8d96e22/dist/confetti.browser.js"
+  attribution_required: true
+author:
+  name: "Kiril Vatev"
+  url: "https://github.com/catdad/canvas-confetti"
+version: 1.9.4

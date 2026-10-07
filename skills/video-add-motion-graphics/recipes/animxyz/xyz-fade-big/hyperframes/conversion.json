@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "xyz-fade-big",
+  "surface": "animxyz",
+  "runtime": [
+    "css"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "css",
+  "source_manifest_sha256": "d8402b054038c8e1488d9e85d90bbf09160f8feaf4eb6c28568a1f338de09628"
+}

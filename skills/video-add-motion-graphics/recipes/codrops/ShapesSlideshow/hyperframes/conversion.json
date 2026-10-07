@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "project_id": "ShapesSlideshow",
+  "demo_url": "http://tympanus.net/Development/ShapesSlideshow/",
+  "article_url": "https://tympanus.net/codrops/2021/03/10/shape-slideshow-with-clip-path/",
+  "source_url": "https://github.com/codrops/ShapesSlideshow/",
+  "source_commit": "793c6d005a897e4545a33bbd9de4cb4b013117ef",
+  "license": {
+    "type": "MIT",
+    "evidence": "repository-file",
+    "file": "LICENSE",
+    "sha256": "1f6db3d0b162eaa534ff5585db684f00c41f776325f7fd11ebf9373650099ce1"
+  },
+  "source_copy": "source",
+  "variants": [
+    {
+      "name": "index",
+      "composition_id": "codrops-shapesslideshow-index",
+      "source_entry": "src/index.html",
+      "runtime_entry": "dist/index.html",
+      "source_sha256": "f005f881e375dc8030d5d4c5b341a2e0f9d2ed97f1996eefdd504dd5ad058762",
+      "runtime_sha256": "53ca1936d07883f6390b02a426b028a801d874e0c1857fad83347a8a571ca2b7",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".slides-nav__button--next"
+          }
+        ]
+      },
+      "output": "index/index.html"
+    },
+    {
+      "name": "index2",
+      "composition_id": "codrops-shapesslideshow-index2",
+      "source_entry": "src/index2.html",
+      "runtime_entry": "dist/index2.html",
+      "source_sha256": "fc006e46c2f2d7637b47705ce596641dc9439d7a33246d1a4d3ea42ecfcf5fed",
+      "runtime_sha256": "b9ba6b3ba1ce5f39157d3af1ecd0b3832189381a6c4982b950c6510771c21d4a",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".slides-nav__button--next"
+          }
+        ]
+      },
+      "output": "index2/index.html"
+    },
+    {
+      "name": "index3",
+      "composition_id": "codrops-shapesslideshow-index3",
+      "source_entry": "src/index3.html",
+      "runtime_entry": "dist/index3.html",
+      "source_sha256": "9492536831dffc71f70a14270f3f745b8324f3b726d5126247223831dc17994d",
+      "runtime_sha256": "971e87369e0cac436cbdb2492fd9f37ac27cf4099e657ddd05e0495b764e4f48",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".slides-nav__button--next"
+          }
+        ]
+      },
+      "output": "index3/index.html"
+    },
+    {
+      "name": "index4",
+      "composition_id": "codrops-shapesslideshow-index4",
+      "source_entry": "src/index4.html",
+      "runtime_entry": "dist/index4.html",
+      "source_sha256": "943de3cd79fd7f398f74f44677b01a496ad5524a59f7d9669eddbf75ea3f5281",
+      "runtime_sha256": "c90a3470ac7a5c4391e97eac59c44a3659028278583ce1a82781d689336a557f",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".slides-nav__button--next"
+          }
+        ]
+      },
+      "output": "index4/index.html"
+    }
+  ]
+}

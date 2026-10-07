@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-map-marker-radius-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "056e4f161d7b803d8dd93a03c6b4a3d698d9ee43274be821376a1e138d6bb902",
+    "icon.svg": "9fdecc1e76b96cc9d7ac3df3d2c7510b82588a191b869ce434a02ecb45e45803",
+    "upstream-icon.json": "34200d751d598378039cc03d65b6e5169c65c0a7024088ea284ae4185c138f33"
+  }
+}

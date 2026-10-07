@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-chevron-down-circle-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "629bc51bc8f1cb88b88e3d018bb431d406e0500617373a8e4639cc9c0d60f6ed",
+    "icon.svg": "ed1abe97495b8797b0c918a6f2fed5b7780f433175fa78eea48edc6e8084f0c3",
+    "upstream-icon.json": "63397d31062a9e812db0ab8f49b8d3a2ad535acc5e8673f09f6c572996f84b97"
+  }
+}

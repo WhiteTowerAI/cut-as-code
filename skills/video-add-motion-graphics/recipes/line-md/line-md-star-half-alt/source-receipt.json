@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-star-half-alt",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "8a1d90a25243a0f8a2f57567e832013ad86016f334c75480a5d8599c2430b6de",
+    "icon.svg": "fa3ca3d91d26dd886e8728735945233e7c830827ad47919e8abcf8e2ada3b7e9",
+    "upstream-icon.json": "9d98606f05b03b604c98c3f546df78a2065639fa421c1c6778f7b34975c8f037"
+  }
+}

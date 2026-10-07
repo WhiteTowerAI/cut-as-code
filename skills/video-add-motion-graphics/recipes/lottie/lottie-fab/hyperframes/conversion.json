@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "lottie-fab",
+  "surface": "lottie",
+  "runtime": [
+    "lottie"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "lottie",
+  "source_manifest_sha256": "7ac7164c485b19f0383d867492d2453576b611c1cb4120d99f9c59010b189a81"
+}

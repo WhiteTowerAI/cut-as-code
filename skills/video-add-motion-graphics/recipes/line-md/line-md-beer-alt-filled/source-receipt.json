@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-beer-alt-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "97b663b5bfeebfdd25fa60f5c88682c46cdc86b29982b7d827906fdea5e47a65",
+    "icon.svg": "138d287fae15b4b01ecc513d71213631035e504c2187bfae2d8e6b681b8b0398",
+    "upstream-icon.json": "c09d3fd9880d7f84ccc3146efddf3aa3793a4fbdbb7becabec597e085e55c6ca"
+  }
+}

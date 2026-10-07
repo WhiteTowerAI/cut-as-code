@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-chat-bubble-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "34066f0630cd0da079ef8fac39b06dc99e8e9f1afb1258dbe0d2a9224cf3c7b8",
+    "icon.svg": "27af84ede88c4e9a1732a4946e75dc87baca521fdd154cec9a031db58bf7feb7",
+    "upstream-icon.json": "37644f785e0aee1517f6ac1549423dea025c7312d08228b1af3fc88bc37ac486"
+  }
+}

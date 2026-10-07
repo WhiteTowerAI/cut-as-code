@@ -1,0 +1,58 @@
+spec_version: 1
+id: line-md-chat-bubble
+name: "Chat Bubble"
+description: "A compact chat bubble icon uses draw-in motion to illustrate email, chat, calling, messaging, or direct contact."
+surfaces: [video]
+category: sticker-communication
+tech: [svg]
+canvas: [video]
+target: [overlay]
+intent: sticker-communication
+runtime: ["svg-smil"]
+export: [skill, html]
+dependencies: []
+tags: ["chat", "bubble", "draw-in", "communication", "message", "contact", "compact"]
+intent_keywords:
+  - "chat bubble"
+  - "chat bubble icon"
+  - "chat bubble symbol"
+  - "email"
+  - "reply"
+  - "message"
+  - "conversation"
+  - "call"
+  - "chat"
+  - "incoming"
+  - "聊天"
+  - "邮件"
+  - "回复"
+  - "消息"
+  - "电话"
+  - "私信"
+best_for:
+  - "A spoken reference to chat bubble needs a compact, immediately recognizable cue"
+  - "The narration explicitly mentions sending, receiving, or replying to a message or call"
+avoid_when:
+  - "The spoken meaning does not refer to chat bubble or a close synonym"
+  - "The communication channel is incidental and does not carry the narrative point"
+restraint:
+  max_per_view: 1
+  notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."
+motion:
+  duration_ms: 6000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: preview.html
+implementations:
+  - tech: svg-smil
+    files: ["icon.svg", "upstream-icon.json"]
+    usage: "Materialize the converted HyperFrames directory, then adapt placement, scale, palette, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/cyberalien/line-md/blob/2ed22555cee9c1e50d4269865681d01ee8cffd7c/line-md.json"
+  attribution_required: true
+author:
+  name: "Vjacheslav Trushkin"
+  url: "https://github.com/cyberalien/line-md"
+version: 3.0.5

@@ -1,0 +1,76 @@
+spec_version: 1
+id: "codrops-onscrolllayoutformations-index"
+name: "Exploration of On-Scroll Layout Formations"
+description: "A muted neutral full-frame panel with a tiny label switches to sparse black fullscreen copy and then holds that text state."
+surfaces: [video]
+category: "fullscreen-typography"
+tech: [html, css, js]
+canvas: [video]
+target: [fullscreen]
+intent: "fullscreen-typography"
+runtime: [css, js]
+export: [skill, html]
+dependencies: []
+tags:
+  - "codrops"
+  - "minimal"
+  - "typography"
+  - "neutral-panel"
+  - "black-field"
+  - "chapter"
+  - "fullscreen"
+intent_keywords:
+  - "minimal black text chapter"
+  - "neutral panel transition"
+  - "sparse editorial copy"
+  - "极简黑底文字章节"
+  - "中性面板转场"
+best_for:
+  - "A chapter or interstitial in reflective essays, design commentary, and quiet editorial storytelling"
+  - "A fullscreen shift from a restrained label to one short block of high-contrast copy"
+avoid_when:
+  - "The video needs image-led spectacle, dense information, or rapid emotional pacing"
+  - "The cue must preserve ongoing footage or support several simultaneous messages"
+structural_roles:
+  - "chapter"
+  - "interstitial"
+motion_functions:
+  - "reveal"
+  - "transition"
+  - "settle"
+visual_language:
+  - "minimal"
+  - "typographic"
+  - "editorial"
+  - "dark"
+mechanisms:
+  - "neutral-panel"
+  - "tiny-label"
+  - "black-text-field"
+  - "text-hold"
+rhythm_energy: "calm"
+information_density: "sparse"
+frame_relationship: "fullscreen"
+color_tendency: "flexible"
+style_rationale: "The reviewed start is a muted neutral panel with a tiny label; the middle and end are sparse black fullscreen copy that holds. Its usable mechanism is a minimal text-state transition, not an image-and-layout formation."
+restraint:
+  max_per_view: 1
+  notes: "Use as one frame-dominant designed cutaway; adapt content, palette, typography, framing, and timing instead of running an unchanged source showcase."
+motion:
+  duration_ms: 8000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: "index/index.html"
+implementations:
+  - tech: js
+    files: ["index/index.html", "index/hf-recipe.js", "index/hf-adapter.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/codrops/OnScrollLayoutFormations/tree/68910ecf85275bdd7e4d0e47013ba4bf9ec94bde"
+  attribution_required: true
+author:
+  name: "codrops"
+  url: "https://github.com/codrops"
+version: 0.1.0

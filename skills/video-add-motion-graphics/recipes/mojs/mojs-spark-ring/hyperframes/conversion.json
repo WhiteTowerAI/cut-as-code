@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "mojs-spark-ring",
+  "surface": "mojs",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "40889920aadae72f65797e424b9147118e0704f23a6c0cf07ac851fcafc81583"
+}

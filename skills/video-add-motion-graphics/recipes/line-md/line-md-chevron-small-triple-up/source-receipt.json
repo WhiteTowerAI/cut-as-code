@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-chevron-small-triple-up",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "04987e8fb52c712632c80663fda95eb128ce5081b272b2c3cf7b313b7bc25eac",
+    "icon.svg": "fd4989ab1179ae7c2603edef5b08f751bdbd62386fd1a766b7778b93e1b08d9b",
+    "upstream-icon.json": "4acdd2d41fb391432874355b5a3fc90ef823ac40633eba195f05023f5faacb80"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "mojs-corner-sparks",
+  "surface": "mojs",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "70ec130d10f18cbd36b8fb64ef2a0ecc09a4413df12ee8b1d1d17058c36d3d54"
+}

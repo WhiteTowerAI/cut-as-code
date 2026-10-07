@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-lightbulb",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "902a2cd96265bbca01e38d4a45181003cdfb10dc783538bad9dc1c9dbfa0d54c",
+    "icon.svg": "fcbc7d4a9f24584daca35d4fc81a4c5eb9fb93c38817d52dbd66ec3143fb28da",
+    "upstream-icon.json": "59549542c5d5529ff62bbe67faacd5014dd91411ba874a98a3f56a66dcbe87bb"
+  }
+}

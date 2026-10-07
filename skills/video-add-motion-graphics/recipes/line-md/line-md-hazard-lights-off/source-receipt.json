@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-hazard-lights-off",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "3f0acf5c2ea3660076e87997702c70ba01ad7d15c8428a40bca97b1dfeff8018",
+    "icon.svg": "2a5657b5d5a52efbb8ac56088fba0af1d88aa272c5ca4cce03c76a072e2f49da",
+    "upstream-icon.json": "c50764be32e6a20e56223851b5df775a99e7e189f19940fd57b524bfd349a8a3"
+  }
+}

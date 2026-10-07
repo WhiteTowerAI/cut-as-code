@@ -1,0 +1,53 @@
+spec_version: 1
+id: line-md-close-circle-twotone
+name: "Close Circle (Twotone)"
+description: "A compact close circle icon uses draw-in motion to illustrate an abstract impact, pulse, energy accent, or non-literal emphasis beat."
+surfaces: [video]
+category: sticker-emphasis
+tech: [svg]
+canvas: [video]
+target: [overlay]
+intent: sticker-emphasis
+runtime: ["svg-smil"]
+export: [skill, html]
+dependencies: []
+tags: ["close", "circle", "draw-in", "emphasis", "impact", "abstract", "compact", "twotone"]
+intent_keywords:
+  - "close circle"
+  - "close circle icon"
+  - "close circle symbol"
+  - "close circle animation"
+  - "close circle visual cue"
+  - "show close circle"
+  - "animated close circle"
+  - "强调"
+  - "强调图标"
+  - "强调动画"
+  - "强调提示"
+best_for:
+  - "A spoken reference to close circle needs a compact, immediately recognizable cue"
+  - "The edit needs a compact abstract hit without introducing a literal icon or new information"
+avoid_when:
+  - "The spoken meaning does not refer to close circle or a close synonym"
+  - "A literal status, object, or action would communicate the spoken meaning more precisely"
+restraint:
+  max_per_view: 1
+  notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."
+motion:
+  duration_ms: 6000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: preview.html
+implementations:
+  - tech: svg-smil
+    files: ["icon.svg", "upstream-icon.json"]
+    usage: "Materialize the converted HyperFrames directory, then adapt placement, scale, palette, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/cyberalien/line-md/blob/2ed22555cee9c1e50d4269865681d01ee8cffd7c/line-md.json"
+  attribution_required: true
+author:
+  name: "Vjacheslav Trushkin"
+  url: "https://github.com/cyberalien/line-md"
+version: 3.0.5

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-discord",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "b6063889d1396485540780487c50f29054591412baa2a0e39a71d27a5acd6328",
+    "icon.svg": "a53730a5a3a327b948e3eaa46aacfde282d2e681d301144818c7b49cd6ef99e6",
+    "upstream-icon.json": "0dd6b444c1ba3fb0427829570a28457f90f4bbeda2ccafdab70da021644e0f11"
+  }
+}

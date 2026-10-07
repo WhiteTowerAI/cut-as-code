@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "recipe_id": "meteocons-partly-cloudy-day",
+  "source_id": "meteocons",
+  "upstream_asset": "fill/partly-cloudy-day.svg",
+  "source_files": {
+    "preview.html": "2a18bf960d3f324e78f4eb2a1d3e057a95cd4a07d1038ebd23f944e2ecdcce87",
+    "icon.svg": "e0445741bfdbbb138e301536d9393cfb02a3716d5f329b7e779aa8d0dd5681f4"
+  }
+}

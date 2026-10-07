@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-briefcase",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "185ea4f8bab954e5b72e01fc1e055c9b3b1ee1b5bed6400a6d9c5ed3dd5e286a",
+    "icon.svg": "0c28c97dd061c9692d1f45963fe05535a08f4179b7b6cbc35495ac481a9a3852",
+    "upstream-icon.json": "1de4b8e286ddbf95b4a4e12a296e07b50e4935489111e7fe6e07e111d43ac20b"
+  }
+}

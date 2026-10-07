@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-moon-alt-off-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "1b4ede8eb2ddd95bb59a4fc53f68353bf59afcaf9b7ec716e6d66e3c0b0ea471",
+    "icon.svg": "a008611cc7b221f781552c1a4239422828071922168213f77e7551eacfff6052",
+    "upstream-icon.json": "4deb978b3188eeae7db9910a93b8c08f16b3349de144d3918436835cf0cacd42"
+  }
+}

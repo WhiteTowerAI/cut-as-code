@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "recipe_id": "shuffle-text",
+  "surface": "web",
+  "runtime": [
+    "css",
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "38385278605b0f5e03aae9b21288cb1100c607caa95d773615e536265ed32b6d"
+}

@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "recipe_id": "pixel-transition",
+  "surface": "web",
+  "runtime": [
+    "css",
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "715dcbc3c66c436fe52903696ba22b2f58494a964b23383fde106f2426d16625"
+}

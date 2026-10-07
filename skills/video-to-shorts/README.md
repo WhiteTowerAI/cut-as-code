@@ -15,7 +15,7 @@ The canonical workflow is:
 3. Validate word-exact excerpts and six-dimension scores.
 4. Review an interactive candidate page and record a hash-bound human or explicitly delegated agent selection.
 5. Write the approved `work/shorts/shorts-plan.json`; stop while it is `awaiting_main_render`.
-6. Finish captions, content cards, graphic motion, and the one shared main render in canonical order, then rerun planning to bind the verified delivery.
+6. Finish captions, content cards, motion graphics, and the one shared main render in canonical order, then rerun planning to bind the verified delivery.
 7. Extract seeked keep ranges and optionally review/render deterministic 9:16 outputs under `final/shorts/`.
 
 Extraction treats the selected final word and the media endpoint separately. Every

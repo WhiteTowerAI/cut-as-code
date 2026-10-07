@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-roundabout-right",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "2707fd71bb12c8cc6fd9c1d8be9f2087eff8c6d662ed3a432e48b0f32843aa20",
+    "icon.svg": "319bc52d5c6769921b423d0bc581ac1d5dbd6f04b938cfff673dd96f0bdc9780",
+    "upstream-icon.json": "01d250182449e86fb16662b55595272711cea9bb7f5caa006a4a720c1406abb7"
+  }
+}

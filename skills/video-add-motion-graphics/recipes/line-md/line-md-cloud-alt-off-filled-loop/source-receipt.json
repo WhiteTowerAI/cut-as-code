@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-cloud-alt-off-filled-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "5ce690978122eb7fc6a4fa5d0010b2e5d05c68a32c98a2a60b90e886409e3e89",
+    "icon.svg": "a64a5c1d050b951116f0117c084c46c35496328ec447e8df648de14896272a6f",
+    "upstream-icon.json": "9fb6f0700ded7dff370ccdc2ffb87341bda3ccbc7096014613810e187df5c82d"
+  }
+}

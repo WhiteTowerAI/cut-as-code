@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "source_id": "tsparticles",
+  "display_name": "tsParticles",
+  "website": "https://particles.js.org/",
+  "repository": "https://github.com/tsparticles/tsparticles",
+  "revision": "d38e87725cb0fa7108481b39064e067203068bac",
+  "package": {
+    "name": "tsparticles",
+    "version": "4.3.2",
+    "tarball_file": "tsparticles-4.3.2.tgz",
+    "tarball_sha256": "ef202c08fae9b865b82d47bedbaaba4f86fe3cdf1c6f71f124369f94dd1d7327"
+  },
+  "license": {
+    "spdx": "MIT",
+    "file": "LICENSE.tsparticles"
+  },
+  "selection_count": 4,
+  "conversion": "Official preset configuration preserved with a deterministic HyperFrames canvas port."
+}

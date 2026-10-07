@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "attention-pulse",
+  "surface": "web",
+  "runtime": [
+    "css"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "css",
+  "source_manifest_sha256": "5998837b0b3cf1eee533b29e368423312ceae6b9828b04cc7783857c4ce467cd"
+}

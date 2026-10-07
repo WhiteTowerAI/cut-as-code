@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "glitch-text",
+  "surface": "web",
+  "runtime": [
+    "css"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "css",
+  "source_manifest_sha256": "fd2fabb3298dd028c0e8fa4dfbb136ae36be1d411494b1feecd1df09f6779ae7"
+}

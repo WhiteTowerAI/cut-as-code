@@ -1,0 +1,151 @@
+{
+  "schema_version": 1,
+  "project_id": "ScrollSpiral",
+  "demo_url": "http://tympanus.net/Development/ScrollSpiral/",
+  "article_url": "https://tympanus.net/codrops/2017/04/26/webgl-scroll-spiral/",
+  "source_url": "https://github.com/codrops/ScrollSpiral/",
+  "source_commit": "3889131fea11ce6b818a1f7e2299cf100f56180d",
+  "license": {
+    "type": "MIT",
+    "evidence": "codrops-site-license",
+    "url": "https://tympanus.net/codrops/licensing/"
+  },
+  "source_copy": "source",
+  "variants": [
+    {
+      "name": "index",
+      "composition_id": "codrops-scrollspiral-index",
+      "source_entry": "index.html",
+      "runtime_entry": "index.html",
+      "source_sha256": "4b6615fdfc144a494573a95cfd7b038859f049a63a9b80248c2b129a9ab41297",
+      "runtime_sha256": "4b6615fdfc144a494573a95cfd7b038859f049a63a9b80248c2b129a9ab41297",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index/index.html"
+    },
+    {
+      "name": "index2",
+      "composition_id": "codrops-scrollspiral-index2",
+      "source_entry": "index2.html",
+      "runtime_entry": "index2.html",
+      "source_sha256": "6be08e91d0efae885aed25c9f8bcc13f88646a40d0c82e2c7a230711e24a1ac6",
+      "runtime_sha256": "6be08e91d0efae885aed25c9f8bcc13f88646a40d0c82e2c7a230711e24a1ac6",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index2/index.html"
+    },
+    {
+      "name": "index3",
+      "composition_id": "codrops-scrollspiral-index3",
+      "source_entry": "index3.html",
+      "runtime_entry": "index3.html",
+      "source_sha256": "035a8d1326e0ac67cc2feec86548fb7d30bd774e1e9a1cb354c380e9f6a92a6a",
+      "runtime_sha256": "035a8d1326e0ac67cc2feec86548fb7d30bd774e1e9a1cb354c380e9f6a92a6a",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index3/index.html"
+    },
+    {
+      "name": "index4",
+      "composition_id": "codrops-scrollspiral-index4",
+      "source_entry": "index4.html",
+      "runtime_entry": "index4.html",
+      "source_sha256": "ad09a4c1d36806b44b6dd10f76ca822d794f358f47d9b671f08d0b219613ead9",
+      "runtime_sha256": "ad09a4c1d36806b44b6dd10f76ca822d794f358f47d9b671f08d0b219613ead9",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index4/index.html"
+    },
+    {
+      "name": "index5",
+      "composition_id": "codrops-scrollspiral-index5",
+      "source_entry": "index5.html",
+      "runtime_entry": "index5.html",
+      "source_sha256": "c4e74412eb999634870389e78e8ec460d63f26903933f757d46d6410b52fe9ac",
+      "runtime_sha256": "c4e74412eb999634870389e78e8ec460d63f26903933f757d46d6410b52fe9ac",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index5/index.html"
+    },
+    {
+      "name": "index6",
+      "composition_id": "codrops-scrollspiral-index6",
+      "source_entry": "index6.html",
+      "runtime_entry": "index6.html",
+      "source_sha256": "7672e6a17b5672aff8b9dab20624c49ff61f3769337808b292a22ba8611f715b",
+      "runtime_sha256": "7672e6a17b5672aff8b9dab20624c49ff61f3769337808b292a22ba8611f715b",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index6/index.html"
+    },
+    {
+      "name": "index7",
+      "composition_id": "codrops-scrollspiral-index7",
+      "source_entry": "index7.html",
+      "runtime_entry": "index7.html",
+      "source_sha256": "c436809b0af47c98946b15cb2df5deac8d329f06b41a76643b8304a51dfe43dc",
+      "runtime_sha256": "c436809b0af47c98946b15cb2df5deac8d329f06b41a76643b8304a51dfe43dc",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index7/index.html"
+    },
+    {
+      "name": "index8",
+      "composition_id": "codrops-scrollspiral-index8",
+      "source_entry": "index8.html",
+      "runtime_entry": "index8.html",
+      "source_sha256": "674c78dd15316119609dab0beb8ddda949d37cbb40e756cf07a69ed0a0a3cc4e",
+      "runtime_sha256": "674c78dd15316119609dab0beb8ddda949d37cbb40e756cf07a69ed0a0a3cc4e",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index8/index.html"
+    },
+    {
+      "name": "index9",
+      "composition_id": "codrops-scrollspiral-index9",
+      "source_entry": "index9.html",
+      "runtime_entry": "index9.html",
+      "source_sha256": "cc4d3a74b6f663a935cb9e5f3e19e186bdc7599f06829d17b0e577dbd78fd845",
+      "runtime_sha256": "cc4d3a74b6f663a935cb9e5f3e19e186bdc7599f06829d17b0e577dbd78fd845",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index9/index.html"
+    }
+  ]
+}

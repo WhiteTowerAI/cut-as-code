@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "recipe_id": "meteocons-tornado",
+  "source_id": "meteocons",
+  "upstream_asset": "fill/tornado.svg",
+  "source_files": {
+    "preview.html": "dc9001639965b1090b4147450c7508f0d6a228e71249b4a7e49e97718780afc3",
+    "icon.svg": "1a405d2df2372d2f2ceb5ae560d97872b9d80296611ae64c083eb3c6c3347217"
+  }
+}

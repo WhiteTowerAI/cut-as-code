@@ -1,0 +1,58 @@
+spec_version: 1
+id: mojs-success-pop
+name: "Success Confirmation Pop"
+description: "A compact green burst reinforcing a completed or approved result."
+surfaces: [video]
+category: sticker-success
+tech: [js]
+canvas: [video]
+target: [overlay]
+intent: sticker-success
+runtime: ["js"]
+export: [skill, html]
+dependencies: []
+tags: ["success", "burst", "confirmation", "compact", "pop", "positive", "reveal"]
+intent_keywords:
+  - "success pop"
+  - "confirmation burst"
+  - "completed"
+  - "successful"
+  - "approved"
+  - "confirmed"
+  - "done"
+  - "passed"
+  - "check mark"
+  - "success pop icon"
+  - "成功弹出"
+  - "确认爆发"
+  - "完成"
+  - "成功"
+  - "确认"
+  - "通过"
+best_for:
+  - "A spoken reference to success pop needs a compact, immediately recognizable cue"
+  - "A task, verification, transaction, or decision has clearly succeeded"
+avoid_when:
+  - "The spoken meaning does not refer to success pop or a close synonym"
+  - "The outcome is still pending, uncertain, failed, or merely being discussed"
+restraint:
+  max_per_view: 1
+  notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."
+motion:
+  duration_ms: 6000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: preview.html
+implementations:
+  - tech: js
+    files: ["vendor.js", "effect.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt placement, scale, palette, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/mojs/mojs/blob/0a9cf9a87dd5637e6fa770755e79048489bcf817/dist/mo.umd.js"
+  attribution_required: true
+author:
+  name: "Oleg Solomka and mo.js contributors"
+  url: "https://github.com/mojs/mojs"
+version: 1.7.1

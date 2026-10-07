@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "mojs-celebration-burst",
+  "surface": "mojs",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "11f583f5fa62b08320bc8b8c47d22e2dbb63e45235f94340ad1d7480ee60e12b"
+}

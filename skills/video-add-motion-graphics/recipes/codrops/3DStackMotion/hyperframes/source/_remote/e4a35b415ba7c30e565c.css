@@ -1,0 +1,28 @@
+@font-face {
+  font-family: 'Kode Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(06b6be14621890e1e4b9.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Kode Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url(3d23371a4ced9498d17f.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Kode Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url(18b12447710985677bd0.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Kode Mono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url(041e79313788467bd008.ttf) format('truetype');
+}

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "confetti-bottom-fountain",
+  "surface": "canvas-confetti",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "f8b7bbdc3346b6d23a8e27740a11283a2cded7c0b46540920a69fed0abd71ad1"
+}

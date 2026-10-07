@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-sun-rising-twotone-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "193ff1ea71a350c6ef341cd3593c39da44fe55ccaa11e4f6d85981d1d7e06d45",
+    "icon.svg": "dc3c87f770523d57aeed970fd4fb1464ac23ec29aaf11755ba5262514c13df20",
+    "upstream-icon.json": "698690e043e398381e238a5fe1df0194d955818b603d955a9fc5aff29b2ce639"
+  }
+}

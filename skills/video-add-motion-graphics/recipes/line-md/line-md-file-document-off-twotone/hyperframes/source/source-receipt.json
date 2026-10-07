@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-file-document-off-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "240753e0c94e9442fbd624815365199f922cf7519fafab35153ec54fa28cfcfc",
+    "icon.svg": "60b52989eace3c4ef665bee52852d65f9cd98f32dfd98df5a2524ff880ec6748",
+    "upstream-icon.json": "a8a6bc598341cc7dbf7574309b22cec75fb96cbf70093219a603d45b8dc29bd6"
+  }
+}

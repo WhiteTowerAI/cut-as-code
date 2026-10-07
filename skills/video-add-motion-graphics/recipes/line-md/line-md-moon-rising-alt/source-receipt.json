@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-moon-rising-alt",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "b2022053628c557094a7b5de78f93532189a0c96311ba9a54d85026a5be453dd",
+    "icon.svg": "b0ca5903f58d8afea18ffdf544c4728ce77ce53de8156b5f6c1cefdfd775503a",
+    "upstream-icon.json": "81a4578fc215da541dc3c5744c136a01b64145e2d5d6a47c0a2f1eb846680c68"
+  }
+}

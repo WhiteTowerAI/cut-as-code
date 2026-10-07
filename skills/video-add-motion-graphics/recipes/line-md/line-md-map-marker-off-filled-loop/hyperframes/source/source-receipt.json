@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-map-marker-off-filled-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "1e95b30704dab3577c3753c23c3a5ea688df459d7653e1eb6c1088c5eedd6d62",
+    "icon.svg": "89a4b4286bbf4b65200876238e45b17e87d28cff65ba3fce28d8354c37463005",
+    "upstream-icon.json": "07c80e3cdc9a53e428ec726a02d4c8bc895c6e6f8baa0d95c3f8f072aff7b2c9"
+  }
+}

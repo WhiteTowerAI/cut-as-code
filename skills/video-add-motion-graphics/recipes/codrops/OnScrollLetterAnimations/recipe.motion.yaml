@@ -1,0 +1,75 @@
+spec_version: 1
+id: "codrops-onscrollletteranimations-index"
+name: "On-Scroll Letter Animations"
+description: "Individual letters and image tiles shift through elegant editorial title states."
+surfaces: [video]
+category: "fullscreen-typography"
+tech: [html, css, js]
+canvas: [video]
+target: [fullscreen]
+intent: "fullscreen-typography"
+runtime: [css, js]
+export: [skill, html]
+dependencies: []
+tags:
+  - "codrops"
+  - "letters"
+  - "typography"
+  - "editorial"
+  - "fashion"
+  - "chapter"
+  - "fullscreen"
+intent_keywords:
+  - "animated letter title"
+  - "editorial typography chapter"
+  - "fashion text transition"
+  - "字母动画标题"
+  - "编辑排版转场"
+best_for:
+  - "An opener, chapter, or interstitial in fashion, culture, books, and design content"
+  - "A fullscreen title sequence that pairs a concise phrase with an image tile"
+avoid_when:
+  - "The title needs a plain functional lower third or dense subtitle copy"
+  - "The selected image must keep a protected face fully visible"
+structural_roles:
+  - "opener"
+  - "chapter"
+  - "interstitial"
+motion_functions:
+  - "reveal"
+  - "transition"
+  - "build"
+visual_language:
+  - "typographic"
+  - "editorial"
+  - "fashion"
+mechanisms:
+  - "letter-animation"
+  - "image-tiles"
+  - "scroll"
+rhythm_energy: "medium"
+information_density: "balanced"
+frame_relationship: "fullscreen"
+color_tendency: "flexible"
+style_rationale: "The reviewed states feature centered letterforms and a small image card, creating a polished page-scale editorial title motion."
+restraint:
+  max_per_view: 1
+  notes: "Use as one frame-dominant designed cutaway; adapt content, palette, typography, framing, and timing instead of running an unchanged source showcase."
+motion:
+  duration_ms: 8000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: "index/index.html"
+implementations:
+  - tech: js
+    files: ["index/index.html", "index/hf-recipe.js", "index/hf-adapter.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/codrops/OnScrollLetterAnimations/tree/b3c14371d62efae0f7711fc378b2ba8df21687d8"
+  attribution_required: true
+author:
+  name: "codrops"
+  url: "https://github.com/codrops"
+version: 0.1.0

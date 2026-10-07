@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "confetti-top-rain",
+  "surface": "canvas-confetti",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "a0ddfec023c5e9336ec7b1e87af9fb6f0d055d1edfd572f19e51b15a976a62e4"
+}

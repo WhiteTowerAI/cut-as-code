@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-beer",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "ac6ea64e76666170f1c3871caafd622722f2dffe50a1ff96879fab47c8d8cd3a",
+    "icon.svg": "c0b8f35fd9ce35da39acf866bae7d4796134068a839eda4c67ccada71b34287b",
+    "upstream-icon.json": "2ff12fa70a350c266272411b443973cb37ba5f240ac52d68304d654735ac0444"
+  }
+}

@@ -1,0 +1,74 @@
+spec_version: 1
+id: "codrops-3dcarousel-index"
+name: "On-Scroll 3D Carousel"
+description: "A full-frame carousel rotates editorial image cards through depth."
+surfaces: [video]
+category: "fullscreen-transition"
+tech: [html, css, js]
+canvas: [video]
+target: [fullscreen]
+intent: "fullscreen-transition"
+runtime: [css, js]
+export: [skill, html]
+dependencies: []
+tags:
+  - "codrops"
+  - "carousel"
+  - "3d"
+  - "images"
+  - "chapter"
+  - "transition"
+  - "frame-dominant"
+intent_keywords:
+  - "editorial image carousel"
+  - "fashion chapter transition"
+  - "3D photo sequence"
+  - "图片轮播"
+  - "时尚章节转场"
+best_for:
+  - "A chapter or interstitial in fashion, culture, travel, or visual-essay edits"
+  - "A frame-dominant transition that can replace its cards with non-face image details"
+avoid_when:
+  - "The video needs literal documentary continuity or restrained business graphics"
+  - "The carousel imagery depends on protected readable faces or dense on-screen copy"
+structural_roles:
+  - "chapter"
+  - "interstitial"
+motion_functions:
+  - "transition"
+  - "loop"
+  - "settle"
+visual_language:
+  - "editorial"
+  - "cinematic"
+  - "3d"
+mechanisms:
+  - "image-carousel"
+  - "perspective"
+  - "scroll"
+rhythm_energy: "medium-high"
+information_density: "balanced"
+frame_relationship: "frame-dominant"
+color_tendency: "image-led"
+style_rationale: "The reviewed sequence moves image cards through a deep curved carousel, making a spatial editorial handoff rather than a compact overlay."
+restraint:
+  max_per_view: 1
+  notes: "Use as one frame-dominant designed cutaway; adapt content, palette, typography, framing, and timing instead of running an unchanged source showcase."
+motion:
+  duration_ms: 8000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: "index/index.html"
+implementations:
+  - tech: js
+    files: ["index/index.html", "index/hf-recipe.js", "index/hf-adapter.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/codrops/3DCarousel/tree/f354a11d19777b4e573d47b016354951b1ecace3"
+  attribution_required: true
+author:
+  name: "codrops"
+  url: "https://github.com/codrops"
+version: 0.1.0

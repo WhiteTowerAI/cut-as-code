@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-monitor-screenshot-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "eda50576828f50a8468356cb2113029c79afec72747bbafdf32ea57d6396f190",
+    "icon.svg": "b0def98e14e951447e3b23475795cfd8fbfd18a68549068e1d5a031757ccc067",
+    "upstream-icon.json": "3744e3cbea7d17642b87bd748efea464b80e12298113b73c96ffefeb24a0b554"
+  }
+}

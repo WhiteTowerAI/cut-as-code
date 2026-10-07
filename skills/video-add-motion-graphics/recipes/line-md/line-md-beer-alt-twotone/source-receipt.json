@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-beer-alt-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "0a2b5324ecf9a15a36cff02bbee639574fbee975c48ab822e74a880cc50dbe4f",
+    "icon.svg": "96be9ff4ca1df2e2a520c7ba8967cb1f23ad363c6add6608b87dae5a9e86562a",
+    "upstream-icon.json": "0a6d5728ad6f8cbebf15da8531bd3167a80cd0d8170a221f0414fb4850565917"
+  }
+}

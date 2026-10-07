@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "confetti-side-cannons",
+  "surface": "canvas-confetti",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "21913353fd14ae489b48002fe609fe22196289c0dc3d28480340714aee82deab"
+}

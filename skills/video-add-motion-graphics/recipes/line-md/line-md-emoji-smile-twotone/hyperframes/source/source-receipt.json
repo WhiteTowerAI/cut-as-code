@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-emoji-smile-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "3fb1a389b6135af46971f8aac7833487fee7483518a859fe4a89408d3ab06ca1",
+    "icon.svg": "99a12d9f3e435a3f2db4a2fbd3814cec0a6e51c991d0b1877d125180dc86f75b",
+    "upstream-icon.json": "3ded4c6dcba522b4de15c74f150d4668d4824289c87f1f7f01639e3b83583940"
+  }
+}

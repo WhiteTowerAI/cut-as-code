@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-volume-plus-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "c553e2f95321f8c3bad3e8e464beeb2789105137eeabb33afa77fc89192b8411",
+    "icon.svg": "f2e87e9924d2ad442491e41c154812e6527cdcf5b4f16d5323633d448dabaaee",
+    "upstream-icon.json": "8b76d5869f17591e0b939f3fa9af20c0b747ace5828f6d7281369911cb31ed02"
+  }
+}

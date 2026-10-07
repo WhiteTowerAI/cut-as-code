@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-sunny-filled-loop-to-moon-filled-transition",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "68d4a0e4dcb8ed725279d1e6f78a3c7963e983e1bde5cd531ebdbdc5ed4ab1dd",
+    "icon.svg": "d77728492402f2eec76d693460cc44daee017d3f716ebd4efc57c6415fb878c4",
+    "upstream-icon.json": "f295dacd7a771ae9a0d0af39cf896c66966df8085843158ec0946db6c0441baa"
+  }
+}

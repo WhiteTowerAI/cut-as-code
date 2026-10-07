@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-loading-twotone-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "2b3e70d5f546b3eda7bea5982103409184836e53c0826ce5fdb80f2787136021",
+    "icon.svg": "5707443a4402a0c4c46bc7b57ff63c4fb39c6477b85bbf913d66be9c2dec37bc",
+    "upstream-icon.json": "c049b94387dc925e43a73d336b8c0b62382f91620eb986ad35c6862de8685153"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-beer-twotone-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "43f0c246fe94c4f8d91c81700dab660ce35c4e8571359164beb32630bff4263a",
+    "icon.svg": "4b34216da0553c1ebe0a09f3c1121ba245a23f7acbbbe51d3cbcf8234d07132e",
+    "upstream-icon.json": "8cd091fe65a6961f8e6959a82ef47592c0804a0ce0eed0a1160a60a7e12cb144"
+  }
+}

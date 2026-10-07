@@ -1,0 +1,76 @@
+spec_version: 1
+id: "codrops-typeshuffleanimation-index"
+name: "Shuffling Typography Animation"
+description: "Glitch-like letter shuffling resolves a dark technical title card."
+surfaces: [video]
+category: "fullscreen-typography"
+tech: [html, css, js]
+canvas: [video]
+target: [fullscreen]
+intent: "fullscreen-typography"
+runtime: [css, js]
+export: [skill, html]
+dependencies: []
+tags:
+  - "codrops"
+  - "type-shuffle"
+  - "glitch"
+  - "technical"
+  - "futuristic"
+  - "opener"
+  - "fullscreen"
+intent_keywords:
+  - "technical text shuffle"
+  - "futuristic title reveal"
+  - "glitch typography opener"
+  - "文字洗牌开场"
+  - "未来感故障标题"
+best_for:
+  - "An opener, chapter, or interstitial for technology, AI, cyber, gaming, and sci-fi explainers"
+  - "A fullscreen title beat with a short technical phrase and dark graphic backdrop"
+avoid_when:
+  - "The production is warm, organic, documentary, or formally conservative"
+  - "The text must be read before the shuffle settles or compete with captions"
+structural_roles:
+  - "opener"
+  - "chapter"
+  - "interstitial"
+motion_functions:
+  - "reveal"
+  - "build"
+  - "settle"
+visual_language:
+  - "futuristic"
+  - "typographic"
+  - "technical"
+  - "dark"
+mechanisms:
+  - "text-shuffle"
+  - "glyph-scramble"
+  - "line-art"
+rhythm_energy: "medium-high"
+information_density: "balanced"
+frame_relationship: "fullscreen"
+color_tendency: "dark"
+style_rationale: "The reviewed black frame pairs scrambled small glyphs with technical line art, giving a controlled futuristic title-reveal rhythm."
+restraint:
+  max_per_view: 1
+  notes: "Use as one frame-dominant designed cutaway; adapt content, palette, typography, framing, and timing instead of running an unchanged source showcase."
+motion:
+  duration_ms: 14000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: "index/index.html"
+implementations:
+  - tech: js
+    files: ["index/index.html", "index/hf-recipe.js", "index/hf-adapter.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/codrops/TypeShuffleAnimation/tree/8f171f1f58d4ac8e1ede46109674f5c71005f166"
+  attribution_required: true
+author:
+  name: "codrops"
+  url: "https://github.com/codrops"
+version: 0.1.0

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-star-pulsating-twotone-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "f974ea8257380117b519c628eba55c65fee2c3dd6b877069ca2fd7f43d9d2fe9",
+    "icon.svg": "4dbdfd9c66268e644283ed477b7404dbbc8474570db05c2e0762dba2f46ff7a0",
+    "upstream-icon.json": "e636f49561910e0bf99c5040ef3a7953522d0d08430853e0198ccfc8fd5f654d"
+  }
+}

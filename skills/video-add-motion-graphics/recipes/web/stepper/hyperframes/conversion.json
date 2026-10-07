@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "recipe_id": "stepper",
+  "surface": "web",
+  "runtime": [
+    "css",
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "244e2f8f6220f1c3f49831f1a81befc9a1702119ff8ef6861ab42fa95235bafc"
+}

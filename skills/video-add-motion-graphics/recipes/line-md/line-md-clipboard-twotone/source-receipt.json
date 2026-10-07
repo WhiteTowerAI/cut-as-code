@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-clipboard-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "464729a9b1f8adc188eab29840176fb0c191e11a069119767f0b9ad847f1851a",
+    "icon.svg": "3f4844e38908b32185eea774b91a4be1b9b164bee5319185a7f1ad9c8229608f",
+    "upstream-icon.json": "1b30d8e5c6117d4ce53fdb5c991c98ccc101ed859a8d0d309a9a8d0bf16067ce"
+  }
+}

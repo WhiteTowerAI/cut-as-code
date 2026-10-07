@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "shine-border",
+  "surface": "web",
+  "runtime": [
+    "css"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "css",
+  "source_manifest_sha256": "004d0120842403c957dceec93bb1be71421a4b3cd272274b252d978a424bd515"
+}

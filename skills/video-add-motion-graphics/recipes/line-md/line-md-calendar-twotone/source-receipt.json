@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-calendar-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "34267df2123d391a7f77af3b5aa1ea4a2cf3eed2fb8510bcac0d69b32e9c1604",
+    "icon.svg": "efa5542974cc7168899d662b1470c46dd123739666267ca61c0a745d3ec9f6c7",
+    "upstream-icon.json": "255979d02156c9fc53f876d292be7eb616005704a3b5138bef68d0ab782b85b0"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-clipboard-check-twotone-to-clipboard-twotone-transition",
+  "surface": "line-md",
+  "runtime": [
+    "svg-smil"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "svg-smil",
+  "source_manifest_sha256": "d3b6419deadd7ad7dd2cf8b1fbc2b32a4fb90e857bc292286ce0e2c18202db33"
+}

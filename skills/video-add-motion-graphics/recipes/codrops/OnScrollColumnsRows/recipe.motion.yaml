@@ -1,0 +1,71 @@
+spec_version: 1
+id: "codrops-onscrollcolumnsrows-index"
+name: "On-Scroll Column & Row Animations"
+description: "A sparse white web-page state leaves only small link-like text and a nearly empty field across the reviewed default sequence."
+surfaces: [video]
+category: "fullscreen-typography"
+tech: [html, css, js]
+canvas: [video]
+target: [fullscreen]
+intent: "fullscreen-typography"
+runtime: [css, js]
+export: [skill, html]
+dependencies: []
+tags:
+  - "codrops"
+  - "minimal"
+  - "white-page"
+  - "link-text"
+  - "static"
+  - "interstitial"
+  - "fullscreen"
+intent_keywords:
+  - "minimal white interstitial"
+  - "sparse web page hold"
+  - "quiet link text transition"
+  - "极简白色间场"
+  - "静态网页章节"
+best_for:
+  - "A quiet interstitial in reflective essays, minimalist design films, and deliberately restrained editorial sequences"
+  - "A fullscreen pause when one tiny navigational or link-like phrase is enough"
+avoid_when:
+  - "The video needs image-led storytelling, expressive color, or immediate emotional impact"
+  - "The cue must carry a clear title, substantial copy, or a strong visual chapter marker"
+structural_roles:
+  - "interstitial"
+motion_functions:
+  - "settle"
+visual_language:
+  - "minimal"
+  - "typographic"
+  - "web-page"
+mechanisms:
+  - "white-page"
+  - "link-text"
+  - "static-hold"
+rhythm_energy: "calm"
+information_density: "sparse"
+frame_relationship: "fullscreen"
+color_tendency: "light"
+style_rationale: "In the current reviewed default, the supposed columns and image areas do not read as a working image layout: the visible result is a near-empty white page with small link-like text, so this record only supports a minimal pause."
+restraint:
+  max_per_view: 1
+  notes: "Use as one frame-dominant designed cutaway; adapt content, palette, typography, framing, and timing instead of running an unchanged source showcase."
+motion:
+  duration_ms: 8000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: "index/index.html"
+implementations:
+  - tech: js
+    files: ["index/index.html", "index/hf-recipe.js", "index/hf-adapter.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/codrops/OnScrollColumnsRows/tree/bc0587f488eaed94905e544dfb05c3de8425012c"
+  attribution_required: true
+author:
+  name: "codrops"
+  url: "https://github.com/codrops"
+version: 0.1.0

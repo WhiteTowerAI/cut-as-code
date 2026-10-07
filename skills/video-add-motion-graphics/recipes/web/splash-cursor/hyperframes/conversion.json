@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "splash-cursor",
+  "surface": "web",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "732cfa1c499177830d66fb5311627ec4e57e68d13463fff5eda587484a012ff2"
+}

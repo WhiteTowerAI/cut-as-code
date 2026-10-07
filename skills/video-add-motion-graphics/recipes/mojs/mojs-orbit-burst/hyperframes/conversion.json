@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "mojs-orbit-burst",
+  "surface": "mojs",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "1fd27993e0778af6b209ee766d3d21856bee14ba52e226239e5a875a05581082"
+}

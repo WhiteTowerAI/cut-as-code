@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-sunny-off-twotone-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "c86436d483add73d4ce4c1b741aa4fea58bc0a413f1535b96fac0e59dc8ad870",
+    "icon.svg": "f127b17aaaac5fc7f45c4d3ce0013433779060c750baef4d7780ba1ae61e8706",
+    "upstream-icon.json": "1c16b7b805e59f7d89511cd3581f13e96039d8ffab638d127cc78d1a444f42cb"
+  }
+}

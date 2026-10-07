@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-chat-alert-twotone-off",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "3a32c965506ee5e75a67c6f0891b8c4e4913b1209881901e626bedeb8abd0596",
+    "icon.svg": "e3475f54377ed38a5828197b32bf2bbd936a7d1c8e76ab0a56dc7e02efa97a84",
+    "upstream-icon.json": "0995f17f180a1ea83a621f8a28d938ccb0cd8a2d3661b68379c3fb190853004f"
+  }
+}

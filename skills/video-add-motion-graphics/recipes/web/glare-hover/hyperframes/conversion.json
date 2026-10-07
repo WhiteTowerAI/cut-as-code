@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "recipe_id": "glare-hover",
+  "surface": "web",
+  "runtime": [
+    "css",
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "fe91a5615c64f0adff92094908016f8a1c68519708744de15286d3676404f37f"
+}

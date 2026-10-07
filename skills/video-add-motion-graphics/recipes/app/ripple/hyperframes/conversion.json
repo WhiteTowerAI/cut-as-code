@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "recipe_id": "ripple",
+  "surface": "app",
+  "runtime": [
+    "css",
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "f0eba6ef82f99e140052787b950d5c60d63098c04a7d084612dbf1370d61f30c"
+}

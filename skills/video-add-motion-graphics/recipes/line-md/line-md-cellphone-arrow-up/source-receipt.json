@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-cellphone-arrow-up",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "063734910dcd6c5623a42150c6b3ce08b444302224f6be56d7f5280cb8f9e7ba",
+    "icon.svg": "f7ebc49644fcaecb4da1f404f898e469078c6d558af7b631018f98aa2abfd874",
+    "upstream-icon.json": "210de3bd24f108b57ceef06fc045da0f96580ed86606b32e3e541015c062b5e8"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-hazard-lights-off-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "5ff71390516e2f0cb0cbb9305282e8ea2ffbf6f5e8aca83237ebe9cc1e43aef0",
+    "icon.svg": "8d9bfc79e744c51271cfbe969806f6d4a6c0f759cd3a6f84c9a1287ce0a5bad7",
+    "upstream-icon.json": "e864cf4ddcf537a028dc67874f8db30ce156ff38f2d59b0510d454179c4e165d"
+  }
+}

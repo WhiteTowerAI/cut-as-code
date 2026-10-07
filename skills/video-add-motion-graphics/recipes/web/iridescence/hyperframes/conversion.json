@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "iridescence",
+  "surface": "web",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "81756ba1d106c544ec4912fe1037b09848ff2d0fa319f9543bdf3b9ec8bff8a7"
+}

@@ -1,0 +1,75 @@
+spec_version: 1
+id: "codrops-kinetictypepagetransition-index"
+name: "Kinetic Typography Page Transition"
+description: "Massive kinetic letterforms reshape a page-scale typographic transition."
+surfaces: [video]
+category: "fullscreen-typography"
+tech: [html, css, js]
+canvas: [video]
+target: [fullscreen]
+intent: "fullscreen-typography"
+runtime: [css, js]
+export: [skill, html]
+dependencies: []
+tags:
+  - "codrops"
+  - "kinetic-type"
+  - "typography"
+  - "letters"
+  - "transition"
+  - "opener"
+  - "fullscreen"
+intent_keywords:
+  - "kinetic typography opener"
+  - "large type transition"
+  - "experimental title card"
+  - "动态排版开场"
+  - "大字转场"
+best_for:
+  - "An opener, chapter, or interstitial for music, design, film-analysis, and youth-culture pieces"
+  - "A fullscreen title transition built around a concise high-impact phrase"
+avoid_when:
+  - "The cue requires calm narration, detailed copy, or sober institutional tone"
+  - "The title must share the frame with visible speaker footage"
+structural_roles:
+  - "opener"
+  - "chapter"
+  - "interstitial"
+motion_functions:
+  - "reveal"
+  - "transition"
+  - "build"
+visual_language:
+  - "typographic"
+  - "experimental"
+  - "editorial"
+mechanisms:
+  - "kinetic-type"
+  - "letter-scale"
+  - "page-transition"
+rhythm_energy: "high"
+information_density: "balanced"
+frame_relationship: "fullscreen"
+color_tendency: "flexible"
+style_rationale: "The reviewed orange page is dominated by giant moving letterforms, making the type itself the transition event."
+restraint:
+  max_per_view: 1
+  notes: "Use as one frame-dominant designed cutaway; adapt content, palette, typography, framing, and timing instead of running an unchanged source showcase."
+motion:
+  duration_ms: 6000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: "index/index.html"
+implementations:
+  - tech: js
+    files: ["index/index.html", "index/hf-recipe.js", "index/hf-adapter.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/codrops/KineticTypePageTransition/tree/ebe926e2f1de42950c36ff8a678321155280c1af"
+  attribution_required: true
+author:
+  name: "codrops"
+  url: "https://github.com/codrops"
+version: 0.1.0

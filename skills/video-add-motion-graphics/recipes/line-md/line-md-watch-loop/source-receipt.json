@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-watch-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "de8949f821a2ced43f4cab7e522d6c5a4856f0d2ab8e4a0ce0ef9e904c758b9b",
+    "icon.svg": "63313eedba58848af975b84f054e89181a1581a710cb31b80262db036bb5b458",
+    "upstream-icon.json": "1276ce284f57f3be226a07e56000f3309d6b191f46358e997998a3ce8c90370c"
+  }
+}

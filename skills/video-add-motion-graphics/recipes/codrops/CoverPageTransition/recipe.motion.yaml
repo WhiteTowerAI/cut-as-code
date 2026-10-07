@@ -1,0 +1,75 @@
+spec_version: 1
+id: "codrops-coverpagetransition-index"
+name: "How to Create a Cover Page Transition"
+description: "A bold cover image expands into a full editorial page."
+surfaces: [video]
+category: "fullscreen-transition"
+tech: [html, css, js]
+canvas: [video]
+target: [fullscreen]
+intent: "fullscreen-transition"
+runtime: [css, js]
+export: [skill, html]
+dependencies: []
+tags:
+  - "codrops"
+  - "cover"
+  - "reveal"
+  - "editorial"
+  - "fashion"
+  - "chapter"
+  - "fullscreen"
+intent_keywords:
+  - "editorial cover reveal"
+  - "fashion page transition"
+  - "magazine opener"
+  - "封面揭示"
+  - "杂志开场转场"
+best_for:
+  - "An opener, chapter, or interstitial in fashion, editorial, and culture videos"
+  - "A fullscreen reveal that introduces one title and one replaceable hero image"
+avoid_when:
+  - "The cue requires a quiet documentary cut or several competing messages"
+  - "The selected image contains a protected face that would be enlarged or cropped"
+structural_roles:
+  - "opener"
+  - "chapter"
+  - "interstitial"
+motion_functions:
+  - "reveal"
+  - "transition"
+  - "settle"
+visual_language:
+  - "editorial"
+  - "fashion"
+  - "typographic"
+mechanisms:
+  - "cover-reveal"
+  - "image-scale"
+  - "page-transition"
+rhythm_energy: "medium-high"
+information_density: "balanced"
+frame_relationship: "fullscreen"
+color_tendency: "image-led"
+style_rationale: "The reviewed red cover state opens into a magazine-like hero composition, a clear page-scale reveal rather than a sticker."
+restraint:
+  max_per_view: 1
+  notes: "Use as one frame-dominant designed cutaway; adapt content, palette, typography, framing, and timing instead of running an unchanged source showcase."
+motion:
+  duration_ms: 6000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: "index/index.html"
+implementations:
+  - tech: js
+    files: ["index/index.html", "index/hf-recipe.js", "index/hf-adapter.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/codrops/CoverPageTransition/tree/28b793b46454d4af382803d082e7e7009574248d"
+  attribution_required: true
+author:
+  name: "codrops"
+  url: "https://github.com/codrops"
+version: 0.1.0

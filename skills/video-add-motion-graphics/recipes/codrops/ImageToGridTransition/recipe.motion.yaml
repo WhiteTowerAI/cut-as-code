@@ -1,0 +1,74 @@
+spec_version: 1
+id: "codrops-imagetogridtransition-index"
+name: "Image To Grid Transition"
+description: "A hero image breaks into an editorial grid of image fragments."
+surfaces: [video]
+category: "fullscreen-transition"
+tech: [html, css, js]
+canvas: [video]
+target: [fullscreen]
+intent: "fullscreen-transition"
+runtime: [css, js]
+export: [skill, html]
+dependencies: []
+tags:
+  - "codrops"
+  - "images"
+  - "grid"
+  - "fragments"
+  - "fashion"
+  - "transition"
+  - "fullscreen"
+intent_keywords:
+  - "image to grid transition"
+  - "fashion photo montage"
+  - "editorial gallery break"
+  - "图片分裂网格"
+  - "时尚图片转场"
+best_for:
+  - "A chapter or interstitial for fashion films, visual essays, portfolios, and product stories"
+  - "A fullscreen handoff from one hero visual to a grid of related image crops"
+avoid_when:
+  - "The material has only one image or needs unbroken face readability"
+  - "The cue needs calm sparse composition or literal continuity"
+structural_roles:
+  - "chapter"
+  - "interstitial"
+motion_functions:
+  - "transition"
+  - "reveal"
+  - "build"
+visual_language:
+  - "editorial"
+  - "fashion"
+  - "geometric"
+mechanisms:
+  - "image-fragments"
+  - "grid"
+  - "scale"
+rhythm_energy: "medium-high"
+information_density: "dense"
+frame_relationship: "fullscreen"
+color_tendency: "image-led"
+style_rationale: "The contact-sheet image resolves from a dominant portrait into many small gallery tiles, which is inherently a full-frame editorial transition."
+restraint:
+  max_per_view: 1
+  notes: "Use as one frame-dominant designed cutaway; adapt content, palette, typography, framing, and timing instead of running an unchanged source showcase."
+motion:
+  duration_ms: 6000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: "index/index.html"
+implementations:
+  - tech: js
+    files: ["index/index.html", "index/hf-recipe.js", "index/hf-adapter.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/codrops/ImageToGridTransition/tree/8717fcf6322b9f6341655cbf08533e6ba3e44f01"
+  attribution_required: true
+author:
+  name: "codrops"
+  url: "https://github.com/codrops"
+version: 0.1.0

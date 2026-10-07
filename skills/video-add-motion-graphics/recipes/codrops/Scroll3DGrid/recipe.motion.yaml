@@ -1,0 +1,76 @@
+spec_version: 1
+id: "codrops-scroll3dgrid-index"
+name: "On-Scroll Perspective Grid Animations"
+description: "A sparse black title state briefly admits a small perspective image-card cluster from a corner before resolving to a near-empty link-like end state."
+surfaces: [video]
+category: "fullscreen-transition"
+tech: [html, css, js]
+canvas: [video]
+target: [fullscreen]
+intent: "fullscreen-transition"
+runtime: [css, js]
+export: [skill, html]
+dependencies: []
+tags:
+  - "codrops"
+  - "3d"
+  - "perspective"
+  - "corner-cards"
+  - "minimal"
+  - "transition"
+  - "fullscreen"
+intent_keywords:
+  - "sparse 3D title transition"
+  - "corner image card reveal"
+  - "minimal futuristic interstitial"
+  - "稀疏三维标题转场"
+  - "角落图片卡片揭示"
+best_for:
+  - "A brief interstitial or chapter handoff in technology, sci-fi, gaming, and minimalist visual essays"
+  - "A fullscreen transition that can move from one short dark title into a small corner-based image detail"
+avoid_when:
+  - "The cue needs sustained full-screen spectacle, a dense montage, or a stable hero image"
+  - "The video requires long readable copy, prominent captions, or literal continuous footage"
+structural_roles:
+  - "interstitial"
+  - "chapter"
+motion_functions:
+  - "reveal"
+  - "transition"
+  - "settle"
+visual_language:
+  - "futuristic"
+  - "minimal"
+  - "3d"
+  - "dark"
+mechanisms:
+  - "black-title-field"
+  - "corner-card-cluster"
+  - "perspective"
+  - "link-state"
+rhythm_energy: "medium"
+information_density: "sparse"
+frame_relationship: "fullscreen"
+color_tendency: "dark"
+style_rationale: "The reviewed start is a sparse black title state, the middle contains only a small perspective image-card cluster entering from a corner, and the end is near-empty with link-like fallback text; it is a brief sparse handoff, not a dense 3D card field."
+restraint:
+  max_per_view: 1
+  notes: "Use as one frame-dominant designed cutaway; adapt content, palette, typography, framing, and timing instead of running an unchanged source showcase."
+motion:
+  duration_ms: 8000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: "index/index.html"
+implementations:
+  - tech: js
+    files: ["index/index.html", "index/hf-recipe.js", "index/hf-adapter.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/codrops/Scroll3DGrid/tree/69718a2eff87b32ab19764b3a6d7b3773dab6af3"
+  attribution_required: true
+author:
+  name: "codrops"
+  url: "https://github.com/codrops"
+version: 0.1.0

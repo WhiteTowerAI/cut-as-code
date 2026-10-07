@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-chat-round-off",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "50bbf04152879da01641c1e6251daedc086b90e50c46484b5678db978f1c2b70",
+    "icon.svg": "43099c373b5e7ae359636c2dd606eb53218da16a1fa061e8ce9382c56d64dd2e",
+    "upstream-icon.json": "5ed0a7c7c77e12c704d7cd5997af7e7163b264aa58a24e0038acc800280ef7aa"
+  }
+}

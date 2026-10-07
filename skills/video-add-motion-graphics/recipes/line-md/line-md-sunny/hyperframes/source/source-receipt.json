@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-sunny",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "603d76cbe15704f70d12445b34c0a0f193af7b22e7d735a516c7ac0f1f203f96",
+    "icon.svg": "5a614cfb1588266a0055083052f75b5f62ac14e5939853bcd8adfe8a0044ee00",
+    "upstream-icon.json": "5f0e40e49c4762db95d3441bcb3691c6f9f2562d57a53b94adf37fb7ec15d66e"
+  }
+}

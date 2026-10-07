@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-sunny-off-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "47d01644dcec2af796704fc3f29fc50755110c7183377479d947cf8ca13b49d7",
+    "icon.svg": "3c36886bd7100bdf153e8a4dcbe948911128507468b7048dcf34a2d40a9ba690",
+    "upstream-icon.json": "4c877f817620be807bd503b61ef46b10e5ed8ca6af8c6e30469c86f48c2bd5b8"
+  }
+}

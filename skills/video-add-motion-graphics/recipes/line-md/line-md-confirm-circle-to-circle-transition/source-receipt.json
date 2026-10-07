@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-confirm-circle-to-circle-transition",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "9712182be2a53759d34650e264da2392198325633e8ab763f9d3854f99fbb1b2",
+    "icon.svg": "38faa8b052180f9ab9cb453b153cba7c174f501299dabb34334886024e11aabc",
+    "upstream-icon.json": "d3ab7e20c9849e7213a8837e5f6fbc2197b6dc2cc74760be5a039c02ff31e30c"
+  }
+}

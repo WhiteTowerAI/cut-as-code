@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-watch-off",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "56f4eb8b7c3122af934db1d28492dfc3ac658724500bb8bb318a255d6c72c378",
+    "icon.svg": "2aef97b1bd504852832b1752ca67f5b6e53e5913030aeb7d06d82c3133f0066d",
+    "upstream-icon.json": "8193ee5da4fb2f412515e763626274f099b915e382e5d4d8b595a1d03a3903b3"
+  }
+}

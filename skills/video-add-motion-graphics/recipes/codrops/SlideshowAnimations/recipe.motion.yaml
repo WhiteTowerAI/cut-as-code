@@ -1,0 +1,76 @@
+spec_version: 1
+id: "codrops-slideshowanimations-index"
+name: "Some Ideas for Fullscreen Image Slideshow Animations"
+description: "Sculptural objects transform through polished cinematic slideshow states."
+surfaces: [video]
+category: "fullscreen-chapter"
+tech: [html, css, js]
+canvas: [video]
+target: [fullscreen]
+intent: "fullscreen-chapter"
+runtime: [css, js]
+export: [skill, html]
+dependencies: []
+tags:
+  - "codrops"
+  - "slideshow"
+  - "objects"
+  - "cinematic"
+  - "minimal"
+  - "opener"
+  - "fullscreen"
+intent_keywords:
+  - "sculptural slideshow opener"
+  - "cinematic object transition"
+  - "minimal art chapter"
+  - "雕塑幻灯片开场"
+  - "电影感物件转场"
+best_for:
+  - "An opener, chapter, interstitial, or outro for design, architecture, product, and art-film content"
+  - "A fullscreen visual beat built from a single styled object or product silhouette"
+avoid_when:
+  - "The cue requires people, documentary realism, or high information density"
+  - "The production cannot supply an object or graphic material with the same art-directed tone"
+structural_roles:
+  - "opener"
+  - "chapter"
+  - "interstitial"
+  - "outro"
+motion_functions:
+  - "transition"
+  - "build"
+  - "settle"
+visual_language:
+  - "cinematic"
+  - "minimal"
+  - "artful"
+mechanisms:
+  - "object-slideshow"
+  - "3d-objects"
+  - "lighting"
+rhythm_energy: "medium"
+information_density: "sparse"
+frame_relationship: "fullscreen"
+color_tendency: "dark"
+style_rationale: "The reviewed frames present isolated rocks and sculptural forms under controlled lighting, producing a slow art-film sequence with strong settle poses."
+restraint:
+  max_per_view: 1
+  notes: "Use as one frame-dominant designed cutaway; adapt content, palette, typography, framing, and timing instead of running an unchanged source showcase."
+motion:
+  duration_ms: 6000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: "index/index.html"
+implementations:
+  - tech: js
+    files: ["index/index.html", "index/hf-recipe.js", "index/hf-adapter.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/codrops/SlideshowAnimations/tree/8f9ee4001e0c786ec617f7f729272c4d5a0830a2"
+  attribution_required: true
+author:
+  name: "codrops"
+  url: "https://github.com/codrops"
+version: 0.1.0

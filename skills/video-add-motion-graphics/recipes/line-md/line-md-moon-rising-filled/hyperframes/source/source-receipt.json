@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-moon-rising-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "53b583462202fa0312b823f7b3fcf6521f48caefdaa532571a1a05724cbc95bd",
+    "icon.svg": "3080e2fc37fd8080beb634cf220570d45edf432a86066d6fe556e80d439bcf00",
+    "upstream-icon.json": "9bf5ffce0a473602ba7299878a3508307704501a5390d98b1cfb5536ccdf1fa6"
+  }
+}

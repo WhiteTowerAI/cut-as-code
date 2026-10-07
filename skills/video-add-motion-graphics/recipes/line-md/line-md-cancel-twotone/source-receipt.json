@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-cancel-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "b72718ea976fb70e8d6d449a406d801ac974ca4792261fde348721235e23fe7e",
+    "icon.svg": "24a20a0cd1fb1fbd485a2dfe4883f2946d580179c82067757cb46e3c5f15ea60",
+    "upstream-icon.json": "202606adb312012e20706b44fee2e93cda623c31d0d1ae02b9b9e6a59704888a"
+  }
+}

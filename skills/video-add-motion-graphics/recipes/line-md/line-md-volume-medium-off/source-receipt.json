@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-volume-medium-off",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "b7f637ff8deb50d89b5aaac57e084f6d0fff3fd220154ed6b6b02601d0e23711",
+    "icon.svg": "9c348e9119ca0428564b42cc922e4dc0c263aecc614adf28f56f68824819da3e",
+    "upstream-icon.json": "6792c8dea9005b0deeac1d296dd29adbb0903cc32905fbfc0ba92d3481a7c351"
+  }
+}

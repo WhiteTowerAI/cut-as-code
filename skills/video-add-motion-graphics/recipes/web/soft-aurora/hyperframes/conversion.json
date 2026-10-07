@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "soft-aurora",
+  "surface": "web",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "56a12c9ae4596b15b1539aa6482f68d5ef1a4f4796010e4a213b03065f4a42ca"
+}

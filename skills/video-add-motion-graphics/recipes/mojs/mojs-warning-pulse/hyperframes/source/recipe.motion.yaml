@@ -1,0 +1,58 @@
+spec_version: 1
+id: mojs-warning-pulse
+name: "Warning Triangle Pulse"
+description: "Urgent triangular particles pulsing around a warning point."
+surfaces: [video]
+category: sticker-warning
+tech: [js]
+canvas: [video]
+target: [overlay]
+intent: sticker-warning
+runtime: ["js"]
+export: [skill, html]
+dependencies: []
+tags: ["warning", "triangle", "pulse", "urgent", "caution", "reveal", "compact"]
+intent_keywords:
+  - "warning pulse"
+  - "danger triangle"
+  - "warning"
+  - "danger"
+  - "risk"
+  - "hazard"
+  - "urgent"
+  - "critical"
+  - "problem"
+  - "caution"
+  - "警告脉冲"
+  - "危险三角"
+  - "警告"
+  - "危险"
+  - "风险"
+  - "隐患"
+best_for:
+  - "A spoken reference to warning pulse needs a compact, immediately recognizable cue"
+  - "The spoken point identifies a real risk, failure, hazard, or urgent exception"
+avoid_when:
+  - "The spoken meaning does not refer to warning pulse or a close synonym"
+  - "The message is neutral, routine, positive, or too speculative to justify alarm"
+restraint:
+  max_per_view: 1
+  notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."
+motion:
+  duration_ms: 6000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: preview.html
+implementations:
+  - tech: js
+    files: ["vendor.js", "effect.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt placement, scale, palette, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/mojs/mojs/blob/0a9cf9a87dd5637e6fa770755e79048489bcf817/dist/mo.umd.js"
+  attribution_required: true
+author:
+  name: "Oleg Solomka and mo.js contributors"
+  url: "https://github.com/mojs/mojs"
+version: 1.7.1

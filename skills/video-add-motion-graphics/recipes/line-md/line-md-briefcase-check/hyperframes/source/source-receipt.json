@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-briefcase-check",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "2a920215c95c1eb20f104e000b8675670adcf40f03119e52fb14f8c89ca8fcd6",
+    "icon.svg": "c73e9ab73ef4d855cc656d59b5f58633576f61d4b13cbd4dd7c8e7b461263d10",
+    "upstream-icon.json": "dc6ef5dc2e3c523e14337e0668c43750d1152cf5e0df0a2e0374bcd5962f4bae"
+  }
+}

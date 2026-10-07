@@ -2,7 +2,7 @@
 name: cut-as-code
 description: >
   Use when any cut-as-code request involves understanding, cutting, color grading,
-  adding B-roll, graphic motion, content cards, captions, creating shorts,
+  adding B-roll, motion graphics, content cards, captions, creating shorts,
   comparing, rendering, or resuming a Project Protocol V1 video project.
 ---
 
@@ -42,7 +42,7 @@ Match the requested output, not a keyword mentioned in passing.
 | Tighten, shorten, remove weak sections, or create a first/rough cut | `/video-cut` after `/video-understand` |
 | Correct color, create/select a look, or deliver/apply a LUT | `/video-color-grade`; use its standalone path only when the user explicitly wants no Project Protocol delivery |
 | Add transcript-timed visual cutaways | `/video-add-b-roll` after `/video-understand` |
-| Add sourced motion graphics or animated semantic overlays | `/video-add-graphic-motion` after `/video-understand` |
+| Add sourced motion graphics or animated semantic overlays | `/video-add-motion-graphics` after `/video-understand` |
 | Add titles, lower-thirds, statistics, quotes, chapters, or calls to action | `/video-add-content-cards` after `/video-understand` |
 | Add subtitles, captions, or karaoke captions | `/video-add-captions` after `/video-understand` |
 | Compare the original with actual final pixels in source time | `/video-edit-compare` after the verified main delivery exists |
@@ -61,7 +61,7 @@ default package. Run the shared understanding prerequisite once. Execute selecte
 main-sequence operations in canonical order:
 
 ```text
-cut -> color-grade -> b-roll -> captions -> content-cards -> graphic-motion
+cut -> color-grade -> b-roll -> captions -> content-cards -> motion-graphics
 ```
 
 For a request that includes Shorts, content cards, or captions, use this staged flow:
@@ -71,7 +71,7 @@ For a request that includes Shorts, content cards, or captions, use this staged 
 -> /video-to-shorts plan and candidate review only
 -> /video-add-captions
 -> /video-add-content-cards
--> /video-add-graphic-motion
+-> /video-add-motion-graphics
 -> compile and render the shared main delivery once
 -> /video-to-shorts finalize and extract approved derivatives
 ```
@@ -79,10 +79,10 @@ For a request that includes Shorts, content cards, or captions, use this staged 
 Complete any requested timeline-changing operation, such as `/video-cut`, before
 Shorts planning; a changed `work/timeline.json` invalidates candidate approval.
 Shorts planning writes shared plan/review state and must not create `final.mp4` or
-anything under `final/shorts/`. Captions, content cards, and graphic motion then add
+anything under `final/shorts/`. Captions, content cards, and motion graphics then add
 their own shared plans and overlay contributions in that relative order. The same
 order applies when only any pair is selected: captions first, content cards second,
-graphic motion last. Re-read `work/project.json` before each handoff. Do not
+motion graphics last. Re-read `work/project.json` before each handoff. Do not
 run leaf skills concurrently when they can write `work/project.json`,
 `work/timeline.json`, an operation plan, or shared render artifacts. Build and render
 the main delivery once, after all selected active operations validate. Run
@@ -90,7 +90,7 @@ the main delivery once, after all selected active operations validate. Run
 `/video-to-shorts` against that verified delivery; shorts remain outside
 `sequences.main.operations`.
 
-For `/video-add-content-cards` and `/video-add-graphic-motion`, reserve the visible face
+For `/video-add-content-cards` and `/video-add-motion-graphics`, reserve the visible face
 and head silhouette of every primary or foreground person, speaker, presenter, interviewee,
 or semantically important person for the complete cue. Incidental background-only people
 who are not a narrative or visual focus are exempt; protect uncertain cases. If an overlay

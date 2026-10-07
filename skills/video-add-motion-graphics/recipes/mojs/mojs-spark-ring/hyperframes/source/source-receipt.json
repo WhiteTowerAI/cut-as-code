@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "mojs-spark-ring",
+  "source_id": "mojs",
+  "upstream_asset": "dist/mo.umd.js",
+  "source_files": {
+    "preview.html": "7522c97f472e0a3b7faf7cfe86236a59988d4632c3f5ad9bbd6923f99f3f6a72",
+    "vendor.js": "363d5349e8ecf9395294e50d72e379dad5bfd7c061e2880ceeb6cb65bfa0a852",
+    "effect.js": "8d69c00b4293380e69f2ea0e383f75b57ce7381bbdccee70ff1e8144f227a07c"
+  }
+}

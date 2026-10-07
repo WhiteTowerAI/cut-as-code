@@ -1,0 +1,58 @@
+spec_version: 1
+id: line-md-arrow-left
+name: "Arrow Left"
+description: "A compact arrow left icon uses draw-in motion to illustrate direction, location, movement, or progression through steps."
+surfaces: [video]
+category: sticker-navigation
+tech: [svg]
+canvas: [video]
+target: [overlay]
+intent: sticker-navigation
+runtime: ["svg-smil"]
+export: [skill, html]
+dependencies: []
+tags: ["arrow", "left", "draw-in", "navigation", "direction", "movement", "compact"]
+intent_keywords:
+  - "arrow left"
+  - "arrow left icon"
+  - "arrow left symbol"
+  - "next"
+  - "previous"
+  - "back"
+  - "location"
+  - "left"
+  - "scroll"
+  - "direction"
+  - "箭头"
+  - "下一步"
+  - "返回"
+  - "向左"
+  - "向下滚动"
+  - "位置"
+best_for:
+  - "A spoken reference to arrow left needs a compact, immediately recognizable cue"
+  - "The narration points to a direction, destination, location, or next step"
+avoid_when:
+  - "The spoken meaning does not refer to arrow left or a close synonym"
+  - "No spatial or sequential relationship needs to be communicated"
+restraint:
+  max_per_view: 1
+  notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."
+motion:
+  duration_ms: 6000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: preview.html
+implementations:
+  - tech: svg-smil
+    files: ["icon.svg", "upstream-icon.json"]
+    usage: "Materialize the converted HyperFrames directory, then adapt placement, scale, palette, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/cyberalien/line-md/blob/2ed22555cee9c1e50d4269865681d01ee8cffd7c/line-md.json"
+  attribution_required: true
+author:
+  name: "Vjacheslav Trushkin"
+  url: "https://github.com/cyberalien/line-md"
+version: 3.0.5

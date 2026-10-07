@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-coffee",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "00c7a18907ba946792fb92842e7f7d1971efe59d20f8cbf18e3d919aafeccd7a",
+    "icon.svg": "c7b2f19021a52843c656d7bbad87bdfc10e369b880a7a8dab8a1ca3bbd4dd72c",
+    "upstream-icon.json": "3989c12efbe58ae04332e9f2266ce5cf6edc5f58f31a7fe4aa7f948b7805740c"
+  }
+}

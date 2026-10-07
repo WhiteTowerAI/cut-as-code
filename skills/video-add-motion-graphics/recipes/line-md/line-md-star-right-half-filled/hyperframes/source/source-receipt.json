@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-star-right-half-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "b1f619b171ee9f67bf0a808cf93fbb010db8529a3e1aadd41b03f13a600e87de",
+    "icon.svg": "4f7775b0b915114c869d1f3c2c0d78d41e611d7bbdb2815032db3d9766d49048",
+    "upstream-icon.json": "d99be21678eb1615c09dc08b40dff916a604800371f1edf06a6a5836b0de36ec"
+  }
+}

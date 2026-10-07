@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-hazard-lights-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "adfd4597c29c2a16e6a6130240dda89e34a5d181e0cdc43d410d4d3f1323c5db",
+    "icon.svg": "1f806bc62c71369884e843c31de0adc3f30a30fda5a4436cd68056633d79c216",
+    "upstream-icon.json": "fbc99c0e01f41ad2337c519ae6f8f964bd9795ddffef305080e62f3508400d71"
+  }
+}

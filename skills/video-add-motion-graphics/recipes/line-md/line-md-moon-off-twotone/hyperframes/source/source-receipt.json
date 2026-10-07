@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-moon-off-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "e11f5efbfbc756eb9731b2f0321c5f318deb623d55a3e173af2a77fe7d31a6fd",
+    "icon.svg": "1a96e73c8f397fa0e52b5c3515677e870bbc6a94bdf13b6454382d183d7a152b",
+    "upstream-icon.json": "6979955402b9419e070a4adb891af9dfa8de725aa0bb98c136838e08c83c97f7"
+  }
+}

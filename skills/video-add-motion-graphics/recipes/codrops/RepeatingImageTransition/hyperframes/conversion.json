@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "project_id": "RepeatingImageTransition",
+  "demo_url": "https://tympanus.net/Development/RepeatingImageTransition",
+  "article_url": "https://tympanus.net/codrops/2025/04/28/animating-in-frames-repeating-image-transition/",
+  "source_url": "https://github.com/codrops/RepeatingImageTransition/",
+  "source_commit": "354c58487ad6a8b728e35b34d6666fca72e9b4eb",
+  "license": {
+    "type": "MIT",
+    "evidence": "repository-file",
+    "file": "LICENSE",
+    "sha256": "a5ad4d98a7970bd09ba775c7e237fb93c60139f8e0e261ebb470e580b213c226"
+  },
+  "source_copy": "source",
+  "variants": [
+    {
+      "name": "index",
+      "composition_id": "codrops-repeatingimagetransition-index",
+      "source_entry": "index.html",
+      "runtime_entry": "index.html",
+      "source_sha256": "d4f97560e0ec9b1a4390138e7b8af660f0a5278389262a832da46ea10a838fd3",
+      "runtime_sha256": "d4f97560e0ec9b1a4390138e7b8af660f0a5278389262a832da46ea10a838fd3",
+      "duration_s": 6,
+      "interaction": {
+        "mode": "transition",
+        "duration": 6,
+        "actions": [
+          {
+            "at": 0.8,
+            "type": "click",
+            "selector": ".grid__item"
+          }
+        ]
+      },
+      "output": "index/index.html"
+    }
+  ]
+}

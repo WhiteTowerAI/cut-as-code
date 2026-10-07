@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-moon-simple",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "91329bd94dc9a4f2ab744be860e166c5006a52c25c4da2ec547c624c3c2db0e6",
+    "icon.svg": "bbb90b9831ed5716d252cfe4d837b22dcff1e5f9a260fcabba8273866f3930a4",
+    "upstream-icon.json": "a591c7e9f922529faa7c90d12ac80517519c686f73166871d31fac479b4e8344"
+  }
+}

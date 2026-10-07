@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "shiny-text",
+  "surface": "web",
+  "runtime": [
+    "css"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "css",
+  "source_manifest_sha256": "037cc8f7772b55c44a19751ad5ff30308acdb6d618c25e3873af5d5b23d630f6"
+}

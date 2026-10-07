@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-chevron-down-square-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "b8fdb08c510c76296c7167353980b221b3d65dd9fdafa25c5260c5b9df830353",
+    "icon.svg": "ff7dd3a172e5d4404518d8df0b9c1adcf1756efa61619c098d3da9ed564bbbc4",
+    "upstream-icon.json": "ef12c78ad5fe5ac4812591f467f53bad5abd65efc9131dcf2cc3b7c1f734c5d0"
+  }
+}

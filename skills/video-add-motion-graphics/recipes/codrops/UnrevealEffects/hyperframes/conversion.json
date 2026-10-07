@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "project_id": "UnrevealEffects",
+  "demo_url": "http://tympanus.net/Development/UnrevealEffects/",
+  "article_url": "https://tympanus.net/codrops/2022/11/01/unreveal-effects-for-content-previews/",
+  "source_url": "https://github.com/codrops/UnrevealEffects/",
+  "source_commit": "3459952fc60fc3c4d9fb3f6dbf9e19097659bfa8",
+  "license": {
+    "type": "MIT",
+    "evidence": "repository-file",
+    "file": "LICENSE",
+    "sha256": "1f6db3d0b162eaa534ff5585db684f00c41f776325f7fd11ebf9373650099ce1"
+  },
+  "source_copy": "source",
+  "variants": [
+    {
+      "name": "index",
+      "composition_id": "codrops-unrevealeffects-index",
+      "source_entry": "src/index.html",
+      "runtime_entry": "dist/index.html",
+      "source_sha256": "95b0c6e400111919c1ac7e698ffc750de6632b2f82c5b232ef8e72da3e936ab1",
+      "runtime_sha256": "dbab2b0c9cecc86f04d31311debf21c6d28c30e67eafb2bf953cfef1adce5b9d",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "pointer",
+        "duration": 8,
+        "actions": [
+          {
+            "at": 2.4,
+            "type": "click",
+            "selector": ".content__item-img-wrap"
+          }
+        ]
+      },
+      "output": "index/index.html"
+    },
+    {
+      "name": "index2",
+      "composition_id": "codrops-unrevealeffects-index2",
+      "source_entry": "src/index2.html",
+      "runtime_entry": "dist/index2.html",
+      "source_sha256": "307319e2e8c6a54138b07493f8efa4e605f6c9e6572ff701dfbc2500df4b4443",
+      "runtime_sha256": "1ee242c3523b3b5b58f39cffe4a7c0c640d7d1943f420f5071f661287aa1b2c6",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "pointer",
+        "duration": 8,
+        "actions": [
+          {
+            "at": 2.4,
+            "type": "click",
+            "selector": ".content__item-img-wrap"
+          }
+        ]
+      },
+      "output": "index2/index.html"
+    },
+    {
+      "name": "index3",
+      "composition_id": "codrops-unrevealeffects-index3",
+      "source_entry": "src/index3.html",
+      "runtime_entry": "dist/index3.html",
+      "source_sha256": "9f98888e34e59f9b6489a19e030aa9adc6ac45558a42f36599c0e3144211f462",
+      "runtime_sha256": "ca06962dae6c1b1ecd5a7bfcb67d4d523071e87c4ffe7f54eb6c99bd9af7c34e",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "pointer",
+        "duration": 8,
+        "actions": [
+          {
+            "at": 2.4,
+            "type": "click",
+            "selector": ".content__item-img-wrap"
+          }
+        ]
+      },
+      "output": "index3/index.html"
+    }
+  ]
+}

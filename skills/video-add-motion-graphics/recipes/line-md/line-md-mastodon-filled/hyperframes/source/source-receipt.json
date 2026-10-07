@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-mastodon-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "ef2dbf72fce681703a1c362450a30e18b0cfd606d9ce4c3325111c0b3297b1f0",
+    "icon.svg": "6c07bd05228cd55f2e8ffad916226dcc54f768ae9feaf07339f0fccbf87c4065",
+    "upstream-icon.json": "de8abf82e792866a2a733015283e6be519b2238fe1e5993adea750fd2826f5ef"
+  }
+}

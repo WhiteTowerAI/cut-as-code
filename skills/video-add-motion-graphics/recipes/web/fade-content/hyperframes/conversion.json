@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "recipe_id": "fade-content",
+  "surface": "web",
+  "runtime": [
+    "css",
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "0fddb1184a2df36699aa9bf2a8eeac190506a058c32327a152bbe8b1a1bd9041"
+}

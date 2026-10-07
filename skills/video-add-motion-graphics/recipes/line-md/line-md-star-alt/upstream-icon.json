@@ -1,0 +1,5 @@
+{
+  "prefix": "line-md",
+  "name": "star-alt",
+  "body": "<path d=\"M12 3l2.35 5.76l6.21 0.46l-4.76 4.02l1.49 6.04l-5.29 -3.28l-5.29 3.28l1.49 -6.04l-4.76 -4.02l6.21 -0.46Z\" stroke=\"currentColor\" fill=\"none\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-dasharray=\"66\"><animate attributeName=\"stroke-dashoffset\" dur=\"0.6s\" fill=\"freeze\" values=\"66;0\"/></path>"
+}

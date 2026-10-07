@@ -1,0 +1,58 @@
+spec_version: 1
+id: line-md-moon-twotone
+name: "Moon Reveal (Twotone)"
+description: "A compact moon icon uses draw-in, fade, looping motion to illustrate literal weather, a forecast, climate, or an environmental condition."
+surfaces: [video]
+category: sticker-weather
+tech: [svg]
+canvas: [video]
+target: [overlay]
+intent: sticker-weather
+runtime: ["svg-smil"]
+export: [skill, html]
+dependencies: []
+tags: ["moon", "draw-in", "fade", "looping", "weather", "forecast", "environment", "compact", "twotone"]
+intent_keywords:
+  - "moon"
+  - "moon icon"
+  - "moon symbol"
+  - "thunderstorm forecast"
+  - "rain"
+  - "sunny weather"
+  - "snow"
+  - "clear night"
+  - "weather"
+  - "sky"
+  - "月亮"
+  - "雷暴天气预报"
+  - "下大雨"
+  - "晴朗天气"
+  - "下雪"
+  - "晴朗夜空"
+best_for:
+  - "A spoken reference to moon needs a compact, immediately recognizable cue"
+  - "The speaker literally refers to current weather, a forecast, or an environmental condition"
+avoid_when:
+  - "The spoken meaning does not refer to moon or a close synonym"
+  - "Weather language is metaphorical, such as a storm of criticism or a sunny outlook"
+restraint:
+  max_per_view: 1
+  notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."
+motion:
+  duration_ms: 6000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: preview.html
+implementations:
+  - tech: svg-smil
+    files: ["icon.svg", "upstream-icon.json"]
+    usage: "Materialize the converted HyperFrames directory, then adapt placement, scale, palette, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/cyberalien/line-md/blob/2ed22555cee9c1e50d4269865681d01ee8cffd7c/line-md.json"
+  attribution_required: true
+author:
+  name: "Vjacheslav Trushkin"
+  url: "https://github.com/cyberalien/line-md"
+version: 3.0.5

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-plus-square-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "0b463aa264cbc52d4f68f0b0791883673f61bb8bdc5b187e1b756074b226e877",
+    "icon.svg": "6e72e33e50f3d45bfee13a23b0764abc602d0683435934d7f4102358bb23592a",
+    "upstream-icon.json": "313a552dd3e5bc41494a1ecb3fb2babc816fcb3288f0f6fcc8f8e9c2d1cd4444"
+  }
+}

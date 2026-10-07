@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-speed-twotone-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "cf4d6a43961cb949109f79d51b6e3d376ccfae2b85b1463f687ccf42b6eb2b73",
+    "icon.svg": "b8c1c4bd2426e556585af0f45b56cac1cf1b2923fcc273eab3dc57b2fc1c19fe",
+    "upstream-icon.json": "a5289081b4f633b54545c51a47cfd388c259dd4f96ce89e88a00b145ac14f5dd"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-cloud-alt-print-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "a55f279378144348e22fa81f33ac12367c8d7f574bfcfc8fd0352b3f96ed7538",
+    "icon.svg": "538b8818267c6e84f2e1a3067285adb329b0e90156160a48f8af1037cb616981",
+    "upstream-icon.json": "dd6f460581407d9a20cd8719271baa20ae1a00b25eaf07869355840dd7d88900"
+  }
+}

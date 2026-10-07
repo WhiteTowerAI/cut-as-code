@@ -1,0 +1,53 @@
+spec_version: 1
+id: line-md-square-twotone-to-confirm-square-transition
+name: "Square Twotone To Confirm Square Transition"
+description: "A compact square twotone to confirm square transition icon uses draw-in motion to illustrate completion, approval, confirmation, or a verified successful result."
+surfaces: [video]
+category: sticker-success
+tech: [svg]
+canvas: [video]
+target: [overlay]
+intent: sticker-success
+runtime: ["svg-smil"]
+export: [skill, html]
+dependencies: []
+tags: ["square", "to", "confirm", "transition", "draw-in", "twotone", "success", "confirmation"]
+intent_keywords:
+  - "square twotone to confirm square transition"
+  - "square twotone to confirm square transition icon"
+  - "square twotone to confirm square transition symbol"
+  - "square twotone to confirm square transition animation"
+  - "square twotone to confirm square transition visual cue"
+  - "show square twotone to confirm square transition"
+  - "animated square twotone to confirm square transition"
+  - "确认"
+  - "确认图标"
+  - "确认动画"
+  - "确认提示"
+best_for:
+  - "A spoken reference to square twotone to confirm square transition needs a compact, immediately recognizable cue"
+  - "A task, verification, transaction, or decision has clearly succeeded"
+avoid_when:
+  - "The spoken meaning does not refer to square twotone to confirm square transition or a close synonym"
+  - "The outcome is still pending, uncertain, failed, or merely being discussed"
+restraint:
+  max_per_view: 1
+  notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."
+motion:
+  duration_ms: 6000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: preview.html
+implementations:
+  - tech: svg-smil
+    files: ["icon.svg", "upstream-icon.json"]
+    usage: "Materialize the converted HyperFrames directory, then adapt placement, scale, palette, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/cyberalien/line-md/blob/2ed22555cee9c1e50d4269865681d01ee8cffd7c/line-md.json"
+  attribution_required: true
+author:
+  name: "Vjacheslav Trushkin"
+  url: "https://github.com/cyberalien/line-md"
+version: 3.0.5

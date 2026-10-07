@@ -1,0 +1,7 @@
+#!/usr/bin/env node
+'use strict'
+
+require('./launcher.cjs').main().then(
+  (message) => process.stdout.write(`${message}\n`),
+  (error) => { process.stderr.write(`${error.message}\n`); process.exitCode = 1 },
+)

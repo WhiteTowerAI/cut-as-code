@@ -25,7 +25,7 @@ Require `ffmpeg` on PATH, Python, and Node.js >= 22 (for `npx hyperframes`, fetc
 
 The skill is valid without a cut or color grade. When captions are active, run them first,
 depend on their current revision, and treat their occupied region as a hard exclusion zone.
-Content cards must precede graphic motion whenever both are active. These relative rules apply
+Content cards must precede motion graphics whenever both are active. These relative rules apply
 to every selected pair. Declare only dependencies actually consumed and record their current
 revisions in `based_on`.
 
@@ -350,7 +350,7 @@ render contribution with its program-time window. A single full-length sparse ov
 valid only when it is demonstrably smaller or required by the composition.
 
 Record this operation contribution in `project.json`. Insert `content-cards` after
-`captions` and before `graphic-motion`; include `captions` in `depends_on`/`based_on`
+`captions` and before `motion-graphics`; include `captions` in `depends_on`/`based_on`
 when it is active:
 
 ```json

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-play-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "8a8557bacc839256aff7588f7637dfce171cd88eb4f1bd38533c994a284bac48",
+    "icon.svg": "7ea14c4051ce1604d33bc795410fd1fc2f0beee0c0818362e050f45448d07e32",
+    "upstream-icon.json": "2c5346d5ca26a7fe12e162cd5b01d53778d2be539ce129cf3fe33ed3969c4659"
+  }
+}

@@ -1,0 +1,74 @@
+spec_version: 1
+id: "codrops-linestolayout-index"
+name: "Lines to Content Layout Animation"
+description: "Fine lines resolve into a spare editorial image-and-type layout."
+surfaces: [video]
+category: "fullscreen-chapter"
+tech: [html, css, js]
+canvas: [video]
+target: [fullscreen]
+intent: "fullscreen-chapter"
+runtime: [css, js]
+export: [skill, html]
+dependencies: []
+tags:
+  - "codrops"
+  - "lines"
+  - "layout"
+  - "minimal"
+  - "editorial"
+  - "chapter"
+  - "fullscreen"
+intent_keywords:
+  - "minimal layout reveal"
+  - "editorial lines animation"
+  - "quiet chapter card"
+  - "极简布局揭示"
+  - "编辑感章节卡"
+best_for:
+  - "A chapter or interstitial in architecture, luxury, design, and reflective essay videos"
+  - "A fullscreen quiet build from lines into one image and a small amount of copy"
+avoid_when:
+  - "The cue needs high energy, fast pacing, or loud visual effects"
+  - "The source material cannot be reduced to a calm single-image layout"
+structural_roles:
+  - "chapter"
+  - "interstitial"
+motion_functions:
+  - "build"
+  - "reveal"
+  - "settle"
+visual_language:
+  - "minimal"
+  - "editorial"
+  - "typographic"
+mechanisms:
+  - "lines"
+  - "layout-build"
+  - "image-panel"
+rhythm_energy: "calm"
+information_density: "sparse"
+frame_relationship: "fullscreen"
+color_tendency: "light"
+style_rationale: "The reviewed pale editorial page uses discreet lines and an image panel to form a measured, highly legible section composition."
+restraint:
+  max_per_view: 1
+  notes: "Use as one frame-dominant designed cutaway; adapt content, palette, typography, framing, and timing instead of running an unchanged source showcase."
+motion:
+  duration_ms: 6000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: "index/index.html"
+implementations:
+  - tech: js
+    files: ["index/index.html", "index/hf-recipe.js", "index/hf-adapter.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/codrops/LinesToLayout/tree/d4071daba81d188165be6b6254bfc6c28c21ef3a"
+  attribution_required: true
+author:
+  name: "codrops"
+  url: "https://github.com/codrops"
+version: 0.1.0

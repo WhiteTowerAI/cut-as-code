@@ -1,0 +1,75 @@
+spec_version: 1
+id: "codrops-textblocktransitions-index"
+name: "Inspiration for Text Block Transitions"
+description: "Large text blocks progress through clean editorial page transitions."
+surfaces: [video]
+category: "fullscreen-typography"
+tech: [html, css, js]
+canvas: [video]
+target: [fullscreen]
+intent: "fullscreen-typography"
+runtime: [css, js]
+export: [skill, html]
+dependencies: []
+tags:
+  - "codrops"
+  - "text"
+  - "blocks"
+  - "editorial"
+  - "minimal"
+  - "chapter"
+  - "fullscreen"
+intent_keywords:
+  - "text block transition"
+  - "editorial chapter typography"
+  - "article page motion"
+  - "文字块转场"
+  - "文章排版章节"
+best_for:
+  - "A chapter, interstitial, or outro in literary essays, documentaries, educational videos, and editorial storytelling"
+  - "A fullscreen statement using one short edited block of readable copy"
+avoid_when:
+  - "The cue needs rapid spectacle, small-screen dense reading, or image-led emotion"
+  - "The message cannot be reduced to a concise paragraph or sentence"
+structural_roles:
+  - "chapter"
+  - "interstitial"
+  - "outro"
+motion_functions:
+  - "transition"
+  - "reveal"
+  - "settle"
+visual_language:
+  - "typographic"
+  - "editorial"
+  - "minimal"
+mechanisms:
+  - "text-blocks"
+  - "page-transition"
+  - "scroll"
+rhythm_energy: "calm"
+information_density: "dense"
+frame_relationship: "fullscreen"
+color_tendency: "light"
+style_rationale: "The reviewed white-page states are built from large readable text blocks and generous margins, matching an article-like section transition."
+restraint:
+  max_per_view: 1
+  notes: "Use as one frame-dominant designed cutaway; adapt content, palette, typography, framing, and timing instead of running an unchanged source showcase."
+motion:
+  duration_ms: 6000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: "index/index.html"
+implementations:
+  - tech: js
+    files: ["index/index.html", "index/hf-recipe.js", "index/hf-adapter.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/codrops/TextBlockTransitions/tree/f26255f089e20df46a4844ab1205e3b07565889a"
+  attribution_required: true
+author:
+  name: "codrops"
+  url: "https://github.com/codrops"
+version: 0.1.0

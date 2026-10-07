@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-pencil-alt-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "c85c09ccdd5fa367298b8958ce77e5043300c5023531f6caf8b043d58ffe95c3",
+    "icon.svg": "f86890bfb15112a25bd563f8c4f15a8380d44468dd6831bc74ae6a5da23e8590",
+    "upstream-icon.json": "e8f070d7b0604d8735ae7c0d42220e21aeb2487cfe6b599852ac71cf25b5cfaf"
+  }
+}

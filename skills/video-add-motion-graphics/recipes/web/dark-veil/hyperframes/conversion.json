@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "dark-veil",
+  "surface": "web",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "cd8bd0c53d6c50bf875b8f53476d9436dcaaa5bbfe8dd08da6b118257dac5077"
+}

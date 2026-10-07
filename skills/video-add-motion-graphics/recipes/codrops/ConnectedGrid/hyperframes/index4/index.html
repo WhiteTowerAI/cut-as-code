@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="icon" href="data:,">
+  <script defer src="./hf-recipe.js" data-hf-recipe></script>
+  <script defer src="./hf-adapter.js" data-hf-adapter></script>
+  <base href="../source/">
+
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>Connected Grid Layout Animation | Demo 4 | Codrops</title>
+		<meta name="description" content="Simple on-scroll animations for connected grid items" />
+		<meta name="keywords" content="on-scroll, animation, gsap, scrolltrigger, css, grid, layout, effect" />
+		<meta name="author" content="Codrops" />
+		
+		<link rel="stylesheet" href="_remote/3bf314f4b7d81996d2e4.css">
+		<link rel="stylesheet" type="text/css" href="css/base.css" />
+		
+		
+	
+  <style data-hf-codrops-frame>
+    html { width: 1920px; height: 1080px; scrollbar-width: none; }
+    body[data-composition-id] { margin: 0; width: 1920px; min-height: 1080px; position: relative; }
+    ::-webkit-scrollbar { display: none; }
+  </style>
+<style data-hf-codrops-chrome>
+html, body { overflow-anchor: none !important; }
+html, body, body * { cursor: none !important; }
+.codrops-header,
+.codrops-links,
+.github,
+.sponsor,
+[class*="sponsor"],
+.demos,
+.effects,
+.trigger,
+.frame__links,
+.frame__tags,
+.frame__nav,
+.frame__info,
+.frame__demo,
+.frame__demos,
+.frame__archive,
+.frame__github,
+.frame__author,
+.frame__hire,
+.frame--footer,
+.frame .modal,
+.frame__title,
+.frame__title-back,
+.frame__back,
+.frame__prev,
+.slidenav,
+.slides-nav,
+.nav__arrow,
+.cover__button,
+.content__enter,
+.enter,
+.item__enter,
+.content__nav,
+.content__footer,
+.intro__title-sub,
+.intro__info,
+.credits,
+.related,
+footer,
+.footer,
+.copyright,
+.cursor { display: none !important; }
+[data-composition-id^="codrops-scrollbasedlayoutanimations-"] .caption,
+[data-composition-id^="codrops-scrollbasedlayoutanimations-"] .project--details:has(a[href*="twitter.com/intent/tweet"]),
+[data-composition-id^="codrops-scrollspiral-"] .content__text,
+[data-composition-id^="codrops-scrollspiral-"] .main-title,
+[data-composition-id^="codrops-scrollspiral-"] .main-tagline,
+[data-composition-id^="codrops-scrollspiral-"] .media-item { visibility: hidden !important; }
+body[data-composition-id^="codrops-scrollspiral-"].loading::before,
+body[data-composition-id^="codrops-scrollspiral-"].loading::after,
+[data-composition-id^="codrops-scrollspiral-"] .content--main::before,
+[data-composition-id^="codrops-scrollspiral-"] .content--main::after { display: none !important; }
+</style></head>
+<body class="demo-4 loading" data-composition-id="codrops-connectedgrid-index4" data-start="0" data-width="1920" data-height="1080" data-duration="8" data-no-timeline>
+
+		<main>
+			<div class="frame">
+				<h1 class="frame__title">Connected Grid Layout Animation</h1> 
+				<a class="frame__back" href="https://tympanus.net/codrops/?p=73283">Back to the article</a>
+				<a class="frame__prev" href="https://tympanus.net/Development/OnScrollColumnsRows/">Previous demo</a>
+				<nav class="frame__demos">
+					<span class="frame__demos-item">Variations </span>
+					<a class="frame__demos-item" href="index.html">1</a>
+					<a class="frame__demos-item" href="index2.html">2</a>
+					<a class="frame__demos-item" href="index3.html">3</a>
+					<span class="frame__demos-item">4</span>
+				</nav>
+			</div>
+			<div class="grid">
+			    <figure class="grid__item" style="--r: 1;--c: 3;">
+			        <div class="grid__item-img">
+			            <div class="grid__item-img-inner" style="background-image:url(img/40.jpg);"></div>
+			        </div>
+			        <figcaption class="grid__item-caption"><h3>Osiris</h3> <span>2023</span></figcaption>
+			    </figure>
+			    <figure class="grid__item" style="--r: 2;--c: 5;">
+			        <div class="grid__item-img">
+			            <div class="grid__item-img-inner" style="background-image:url(img/41.jpg);"></div>
+			        </div>
+			        <figcaption class="grid__item-caption"><h3>Isis</h3> <span>2022</span></figcaption>
+			    </figure>
+			    <figure class="grid__item" style="--r: 3;--c: 7;">
+			        <div class="grid__item-img">
+			            <div class="grid__item-img-inner" style="background-image:url(img/42.jpg);"></div>
+			        </div>
+			        <figcaption class="grid__item-caption"><h3>Horus</h3> <span>2024</span></figcaption>
+			    </figure>
+			    <figure class="grid__item" style="--r: 4;--c: 5;">
+			        <div class="grid__item-img">
+			            <div class="grid__item-img-inner" style="background-image:url(img/43.jpg);"></div>
+			        </div>
+			        <figcaption class="grid__item-caption"><h3>Amun</h3> <span>2021</span></figcaption>
+			    </figure>
+			    <figure class="grid__item" style="--r: 5;--c: 3;">
+			        <div class="grid__item-img">
+			            <div class="grid__item-img-inner" style="background-image:url(img/44.jpg);"></div>
+			        </div>
+			        <figcaption class="grid__item-caption"><h3>Ptah</h3> <span>2023</span></figcaption>
+			    </figure>
+			    <figure class="grid__item" style="--r: 6;--c: 1;">
+			        <div class="grid__item-img">
+			            <div class="grid__item-img-inner" style="background-image:url(img/45.jpg);"></div>
+			        </div>
+			        <figcaption class="grid__item-caption"><h3>Anubis</h3> <span>2022</span></figcaption>
+			    </figure>
+			    <figure class="grid__item" style="--r: 7;--c: 3;">
+			        <div class="grid__item-img">
+			            <div class="grid__item-img-inner" style="background-image:url(img/46.jpg);"></div>
+			        </div>
+			        <figcaption class="grid__item-caption"><h3>Hathor</h3> <span>2024</span></figcaption>
+			    </figure>
+			    <figure class="grid__item" style="--r: 8;--c: 5;">
+			        <div class="grid__item-img">
+			            <div class="grid__item-img-inner" style="background-image:url(img/47.jpg);"></div>
+			        </div>
+			        <figcaption class="grid__item-caption"><h3>Bastes</h3> <span>2021</span></figcaption>
+			    </figure>
+			    <figure class="grid__item" style="--r: 9;--c: 7;">
+			        <div class="grid__item-img">
+			            <div class="grid__item-img-inner" style="background-image:url(img/48.jpg);"></div>
+			        </div>
+			        <figcaption class="grid__item-caption"><h3>Thoth</h3> <span>2023</span></figcaption>
+			    </figure>
+			    <figure class="grid__item" style="--r: 10;--c: 5;">
+			        <div class="grid__item-img">
+			            <div class="grid__item-img-inner" style="background-image:url(img/49.jpg);"></div>
+			        </div>
+			        <figcaption class="grid__item-caption"><h3>Neith</h3> <span>2022</span></figcaption>
+			    </figure>
+			    <figure class="grid__item" style="--r: 11;--c: 3;">
+			        <div class="grid__item-img">
+			            <div class="grid__item-img-inner" style="background-image:url(img/50.jpg);"></div>
+			        </div>
+			        <figcaption class="grid__item-caption"><h3>Shu</h3> <span>2024</span></figcaption>
+			    </figure>
+			    <figure class="grid__item" style="--r: 12;--c: 1;">
+			        <div class="grid__item-img">
+			            <div class="grid__item-img-inner" style="background-image:url(img/51.jpg);"></div>
+			        </div>
+			        <figcaption class="grid__item-caption"><h3>Sobek</h3> <span>2021</span></figcaption>
+			    </figure>
+			    <figure class="grid__item" style="--r: 13;--c: 3;">
+			        <div class="grid__item-img">
+			            <div class="grid__item-img-inner" style="background-image:url(img/52.jpg);"></div>
+			        </div>
+			        <figcaption class="grid__item-caption"><h3>Bes</h3> <span>2023</span></figcaption>
+			    </figure>
+			    <figure class="grid__item" style="--r: 14;--c: 5;">
+			        <div class="grid__item-img">
+			            <div class="grid__item-img-inner" style="background-image:url(img/53.jpg);"></div>
+			        </div>
+			        <figcaption class="grid__item-caption"><h3>Ra</h3> <span>2023</span></figcaption>
+			    </figure>
+			    <figure class="grid__item" style="--r: 15;--c: 7;">
+			        <div class="grid__item-img">
+			            <div class="grid__item-img-inner" style="background-image:url(img/54.jpg);"></div>
+			        </div>
+			        <figcaption class="grid__item-caption"><h3>Ma'at</h3> <span>2023</span></figcaption>
+			    </figure>
+			</div>
+			<section class="outro">
+				<h2 class="outro__title">More you might like</h2>
+				<div class="card-wrap">
+					<div class="card">
+						<a href="http://tympanus.net/Development/GridToSlider/" class="card__image" style="background-image:none"></a>
+						<h3 class="card__title"><a href="http://tympanus.net/Development/GridFlowEffect/">Grid Flow Animation</a></h3>
+					</div>
+				</div>
+			</section>
+			<p class="credits">Made by <a href="https://twitter.com/codrops">@codrops</a></p>
+		</main>
+		
+		
+		
+		
+		
+		
+	
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "image-trail",
+  "surface": "web",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "b0380794b662ae1a9dfe7aee87038e1c49897ec973286631c36d3662512b06fd"
+}

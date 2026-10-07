@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-brake-parking-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "6beef6e5ed5b9a3cc4161a1ea5710eed4e92ba9c59d052d7a96f7ea0de0996fb",
+    "icon.svg": "ee3343a3fa5cbc72bfb8a0f2779b917c0ad0d30bc3abe8826759fe18deda5a4a",
+    "upstream-icon.json": "d5fe632a523dc8c6d7acc4bd5aca6b6030fb380dd9de602f0b3cc657778ba670"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "recipe_id": "rotating-text",
+  "surface": "web",
+  "runtime": [
+    "css",
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "1db7a3f5311d9c65df6a08e972e9a3e305c45381cafdfafcb14a47a9c286d381"
+}

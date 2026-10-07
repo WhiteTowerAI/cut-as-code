@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-gauge-low",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "6de67605c707139f8f5448daa108b32af66e56812b45223ab8d868288b89e1e9",
+    "icon.svg": "79e257a02fef6c3cdf3245134cee0b0718b8b48b817caecbe1e587cf5c9fb07c",
+    "upstream-icon.json": "bc64ae11f492a2b5f2f60b168a1d808662d6b4c6b33e2091c93bb81f992bb420"
+  }
+}

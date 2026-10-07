@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-map-marker-radius-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "03f2ca3b8fd9942af6af96c7e49d9fde7b6a63dd3316df32b51f640bdadf098b",
+    "icon.svg": "b29ccc9dd061455c32975b9fd71ad1638ae30fe63f9f07ef1114f562b058d2a0",
+    "upstream-icon.json": "83179bffa63936c7e5ae93e8676a34eac2ef211b7f2419da96ad14eceb4c1c50"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-emoji-frown-open-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "dc7615c95c4f2aaa943a25f9eaf4201f374e0a9fd3abe857889b918dd0f7b08c",
+    "icon.svg": "12f2bba2addf5b683c500be4f15757c69d84e4d96ca2f45275a6757e30c28967",
+    "upstream-icon.json": "3673c9bc4da55f289be82bd13c50befc70decbd21e4c21bcbded1d0eb88f5f42"
+  }
+}

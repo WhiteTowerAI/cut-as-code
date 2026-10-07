@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "prism",
+  "surface": "web",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "4771fb8054df1a19cb5262441ef0a3d49b8d2ee865ec9bd71a381f384e889db4"
+}

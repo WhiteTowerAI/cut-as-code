@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-sun-rising-filled-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "d0bacac68946c9c1d9dbd06e90acfeb9c7558d60905b36458095f12a2d5ed986",
+    "icon.svg": "c80dc88e88d5a9cf5bb9ce9ba22029b37d959679891be9c04bf9252ed93ca5f3",
+    "upstream-icon.json": "40058b8dbaf4e581c4ca33fc92826d63af4d2f3d0d24527f9d6651944c1704b3"
+  }
+}

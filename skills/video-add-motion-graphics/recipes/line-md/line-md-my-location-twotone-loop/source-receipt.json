@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-my-location-twotone-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "00bb813a5373a6c71d80772a29582a0e6e98ba546c931db81db603cfbdb31193",
+    "icon.svg": "25050fc92ab9fa2040d729c5edc904d41f2fc6917644ceb31f973a2648922b08",
+    "upstream-icon.json": "8703e6d8ac73fd8f7bbf05b7abe762bcfdd30a92afc24da7ce607147d5dba45b"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "gradient-blinds",
+  "surface": "web",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "c65dd3b69556055537d619cdca92ba834390119d0cbd5f6b795ff29025065452"
+}

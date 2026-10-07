@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "xyz-fade-small",
+  "surface": "animxyz",
+  "runtime": [
+    "css"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "css",
+  "source_manifest_sha256": "3eecdfbc56477fa6d924bdbd59bfcb487a50b9c0b32f6bfa0deaf8bcef8bf2ba"
+}

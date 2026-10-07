@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-buy-me-a-coffee-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "4862da0598c0329d4a7410f96bc014dde4787558b454015487a550a27ea9abcc",
+    "icon.svg": "c7b4ba4241d2d832f27ac4a1f46cb281d78666bd03a2ea111e110400e13c6845",
+    "upstream-icon.json": "58f4cfd22c229696850d16ba9405eb9fd35fe5265e2a895ef7fd9d75a48ec5a5"
+  }
+}

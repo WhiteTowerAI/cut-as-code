@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "recipe_id": "meteocons-rainbow",
+  "source_id": "meteocons",
+  "upstream_asset": "fill/rainbow.svg",
+  "source_files": {
+    "preview.html": "847b497422bfc4e2fa6fccd3bc7d0c130d33a5fdf3bbcda5e7d84f0364a15f62",
+    "icon.svg": "7d3a0e59a2b744abfc612d9a60ea433f6bfe2d5e7adc42a89d90141497f8b965"
+  }
+}

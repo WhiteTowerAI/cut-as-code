@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-speedometer",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "c8b37d59ba26edffad1c1c6f9f7ef05be2852bf6987daccd3eb81b67318cdccf",
+    "icon.svg": "f6a8c88e150d7df9c0eb408859c485372ae457a1e0e4291ad64919f9e19bf51c",
+    "upstream-icon.json": "440c0324d483c1561d86c24ed6f040d6ca697bf8f35ac4833fd79e41db1c4806"
+  }
+}

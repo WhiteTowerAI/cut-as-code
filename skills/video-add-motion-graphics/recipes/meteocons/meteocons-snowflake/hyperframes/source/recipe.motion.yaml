@@ -1,0 +1,58 @@
+spec_version: 1
+id: meteocons-snowflake
+name: "Single Snowflake"
+description: "A rotating snowflake marking cold or snowy conditions."
+surfaces: [video]
+category: sticker-weather
+tech: [svg]
+canvas: [video]
+target: [overlay]
+intent: sticker-weather
+runtime: ["svg-smil"]
+export: [skill, html]
+dependencies: []
+tags: ["snowflake", "cold", "rotation", "weather", "forecast", "environment", "reveal", "compact"]
+intent_keywords:
+  - "snowflake"
+  - "cold weather"
+  - "thunderstorm forecast"
+  - "rain"
+  - "sunny weather"
+  - "snow"
+  - "clear night"
+  - "weather"
+  - "sky"
+  - "snowflake icon"
+  - "雪花"
+  - "寒冷天气"
+  - "雷暴天气预报"
+  - "下大雨"
+  - "晴朗天气"
+  - "下雪"
+best_for:
+  - "A spoken reference to snowflake needs a compact, immediately recognizable cue"
+  - "The speaker literally refers to current weather, a forecast, or an environmental condition"
+avoid_when:
+  - "The spoken meaning does not refer to snowflake or a close synonym"
+  - "Weather language is metaphorical, such as a storm of criticism or a sunny outlook"
+restraint:
+  max_per_view: 1
+  notes: "Use as one selective semantic sticker; keep the full animated path outside visible faces."
+motion:
+  duration_ms: 6000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: preview.html
+implementations:
+  - tech: svg-smil
+    files: ["icon.svg"]
+    usage: "Materialize the converted HyperFrames directory, then adapt placement, scale, palette, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://www.npmjs.com/package/@meteocons/svg/v/0.1.0"
+  attribution_required: true
+author:
+  name: "Bas Milius"
+  url: "https://github.com/basmilius/weather-icons"
+version: 0.1.0

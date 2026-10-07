@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-emoji-cry-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "b64c6a74052a7da1e4f3834dbb267d42797afd4298410ea3957b20ec2c9826a8",
+    "icon.svg": "746d420c6bff668a87c0f22c66add827542c8c57b5b2d262038d03d233808038",
+    "upstream-icon.json": "67184fba298af8d55e4814b56b0f8506e1b6ae1eae63de7bfbdbc67b14e38549"
+  }
+}

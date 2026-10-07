@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-phone-remove-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "2945a444fea089103cbf8fd3f5af11ce83c7e5b77338ace42a34fdc2c93f1d22",
+    "icon.svg": "1b3a3243fd1ced673801e8448bcbb5d28349c309ddb84553cc48486c1f059317",
+    "upstream-icon.json": "1e023c00b850e6e1fdddb1e99822333c640da9217728fcd604febfd8960ea48f"
+  }
+}

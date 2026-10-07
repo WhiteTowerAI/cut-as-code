@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-moon-off-filled-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "e927f9960f83a99d546e42d150817b15f8d1cf319cb1a09e30a432d403f0b51f",
+    "icon.svg": "941203460b7a97e182a98d4aeb0d280c5ac2fa1f49ec678faaa145210778e1ab",
+    "upstream-icon.json": "8df2eb8ee731102d85bc2897fd18d1104a7b40e3545f041e5ec02cd824932325"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-calendar",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "6e23570d14d5693b926e00447e9715f0f49e6e6f9ec145dcc77a9ec700918a7c",
+    "icon.svg": "4145eeeb2b3a1837496be922b23bb084c459f511a5e1950641a9e8bd2bd0b102",
+    "upstream-icon.json": "1385fe78c74bc7eb7b7e8c304cf02bc50b37870e6081fc7ed9c22f6b628808bd"
+  }
+}

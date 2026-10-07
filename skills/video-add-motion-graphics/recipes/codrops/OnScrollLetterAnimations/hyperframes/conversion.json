@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "project_id": "OnScrollLetterAnimations",
+  "demo_url": "https://tympanus.net/Development/OnScrollLetterAnimations/",
+  "article_url": "https://tympanus.net/codrops/2021/01/20/on-scroll-letter-animations/",
+  "source_url": "https://github.com/codrops/OnScrollLetterAnimations/",
+  "source_commit": "b3c14371d62efae0f7711fc378b2ba8df21687d8",
+  "license": {
+    "type": "MIT",
+    "evidence": "repository-file",
+    "file": "LICENSE",
+    "sha256": "a4552773ea59e8272be04873aa1bcd617d9d31a03ddd7599c915b803b7cc8413"
+  },
+  "source_copy": "source",
+  "variants": [
+    {
+      "name": "index",
+      "composition_id": "codrops-onscrollletteranimations-index",
+      "source_entry": "src/index.html",
+      "runtime_entry": "dist/index.html",
+      "source_sha256": "2cad757baacf84070db0b45717c2a3aca8ecb477376980117cb0c166bf5771ee",
+      "runtime_sha256": "928272155bd09ef6f2d6ba51994c502d68618862f9c4258b8f33130078c8af0c",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index/index.html"
+    },
+    {
+      "name": "index2",
+      "composition_id": "codrops-onscrollletteranimations-index2",
+      "source_entry": "src/index2.html",
+      "runtime_entry": "dist/index2.html",
+      "source_sha256": "d7f1824382148dd8b3c2dc6958dc81183ddca2cbaefaf70d397c4e1fb40f0180",
+      "runtime_sha256": "8b134d52c79cb659425dc54abeeceb7a83b618add1584221f4262ef2629b19b2",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index2/index.html"
+    },
+    {
+      "name": "index3",
+      "composition_id": "codrops-onscrollletteranimations-index3",
+      "source_entry": "src/index3.html",
+      "runtime_entry": "dist/index3.html",
+      "source_sha256": "8d2a97f0ca9565cab0bc7cdc9880f5c4d46f38804f4572ca8a7c713e928d23e1",
+      "runtime_sha256": "388462a8ec1e6ebc6b6861e9987e56f6ff6d112529e8ee6f480027055b620950",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index3/index.html"
+    },
+    {
+      "name": "index4",
+      "composition_id": "codrops-onscrollletteranimations-index4",
+      "source_entry": "src/index4.html",
+      "runtime_entry": "dist/index4.html",
+      "source_sha256": "9677109990369fbcc4ea0971bdc44b890519bd0a67501ee02ed312f7e25672e9",
+      "runtime_sha256": "3c9cc21f4fed0ade6c7125ec3fb9d67eb7e1104d5dfd1cabc2d6826f6316d6dd",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index4/index.html"
+    },
+    {
+      "name": "index5",
+      "composition_id": "codrops-onscrollletteranimations-index5",
+      "source_entry": "src/index5.html",
+      "runtime_entry": "dist/index5.html",
+      "source_sha256": "143f37153f10f9686e10259e8c7a877b657a0b726fc6122fb0faf318767d4058",
+      "runtime_sha256": "82c4da38610cde8e632f5b95a50676f00c6fd3e69790c2fbebd1117b76eba5aa",
+      "duration_s": 8,
+      "interaction": {
+        "mode": "scroll",
+        "duration": 8,
+        "actions": []
+      },
+      "output": "index5/index.html"
+    }
+  ]
+}

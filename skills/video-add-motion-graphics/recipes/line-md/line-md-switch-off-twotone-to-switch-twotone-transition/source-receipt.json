@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-switch-off-twotone-to-switch-twotone-transition",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "8360caa0ff30ec8d7a4281fd076602f7a2592dc189f1385796d2d2833ce37642",
+    "icon.svg": "88ddaf9b6b9e6b8c3bca7b8c2ecd8cbbed8d9391c748bb585ed16217110f2648",
+    "upstream-icon.json": "18506d96929e8959b0979e03307965d5db92397833771568aba310cf4ca12e72"
+  }
+}

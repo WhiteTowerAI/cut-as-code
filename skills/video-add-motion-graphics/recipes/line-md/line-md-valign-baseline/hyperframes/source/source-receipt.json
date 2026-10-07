@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-valign-baseline",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "bd08c09fde25954ff1495c963b6d878eb4485b0e9187f36af817b23875ff260d",
+    "icon.svg": "183dedd7f2f7d7f18a1ae29e4f70cf0f3f538c226096b3abdf32f02ba066261d",
+    "upstream-icon.json": "812b0d3bee549900aad1411cae31f377a93edf33fe37c42e2bc09b7d442bd405"
+  }
+}

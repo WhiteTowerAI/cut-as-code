@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-phone-off",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "e67b55577447c0a4803f0813577cb021c7872d3eeab03f9d8e905dba88b4e153",
+    "icon.svg": "be3cd44a9b52ce9c591f662e45e571822f7c3bfe188231e7f94a360277cb3fce",
+    "upstream-icon.json": "e692df1fb67d79932539fb293edd16d76be04eceadae68ba70c1a9cab6b2999e"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-plus-circle-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "2a4038b3a27dc45b47c580130b9caf33f42167568e210bd74dd54468a47bc7ea",
+    "icon.svg": "77e9e9f36f31df4b1f72c65582116aec6bc8817adfd621755f86190c7d5d268b",
+    "upstream-icon.json": "5c66059de1f1eb736db311719ad6f7873110d1233db3b31ae5371cc0b1b8787c"
+  }
+}

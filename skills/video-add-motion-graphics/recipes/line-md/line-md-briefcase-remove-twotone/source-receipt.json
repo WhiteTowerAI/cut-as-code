@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-briefcase-remove-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "88bcdd2bd9e7401f2aef05f4e6fa2aa5cee8454acac6194eba7afdbd55388428",
+    "icon.svg": "7c5476932ae051d91409e457282adcd9ef299b60b9afd939619886363588ab70",
+    "upstream-icon.json": "ba7579586cf2ba482082ca1dc2ed9e8ffdb4c28a20a52d5d36516ab88ed618b9"
+  }
+}

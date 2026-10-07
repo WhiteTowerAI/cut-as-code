@@ -1,0 +1,74 @@
+spec_version: 1
+id: "codrops-onscrollfilter-index"
+name: "On-Scroll SVG Filter Effect"
+description: "A portrait and title are transformed by a strong on-scroll filter treatment."
+surfaces: [video]
+category: "fullscreen-transition"
+tech: [html, css, js]
+canvas: [video]
+target: [fullscreen]
+intent: "fullscreen-transition"
+runtime: [css, js]
+export: [skill, html]
+dependencies: []
+tags:
+  - "codrops"
+  - "filter"
+  - "portrait"
+  - "editorial"
+  - "fashion"
+  - "transition"
+  - "fullscreen"
+intent_keywords:
+  - "filtered portrait transition"
+  - "editorial image effect"
+  - "fashion chapter reveal"
+  - "滤镜肖像转场"
+  - "时尚图片揭示"
+best_for:
+  - "A chapter or interstitial in fashion, music, beauty, and graphic visual essays"
+  - "A fullscreen portrait or object treatment when the selected image is not a protected face"
+avoid_when:
+  - "The story depends on naturalistic color or readable facial identity"
+  - "The motion would distort a speaker, interviewee, or documentary evidence"
+structural_roles:
+  - "chapter"
+  - "interstitial"
+motion_functions:
+  - "reveal"
+  - "transition"
+  - "settle"
+visual_language:
+  - "editorial"
+  - "fashion"
+  - "experimental"
+mechanisms:
+  - "image-filter"
+  - "portrait"
+  - "scroll"
+rhythm_energy: "medium-high"
+information_density: "balanced"
+frame_relationship: "fullscreen"
+color_tendency: "image-led"
+style_rationale: "The reviewed warm portrait, title, and aggressive image filter make the composition a stylized editorial reveal rather than neutral footage treatment."
+restraint:
+  max_per_view: 1
+  notes: "Use as one frame-dominant designed cutaway; adapt content, palette, typography, framing, and timing instead of running an unchanged source showcase."
+motion:
+  duration_ms: 8000
+  easing: linear
+  reduced_motion: freeze
+  gpu_safe: true
+entry: "index/index.html"
+implementations:
+  - tech: js
+    files: ["index/index.html", "index/hf-recipe.js", "index/hf-adapter.js"]
+    usage: "Materialize the converted HyperFrames directory, then adapt imagery, palette, typography, framing, and timing to the shot."
+license:
+  spdx: MIT
+  upstream: "https://github.com/codrops/OnScrollFilter/tree/3271b3fac95df7bd224da0c6a5860e48441f17ad"
+  attribution_required: true
+author:
+  name: "codrops"
+  url: "https://github.com/codrops"
+version: 0.1.0

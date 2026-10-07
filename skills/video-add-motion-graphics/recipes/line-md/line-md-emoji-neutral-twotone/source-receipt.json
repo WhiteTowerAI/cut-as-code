@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-emoji-neutral-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "9ab7fd0bad58e87dcc077a6e6d911c28e295093a4e00aadcda155a0158f8199b",
+    "icon.svg": "781550961628aa34df2c286bbe3ad7a3541ad97fce78ea5985df078ec970c249",
+    "upstream-icon.json": "2f1c11e7f767a66ee6054aa56667e29765dbcfe934538f1e2172d86ff1e0a341"
+  }
+}

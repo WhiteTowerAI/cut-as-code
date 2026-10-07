@@ -4,18 +4,33 @@ __pycache__/
 .env
 
 .superpowers/
+.plugin-validator-deps/
+.plugin-validator-wheel/
 
 work/
 docs/
 /tests/
-skills/video-add-graphic-motion/tests/
+/TEST/
+skills/video-add-motion-graphics/tests/
 
 .claude/worktrees/
 .worktree/
 .vscode/
+
+# Playwright output; keep the checked-in *-reference.png baselines.
+ui/playwright-report/
+ui/test-results/
+ui/tests/screenshots/*-browser.png
+ui/tests/screenshots/*-diff.png
+ui/tests/screenshots/*-reference-compared.png
+ui/tests/screenshots/*-result.json
+ui/tests/screenshots/visual-comparison-results.json
+
 # HyperFrames preview cache + regenerable self-check stills/gallery
 .hyperframes/
+**/.thumbnails/
 # snapshots/
 # gallery.html
 
-video-add-graphic-motion_bak/
+video-add-motion-graphics_bak/
+/rename_motion_graphics.ps1

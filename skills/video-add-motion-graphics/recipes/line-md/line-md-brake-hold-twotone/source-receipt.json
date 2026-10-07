@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-brake-hold-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "6fbe7702090dee44851f856836b977c8bed8ba7eb9ca6bc58b2047de6748a273",
+    "icon.svg": "95dc8d862f61ee9cd25c8710d66c9c0269013d5e710bb98c0c16dbf66fad4601",
+    "upstream-icon.json": "251b39e2d7c3c9d148d163760004edc5e43aff272cfa8c3c3443f20e9f66ff78"
+  }
+}

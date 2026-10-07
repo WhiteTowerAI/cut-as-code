@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "meteocons-partly-cloudy-day",
+  "surface": "meteocons",
+  "runtime": [
+    "svg-smil"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "svg-smil",
+  "source_manifest_sha256": "a848d3b7f3eb6a4fa963aed5bcbf43b96f5ee11af226c900caee60b240aed552"
+}

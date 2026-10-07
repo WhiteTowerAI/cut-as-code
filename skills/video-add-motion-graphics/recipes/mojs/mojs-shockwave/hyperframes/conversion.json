@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recipe_id": "mojs-shockwave",
+  "surface": "mojs",
+  "runtime": [
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "af4221f738c2e830706ad9c02b5695dd24df73cc04075da5217135ab78c8bc05"
+}

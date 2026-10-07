@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-speedometer-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "9940253e9813630c88c32613a85ce831f9bc53db8f5ffad3c5c9b54ea9a4ac40",
+    "icon.svg": "1966107edf4ef944f69a3789747a2a2ab7224fadde7b21b82305fe3669bd4a1c",
+    "upstream-icon.json": "ef276c4a75c6a51a17654977e5e42010d1eba5ce1c5beeb21a52f9b89a1ce774"
+  }
+}

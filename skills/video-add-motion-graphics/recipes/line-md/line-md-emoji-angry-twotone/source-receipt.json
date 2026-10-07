@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-emoji-angry-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "66bc9401ddd258501527f9aa3c382ce29d2fca9447573a32bf4d7847101fbd37",
+    "icon.svg": "bce90d42f45c478bf46e1c12cc3ba0d2d0c6f5d9f3a098a96a6f6a25b56ad597",
+    "upstream-icon.json": "1735afcdda4c68f92484900f2b7fd7749c032d1116a16aae5f9ccbad95a31ebc"
+  }
+}

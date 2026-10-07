@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-sunny-off-loop",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "99327ff08ff3de2c79654ca36231b379b6c65b58d88e81139fef4a07e3649f3f",
+    "icon.svg": "e0820728126b853d344cceda3fece9dc57af57702149afa038baa243c7e608e2",
+    "upstream-icon.json": "d9a74facf4ba06d55f302cccc328bf4f82dd826a06f4aa1c3e985e2cc8b3845c"
+  }
+}

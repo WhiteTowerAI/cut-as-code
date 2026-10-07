@@ -1,0 +1,1997 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-07T04:53:43.379Z",
+  "imports_root": "D:\\Users\\Charles Kang\\Desktop\\temp\\cut-as-code\\skills\\video-add-motion-graphics\\recipes\\codrops",
+  "total_variants": 1,
+  "visual": [],
+  "cli": [
+    {
+      "key": "3DCarousel/index",
+      "ok": true,
+      "check": {
+        "ok": true,
+        "json": {
+          "ok": true,
+          "strict": false,
+          "lint": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 1,
+            "infoCount": 0,
+            "findings": [
+              {
+                "code": "composition_file_too_large",
+                "severity": "warning",
+                "message": "This HTML composition file has 734 lines. Smaller sub-compositions are easier to read, iterate on, and diff.",
+                "selector": "[data-composition-id]",
+                "dataAttributes": {},
+                "sourceFile": "D:\\Temp\\codrops-hf-cli-OuuQFS\\index.html",
+                "bbox": {
+                  "x": 0,
+                  "y": 0,
+                  "width": 0,
+                  "height": 0
+                },
+                "time": 0,
+                "fixHint": "Split coherent scenes or layers into separate .html files under compositions/, then mount them from the parent with data-composition-src so each file stays small enough to inspect, revise, and validate independently."
+              }
+            ],
+            "filesScanned": 1
+          },
+          "runtime": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": []
+          },
+          "layout": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 1,
+            "infoCount": 45,
+            "findings": [
+              {
+                "code": "escaped_container",
+                "severity": "warning",
+                "time": 0.444,
+                "selector": "div.carousel__cell",
+                "message": "Positioned element renders far outside its offset parent — its coordinates were likely computed in a different frame (canvas/viewport pixels).",
+                "rect": {
+                  "left": 1218.99,
+                  "top": 1456.81,
+                  "right": 1300.83,
+                  "bottom": 1751.66,
+                  "width": 81.85,
+                  "height": 294.85
+                },
+                "containerSelector": "div.carousel",
+                "text": "",
+                "fixHint": "Compute left/top in the offset parent's frame (subtract its rect), or mark intentional placement with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 826.72,
+                  "top": 1460.2,
+                  "right": 1090.9,
+                  "bottom": 1782.71,
+                  "width": 264.18,
+                  "height": 322.51
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 1218.99,
+                  "y": 1456.81,
+                  "width": 81.85,
+                  "height": 294.85
+                },
+                "firstSeen": 0.444,
+                "lastSeen": 7.556,
+                "occurrences": 9
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 0.444,
+                "selector": "#smooth-content",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 6480,
+                  "width": 1920,
+                  "height": 6480
+                },
+                "containerSelector": "div.ScrollSmoother-wrapper",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 5400
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 0,
+                  "y": 0,
+                  "width": 1920,
+                  "height": 6480
+                },
+                "firstSeen": 0.444,
+                "lastSeen": 0.444,
+                "occurrences": 1
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 1.333,
+                "selector": "#smooth-content",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 0,
+                  "top": -381.44,
+                  "right": 1920,
+                  "bottom": 6098.56,
+                  "width": 1920,
+                  "height": 6480
+                },
+                "containerSelector": "div.ScrollSmoother-wrapper",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 381.44,
+                  "bottom": 5018.56
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 0,
+                  "y": -381.44,
+                  "width": 1920,
+                  "height": 6480
+                },
+                "firstSeen": 1.333,
+                "lastSeen": 1.333,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 1.333,
+                "selector": "div.card__face.card__face--front",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 615.04,
+                  "top": -70.15,
+                  "right": 763.55,
+                  "bottom": 304.05,
+                  "width": 148.51,
+                  "height": 374.2
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 70.15
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 615.04,
+                  "y": -70.15,
+                  "width": 148.51,
+                  "height": 374.2
+                },
+                "firstSeen": 1.333,
+                "lastSeen": 1.333,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 1.333,
+                "selector": "div.card__face.card__face--back",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 615.04,
+                  "top": -70.15,
+                  "right": 763.55,
+                  "bottom": 304.05,
+                  "width": 148.51,
+                  "height": 374.2
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 70.15
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 615.04,
+                  "y": -70.15,
+                  "width": 148.51,
+                  "height": 374.2
+                },
+                "firstSeen": 1.333,
+                "lastSeen": 1.333,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 1.333,
+                "selector": "div.card__face.card__face--front",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 1150.76,
+                  "top": -79.44,
+                  "right": 1329.18,
+                  "bottom": 304.46,
+                  "width": 178.42,
+                  "height": 383.9
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 79.44
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 1150.76,
+                  "y": -79.44,
+                  "width": 178.42,
+                  "height": 383.9
+                },
+                "firstSeen": 1.333,
+                "lastSeen": 1.333,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 1.333,
+                "selector": "div.card__face.card__face--back",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 1150.76,
+                  "top": -79.44,
+                  "right": 1329.18,
+                  "bottom": 304.46,
+                  "width": 178.42,
+                  "height": 383.9
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 79.44
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 1150.76,
+                  "y": -79.44,
+                  "width": 178.42,
+                  "height": 383.9
+                },
+                "firstSeen": 1.333,
+                "lastSeen": 1.333,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 1.333,
+                "selector": "div.card__face.card__face--front",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 657.11,
+                  "top": 970.62,
+                  "right": 1022.32,
+                  "bottom": 1399.67,
+                  "width": 365.21,
+                  "height": 429.05
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 319.67
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 657.11,
+                  "y": 970.62,
+                  "width": 365.21,
+                  "height": 429.05
+                },
+                "firstSeen": 1.333,
+                "lastSeen": 1.333,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 1.333,
+                "selector": "div.card__face.card__face--back",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 657.11,
+                  "top": 970.62,
+                  "right": 1022.32,
+                  "bottom": 1399.67,
+                  "width": 365.21,
+                  "height": 429.05
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 319.67
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 657.11,
+                  "y": 970.62,
+                  "width": 365.21,
+                  "height": 429.05
+                },
+                "firstSeen": 1.333,
+                "lastSeen": 1.333,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 1.333,
+                "selector": "div.card__face.card__face--front",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 1256.03,
+                  "top": 1047.77,
+                  "right": 1289.76,
+                  "bottom": 1370.62,
+                  "width": 33.72,
+                  "height": 322.85
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 290.62
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 1256.03,
+                  "y": 1047.77,
+                  "width": 33.72,
+                  "height": 322.85
+                },
+                "firstSeen": 1.333,
+                "lastSeen": 1.333,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 1.333,
+                "selector": "div.card__face.card__face--back",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 1256.03,
+                  "top": 1047.77,
+                  "right": 1289.76,
+                  "bottom": 1370.62,
+                  "width": 33.72,
+                  "height": 322.85
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 290.62
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 1256.03,
+                  "y": 1047.77,
+                  "width": 33.72,
+                  "height": 322.85
+                },
+                "firstSeen": 1.333,
+                "lastSeen": 1.333,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 1.333,
+                "selector": "div.card__face.card__face--front",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 607.85,
+                  "top": 1069.03,
+                  "right": 720.4,
+                  "bottom": 1338.16,
+                  "width": 112.56,
+                  "height": 269.12
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 258.16
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 607.85,
+                  "y": 1069.03,
+                  "width": 112.56,
+                  "height": 269.12
+                },
+                "firstSeen": 1.333,
+                "lastSeen": 1.333,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 1.333,
+                "selector": "div.card__face.card__face--back",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 607.85,
+                  "top": 1069.03,
+                  "right": 720.4,
+                  "bottom": 1338.16,
+                  "width": 112.56,
+                  "height": 269.12
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 258.16
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 607.85,
+                  "y": 1069.03,
+                  "width": 112.56,
+                  "height": 269.12
+                },
+                "firstSeen": 1.333,
+                "lastSeen": 1.333,
+                "occurrences": 1
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 2.222,
+                "selector": "#smooth-content",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 0,
+                  "top": -1000.52,
+                  "right": 1920,
+                  "bottom": 5479.48,
+                  "width": 1920,
+                  "height": 6480
+                },
+                "containerSelector": "div.ScrollSmoother-wrapper",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 1000.52,
+                  "bottom": 4399.48
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 0,
+                  "y": -1000.52,
+                  "width": 1920,
+                  "height": 6480
+                },
+                "firstSeen": 2.222,
+                "lastSeen": 2.222,
+                "occurrences": 1
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 3.111,
+                "selector": "#smooth-content",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 0,
+                  "top": -1804.13,
+                  "right": 1920,
+                  "bottom": 4675.87,
+                  "width": 1920,
+                  "height": 6480
+                },
+                "containerSelector": "div.ScrollSmoother-wrapper",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 1804.13,
+                  "bottom": 3595.87
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 0,
+                  "y": -1804.13,
+                  "width": 1920,
+                  "height": 6480
+                },
+                "firstSeen": 3.111,
+                "lastSeen": 3.111,
+                "occurrences": 1
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 4,
+                "selector": "#smooth-content",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 0,
+                  "top": -2700,
+                  "right": 1920,
+                  "bottom": 3780,
+                  "width": 1920,
+                  "height": 6480
+                },
+                "containerSelector": "div.ScrollSmoother-wrapper",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 2700,
+                  "bottom": 2700
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 0,
+                  "y": -2700,
+                  "width": 1920,
+                  "height": 6480
+                },
+                "firstSeen": 4,
+                "lastSeen": 4,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 4,
+                "selector": "div.card__face.card__face--front",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 780.36,
+                  "top": -113.4,
+                  "right": 942.63,
+                  "bottom": 93.47,
+                  "width": 162.27,
+                  "height": 206.86
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 113.4
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 780.36,
+                  "y": -113.4,
+                  "width": 162.27,
+                  "height": 206.86
+                },
+                "firstSeen": 4,
+                "lastSeen": 4,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 4,
+                "selector": "div.card__face.card__face--back",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 780.36,
+                  "top": -113.4,
+                  "right": 942.63,
+                  "bottom": 93.47,
+                  "width": 162.27,
+                  "height": 206.86
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 113.4
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 780.36,
+                  "y": -113.4,
+                  "width": 162.27,
+                  "height": 206.86
+                },
+                "firstSeen": 4,
+                "lastSeen": 4,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 4,
+                "selector": "div.card__face.card__face--front",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 628.39,
+                  "top": -208.33,
+                  "right": 678.56,
+                  "bottom": 136.49,
+                  "width": 50.17,
+                  "height": 344.82
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 208.33
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 628.39,
+                  "y": -208.33,
+                  "width": 50.17,
+                  "height": 344.82
+                },
+                "firstSeen": 4,
+                "lastSeen": 4,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 4,
+                "selector": "div.card__face.card__face--back",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 628.39,
+                  "top": -208.33,
+                  "right": 678.56,
+                  "bottom": 136.49,
+                  "width": 50.17,
+                  "height": 344.82
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 208.33
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 628.39,
+                  "y": -208.33,
+                  "width": 50.17,
+                  "height": 344.82
+                },
+                "firstSeen": 4,
+                "lastSeen": 4,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 4,
+                "selector": "div.card__face.card__face--front",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 1016.2,
+                  "top": -244.94,
+                  "right": 1308.96,
+                  "bottom": 155.18,
+                  "width": 292.77,
+                  "height": 400.11
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 244.94
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 1016.2,
+                  "y": -244.94,
+                  "width": 292.77,
+                  "height": 400.11
+                },
+                "firstSeen": 4,
+                "lastSeen": 4,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 4,
+                "selector": "div.card__face.card__face--back",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 1016.2,
+                  "top": -244.94,
+                  "right": 1308.96,
+                  "bottom": 155.18,
+                  "width": 292.77,
+                  "height": 400.11
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 244.94
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 1016.2,
+                  "y": -244.94,
+                  "width": 292.77,
+                  "height": 400.11
+                },
+                "firstSeen": 4,
+                "lastSeen": 4,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 4,
+                "selector": "div.card__face.card__face--front",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 1150.16,
+                  "top": -154.82,
+                  "right": 1281.7,
+                  "bottom": 92.7,
+                  "width": 131.55,
+                  "height": 247.52
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 154.82
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 1150.16,
+                  "y": -154.82,
+                  "width": 131.55,
+                  "height": 247.52
+                },
+                "firstSeen": 4,
+                "lastSeen": 4,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 4,
+                "selector": "div.card__face.card__face--back",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 1150.16,
+                  "top": -154.82,
+                  "right": 1281.7,
+                  "bottom": 92.7,
+                  "width": 131.55,
+                  "height": 247.52
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 154.82
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 1150.16,
+                  "y": -154.82,
+                  "width": 131.55,
+                  "height": 247.52
+                },
+                "firstSeen": 4,
+                "lastSeen": 4,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 4,
+                "selector": "div.card__face.card__face--front",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 611.04,
+                  "top": 835.06,
+                  "right": 903.8,
+                  "bottom": 1235.18,
+                  "width": 292.77,
+                  "height": 400.11
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 155.18
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 611.04,
+                  "y": 835.06,
+                  "width": 292.77,
+                  "height": 400.11
+                },
+                "firstSeen": 4,
+                "lastSeen": 4,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 4,
+                "selector": "div.card__face.card__face--back",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 611.04,
+                  "top": 835.06,
+                  "right": 903.8,
+                  "bottom": 1235.18,
+                  "width": 292.77,
+                  "height": 400.11
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 155.18
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 611.04,
+                  "y": 835.06,
+                  "width": 292.77,
+                  "height": 400.11
+                },
+                "firstSeen": 4,
+                "lastSeen": 4,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 4,
+                "selector": "div.card__face.card__face--front",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 1241.44,
+                  "top": 871.67,
+                  "right": 1291.61,
+                  "bottom": 1216.49,
+                  "width": 50.17,
+                  "height": 344.82
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 136.49
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 1241.44,
+                  "y": 871.67,
+                  "width": 50.17,
+                  "height": 344.82
+                },
+                "firstSeen": 4,
+                "lastSeen": 4,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 4,
+                "selector": "div.card__face.card__face--back",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 1241.44,
+                  "top": 871.67,
+                  "right": 1291.61,
+                  "bottom": 1216.49,
+                  "width": 50.17,
+                  "height": 344.82
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 136.49
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 1241.44,
+                  "y": 871.67,
+                  "width": 50.17,
+                  "height": 344.82
+                },
+                "firstSeen": 4,
+                "lastSeen": 4,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 4,
+                "selector": "div.card__face.card__face--front",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 977.37,
+                  "top": 966.6,
+                  "right": 1139.64,
+                  "bottom": 1173.47,
+                  "width": 162.27,
+                  "height": 206.86
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 93.47
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 977.37,
+                  "y": 966.6,
+                  "width": 162.27,
+                  "height": 206.86
+                },
+                "firstSeen": 4,
+                "lastSeen": 4,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 4,
+                "selector": "div.card__face.card__face--back",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 977.37,
+                  "top": 966.6,
+                  "right": 1139.64,
+                  "bottom": 1173.47,
+                  "width": 162.27,
+                  "height": 206.86
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 93.47
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 977.37,
+                  "y": 966.6,
+                  "width": 162.27,
+                  "height": 206.86
+                },
+                "firstSeen": 4,
+                "lastSeen": 4,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 4,
+                "selector": "div.card__face.card__face--front",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 638.3,
+                  "top": 925.18,
+                  "right": 769.84,
+                  "bottom": 1172.7,
+                  "width": 131.55,
+                  "height": 247.52
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 92.7
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 638.3,
+                  "y": 925.18,
+                  "width": 131.55,
+                  "height": 247.52
+                },
+                "firstSeen": 4,
+                "lastSeen": 4,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 4,
+                "selector": "div.card__face.card__face--back",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 638.3,
+                  "top": 925.18,
+                  "right": 769.84,
+                  "bottom": 1172.7,
+                  "width": 131.55,
+                  "height": 247.52
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 92.7
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 638.3,
+                  "y": 925.18,
+                  "width": 131.55,
+                  "height": 247.52
+                },
+                "firstSeen": 4,
+                "lastSeen": 4,
+                "occurrences": 1
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 4.889,
+                "selector": "#smooth-content",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 0,
+                  "top": -3563.77,
+                  "right": 1920,
+                  "bottom": 2916.23,
+                  "width": 1920,
+                  "height": 6480
+                },
+                "containerSelector": "div.ScrollSmoother-wrapper",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 3563.77,
+                  "bottom": 1836.23
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 0,
+                  "y": -3563.77,
+                  "width": 1920,
+                  "height": 6480
+                },
+                "firstSeen": 4.889,
+                "lastSeen": 4.889,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 4.889,
+                "selector": "div.card__face.card__face--front",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 598.81,
+                  "top": 966.16,
+                  "right": 1045.36,
+                  "bottom": 1480.15,
+                  "width": 446.54,
+                  "height": 513.99
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 400.15
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 598.81,
+                  "y": 966.16,
+                  "width": 446.54,
+                  "height": 513.99
+                },
+                "firstSeen": 4.889,
+                "lastSeen": 4.889,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 4.889,
+                "selector": "div.card__face.card__face--back",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 598.81,
+                  "top": 966.16,
+                  "right": 1045.36,
+                  "bottom": 1480.15,
+                  "width": 446.54,
+                  "height": 513.99
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 400.15
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 598.81,
+                  "y": 966.16,
+                  "width": 446.54,
+                  "height": 513.99
+                },
+                "firstSeen": 4.889,
+                "lastSeen": 4.889,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 4.889,
+                "selector": "div.card__face.card__face--front",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 1308.17,
+                  "top": 1034.61,
+                  "right": 1420.07,
+                  "bottom": 1458.91,
+                  "width": 111.9,
+                  "height": 424.3
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 378.91
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 1308.17,
+                  "y": 1034.61,
+                  "width": 111.9,
+                  "height": 424.3
+                },
+                "firstSeen": 4.889,
+                "lastSeen": 4.889,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 4.889,
+                "selector": "div.card__face.card__face--back",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 1308.17,
+                  "top": 1034.61,
+                  "right": 1420.07,
+                  "bottom": 1458.91,
+                  "width": 111.9,
+                  "height": 424.3
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 378.91
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 1308.17,
+                  "y": 1034.61,
+                  "width": 111.9,
+                  "height": 424.3
+                },
+                "firstSeen": 4.889,
+                "lastSeen": 4.889,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 4.889,
+                "selector": "div.card__face.card__face--front",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 467.72,
+                  "top": 1060.41,
+                  "right": 523.56,
+                  "bottom": 1413.42,
+                  "width": 55.84,
+                  "height": 353
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 333.42
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 467.72,
+                  "y": 1060.41,
+                  "width": 55.84,
+                  "height": 353
+                },
+                "firstSeen": 4.889,
+                "lastSeen": 4.889,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 4.889,
+                "selector": "div.card__face.card__face--back",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 467.72,
+                  "top": 1060.41,
+                  "right": 523.56,
+                  "bottom": 1413.42,
+                  "width": 55.84,
+                  "height": 353
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "bottom": 333.42
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 467.72,
+                  "y": 1060.41,
+                  "width": 55.84,
+                  "height": 353
+                },
+                "firstSeen": 4.889,
+                "lastSeen": 4.889,
+                "occurrences": 1
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 5.778,
+                "selector": "#smooth-content",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 0,
+                  "top": -4372.44,
+                  "right": 1920,
+                  "bottom": 2107.56,
+                  "width": 1920,
+                  "height": 6480
+                },
+                "containerSelector": "div.ScrollSmoother-wrapper",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 4372.44,
+                  "bottom": 1027.56
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 0,
+                  "y": -4372.44,
+                  "width": 1920,
+                  "height": 6480
+                },
+                "firstSeen": 5.778,
+                "lastSeen": 5.778,
+                "occurrences": 1
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 6.667,
+                "selector": "#smooth-content",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 0,
+                  "top": -5000,
+                  "right": 1920,
+                  "bottom": 1480,
+                  "width": 1920,
+                  "height": 6480
+                },
+                "containerSelector": "div.ScrollSmoother-wrapper",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 5000,
+                  "bottom": 400
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 0,
+                  "y": -5000,
+                  "width": 1920,
+                  "height": 6480
+                },
+                "firstSeen": 6.667,
+                "lastSeen": 6.667,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 6.667,
+                "selector": "div.card__face.card__face--front",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 498.85,
+                  "top": -411.82,
+                  "right": 653.1,
+                  "bottom": 26.24,
+                  "width": 154.25,
+                  "height": 438.06
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 411.82
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 498.85,
+                  "y": -411.82,
+                  "width": 154.25,
+                  "height": 438.06
+                },
+                "firstSeen": 6.667,
+                "lastSeen": 6.667,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 6.667,
+                "selector": "div.card__face.card__face--back",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 498.85,
+                  "top": -411.82,
+                  "right": 653.1,
+                  "bottom": 26.24,
+                  "width": 154.25,
+                  "height": 438.06
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 411.82
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 498.85,
+                  "y": -411.82,
+                  "width": 154.25,
+                  "height": 438.06
+                },
+                "firstSeen": 6.667,
+                "lastSeen": 6.667,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 6.667,
+                "selector": "div.card__face.card__face--front",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 943.84,
+                  "top": -457.98,
+                  "right": 1359.31,
+                  "bottom": 40.84,
+                  "width": 415.48,
+                  "height": 498.82
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 457.98
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 943.84,
+                  "y": -457.98,
+                  "width": 415.48,
+                  "height": 498.82
+                },
+                "firstSeen": 6.667,
+                "lastSeen": 6.667,
+                "occurrences": 1
+              },
+              {
+                "code": "panel_out_of_canvas",
+                "severity": "info",
+                "time": 6.667,
+                "selector": "div.card__face.card__face--back",
+                "message": "Painted panel extends outside the composition canvas.",
+                "rect": {
+                  "left": 943.84,
+                  "top": -457.98,
+                  "right": 1359.31,
+                  "bottom": 40.84,
+                  "width": 415.48,
+                  "height": 498.82
+                },
+                "containerSelector": "[data-composition-id=\"codrops-3dcarousel-index\"]",
+                "text": "",
+                "fixHint": "Move the panel inward, or mark intentional off-canvas animation with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 457.98
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 943.84,
+                  "y": -457.98,
+                  "width": 415.48,
+                  "height": 498.82
+                },
+                "firstSeen": 6.667,
+                "lastSeen": 6.667,
+                "occurrences": 1
+              },
+              {
+                "code": "container_overflow",
+                "severity": "info",
+                "time": 7.556,
+                "selector": "#smooth-content",
+                "message": "Element extends outside a clipping layout container.",
+                "rect": {
+                  "left": 0,
+                  "top": -5347.02,
+                  "right": 1920,
+                  "bottom": 1132.98,
+                  "width": 1920,
+                  "height": 6480
+                },
+                "containerSelector": "div.ScrollSmoother-wrapper",
+                "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+                "containerRect": {
+                  "left": 0,
+                  "top": 0,
+                  "right": 1920,
+                  "bottom": 1080,
+                  "width": 1920,
+                  "height": 1080
+                },
+                "overflow": {
+                  "top": 5347.02,
+                  "bottom": 52.98
+                },
+                "dataAttributes": {},
+                "sourceFile": "index.html",
+                "bbox": {
+                  "x": 0,
+                  "y": -5347.02,
+                  "width": 1920,
+                  "height": 6480
+                },
+                "firstSeen": 7.556,
+                "lastSeen": 7.556,
+                "occurrences": 1
+              }
+            ],
+            "duration": 8,
+            "samples": [
+              0.444,
+              1.333,
+              2.222,
+              3.111,
+              4,
+              4.889,
+              5.778,
+              6.667,
+              7.556
+            ],
+            "transitionSamples": [],
+            "transitionSamplesDropped": 0,
+            "tolerance": 2,
+            "totalIssueCount": 46,
+            "truncated": false
+          },
+          "motion": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "enabled": false,
+            "samples": 0
+          },
+          "contrast": {
+            "ok": true,
+            "errorCount": 0,
+            "warningCount": 0,
+            "infoCount": 0,
+            "findings": [],
+            "enabled": true,
+            "samples": [
+              0.444,
+              2.222,
+              4,
+              5.778,
+              7.556
+            ],
+            "checked": 0,
+            "passed": 0
+          },
+          "snapshots": {
+            "enabled": false,
+            "files": [],
+            "times": [],
+            "findingFiles": []
+          },
+          "_meta": {
+            "version": "0.7.96",
+            "latestVersion": "0.7.96",
+            "updateAvailable": false
+          }
+        },
+        "stderr": "[hyperframes] browserGpuMode probe → hardware (WebGL renderer vendor=\"Google Inc. (AMD)\" renderer=\"ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)\")"
+      },
+      "keyframes": {
+        "ok": true,
+        "json": {
+          "project": "codrops-hf-cli-OuuQFS",
+          "runtime": "all",
+          "compositions": [
+            {
+              "composition": "index.html",
+              "source": "index.html",
+              "tweens": [],
+              "traces": [],
+              "cssKeyframes": [],
+              "anime": []
+            }
+          ],
+          "_meta": {
+            "version": "0.7.96",
+            "latestVersion": "0.7.96",
+            "updateAvailable": false
+          }
+        },
+        "stderr": ""
+      },
+      "cleanup": {
+        "ok": true
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "check_ok": true,
+          "check_json_ok": true,
+          "check_error": null,
+          "check_stderr": "[hyperframes] browserGpuMode probe → hardware (WebGL renderer vendor=\"Google Inc. (AMD)\" renderer=\"ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001681) Direct3D11 vs_5_0 ps_5_0, D3D11)\")",
+          "keyframes_ok": true,
+          "cleanup": {
+            "ok": true
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "visual_passed": 0,
+    "visual_failed": 0,
+    "cli_passed": 1,
+    "cli_failed": 0
+  }
+}

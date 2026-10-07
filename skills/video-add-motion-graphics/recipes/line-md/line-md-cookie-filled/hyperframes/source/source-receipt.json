@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-cookie-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "5472bb1a396f03f19956f0805455f5f65c1d9a12eb84e3c067d53bf0df8b607a",
+    "icon.svg": "a1c146d23106e3e12712e0510f8a88583e1cfd328d681f3f5911691f8b8dcb49",
+    "upstream-icon.json": "d54a73a73d4a67cea447cd72cad0ca92157239ec227d23e53a12bc25d1efbadf"
+  }
+}

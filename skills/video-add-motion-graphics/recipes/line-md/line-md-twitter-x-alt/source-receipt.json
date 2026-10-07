@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-twitter-x-alt",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "2576e3dea7f4c13a009921b04a679a3eb486678f6bceb88df1322cf88f234447",
+    "icon.svg": "379eec7b094edf15ea6ec4d09d51f5024b4e6604d718a7538095e8866cbd0022",
+    "upstream-icon.json": "95fbddda57406389f499b1abcb39492dcd314675060131dba70bf03909e4cd4e"
+  }
+}

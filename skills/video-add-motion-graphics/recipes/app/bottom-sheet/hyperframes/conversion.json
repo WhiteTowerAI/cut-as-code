@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "recipe_id": "bottom-sheet",
+  "surface": "app",
+  "runtime": [
+    "css",
+    "js"
+  ],
+  "duration_s": 6,
+  "entry": "index.html",
+  "source_entry": "preview.html",
+  "deterministic_adapter": "replay",
+  "source_manifest_sha256": "8f395bbe9e17ff26d6712daded5a45c265ddbdb2fdb4209af8017b555a61cb7d"
+}

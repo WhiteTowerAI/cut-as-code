@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-emoji-grin",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "0232ad6713591a2e122b218b4b9c15c48e9007b4f6b8dad49bc55b0f063780c2",
+    "icon.svg": "7acdd86d310da4f8da9cc05ca690211026ff6efa2e982d7beee822af497e7eae",
+    "upstream-icon.json": "b7f7ca071993efbadfd7db3a6d850fd13e73238d45aa5320e8c9aabc30a7ffbb"
+  }
+}

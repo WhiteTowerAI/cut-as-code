@@ -6,11 +6,16 @@
 
 **Cut-as-code** turns video editing into an inspectable, code-driven workflow you can drive with AI coding agents like Claude Code, Codex, and OpenClaw. The agent proposes and records editing decisions as readable files; you review them in browser pages and template galleries, approve the work, and then render the final videos — all free, open source (MIT), and with nothing uploaded to a cloud service.
 
+The bundled Editor Hub outlives browser tabs and Agent/MCP sessions. Closing or refreshing a tab does not stop a project. Use **Close Project** in the Hub to release one runtime or **Quit Editor Service** to stop all runtimes; protected drafts and active work require confirmation. An idle runtime is eligible for reclamation after 30 minutes only when it has no connected event client, active operation, mutation lease, or recoverable draft. Reopening reconstructs it from authoritative Protocol V1 files and any permitted draft in Plugin data.
+
+Plugin data is private state for the current OS user and is the Hub discovery trust root. The launcher rejects malformed, unsigned, stale, unresponsive, or challenge-mismatched locators. It does not claim to isolate the editor from another process that already has the same user's permission to rewrite Plugin data; that process is inside the local trust boundary and can also rewrite Plugin configuration and drafts.
+
 - ✂️ **Cut** — reviewed keep/drop decisions and a compact first cut.
 - 🎨 **Color grade** — candidate looks to review, then a baked LUT.
 - 🎬 **B-roll** — reviewed visual cutaways from local media or Pexels.
 - 💬 **Captions** — word-timed, preset styles with optional karaoke.
-- 🃏 **Graphic motion cards** — titles, lower thirds, stats, quotes, and calls to action.
+- 🃏 **Content cards** — titles, lower thirds, stats, quotes, and calls to action.
+- ✨ **Motion graphics** — reviewed animations from the local recipe library.
 - 📱 **To TikTok/YouTube shorts** — extract moments and reframe them for 9:16 vertical.
 
 ## How It Works
@@ -43,7 +48,7 @@ Watch this 2-minute walkthrough to see how to interact with an AI coding agent a
 
 > **Prompt:** For [video-path], use /video-understand, /video-to-shorts, /video-add-captions, and /video-add-content-cards.
 >
-> **Agent:** Proposes short-form candidates, and displays captions and content cards with graphic motion for your review, and delivers the final edit.
+> **Agent:** Proposes short-form candidates, and displays captions and content cards with motion graphics for your review, and delivers the final edit.
 
 <table>
   <tr>
@@ -115,14 +120,18 @@ Each directory under `skills/` is a self-contained agent skill. Its `SKILL.md` i
 
 | Skill | Purpose |
 |---|---|
+| `/cut-as-code` | Start or resume a project and route the requested work to the right skills. |
 | `/video-understand` | Probe media, generate a word-level transcript, analyze speech, and build reusable evidence for downstream skills. |
 | `/video-cut` | Create reviewed keep/drop decisions, generate the canonical timeline, render a compact first cut, and verify its boundaries. |
 | `/video-color-grade` | Assess footage, generate named looks, review the alternatives, record a selection, and bake or apply a portable LUT. |
 | `/video-add-b-roll` | Add selective transcript-timed visual cutaways from your own footage or Pexels, with reviewed candidates and recorded provenance. |
 | `/video-add-captions` | Render preset-driven, word-timed captions with optional karaoke highlighting. |
 | `/video-add-content-cards` | Add selective transcript-timed titles, lower thirds, statistics, lists, quotes, chapter cards, and calls to action. |
+| `/video-add-motion-graphics` | Adapt local animation recipes into reviewed overlays or full-frame timeline inserts. |
 | `/video-to-shorts` | Find and extract approved horizontal shorts, then optionally create reviewed 9:16 vertical deliveries. |
 | `/video-edit-compare` | Compare the original source with the actual final delivery on the original source clock. |
+
+The bundled Editor Plugin opens projects in a local browser timeline for review and supported edits. Browse [motion graphics recipes](skills/video-add-motion-graphics/recipes/) and the [content card gallery](skills/video-add-content-cards/examples/gallery-animated.html) when choosing a style.
 
 ## Quick Start
 

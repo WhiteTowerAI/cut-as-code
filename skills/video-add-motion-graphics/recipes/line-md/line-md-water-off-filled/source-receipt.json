@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-water-off-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "3cea4fe0717c20dff9d4cb871fb69b35416c49c90ff2d3ea121141eacb0c1429",
+    "icon.svg": "f533b2cbb9485a767b925759f4579f1d427d25318ee1e3241783fb62e9fdb9b2",
+    "upstream-icon.json": "a40f955eefc52f385a05aa9488553f559d63250753e1d49893ef3a66d89b5bd4"
+  }
+}

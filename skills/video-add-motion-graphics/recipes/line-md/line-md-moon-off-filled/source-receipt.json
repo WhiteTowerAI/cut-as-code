@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-moon-off-filled",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "a8d2c426c4385418e952020f462549db043ef8f1cc1a536fdd11f7bf770bfc20",
+    "icon.svg": "fb16ea7e85ecaf2da104611bbf9deb94ba36e2cedc4fce16686dba9d1ad10eee",
+    "upstream-icon.json": "f25463c7b7a8fa3f6f43ed4beb6e52069d6d0eb07fb22c2439190e88dfe9dd78"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-moon-off",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "e167904b0c29acdf25bdb2d035eedb6d9b7aa04fa47c66b2343a9ccdbf067299",
+    "icon.svg": "5bd232f1e38697f541c71238db2e168011da42b1cc9447d60facabdac701dd48",
+    "upstream-icon.json": "372e149e9353326998a0018fc40909085091742d7cf3b3d3a7981515960adb34"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-bell-twotone",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "3a862488f5220cab848a441d519b7a22614ce485f74627ccf571b3173272ed42",
+    "icon.svg": "f18999fed00ea88e16df190fe1ccdd841bbd3f76922cfff34866aa8884652082",
+    "upstream-icon.json": "fe25a4ec474d723d422bd10391c9b0968990081b52182678df13ed54f2e4ec73"
+  }
+}

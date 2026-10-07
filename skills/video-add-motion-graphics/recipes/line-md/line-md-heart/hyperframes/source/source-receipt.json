@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "recipe_id": "line-md-heart",
+  "source_id": "line-md",
+  "upstream_asset": "line-md.json",
+  "source_files": {
+    "preview.html": "23b775b0ec8df827565eee56aca71699c8a569264a7ca5b958e9ca04bdaaade0",
+    "icon.svg": "91239909f9f5291f896fdcb8f361dc535a9a97e288a02c3aee0e97b5fc9b2577",
+    "upstream-icon.json": "f3f03b65175cdb144f16c5a268f10be49de8681bff474d8965b71b1715ca837f"
+  }
+}
