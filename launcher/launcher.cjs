@@ -36,7 +36,9 @@ function codexSpec(environment, platform) {
   const args = ['plugin', 'list', '--json']
   if (environment.CAC_CODEX_CLI) return commandSpec(environment.CAC_CODEX_CLI, args)
   if (platform !== 'win32') return { command: 'codex', args }
-  for (const directory of (environment.PATH || '').split(path.delimiter).filter(Boolean)) {
+  const directories = (environment.PATH || '').split(path.delimiter).filter(Boolean)
+  directories.push(path.join(environment.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'npm'))
+  for (const directory of directories) {
     const npmShim = path.join(directory, 'codex.cmd')
     const npmCli = path.join(directory, 'node_modules', '@openai', 'codex', 'bin', 'codex.js')
     if (fs.existsSync(npmShim) && fs.existsSync(npmCli)) {

@@ -182,13 +182,17 @@ class DesktopLauncherTests(unittest.TestCase):
             })
             environment.pop("CAC_CODEX_CLI", None)
 
-            result = subprocess.run(
-                ["node", str(LAUNCHER)], check=False, capture_output=True, text=True,
-                encoding="utf-8", env=environment, timeout=20,
-            )
+            environment["APPDATA"] = str(root)
+            for search_path in (str(bin_root), ""):
+                with self.subTest(search_path=search_path):
+                    environment["PATH"] = search_path
+                    result = subprocess.run(
+                        ["node", str(LAUNCHER)], check=False, capture_output=True, text=True,
+                        encoding="utf-8", env=environment, timeout=20,
+                    )
 
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(result.stdout, "Cut as Code Editor opened.\n")
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stdout, "Cut as Code Editor opened.\n")
 
     def test_invalid_plugin_and_browser_failure_are_actionable(self) -> None:
         with tempfile.TemporaryDirectory(prefix="cut launcher failures ") as temporary:
