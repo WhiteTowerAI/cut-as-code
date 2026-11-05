@@ -18,6 +18,41 @@ BUILD_LAUNCHER = REPOSITORY_ROOT / "scripts" / "build_desktop_launcher.py"
 
 
 class DesktopLauncherTests(unittest.TestCase):
+    def test_local_plugin_source_uses_its_current_manifest(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="cut launcher local & ") as temporary:
+            root = Path(temporary)
+            plugin_root = root / "local plugin"
+            self._write_plugin(plugin_root, "1.2.3", valid=True)
+            codex_cli = root / "codex.cjs"
+            metadata = {"installed": [{
+                "name": "cut-as-code-editor", "marketplaceName": "personal",
+                "version": "1.0.0", "installed": True,
+                "source": {"source": "local", "path": str(plugin_root)},
+            }]}
+            browser_cli = root / "browser.cjs"
+            browser_cli.write_text("process.exit(0)\n", encoding="utf-8")
+            environment = {
+                **os.environ, "CODEX_HOME": str(root / "codex"),
+                "CAC_CODEX_CLI": str(codex_cli), "CAC_BROWSER_CLI": str(browser_cli),
+                "HUB_LOG": str(root / "hub.json"),
+            }
+            for source_path, expected in ((str(plugin_root), 0), ("relative-plugin", 1)):
+                with self.subTest(source_path=source_path):
+                    metadata["installed"][0]["source"]["path"] = source_path
+                    codex_cli.write_text(
+                        "process.stdout.write(" + json.dumps(json.dumps(metadata)) + ")\n",
+                        encoding="utf-8",
+                    )
+                    result = self._run_launcher(environment)
+                    self.assertEqual(result.returncode, expected, result.stderr)
+                    if expected == 0:
+                        self.assertEqual(
+                            json.loads((root / "hub.json").read_text(encoding="utf-8")),
+                            {"version": "1.2.3", "args": ["launch"]},
+                        )
+                    else:
+                        self.assertIn("invalid local source path", result.stderr)
+
     def test_launcher_opens_the_exact_plugin_version_reported_by_codex(self) -> None:
         with tempfile.TemporaryDirectory(prefix="cut launcher & ") as temporary:
             root = Path(temporary)

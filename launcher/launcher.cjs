@@ -62,14 +62,18 @@ function parsePluginList(output) {
 
 async function resolveInstalledPlugin(metadata, codexHome) {
   const versionsRoot = path.join(codexHome, 'plugins', 'cache', metadata.marketplaceName, PLUGIN_NAME)
-  const root = path.join(versionsRoot, metadata.version)
+  const localSource = metadata.source?.source === 'local'
+  if (localSource && (typeof metadata.source.path !== 'string' || !path.isAbsolute(metadata.source.path))) {
+    throw new Error('The installed Cut as Code Editor Plugin has an invalid local source path.')
+  }
+  const root = localSource ? metadata.source.path : path.join(versionsRoot, metadata.version)
   const manifestPath = path.join(root, '.codex-plugin', 'plugin.json')
   const hubClientPath = path.join(root, 'runtime', 'hub-client.cjs')
   const manifest = await readJson(manifestPath)
   const valid = await isDirectory(root)
     && await isFile(manifestPath)
     && manifest?.name === PLUGIN_NAME
-    && manifest.version === metadata.version
+    && (localSource ? safeSegment(manifest.version) : manifest.version === metadata.version)
     && await isFile(hubClientPath)
   if (!valid) {
     throw new Error('No valid installed Cut as Code Editor Plugin was found. Reinstall the Plugin, then try again.')
