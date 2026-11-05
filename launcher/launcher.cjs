@@ -12,10 +12,16 @@ const MAX_OUTPUT_BYTES = 1024 * 1024
 
 async function main(environment = process.env, platform = process.platform) {
   const codexHome = path.resolve(environment.CODEX_HOME || path.join(os.homedir(), '.codex'))
-  const codex = codexSpec(environment, platform)
-  const listed = await run(codex.command, codex.args, { timeoutMs: COMMAND_TIMEOUT_MS })
-    .catch((error) => { throw actionable(error, 'Codex Plugin metadata is unavailable. Install or repair Codex, then try again.') })
-  const metadata = parsePluginList(listed.stdout)
+  const repositoryRoot = path.resolve(__dirname, '..')
+  let metadata
+  if (await isFile(path.join(repositoryRoot, '.codex-plugin', 'plugin.json'))) {
+    metadata = { source: { source: 'local', path: repositoryRoot } }
+  } else {
+    const codex = codexSpec(environment, platform)
+    const listed = await run(codex.command, codex.args, { timeoutMs: COMMAND_TIMEOUT_MS })
+      .catch((error) => { throw actionable(error, `Could not read Codex Plugin metadata using ${codex.command}.`) })
+    metadata = parsePluginList(listed.stdout)
+  }
   const pluginRoot = await resolveInstalledPlugin(metadata, codexHome)
   const hub = await run(process.execPath, [path.join(pluginRoot, 'runtime', 'hub-client.cjs'), 'launch'], {
     timeoutMs: COMMAND_TIMEOUT_MS,
@@ -63,12 +69,12 @@ function parsePluginList(output) {
 }
 
 async function resolveInstalledPlugin(metadata, codexHome) {
-  const versionsRoot = path.join(codexHome, 'plugins', 'cache', metadata.marketplaceName, PLUGIN_NAME)
   const localSource = metadata.source?.source === 'local'
   if (localSource && (typeof metadata.source.path !== 'string' || !path.isAbsolute(metadata.source.path))) {
     throw new Error('The installed Cut as Code Editor Plugin has an invalid local source path.')
   }
-  const root = localSource ? metadata.source.path : path.join(versionsRoot, metadata.version)
+  const root = localSource ? metadata.source.path
+    : path.join(codexHome, 'plugins', 'cache', metadata.marketplaceName, PLUGIN_NAME, metadata.version)
   const manifestPath = path.join(root, '.codex-plugin', 'plugin.json')
   const hubClientPath = path.join(root, 'runtime', 'hub-client.cjs')
   const manifest = await readJson(manifestPath)
@@ -148,7 +154,7 @@ async function isDirectory(directory) {
 }
 
 function actionable(error, message) {
-  const wrapped = new Error(message)
+  const wrapped = new Error(`${message}\n${error.message}`)
   wrapped.cause = error
   return wrapped
 }

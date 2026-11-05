@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -18,6 +19,59 @@ BUILD_LAUNCHER = REPOSITORY_ROOT / "scripts" / "build_desktop_launcher.py"
 
 
 class DesktopLauncherTests(unittest.TestCase):
+    def setUp(self) -> None:
+        temporary = tempfile.TemporaryDirectory(prefix="cut launcher standalone ")
+        self.addCleanup(temporary.cleanup)
+        self.launcher = Path(temporary.name) / "launcher.cjs"
+        shutil.copyfile(LAUNCHER, self.launcher)
+
+    def test_repository_entry_starts_its_own_plugin_without_codex(self) -> None:
+        root = self.launcher.parent
+        self._write_plugin(root, "1.2.3", valid=True)
+        entry = root / "launcher"
+        entry.mkdir()
+        shutil.copyfile(LAUNCHER, entry / "launcher.cjs")
+        shutil.copyfile(LAUNCHER.with_name("Cut as Code Editor.cmd"), entry / "Cut as Code Editor.cmd")
+        browser_cli = root / "browser.cjs"
+        browser_cli.write_text(
+            "require('node:fs').writeFileSync(process.env.HUB_LOG+'.data',process.env.CAC_EDITOR_DATA)\n",
+            encoding="utf-8",
+        )
+        environment = {
+            **os.environ, "CAC_CODEX_CLI": str(root / "missing-codex.cjs"),
+            "CAC_BROWSER_CLI": str(browser_cli), "HUB_LOG": str(root / "hub.json"),
+        }
+        environment.pop("CAC_EDITOR_DATA", None)
+        for data_root in (None, str(root / "custom data")):
+            with self.subTest(data_root=data_root):
+                if data_root:
+                    environment["CAC_EDITOR_DATA"] = data_root
+                result = subprocess.run(
+                    ["cmd.exe", "/d", "/c", "call", str(entry / "Cut as Code Editor.cmd")],
+                    check=False, capture_output=True, text=True, encoding="utf-8",
+                    env=environment, cwd=entry, timeout=20,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, "Cut as Code Editor opened.\n")
+                self.assertEqual(
+                    Path((root / "hub.json.data").read_text(encoding="utf-8")).resolve(),
+                    Path(data_root) if data_root else root / "work" / "editor-data",
+                )
+        self.assertEqual(
+            json.loads((root / "hub.json").read_text(encoding="utf-8")),
+            {"version": "1.2.3", "args": ["launch"]},
+        )
+        (root / ".codex-plugin" / "plugin.json").write_text(
+            json.dumps({"name": "other-plugin", "version": "1.2.3"}), encoding="utf-8",
+        )
+        result = subprocess.run(
+            ["cmd.exe", "/d", "/c", "call", str(entry / "Cut as Code Editor.cmd")],
+            input="\n", check=False, capture_output=True, text=True,
+            encoding="utf-8", errors="replace", env=environment, cwd=entry, timeout=20,
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("No valid installed Cut as Code Editor Plugin", result.stderr)
+
     def test_local_plugin_source_uses_its_current_manifest(self) -> None:
         with tempfile.TemporaryDirectory(prefix="cut launcher local & ") as temporary:
             root = Path(temporary)
@@ -87,7 +141,7 @@ class DesktopLauncherTests(unittest.TestCase):
                 "HUB_LOG": str(root / "hub log.json"),
             })
             result = subprocess.run(
-                ["node", str(LAUNCHER)],
+                ["node", str(self.launcher)],
                 check=False,
                 capture_output=True,
                 text=True,
@@ -187,7 +241,7 @@ class DesktopLauncherTests(unittest.TestCase):
                 with self.subTest(search_path=search_path):
                     environment["PATH"] = search_path
                     result = subprocess.run(
-                        ["node", str(LAUNCHER)], check=False, capture_output=True, text=True,
+                        ["node", str(self.launcher)], check=False, capture_output=True, text=True,
                         encoding="utf-8", env=environment, timeout=20,
                     )
 
@@ -217,7 +271,7 @@ class DesktopLauncherTests(unittest.TestCase):
             })
 
             result = subprocess.run(
-                ["node", str(LAUNCHER)], check=False, capture_output=True, text=True,
+                ["node", str(self.launcher)], check=False, capture_output=True, text=True,
                 encoding="utf-8", env=environment, timeout=20,
             )
 
@@ -251,7 +305,7 @@ class DesktopLauncherTests(unittest.TestCase):
             })
 
             result = subprocess.run(
-                ["node", str(LAUNCHER)], check=False, capture_output=True, text=True,
+                ["node", str(self.launcher)], check=False, capture_output=True, text=True,
                 encoding="utf-8", env=environment, timeout=20,
             )
 
@@ -264,7 +318,8 @@ class DesktopLauncherTests(unittest.TestCase):
             missing_cli = os.environ.copy()
             missing_cli["CAC_CODEX_CLI"] = str(root / "missing-codex.cjs")
             result = self._run_launcher(missing_cli)
-            self.assertIn("Codex Plugin metadata is unavailable", result.stderr)
+            self.assertIn("Could not read Codex Plugin metadata", result.stderr)
+            self.assertIn("missing-codex.cjs", result.stderr)
 
             codex_cli = root / "codex.cjs"
             codex_cli.write_text(
@@ -317,7 +372,7 @@ class DesktopLauncherTests(unittest.TestCase):
             }
             processes = [
                 subprocess.Popen(
-                    ["node", str(LAUNCHER)], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    ["node", str(self.launcher)], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                     text=True, encoding="utf-8", env=environment,
                 )
                 for _ in range(2)
@@ -352,10 +407,9 @@ class DesktopLauncherTests(unittest.TestCase):
                 self.assertEqual(archive.getinfo("Cut as Code Editor.command").external_attr >> 16, 0o100755)
                 self.assertEqual(archive.getinfo("cut-as-code-editor").external_attr >> 16, 0o100755)
 
-    @staticmethod
-    def _run_launcher(environment: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    def _run_launcher(self, environment: dict[str, str]) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
-            ["node", str(LAUNCHER)], check=False, capture_output=True, text=True,
+            ["node", str(self.launcher)], check=False, capture_output=True, text=True,
             encoding="utf-8", env=environment, timeout=20,
         )
 
